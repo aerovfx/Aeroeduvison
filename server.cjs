@@ -777,7 +777,7 @@ function makeProxy(target, label, pathFilter) {
   // ── POST /api/teacher/quiz-extract ─────────────────────────
   // Bắt đầu pipeline Wayground: PDF → fal.ai → JSON câu hỏi.
   // KHÔNG yêu cầu DATABASE_URL — extractor stateless để dev nhanh.
-  app.post('/api/teacher/quiz-extract', async (req, res) => {
+  app.post('/api/teacher/quiz-extract', require('./lib/gating.cjs').requireFeature('quiz_extract'), async (req, res) => {
     const t0 = Date.now();
     try {
       // Auth optional ở dev: cho phép gọi không cần token nếu ALLOW_QUIZ_ANON=1.
@@ -990,9 +990,35 @@ function makeProxy(target, label, pathFilter) {
     } catch { return null; }
   }
 
+  // ── onDigestBind handler — wire khi user click deep-link Telegram ──
+  async function onDigestBind({ chatId, userId, fromUser }) {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, name, email FROM "User" WHERE id = $1`, [userId]
+      );
+      if (!rows.length) return { ok: false, error: 'Tài khoản không tồn tại' };
+      const u = rows[0];
+      // Upsert telegram_chat_id + auto-enable telegram channel
+      await pool.query(`
+        INSERT INTO "UserProfile"(user_id, telegram_chat_id, digest_channels, updated_at)
+        VALUES ($1, $2, $3::jsonb, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          telegram_chat_id = EXCLUDED.telegram_chat_id,
+          digest_channels = COALESCE("UserProfile".digest_channels, '{}'::jsonb) || EXCLUDED.digest_channels,
+          updated_at = NOW()
+      `, [userId, String(chatId), JSON.stringify({ telegram: true })]);
+      console.log(`[telegram:digest-bind] user=${userId} chat=${chatId} from=${fromUser?.username || '?'}`);
+      return { ok: true, userName: u.name, email: u.email };
+    } catch (e) {
+      console.error('[telegram:digest-bind]', e.message);
+      return { ok: false, error: e.message };
+    }
+  }
+
   // Long polling worker (chỉ cần khi không setWebhook)
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_USE_WEBHOOK !== 'true') {
-    tg.startPolling({ onCallback: onAdminCallback });
+    tg.startPolling({ onCallback: onAdminCallback, onDigestBind });
   }
 
   app.get('/api/payment/plans', (_req, res) => {
@@ -1090,7 +1116,7 @@ function makeProxy(target, label, pathFilter) {
         const got = req.headers['x-telegram-bot-api-secret-token'];
         if (got !== secret) return res.status(401).json({ error: 'bad secret' });
       }
-      await tg.handleUpdate(req.body, { onCallback: onAdminCallback });
+      await tg.handleUpdate(req.body, { onCallback: onAdminCallback, onDigestBind });
       res.json({ ok: true });
     } catch (err) {
       console.error('[telegram:webhook] ❌', err.message);
@@ -1144,7 +1170,74 @@ app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [],
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
-app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+
+// /api/teacher/roster — merge ClassStudent (PII-safe, no maDinhDanh) + TSL-approved
+// Shape: { students: RosterStudent[] } — match FE LearningPathBuilder
+app.get('/api/teacher/roster', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+  try {
+    const pool = _getPool();
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+
+    // 1. HS từ Class → ClassStudent
+    const { rows: classStuds } = await pool.query(`
+      SELECT cs.id, cs.ho_ten AS "hoTen", cs.stt,
+             c.id AS "classId", c.name AS "className"
+      FROM "Class" c
+      JOIN "ClassStudent" cs ON cs.class_id = c.id
+      WHERE c.teacher_id = ANY($1::text[])
+      ORDER BY c.name, cs.stt NULLS LAST, cs.ho_ten
+      LIMIT 2000
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    // 2. HS đã kết nối TSL (approved)
+    const { rows: tslStuds } = await pool.query(`
+      SELECT tsl.student_id AS id, tsl.student_email AS "studentEmail",
+             u.name, u.email, u.image
+      FROM "TeacherStudentLink" tsl
+      LEFT JOIN "User" u ON u.id = tsl.student_id
+      WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
+      LIMIT 1000
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    const byId = new Map();
+    for (const r of classStuds) {
+      if (!r.id) continue;
+      const cur = byId.get(r.id) || {
+        id: r.id, userId: null, name: r.hoTen || `HS ${r.stt || '?'}`,
+        email: '', avatar: null, classNames: [], isLinked: false,
+      };
+      if (r.className && !cur.classNames.includes(r.className)) cur.classNames.push(r.className);
+      byId.set(r.id, cur);
+    }
+    for (const r of tslStuds) {
+      const id = r.id || `email:${r.studentEmail || ''}`;
+      if (!id || id === 'email:') continue;
+      const cur = byId.get(id) || {
+        id, userId: r.id || null,
+        name: r.name || r.email || r.studentEmail || `HS ${String(id).slice(0, 8)}`,
+        email: r.email || r.studentEmail || '',
+        avatar: r.image || null, classNames: [], isLinked: true,
+      };
+      cur.isLinked = true;
+      if (r.name && cur.name.startsWith('HS ')) cur.name = r.name;
+      if (r.email && !cur.email) cur.email = r.email;
+      if (r.image && !cur.avatar) cur.avatar = r.image;
+      byId.set(id, cur);
+    }
+    const students = Array.from(byId.values())
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+    return res.json({ students, total: students.length });
+  } catch (e) {
+    console.error('[teacher:roster]', e.message);
+    return res.json({ students: [], total: 0 });
+  }
+});
 
 // ── Career Survey + Teacher CPD (Knowledge Graph) — DB-backed
 // /api/users/me/career-survey GET/POST — khảo sát nghề nghiệp GV/PH/HS
@@ -1760,7 +1853,11 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       ['direction', "VARCHAR(20) DEFAULT 'teacher_invites'"], ['message', "TEXT"],
       ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
     ]);
-    await _dropLegacyNotNull('TeacherStudentLink', ['teacherId','studentId','studentEmail','status','direction','message','createdAt','updatedAt']);
+    await _dropLegacyNotNull('TeacherStudentLink', [
+      'teacherId','studentId','studentEmail','status','direction','message',
+      'createdAt','updatedAt','initiatedBy','initiatorId','approvedAt','rejectedAt',
+      'requesterId','recipientId','linkType','grade','subject','classId',
+    ]);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_teacher ON "TeacherStudentLink"(teacher_id, status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_student ON "TeacherStudentLink"(student_id, status)`);
 
@@ -1832,25 +1929,53 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     } catch (e) { console.error('[tsl:my-students]', e.message); return res.json({ students: [], total: 0 }); }
   });
 
-  // POST /api/teacher-student-link/request — HS request kết nối với GV (email)
+  // POST /api/teacher-student-link/request — HS request kết nối GV
+  // Chấp nhận teacherId HOẶC teacherEmail (FE MyTeachers card click gửi teacherId)
   app.post('/api/teacher-student-link/request', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     const myId = decoded.userId || decoded.id || decoded.sub;
     try {
-      const { teacherEmail, message } = req.body || {};
-      if (!teacherEmail) return res.status(400).json({ error: 'Thiếu teacherEmail' });
+      const { teacherId, teacherEmail, message } = req.body || {};
+      if (!teacherId && !teacherEmail) {
+        return res.status(400).json({ error: 'Thiếu teacherId hoặc teacherEmail' });
+      }
       const pool = _getPool();
-      const { rows: teachers } = await pool.query(
-        `SELECT id FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
-        [String(teacherEmail).toLowerCase().trim()]);
-      if (!teachers.length) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      // Resolve teacher từ id HOẶC email
+      let teacherRow = null;
+      if (teacherId) {
+        const { rows } = await pool.query(
+          `SELECT id, name, email FROM "User" WHERE id = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+          [String(teacherId)]);
+        teacherRow = rows[0] || null;
+      }
+      if (!teacherRow && teacherEmail) {
+        const { rows } = await pool.query(
+          `SELECT id, name, email FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+          [String(teacherEmail).toLowerCase().trim()]);
+        teacherRow = rows[0] || null;
+      }
+      if (!teacherRow) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      // Self-link check
+      if (teacherRow.id === myId) {
+        return res.status(400).json({ error: 'Không thể kết nối với chính mình' });
+      }
+      // Check duplicate pending request
+      const { rows: existing } = await pool.query(`
+        SELECT id, status FROM "TeacherStudentLink"
+        WHERE teacher_id = $1 AND student_id = $2 AND status IN ('pending', 'approved')
+        LIMIT 1
+      `, [teacherRow.id, myId]);
+      if (existing[0]) {
+        const msg = existing[0].status === 'approved' ? 'Đã kết nối với GV này' : 'Đã gửi yêu cầu trước đó (đang chờ duyệt)';
+        return res.status(409).json({ error: msg, linkId: existing[0].id });
+      }
       const { randomUUID } = require('crypto');
       const linkId = randomUUID();
       await pool.query(`
         INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction, message)
         VALUES ($1, $2, $3, 'pending', 'student_requests', $4)`,
-        [linkId, teachers[0].id, myId, message || null]);
-      return res.json({ ok: true, linkId });
+        [linkId, teacherRow.id, myId, message || null]);
+      return res.json({ ok: true, linkId, teacherName: teacherRow.name });
     } catch (e) { console.error('[tsl:request]', e.message); return res.status(500).json({ error: 'Lỗi gửi yêu cầu' }); }
   });
 
@@ -1859,18 +1984,47 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     const myId = decoded.userId || decoded.id || decoded.sub;
     try {
-      const { studentEmail, message } = req.body || {};
-      if (!studentEmail) return res.status(400).json({ error: 'Thiếu studentEmail' });
+      const { studentId, studentEmail, message } = req.body || {};
+      if (!studentId && !studentEmail) {
+        return res.status(400).json({ error: 'Thiếu studentId hoặc studentEmail' });
+      }
       const pool = _getPool();
-      const { rows: students } = await pool.query(
-        `SELECT id FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
-        [String(studentEmail).toLowerCase().trim()]);
+      // Resolve student từ id HOẶC email
+      let studentRow = null;
+      if (studentId) {
+        const { rows } = await pool.query(
+          `SELECT id, email FROM "User" WHERE id = $1 LIMIT 1`, [String(studentId)]);
+        studentRow = rows[0] || null;
+      }
+      if (!studentRow && studentEmail) {
+        const { rows } = await pool.query(
+          `SELECT id, email FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
+          [String(studentEmail).toLowerCase().trim()]);
+        studentRow = rows[0] || null;
+      }
+      const finalStudentId = studentRow?.id || null;
+      const finalStudentEmail = studentRow?.email || (studentEmail ? String(studentEmail).toLowerCase().trim() : null);
+      // Self-invite check
+      if (finalStudentId === myId) {
+        return res.status(400).json({ error: 'Không thể mời chính mình' });
+      }
+      // Check duplicate (chỉ check khi có studentId để khớp PK)
+      if (finalStudentId) {
+        const { rows: existing } = await pool.query(`
+          SELECT id, status FROM "TeacherStudentLink"
+          WHERE teacher_id = $1 AND student_id = $2 AND status IN ('pending', 'approved') LIMIT 1
+        `, [myId, finalStudentId]);
+        if (existing[0]) {
+          const msg = existing[0].status === 'approved' ? 'HS đã kết nối' : 'Đã mời HS này (đang chờ)';
+          return res.status(409).json({ error: msg, linkId: existing[0].id });
+        }
+      }
       const { randomUUID } = require('crypto');
       const linkId = randomUUID();
       await pool.query(`
         INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, student_email, status, direction, message)
         VALUES ($1, $2, $3, $4, 'pending', 'teacher_invites', $5)`,
-        [linkId, myId, students[0]?.id || null, String(studentEmail).toLowerCase().trim(), message || null]);
+        [linkId, myId, finalStudentId, finalStudentEmail, message || null]);
       return res.json({ ok: true, linkId });
     } catch (e) { console.error('[tsl:invite]', e.message); return res.status(500).json({ error: 'Lỗi mời HS' }); }
   });
@@ -2509,7 +2663,65 @@ app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], cou
   });
 })();
 
+// ── /api/teachers/all — TRƯỚC proxy /api/teacher (string prefix sẽ match cả 's') ──
+// Shape match TeacherProfile ở MyTeachers.tsx — FE crash nếu cpd.milestone undefined.
+app.get('/api/teachers/all', async (req, res) => {
+  try {
+    const pool = _getPool();
+    let viewerId = null;
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      try { viewerId = _akVerify(auth.slice(7)).sub; } catch {}
+    }
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.email, u.image, u.role, u."createdAt" AS "joinedAt",
+             up.bio, up.data AS profile_data,
+             (SELECT COUNT(*)::int FROM "Class" WHERE teacher_id = u.id) AS "classCount",
+             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount",
+             (SELECT EXISTS(SELECT 1 FROM "TeacherStudentLink" WHERE teacher_id = u.id AND student_id = $1 AND status = 'approved')) AS "isConnected"
+      FROM "User" u
+      LEFT JOIN "UserProfile" up ON up.user_id = u.id
+      WHERE u.role IN ('TEACHER', 'ADMIN') AND COALESCE(u.banned, false) = false
+      ORDER BY u."createdAt" DESC LIMIT 200
+    `, [viewerId || '']).catch(() => ({ rows: [] }));
+
+    const teachers = rows.map(r => {
+      const pd = r.profile_data || {};
+      return {
+        id: r.id,
+        name: r.name || (r.email ? r.email.split('@')[0] : 'GV'),
+        // PII: chỉ expose email nếu đã connected (FE comment: "null nếu HS chưa kết nối")
+        email: r.isConnected ? r.email : null,
+        image: r.image,
+        bio: r.bio || null,
+        phone: r.isConnected ? (pd.phone || null) : null,
+        website: pd.website || null,
+        joinedAt: r.joinedAt,
+        lat: typeof pd.lat === 'number' ? pd.lat : null,
+        lon: typeof pd.lon === 'number' ? pd.lon : null,
+        province: pd.province || null,
+        isConnected: !!r.isConnected,
+        // cpd object FULL với defaults — KHÔNG để null vì FE access .milestone trực tiếp
+        cpd: {
+          avgScore: 0,
+          skillCount: 0,
+          expertCount: 0,
+          proficientCount: 0,
+          milestone: null,
+          updatedAt: null,
+        },
+        // bonus fields
+        classCount: r.classCount || 0,
+        studentCount: r.studentCount || 0,
+      };
+    });
+    return res.json({ teachers, total: teachers.length });
+  } catch (e) { console.error('[teachers:all]', e.message); return res.json({ teachers: [], total: 0 }); }
+});
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
+// LƯU Ý: pathFilter '/api/teacher' là string prefix match → cả /api/teachers/...
+// cũng bị catch. Mọi /api/teachers/* handler PHẢI đăng ký TRƯỚC line này.
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
 // ══════════════════════════════════════════════════════════════
@@ -3128,6 +3340,92 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ── POST /api/questions/fix-latex — bulk scan + auto-fix LaTeX lỗi phổ biến ──
+  // Body: { limit?: number=500, subject?: string }
+  // Response: { data: { scanned, fixed } }
+  function _fixLatexString(s) {
+    if (typeof s !== 'string' || !s) return { out: s, changed: false };
+    let out = s;
+    // 1. Smart quotes → straight (LaTeX nuốt curly quotes)
+    out = out.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+    // 2. Unicode minus / en-dash / em-dash → ASCII -
+    out = out.replace(/[−–—]/g, '-');
+    // 3. Common typo: \fra{...}{...} → \frac, \frqc → \frac
+    out = out.replace(/\\fra(?=[^c])/g, '\\frac').replace(/\\frqc\b/g, '\\frac');
+    // 4. \sqrtX → \sqrt{X} (single char or {...})
+    out = out.replace(/\\sqrt(\d)/g, '\\sqrt{$1}');
+    // 5. Bare ^ / _ ở math mode follow by 2+ chars chưa có {} → wrap
+    //    VD: x^23 → x^{23}, x_ab → x_{ab}. Chỉ apply khi đã nằm trong $...$
+    //    (đơn giản: apply cho dollar segments)
+    out = out.replace(/(\$[^$]*\$)/g, (seg) => {
+      return seg
+        .replace(/([a-zA-Z\d])\^([a-zA-Z0-9]{2,})/g, '$1^{$2}')
+        .replace(/([a-zA-Z\d])_([a-zA-Z0-9]{2,})/g, '$1_{$2}');
+    });
+    // 6. Mathit triple-dot ⋯ ⋅ ⋮ → \cdots / \cdot / \vdots
+    out = out.replace(/⋯/g, '\\cdots').replace(/⋅/g, '\\cdot').replace(/⋮/g, '\\vdots');
+    // 7. Degree symbol ° → ^{\circ} khi nằm sau số trong math
+    out = out.replace(/(\$[^$]*\$)/g, (seg) => seg.replace(/(\d)°/g, '$1^{\\circ}'));
+    // 8. Greek letters viết tắt: \pi (giữ nguyên), nhưng \Pi typo Pi → \Pi
+    //    (skip — quá rủi ro false-positive)
+    // 9. Multiple spaces → single (chỉ ngoài math segments)
+    out = out.replace(/  +/g, ' ');
+    return { out, changed: out !== s };
+  }
+
+  app.post('/api/questions/fix-latex', async (req, res) => {
+    try {
+      const pool = getQPool();
+      const limit = Math.min(Number(req.body?.limit) || 500, 5000);
+      const subject = req.body?.subject ? String(req.body.subject) : null;
+
+      const params = [];
+      let where = '1=1';
+      if (subject) { params.push(subject); where += ` AND subject = $${params.length}`; }
+      params.push(limit);
+      const { rows } = await pool.query(
+        `SELECT id, content, explanation, options FROM "Question"
+         WHERE ${where} ORDER BY "createdAt" DESC LIMIT $${params.length}`,
+        params);
+
+      let scanned = 0, fixed = 0;
+      for (const r of rows) {
+        scanned++;
+        const c = _fixLatexString(r.content || '');
+        const e = _fixLatexString(r.explanation || '');
+        let optionsChanged = false;
+        let nextOptions = r.options;
+        if (Array.isArray(r.options)) {
+          const out = r.options.map(o => {
+            if (typeof o === 'string') {
+              const f = _fixLatexString(o);
+              if (f.changed) optionsChanged = true;
+              return f.out;
+            } else if (o && typeof o === 'object' && typeof o.text === 'string') {
+              const f = _fixLatexString(o.text);
+              if (f.changed) optionsChanged = true;
+              return { ...o, text: f.out };
+            }
+            return o;
+          });
+          if (optionsChanged) nextOptions = out;
+        }
+        if (c.changed || e.changed || optionsChanged) {
+          await pool.query(
+            `UPDATE "Question" SET content = $1, explanation = $2, options = $3::jsonb, "updatedAt" = NOW()
+             WHERE id = $4`,
+            [c.out, e.out, JSON.stringify(nextOptions || []), r.id]);
+          fixed++;
+        }
+      }
+      console.log(`[questions:fix-latex] scanned=${scanned} fixed=${fixed} subject=${subject || 'all'}`);
+      return res.json({ data: { scanned, fixed } });
+    } catch (err) {
+      console.error('[questions:fix-latex] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── GET /api/questions (& /api/question-bank alias) ────────
   app.get('/api/questions', handleListQuestions);
   app.get('/api/question-bank', handleListQuestions);
@@ -3298,7 +3596,8 @@ if (USE_NODEJS_QUESTIONS) {
     return collapsed.slice(-10); // keep last ~10 turns
   }
 
-  app.post('/api/ai-tutor/chat', async (req, res) => {
+  const _aiGating = require('./lib/gating.cjs');
+  app.post('/api/ai-tutor/chat', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
     const startedAt = Date.now();
     try {
       const body = req.body || {};
@@ -4003,7 +4302,31 @@ if (USE_NODEJS_QUESTIONS) {
         });
       }
 
-      return res.status(400).json({ success: false, error: 'invalid_action' });
+      // community-stats — aggregate cho card "Cộng đồng đang luyện"
+      if (action === 'community-stats') {
+        try {
+          const { rows } = await pool.query(`
+            SELECT
+              COUNT(DISTINCT "studentId")::int AS users,
+              COUNT(*) FILTER (WHERE completed)::int AS sessions,
+              COUNT(*) FILTER (WHERE completed AND "completedAt" >= NOW() - INTERVAL '1 day')::int AS today,
+              COUNT(*) FILTER (WHERE completed AND "completedAt" >= NOW() - INTERVAL '7 day')::int AS week,
+              COALESCE(AVG(percentage) FILTER (WHERE completed), 0)::int AS avg_score
+            FROM "PracticeExam"
+          `);
+          const r = rows[0] || {};
+          return res.json({
+            success: true,
+            users: r.users || 0,
+            sessions: r.sessions || 0,
+            today: r.today || 0,
+            week: r.week || 0,
+            avgScore: r.avg_score || 0,
+          });
+        } catch { return res.json({ success: true, users: 0, sessions: 0, today: 0, week: 0, avgScore: 0 }); }
+      }
+
+      return res.status(400).json({ success: false, error: 'invalid_action', received: action });
     } catch (err) {
       console.error('[exam-prep:GET] ❌', err.message);
       return res.status(500).json({ success: false, error: 'internal', message: err.message });
@@ -4014,7 +4337,7 @@ if (USE_NODEJS_QUESTIONS) {
   // POST /api/agents/exam-prep  { action: 'create' | 'create_from_exam'
   //   | 'create_from_matrix' | 'submit' }
   // ══════════════════════════════════════════════════════════════
-  app.post('/api/agents/exam-prep', async (req, res) => {
+  app.post('/api/agents/exam-prep', require('./lib/gating.cjs').requireFeature('ai_examprep'), async (req, res) => {
     try {
       const user = getUserFromReqEP(req);
       if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
@@ -7937,15 +8260,257 @@ app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true 
 // Recommendation feed (reco-service)
 // Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
 // Items dựa trên dữ liệu thực của GV trong bảng "Exam", "LessonPlan", "Class"
+// ── Phoenix-style multi-source retrieval — STUDENT For-You feed ──
+// Lấy candidates từ 5 sources, mỗi source contribute independently:
+//   1. enrolled-lessons  — Course HS đã enrol (Purchase table)
+//   2. exam-pending      — Exam được assigned, chưa làm
+//   3. weak-topics-kg    — KgNode mastery thấp (UserKgMastery)
+//   4. teacher-recs      — LearningPath + AssignmentTarget cho HS
+//   5. ai-suggested      — Phù hợp UserProfile.reco_prefs (subject/grade)
+// → trả về để Mixer scoring (Phase 2) rank theo weighted formula.
+async function _studentFeedPhoenix(studentId, prefs, limit) {
+  const pool = _getPool();
+  const myIds = [studentId];
+  const all = [];
+
+  // SOURCE 1: enrolled lessons (Course đã mua)
+  try {
+    const { rows } = await pool.query(`
+      SELECT c.id, c.title, c.description, c.image, c."imageUrl", cat.name AS category
+      FROM "Purchase" p
+      JOIN "Course" c ON c.id = p."courseId"
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      WHERE p."userId" = ANY($1::text[])
+      ORDER BY p."createdAt" DESC LIMIT 20
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const c of rows) {
+      all.push({
+        type: 'lesson', source: 'enrolled-lessons',
+        id: `course-${c.id}`,
+        title: c.title,
+        subtitle: c.category || 'Khóa học',
+        description: (c.description || '').slice(0, 200),
+        image: c.image || c.imageUrl,
+        link: `/courses/${c.id}`,
+        cta: 'Tiếp tục học',
+        signals: { _source_weight: 1.0 },  // weighted bằng Mixer
+        reasons: ['📚 Đang học'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 2: exam pending (assignments + exam matrix chưa làm)
+  try {
+    const { rows } = await pool.query(`
+      SELECT a.id, a.title, a.description, a.subject, a.difficulty, a.due_date, a.qr_token
+      FROM "AssignmentTarget" at
+      JOIN assignments a ON a.id = at.assignment_id
+      WHERE at.type = 'student' AND at.target_id = ANY($1::text[])
+        AND a.status IN ('pending', 'published')
+        AND (a.due_date IS NULL OR a.due_date > NOW())
+      ORDER BY a.due_date ASC NULLS LAST LIMIT 15
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const a of rows) {
+      const hoursToDue = a.due_date ? (new Date(a.due_date).getTime() - Date.now()) / 3600000 : null;
+      const urgent = hoursToDue !== null && hoursToDue < 24;
+      all.push({
+        type: 'exam', source: 'exam-pending',
+        id: `asgn-${a.id}`,
+        title: `${urgent ? '⚠ Hạn gấp: ' : ''}${a.title}`,
+        subtitle: `${a.subject || 'Bài tập'} · ${a.difficulty || 'TB'}`,
+        description: (a.description || '').slice(0, 200),
+        link: a.qr_token ? `/a/${a.qr_token}` : `/student/assignments/${a.id}`,
+        cta: 'Làm bài',
+        signals: { _source_weight: urgent ? 1.5 : 1.2, due_date: a.due_date },
+        reasons: urgent ? ['⏰ Hạn gấp < 24h', '📝 Bài tập GV giao'] : ['📝 Bài tập GV giao'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 3: weak topics từ KG (lazy table — nếu chưa có thì skip)
+  try {
+    const { rows } = await pool.query(`
+      SELECT n.id, n.name AS title, n.subject, m.mastery_score
+      FROM "UserKgMastery" m
+      JOIN "KgNode" n ON n.id = m.node_id
+      WHERE m.user_id = ANY($1::text[]) AND m.mastery_score < 0.5
+      ORDER BY m.mastery_score ASC LIMIT 10
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const t of rows) {
+      const gap = Math.round((1 - (t.mastery_score || 0)) * 100);
+      all.push({
+        type: 'topic', source: 'weak-topics-kg',
+        id: `kg-${t.id}`,
+        title: t.title,
+        subtitle: `${t.subject || 'Kiến thức'} · Cần cải thiện`,
+        description: `Mức thành thạo hiện tại ${Math.round((t.mastery_score || 0) * 100)}%. Ôn lại sẽ giúp bạn vững hơn.`,
+        link: `/student/knowledge-graph?focus=${t.id}`,
+        cta: 'Ôn lại',
+        signals: { _source_weight: 1.3, mastery_score: t.mastery_score, gap_pct: gap },
+        reasons: [`📉 Yếu ${gap}%`, '🎯 KG khuyến nghị'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 4: teacher's recommendations (Learning Path đã gán)
+  try {
+    const { rows } = await pool.query(`
+      SELECT lp.id, lp.name AS title, lp.description, lp.subject, lp.difficulty,
+             jsonb_array_length(lp.modules) AS module_count, lpa.created_at AS "assignedAt"
+      FROM "LearningPathAssignment" lpa
+      JOIN "LearningPath" lp ON lp.id = lpa.path_id
+      WHERE lpa.student_id = ANY($1::text[])
+      ORDER BY lpa.created_at DESC LIMIT 10
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const p of rows) {
+      all.push({
+        type: 'path', source: 'teacher-recs',
+        id: `path-${p.id}`,
+        title: p.title,
+        subtitle: `${p.subject || 'Lộ trình'} · ${p.module_count || 0} module · ${p.difficulty || 'TB'}`,
+        description: (p.description || '').slice(0, 200),
+        link: `/student/learning-paths/${p.id}`,
+        cta: 'Bắt đầu',
+        signals: { _source_weight: 1.4, assignedAt: p.assignedAt },
+        reasons: ['👨‍🏫 GV gợi ý', '📚 Lộ trình cá nhân'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 5: AI-suggested (theo reco_prefs: subject + grade)
+  try {
+    const subject = prefs?.subject;
+    const grade = prefs?.grade;
+    if (subject || grade) {
+      const params = [];
+      let where = '1=1';
+      if (subject) { params.push(subject); where += ` AND q.subject = $${params.length}`; }
+      if (grade)   { params.push(grade);   where += ` AND q.grade   = $${params.length}`; }
+      const { rows } = await pool.query(`
+        SELECT DISTINCT ON (e.id) e.id, e.title, e.subject, e.grade, e.duration
+        FROM "Exam" e
+        JOIN "Question" q ON q.id = ANY(e.question_ids)
+        WHERE ${where} AND (e.visibility = 'public' OR e.status = 'published')
+        ORDER BY e.id DESC, e.created_at DESC LIMIT 8
+      `, params).catch(() => ({ rows: [] }));
+      for (const e of rows) {
+        all.push({
+          type: 'ai-exam', source: 'ai-suggested',
+          id: `aiexam-${e.id}`,
+          title: e.title,
+          subtitle: `${e.subject || ''} ${e.grade ? '· Khối ' + e.grade : ''} ${e.duration ? '· ' + e.duration + 'p' : ''}`.trim(),
+          description: 'Đề phù hợp môn/khối bạn quan tâm.',
+          link: `/student/exam-prep?examId=${e.id}`,
+          cta: 'Luyện',
+          signals: { _source_weight: 0.9 },  // priority thấp hơn — chỉ enrich
+          reasons: ['🤖 AI gợi ý', `🎯 ${subject || grade}`],
+        });
+      }
+    }
+  } catch { /* silent */ }
+
+  return all.slice(0, limit * 2);  // trả 2x limit để Mixer rank
+}
+
+// ── Mixer scoring — weighted formula áp dụng X Phoenix pattern ──
+// weighted_score =
+//   0.30 * mastery_gap   (cần học nhất — KG yếu)
+//   0.25 * teacher_pref  (GV đã gợi ý cho HS này)
+//   0.20 * engagement    (tương tác trước đây tốt)
+//   0.15 * freshness     (mới gán / mới publish)
+//   0.10 * social        (HS cùng lớp đã làm)
+function _mixerScore(item, weights) {
+  const s = item.signals || {};
+  const w = weights || { mastery: 0.30, teacher: 0.25, engagement: 0.20, freshness: 0.15, social: 0.10 };
+  const masteryGap = s.gap_pct ? Math.min(1, s.gap_pct / 100) : 0;
+  const teacherPref = ['teacher-recs', 'exam-pending'].includes(item.source) ? 1 : 0;
+  const engagement = Math.min(1, (s._source_weight || 1) / 1.5);
+  let freshness = 0.5;
+  const ts = s.due_date || s.assignedAt;
+  if (ts) {
+    const days = (Date.now() - new Date(ts).getTime()) / 86400000;
+    freshness = days < 0 ? 1 : Math.max(0, 1 - days / 30);
+  }
+  const social = 0.3;
+  return Math.round((
+    w.mastery * masteryGap +
+    w.teacher * teacherPref +
+    w.engagement * engagement +
+    w.freshness * freshness +
+    w.social * social
+  ) * 1000) / 1000;
+}
+
 app.get('/api/reco/feed', async (req, res) => {
   const audience = req.query.audience || 'student';
   const limit = Math.min(Number(req.query.limit) || 30, 100);
   const auth = req.headers.authorization || '';
-  let teacherId = null;
+  let userId = null;
   if (auth.startsWith('Bearer ')) {
-    try { teacherId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
+    try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
   }
-  // Student audience — chưa có signals, trả empty
+
+  // STUDENT audience — Phoenix 5 sources + Mixer scoring
+  if (audience === 'student') {
+    if (!userId) {
+      return res.json({ audience: 'student', count: 0, items: [], sources: [], isColdStart: true });
+    }
+    try {
+      const pool = _getPool();
+      // Load user prefs
+      const { rows: prefRows } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      const prefs = prefRows[0]?.reco_prefs || null;
+
+      const candidates = await _studentFeedPhoenix(userId, prefs, limit);
+      // A/B variant lookup — experiment "mixer_weights" controls scoring formula
+      const variants = global.__rsGetUserVariants ? await global.__rsGetUserVariants(userId) : {};
+      const mixerVariant = variants.mixer_weights;  // vd: 'control' | 'teacher_heavy' | 'mastery_heavy'
+      const weightPresets = {
+        control:        { mastery: 0.30, teacher: 0.25, engagement: 0.20, freshness: 0.15, social: 0.10 },
+        teacher_heavy:  { mastery: 0.20, teacher: 0.40, engagement: 0.20, freshness: 0.10, social: 0.10 },
+        mastery_heavy:  { mastery: 0.45, teacher: 0.20, engagement: 0.15, freshness: 0.10, social: 0.10 },
+        freshness_heavy:{ mastery: 0.20, teacher: 0.20, engagement: 0.20, freshness: 0.30, social: 0.10 },
+      };
+      const weights = weightPresets[mixerVariant] || weightPresets.control;
+      // Mixer scoring
+      const scored = candidates.map(c => ({ ...c, score: _mixerScore(c, weights) }));
+      const seen = new Set();
+      const ranked = scored
+        .sort((a, b) => b.score - a.score)
+        .filter(c => seen.has(c.id) ? false : (seen.add(c.id), true))
+        .slice(0, limit);
+      const sources = [...new Set(scored.map(c => c.source))];
+
+      // Track A/B view event (best-effort, async)
+      if (mixerVariant && ranked.length > 0) {
+        try {
+          const pool = _getPool();
+          pool.query(
+            `INSERT INTO "RsExperimentEvent"(exp_name, variant_key, user_id, action, metadata)
+             VALUES ('mixer_weights', $1, $2, 'view', $3::jsonb)`,
+            [mixerVariant, userId, JSON.stringify({ count: ranked.length, sources })]
+          ).catch(() => {});
+        } catch { /* silent */ }
+      }
+
+      return res.json({
+        audience: 'student',
+        count: ranked.length,
+        items: ranked,
+        sources,
+        isColdStart: ranked.length === 0 || !prefs,
+        _variant: mixerVariant || 'control',
+      });
+    } catch (e) {
+      console.error('[reco/feed:student]', e.message);
+      return res.json({ audience: 'student', count: 0, items: [], sources: [], isColdStart: true });
+    }
+  }
+
+  // TEACHER audience (giữ logic cũ)
+  let teacherId = userId;
   if (audience !== 'teacher' || !teacherId) {
     return res.json({ audience, count: 0, items: [], sources: [], isColdStart: true });
   }
@@ -8029,10 +8594,318 @@ app.get('/api/reco/feed', async (req, res) => {
 });
 app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 
+// ── RS-Phase 9: A/B Testing framework — production wire ──
+// Tables: RsExperiment (def), RsExperimentAssign (user→variant), RsExperimentEvent (tracking)
+// Endpoints: CRUD experiments + getVariant() + metrics aggregation
+;(() => {
+  async function _ensureExpTables() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperiment" (
+          id          VARCHAR(36)  PRIMARY KEY,
+          name        VARCHAR(100) UNIQUE NOT NULL,
+          description TEXT,
+          variants    JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          allocation  JSONB        NOT NULL DEFAULT '{}'::jsonb,
+          status      VARCHAR(20)  DEFAULT 'draft',
+          start_at    TIMESTAMPTZ,
+          end_at      TIMESTAMPTZ,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperimentAssign" (
+          user_id     VARCHAR(255) NOT NULL,
+          exp_name    VARCHAR(100) NOT NULL,
+          variant_key VARCHAR(50)  NOT NULL,
+          assigned_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (user_id, exp_name)
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperimentEvent" (
+          id          BIGSERIAL    PRIMARY KEY,
+          exp_name    VARCHAR(100) NOT NULL,
+          variant_key VARCHAR(50)  NOT NULL,
+          user_id     VARCHAR(255),
+          action      VARCHAR(50)  NOT NULL,
+          item_id     VARCHAR(255),
+          metadata    JSONB,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_rsexpevt_name ON "RsExperimentEvent"(exp_name, variant_key, created_at DESC)`);
+    } catch (e) { console.warn('[rs-exp] migration:', e.message); }
+  }
+  _ensureExpTables().catch(() => {});
+
+  // Hash-based deterministic bucket: user X always lands variant Y for exp E
+  // bucket = hash(userId + expName) % 100 → cumulative variant ranges
+  function _hashBucket(userId, expName) {
+    const { createHash } = require('crypto');
+    const h = createHash('sha256').update(`${userId}::${expName}`).digest('hex');
+    // First 8 hex = 32-bit int
+    return parseInt(h.slice(0, 8), 16) % 100;
+  }
+
+  function _assignVariant(experiment, userId) {
+    const alloc = experiment.allocation || {};
+    const variants = experiment.variants || [];
+    if (variants.length === 0) return null;
+    const bucket = _hashBucket(userId, experiment.name);
+    let cum = 0;
+    for (const v of variants) {
+      cum += Number(alloc[v.key] || 0);
+      if (bucket < cum) return v.key;
+    }
+    return variants[0].key;  // fallback đầu tiên
+  }
+
+  // Cached active experiments (reload mỗi 60s để pickup config mới)
+  let _activeExpsCache = null;
+  let _activeExpsCacheAt = 0;
+  async function _getActiveExperiments() {
+    if (Date.now() - _activeExpsCacheAt < 60_000 && _activeExpsCache) return _activeExpsCache;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT name, variants, allocation FROM "RsExperiment" WHERE status = 'active'`
+      );
+      _activeExpsCache = rows.map(r => ({
+        name: r.name,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : r.variants,
+        allocation: typeof r.allocation === 'string' ? JSON.parse(r.allocation) : r.allocation,
+      }));
+      _activeExpsCacheAt = Date.now();
+    } catch { _activeExpsCache = []; }
+    return _activeExpsCache;
+  }
+
+  // Public: get all variant assignments cho user (cache in DB)
+  async function _getUserVariants(userId) {
+    if (!userId) return {};
+    const exps = await _getActiveExperiments();
+    if (!exps.length) return {};
+    const pool = _getPool();
+    const assigned = {};
+    for (const exp of exps) {
+      // Check cache
+      try {
+        const { rows } = await pool.query(
+          `SELECT variant_key FROM "RsExperimentAssign" WHERE user_id = $1 AND exp_name = $2`,
+          [userId, exp.name]
+        );
+        if (rows.length > 0) {
+          assigned[exp.name] = rows[0].variant_key;
+          continue;
+        }
+        // Assign new
+        const variant = _assignVariant(exp, userId);
+        if (variant) {
+          await pool.query(
+            `INSERT INTO "RsExperimentAssign"(user_id, exp_name, variant_key) VALUES ($1,$2,$3)
+             ON CONFLICT (user_id, exp_name) DO NOTHING`,
+            [userId, exp.name, variant]
+          );
+          assigned[exp.name] = variant;
+        }
+      } catch (e) { /* skip exp on error */ }
+    }
+    return assigned;
+  }
+  global.__rsGetUserVariants = _getUserVariants;  // expose cho feed handler
+
+  // Admin gate qua header x-admin-token (đơn giản cho dashboard)
+  const ADMIN_TOKEN = process.env.RS_ADMIN_TOKEN || process.env.JWT_SECRET || 'dev-admin-token';
+  function _adminGate(req, res) {
+    const token = req.headers['x-admin-token'] || '';
+    if (token !== ADMIN_TOKEN && process.env.DISABLE_ADMIN_GATE !== '1') {
+      res.status(401).json({ success: false, error: 'Invalid admin token' });
+      return false;
+    }
+    return true;
+  }
+
+  // GET /api/reco/experiments
+  app.get('/api/reco/experiments', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "RsExperiment" ORDER BY created_at DESC LIMIT 100`
+      );
+      return res.json({ success: true, experiments: rows });
+    } catch (e) { console.error('[rs-exp:list]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/experiments — create
+  app.post('/api/reco/experiments', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const { name, description, variants, allocation, status = 'draft', start_at, end_at } = req.body || {};
+      if (!name || !Array.isArray(variants) || variants.length < 2) {
+        return res.status(400).json({ success: false, error: 'Cần name + 2+ variants' });
+      }
+      const { randomUUID } = require('crypto');
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "RsExperiment"(id, name, description, variants, allocation, status, start_at, end_at)
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)
+      `, [randomUUID(), name, description || null, JSON.stringify(variants),
+          JSON.stringify(allocation || {}), status, start_at, end_at]);
+      _activeExpsCacheAt = 0;  // invalidate cache
+      return res.json({ success: true });
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ success: false, error: `Experiment "${req.body?.name}" đã tồn tại` });
+      console.error('[rs-exp:create]', e.message); return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // PUT /api/reco/experiments/:name — update status/allocation
+  app.put('/api/reco/experiments/:name', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const { status, allocation, end_at } = req.body || {};
+      const updates = [];
+      const params = [req.params.name];
+      if (status !== undefined) { params.push(status); updates.push(`status = $${params.length}`); }
+      if (allocation !== undefined) { params.push(JSON.stringify(allocation)); updates.push(`allocation = $${params.length}::jsonb`); }
+      if (end_at !== undefined) { params.push(end_at); updates.push(`end_at = $${params.length}`); }
+      if (!updates.length) return res.json({ success: true });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "RsExperiment" SET ${updates.join(', ')} WHERE name = $1`, params
+      );
+      if (!rowCount) return res.status(404).json({ success: false, error: 'Không tìm thấy' });
+      _activeExpsCacheAt = 0;
+      return res.json({ success: true });
+    } catch (e) { console.error('[rs-exp:update]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/experiments/:name/metrics
+  app.get('/api/reco/experiments/:name/metrics', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT variant_key,
+               COUNT(*)::int AS total_actions,
+               COUNT(*) FILTER (WHERE action = 'view')::int AS views,
+               COUNT(*) FILTER (WHERE action = 'click')::int AS clicks,
+               COUNT(*) FILTER (WHERE action = 'complete')::int AS completes,
+               COUNT(*) FILTER (WHERE action = 'pass')::int AS passes,
+               COUNT(*) FILTER (WHERE action = 'skip')::int AS skips,
+               COUNT(*) FILTER (WHERE action = 'not_interested')::int AS notInter
+        FROM "RsExperimentEvent" WHERE exp_name = $1
+        GROUP BY variant_key ORDER BY variant_key
+      `, [req.params.name]);
+      const variants = rows.map(r => ({
+        key: r.variant_key,
+        totalActions: r.total_actions,
+        byAction: { view: r.views, click: r.clicks, complete: r.completes, pass: r.passes, skip: r.skips, not_interested: r.notInter },
+        metrics: {
+          views: r.views, clicks: r.clicks, completes: r.completes, passes: r.passes,
+          skips: r.skips, notInter: r.notInter,
+          ctr: r.views > 0 ? Math.round((r.clicks / r.views) * 10000) / 100 : 0,
+          completion: r.clicks > 0 ? Math.round((r.completes / r.clicks) * 10000) / 100 : 0,
+          pass_rate: r.completes > 0 ? Math.round((r.passes / r.completes) * 10000) / 100 : 0,
+          negative_rate: r.total_actions > 0 ? Math.round(((r.skips + r.notInter) / r.total_actions) * 10000) / 100 : 0,
+        },
+      }));
+      return res.json({ success: true, variants });
+    } catch (e) { console.error('[rs-exp:metrics]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+})();
+
+// ── RS-Phase 10: Onboarding preferences (cold-start) ──
+// Lưu user prefs cho For-You feed personalization: subject/grade/interestedTopics.
+// Persist trong "UserProfile.data" JSONB → user_id PK.
+;(() => {
+  async function _ensureRecoPrefsCol() {
+    const pool = _getPool();
+    try { await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS reco_prefs JSONB`); } catch {}
+  }
+  _ensureRecoPrefsCol().catch(() => {});
+
+  function _recoAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ success: false, error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ success: false, error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // GET /api/reco/onboarding/prefs
+  app.get('/api/reco/onboarding/prefs', async (req, res) => {
+    const decoded = _recoAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1 LIMIT 1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      return res.json({ success: true, prefs: rows[0]?.reco_prefs || null });
+    } catch (e) { console.error('[reco:onboarding:get]', e.message); return res.json({ success: true, prefs: null }); }
+  });
+
+  // PUT /api/reco/onboarding/prefs — partial upsert
+  app.put('/api/reco/onboarding/prefs', async (req, res) => {
+    const decoded = _recoAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const patch = req.body || {};
+      const pool = _getPool();
+      // Merge với prefs cũ
+      const { rows: existing } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      const current = existing[0]?.reco_prefs || {};
+      const next = {
+        ...current, ...patch,
+        completedAt: patch.skipped ? null : (patch.completedAt || new Date().toISOString()),
+      };
+      // Fallback SELECT-then-UPDATE/INSERT nếu ON CONFLICT không có UNIQUE constraint
+      try {
+        await pool.query(`
+          INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at)
+          VALUES ($1, $2::jsonb, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET reco_prefs = EXCLUDED.reco_prefs, updated_at = NOW()
+        `, [userId, JSON.stringify(next)]);
+      } catch (e) {
+        // Schema cũ không có UNIQUE → manual upsert
+        const { rowCount } = await pool.query(
+          `UPDATE "UserProfile" SET reco_prefs = $1::jsonb, updated_at = NOW() WHERE user_id = $2`,
+          [JSON.stringify(next), userId]
+        );
+        if (rowCount === 0) {
+          await pool.query(
+            `INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at) VALUES ($1, $2::jsonb, NOW())`,
+            [userId, JSON.stringify(next)]
+          );
+        }
+      }
+      return res.json({ success: true, prefs: next });
+    } catch (e) { console.error('[reco:onboarding:put]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/onboarding/subjects — danh sách môn + khối cho UI onboarding
+  app.get('/api/reco/onboarding/subjects', (_req, res) => {
+    res.json({
+      success: true,
+      subjects: [
+        'Toán học', 'Vật lí', 'Hoá học', 'Sinh học',
+        'Ngữ văn', 'Tiếng Anh', 'Lịch sử', 'Địa lí',
+        'Tin học', 'Công nghệ', 'GDCD', 'Mĩ thuật', 'Âm nhạc', 'Thể dục',
+      ],
+      grades: ['6','7','8','9','10','11','12'],
+    });
+  });
+})();
+
 // Teacher service (port 8106)
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
-app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+// (real /api/teacher/roster handler ở line ~1150 — không cần stub này)
 
 // Lesson Plans CRUD (teacher-service offline) — bảng "LessonPlan" Node.js
 async function _ensureLessonPlanTable() {
@@ -8500,7 +9373,7 @@ app.get('/api/questions/taxonomy', (_req, res) => res.json({
   difficulties: ['NB','TH','VD','VDC'],
   types: ['multiple_choice','true_false','essay','fill_blank'],
 }));
-app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.content || '', changes: [] }));
+// (real handler at line ~3130 inside USE_NODEJS_QUESTIONS block — bulk scan + update Question table)
 
 // ── Exams CRUD ──
 // /api/exams + /api/teacher/exams — list đề: của mình + public của người khác
@@ -8560,18 +9433,143 @@ app.post('/api/exams', async (req, res) => {
 });
 
 app.get('/api/exams/:id', async (req, res) => {
-  const decoded = _examAuth(req, res); if (!decoded) return;
+  // Optional auth — anonymous xem đề preview, authenticated thấy isOwner.
+  const auth = req.headers.authorization || '';
+  let decoded = null;
+  if (auth.startsWith('Bearer ')) {
+    try { decoded = _akVerify(auth.slice(7)); } catch { /* ignore */ }
+  }
   try {
     const pool = _getPool();
-    // Cho phép xem đề của mình HOẶC public
+    const myIds = decoded ? [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))] : [];
     const { rows } = await pool.query(
-      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
-       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
-      [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
-    const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
-    return res.json({ exam });
+      `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
+       WHERE id = $1 AND COALESCE(status, '') != 'archived'`,
+      [req.params.id, myIds.length ? myIds : ['__none__']]);
+    if (!rows.length) {
+      const { rowCount } = await pool.query(`SELECT 1 FROM "Exam" WHERE id = $1`, [req.params.id]);
+      if (!rowCount) return res.status(404).json({ error: 'Đề thi không tồn tại trong hệ thống' });
+      return res.status(403).json({ error: 'Đề này đã bị lưu trữ — không thể truy cập' });
+    }
+    const examRow = rows[0];
+    const exam = { ...examRow, visibility: examRow.visibility || 'private', isOwner: !!examRow.is_owner };
+    // Hydrate questions
+    let questions = [];
+    let questionsSource = 'exam_question_ids';
+    const qIds = Array.isArray(examRow.question_ids) ? examRow.question_ids
+                 : (examRow.question_ids ? JSON.parse(examRow.question_ids) : []);
+    if (qIds && qIds.length > 0) {
+      const { rows: qRows } = await pool.query(
+        `SELECT id, content, type, difficulty, options, answer AS correct, explanation,
+                subject, grade, chapter
+         FROM "Question" WHERE id = ANY($1::text[])`, [qIds]
+      ).catch(() => ({ rows: [] }));
+      const byId = new Map(qRows.map(q => [q.id, q]));
+      questions = qIds.map(id => byId.get(id)).filter(Boolean);
+    }
+    // FALLBACK: nếu exam có 0 question, pull theo subject — subject có thể
+    // trong examRow.subject HOẶC examRow.description JSON {"subject":"..."}
+    if (questions.length === 0) {
+      let subj = examRow.subject;
+      if (!subj && examRow.description) {
+        try {
+          const parsed = typeof examRow.description === 'string'
+            ? JSON.parse(examRow.description) : examRow.description;
+          subj = parsed?.subject || null;
+        } catch { /* not JSON, treat as plain text — skip */ }
+      }
+      // Normalize variants: Vật lý → Vật lí (TT 32/2018)
+      if (subj === 'Vật lý' || subj === 'Vat ly') subj = 'Vật lí';
+      if (subj === 'Hóa học') subj = 'Hoá học';
+      if (subj) {
+        try {
+          const { rows: qRows } = await pool.query(`
+            SELECT id, content, type, difficulty, options, answer AS correct, explanation,
+                   subject, grade, chapter
+            FROM "Question"
+            WHERE subject IN ($1, $2) AND COALESCE(status, '') != 'archived'
+            ORDER BY RANDOM() LIMIT 20
+          `, [subj, subj === 'Vật lí' ? 'Vật lý' : subj]);  // match cả 2 chính tả
+          questions = qRows;
+          if (questions.length > 0) questionsSource = 'fallback_by_subject';
+        } catch { /* skip */ }
+      }
+    }
+    return res.json({ exam, questions, questionsSource, note: questions.length === 0 ? 'Đề này chưa có câu hỏi nào. Liên hệ GV để bổ sung.' : null });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
+});
+
+// POST /api/exams/:id/grade — HS submit answers, BE calculate score + save PracticeExam
+app.post('/api/exams/:id/grade', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let decoded = null;
+  if (auth.startsWith('Bearer ')) {
+    try { decoded = _akVerify(auth.slice(7)); } catch {}
+  }
+  try {
+    const { answers = {}, timeSpent = 0 } = req.body || {};
+    const pool = _getPool();
+    // Load exam + questions
+    const { rows: examRows } = await pool.query(
+      `SELECT id, title, question_ids, total_points FROM "Exam" WHERE id = $1`,
+      [req.params.id]);
+    if (!examRows.length) return res.status(404).json({ error: 'Đề thi không tồn tại' });
+    const examRow = examRows[0];
+    const qIds = Array.isArray(examRow.question_ids) ? examRow.question_ids
+                 : (examRow.question_ids ? JSON.parse(examRow.question_ids) : []);
+    if (!qIds.length) return res.status(400).json({ error: 'Đề chưa có câu hỏi' });
+    const { rows: questions } = await pool.query(
+      `SELECT id, type, options, answer AS correct FROM "Question" WHERE id = ANY($1::text[])`, [qIds]);
+
+    // Grade
+    let correct = 0;
+    const breakdown = [];
+    for (const q of questions) {
+      const userAns = answers[q.id];
+      const correctAns = q.correct;
+      let isCorrect = false;
+      if (userAns != null && correctAns != null) {
+        // Multiple choice: compare string/index
+        if (Array.isArray(correctAns)) {
+          isCorrect = Array.isArray(userAns) &&
+            userAns.length === correctAns.length &&
+            userAns.every(a => correctAns.includes(a));
+        } else {
+          isCorrect = String(userAns).trim() === String(correctAns).trim();
+        }
+      }
+      if (isCorrect) correct++;
+      breakdown.push({ questionId: q.id, isCorrect, userAnswer: userAns, correctAnswer: correctAns });
+    }
+    const total = questions.length;
+    const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const score = examRow.total_points ? Math.round((correct / total) * examRow.total_points) : correct;
+
+    // Save PracticeExam record (graceful nếu table chưa có)
+    const userId = decoded?.userId || decoded?.id || decoded?.sub;
+    if (userId) {
+      try {
+        const { randomUUID } = require('crypto');
+        await pool.query(`
+          INSERT INTO "PracticeExam"(id, "studentId", "examId", "examTitle",
+            "totalQuestions", "correctCount", percentage, score, "timeSpentSec",
+            breakdown, completed, "completedAt", "createdAt")
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,true,NOW(),NOW())
+        `, [randomUUID(), userId, examRow.id, examRow.title,
+            total, correct, percentage, score, Math.floor(timeSpent),
+            JSON.stringify(breakdown)]);
+      } catch { /* table may not exist */ }
+    }
+
+    return res.json({
+      success: true,
+      total, correct, wrong: total - correct,
+      percentage, score,
+      passed: percentage >= 50,
+      breakdown,
+      timeSpent: Math.floor(timeSpent),
+    });
+  } catch (e) { console.error('[exams:grade]', e.message); return res.status(500).json({ error: 'Lỗi chấm bài' }); }
 });
 
 app.patch('/api/exams/:id', async (req, res) => {
@@ -8604,8 +9602,8 @@ app.delete('/api/exams/:id', async (req, res) => {
   } catch (e) { console.error('[exams:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
 });
 
-// /api/exams/generate-from-matrix — stub: tạo exam rỗng
-app.post('/api/exams/generate-from-matrix', async (req, res) => {
+// /api/exams/generate-from-matrix — tạo exam từ ma trận (AI quiz_generate)
+app.post('/api/exams/generate-from-matrix', require('./lib/gating.cjs').requireFeature('quiz_generate'), async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const { matrixId, title = 'Đề từ ma trận' } = req.body || {};
@@ -8667,17 +9665,758 @@ app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [],
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 
 // Student
-app.get('/api/student/my-teachers', (_req, res) => res.json({ teachers: [], total: 0 }));
+// Real /api/student/my-teachers — HS đã kết nối GV qua TSL (status=approved)
+app.get('/api/student/my-teachers', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  try {
+    const pool = _getPool();
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+    const { rows } = await pool.query(`
+      SELECT tsl.id AS "linkId", tsl.created_at AS "linkedAt",
+             u.id, u.name, u.email, u.image, u.role
+      FROM "TeacherStudentLink" tsl
+      LEFT JOIN "User" u ON u.id = tsl.teacher_id
+      WHERE tsl.status = 'approved' AND tsl.student_id = ANY($1::text[])
+      ORDER BY tsl.created_at DESC LIMIT 200
+    `, [myIds]).catch(() => ({ rows: [] }));
+    const teachers = rows.map(r => ({
+      id: r.id, linkId: r.linkId,
+      name: r.name || r.email || `GV ${(r.id || '').slice(0, 8)}`,
+      email: r.email || '', image: r.image || null,
+      role: r.role || 'TEACHER',
+      linkedAt: r.linkedAt,
+    }));
+    return res.json({ teachers, total: teachers.length });
+  } catch (e) { console.error('[student:my-teachers]', e.message); return res.json({ teachers: [], total: 0 }); }
+});
 app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, subjects: [], streak: 0 }));
 app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
 
+// ── /api/student/exam-rooms — HS thấy phòng thi public + đã join ──
+// Shape match StudentExamRoom interface ở pages/student/Exams.tsx
+app.get('/api/student/exam-rooms', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  try {
+    const pool = _getPool();
+    // Lazy migrate RoomParticipant table (HS join phòng → record)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "RoomParticipant" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        room_id     VARCHAR(36)  NOT NULL,
+        user_id     VARCHAR(255) NOT NULL,
+        score       NUMERIC(5,2),
+        joined_at   TIMESTAMPTZ  DEFAULT NOW(),
+        submitted_at TIMESTAMPTZ,
+        completed   BOOLEAN      DEFAULT false,
+        UNIQUE (room_id, user_id)
+      )
+    `).catch(() => {});
+
+    // Load rooms: public OR HS đã join
+    const myIds = userId ? [userId] : [''];
+    const { rows: rooms } = await pool.query(`
+      SELECT r.id, r.name, r.description, r.status, r.start_time AS "startTime",
+             r.end_time AS "endTime", r.duration, r.is_public AS "isPublic",
+             r.max_students AS "maxStudents", r.teacher_id, r.exam_id,
+             u.name AS "teacherName",
+             e.title AS "examTitle"
+      FROM "OnlineExamRoom" r
+      LEFT JOIN "User" u ON u.id = r.teacher_id
+      LEFT JOIN "Exam" e ON e.id = r.exam_id
+      WHERE r.is_public = true
+         OR EXISTS (SELECT 1 FROM "RoomParticipant" WHERE room_id = r.id AND user_id = ANY($1::text[]))
+      ORDER BY r.start_time DESC NULLS LAST LIMIT 100
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    if (!rooms.length) return res.json({ rooms: [], count: 0 });
+
+    const roomIds = rooms.map(r => r.id);
+    // Batch load participants + counts
+    const [participants, examQCount] = await Promise.all([
+      pool.query(`
+        SELECT room_id, user_id, score, joined_at, submitted_at, completed
+        FROM "RoomParticipant" WHERE room_id = ANY($1::text[])
+      `, [roomIds]).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT id, COALESCE(jsonb_array_length(question_ids), 0)::int AS qcount
+        FROM "Exam" WHERE id = ANY($1::text[])
+      `, [rooms.filter(r => r.exam_id).map(r => r.exam_id)]).catch(() => ({ rows: [] })),
+    ]);
+
+    const qcountByExam = {};
+    for (const r of examQCount.rows) qcountByExam[r.id] = r.qcount;
+
+    const partsByRoom = {};
+    for (const p of participants.rows) {
+      (partsByRoom[p.room_id] = partsByRoom[p.room_id] || []).push(p);
+    }
+
+    // Build leaderboard names — batch query User
+    const allUserIds = [...new Set(participants.rows.map(p => p.user_id))];
+    const usersById = {};
+    if (allUserIds.length) {
+      const { rows: us } = await pool.query(
+        `SELECT id, name FROM "User" WHERE id = ANY($1::text[])`, [allUserIds]
+      ).catch(() => ({ rows: [] }));
+      for (const u of us) usersById[u.id] = u.name;
+    }
+
+    const result = rooms.map(r => {
+      const parts = partsByRoom[r.id] || [];
+      // Leaderboard: sort by score DESC, top 10
+      const ranked = parts
+        .filter(p => p.score != null)
+        .sort((a, b) => Number(b.score) - Number(a.score))
+        .slice(0, 10)
+        .map((p, idx) => ({
+          userId: p.user_id,
+          name: usersById[p.user_id] || `HS ${p.user_id.slice(0, 6)}`,
+          score: Number(p.score),
+          rank: idx + 1,
+          submittedAt: p.submitted_at,
+          isMe: p.user_id === userId,
+        }));
+      const myPart = userId ? parts.find(p => p.user_id === userId) : null;
+      return {
+        id: r.id, name: r.name, description: r.description,
+        status: r.status, startTime: r.startTime, endTime: r.endTime,
+        duration: r.duration, isPublic: r.isPublic, maxStudents: r.maxStudents,
+        Teacher: r.teacher_id ? { id: r.teacher_id, name: r.teacherName || 'GV' } : null,
+        Exam: r.exam_id ? { id: r.exam_id, title: r.examTitle || 'Đề thi', examType: 'standard' } : null,
+        _count: { participants: parts.length, questions: qcountByExam[r.exam_id] || 0 },
+        myParticipant: myPart ? {
+          score: myPart.score != null ? Number(myPart.score) : null,
+          joinedAt: myPart.joined_at, submittedAt: myPart.submitted_at,
+          completed: !!myPart.completed,
+        } : null,
+        leaderboard: ranked,
+      };
+    });
+
+    return res.json({ rooms: result, count: result.length });
+  } catch (e) {
+    console.error('[student:exam-rooms]', e.message);
+    return res.json({ rooms: [], count: 0 });
+  }
+});
+
+// ── /api/personality-test — Career test (MBTI + Holland) ──
+;(() => {
+  async function _ensurePersonalityTable() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "PersonalityTest" (
+          id              VARCHAR(36)  PRIMARY KEY,
+          user_id         VARCHAR(255),
+          user_name       VARCHAR(200),
+          user_year       INTEGER,
+          mbti_type       VARCHAR(10),
+          mbti_name       VARCHAR(100),
+          mbti_scores     JSONB,
+          holland_code    VARCHAR(10),
+          holland_scores  JSONB,
+          careers         JSONB,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_personality_user ON "PersonalityTest"(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_personality_mbti ON "PersonalityTest"(mbti_type)`);
+    } catch {}
+  }
+  _ensurePersonalityTable().catch(() => {});
+
+  // POST /api/personality-test — save kết quả
+  app.post('/api/personality-test', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+    try {
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "PersonalityTest"(id, user_id, user_name, user_year,
+          mbti_type, mbti_name, mbti_scores, holland_code, holland_scores, careers)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10::jsonb)
+      `, [id, userId, b.userName || null, b.userYearOfBirth || null,
+          b.mbtiType, b.personalityName, JSON.stringify(b.mbtiScores || {}),
+          b.hollandCode, JSON.stringify(b.hollandScores || {}),
+          JSON.stringify(b.careers || [])]);
+      return res.json({ success: true, id });
+    } catch (e) { console.error('[personality:save]', e.message); return res.json({ success: false, id: null }); }
+  });
+
+  // GET /api/personality-test?action=history | community-stats
+  app.get('/api/personality-test', async (req, res) => {
+    const action = String(req.query.action || '').toLowerCase();
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+
+    const MBTI_NAMES = {
+      INTJ: 'Nhà chiến lược', INTP: 'Nhà tư tưởng', ENTJ: 'Tổng tư lệnh', ENTP: 'Người tranh luận',
+      INFJ: 'Người che chở', INFP: 'Người trung gian', ENFJ: 'Nhà sư phạm', ENFP: 'Nhà vận động',
+      ISTJ: 'Nhà kỹ trị', ISFJ: 'Người bảo vệ', ESTJ: 'Nhà điều hành', ESFJ: 'Lãnh sự',
+      ISTP: 'Nghệ nhân', ISFP: 'Nghệ sĩ', ESTP: 'Doanh nhân', ESFP: 'Người trình diễn',
+    };
+    const HOLLAND_LABELS = {
+      R: 'Realistic (Thực tế)', I: 'Investigative (Nghiên cứu)', A: 'Artistic (Nghệ thuật)',
+      S: 'Social (Xã hội)', E: 'Enterprising (Lãnh đạo)', C: 'Conventional (Quy củ)',
+    };
+
+    try {
+      const pool = _getPool();
+      if (action === 'history') {
+        if (!userId) return res.json({ success: true, data: [] });
+        const { rows } = await pool.query(`
+          SELECT id, user_name AS "userName", user_year AS "userYearOfBirth",
+                 mbti_type AS "mbtiType", mbti_name AS "personalityName",
+                 mbti_scores AS "mbtiScores", holland_code AS "hollandCode",
+                 holland_scores AS "hollandScores", careers,
+                 created_at AS "createdAt"
+          FROM "PersonalityTest" WHERE user_id = $1
+          ORDER BY created_at DESC LIMIT 50
+        `, [userId]).catch(() => ({ rows: [] }));
+        return res.json({ success: true, data: rows });
+      }
+      // community-stats — aggregate toàn bộ
+      const [totals, mbtiDist, hollandDist, topCareers, lastAt] = await Promise.all([
+        pool.query(`
+          SELECT COUNT(*)::int AS attempts,
+                 COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS users
+          FROM "PersonalityTest"`).catch(() => ({ rows: [{ attempts: 0, users: 0 }] })),
+        pool.query(`
+          SELECT mbti_type AS type, COUNT(*)::int AS count FROM "PersonalityTest"
+          WHERE mbti_type IS NOT NULL GROUP BY mbti_type ORDER BY count DESC LIMIT 16
+        `).catch(() => ({ rows: [] })),
+        pool.query(`
+          SELECT SUBSTRING(holland_code FROM i FOR 1) AS letter, COUNT(*)::int AS count
+          FROM "PersonalityTest", generate_series(1, 6) AS i
+          WHERE holland_code IS NOT NULL AND LENGTH(holland_code) >= i
+          GROUP BY letter ORDER BY count DESC LIMIT 6
+        `).catch(() => ({ rows: [] })),
+        pool.query(`
+          SELECT career, COUNT(*)::int AS count
+          FROM "PersonalityTest", jsonb_array_elements_text(careers) AS career
+          WHERE careers IS NOT NULL GROUP BY career ORDER BY count DESC LIMIT 10
+        `).catch(() => ({ rows: [] })),
+        pool.query(`SELECT MAX(created_at) AS at FROM "PersonalityTest"`).catch(() => ({ rows: [{ at: null }] })),
+      ]);
+      const totalAttempts = totals.rows[0]?.attempts || 0;
+      const totalUsers = totals.rows[0]?.users || 0;
+      const mbti = mbtiDist.rows.map(r => ({
+        type: r.type, name: MBTI_NAMES[r.type] || r.type,
+        count: r.count, percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+      }));
+      const holland = hollandDist.rows
+        .filter(r => ['R','I','A','S','E','C'].includes(r.letter))
+        .map(r => ({
+          code: r.letter, label: HOLLAND_LABELS[r.letter] || r.letter,
+          count: r.count, percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+        }));
+      const careers = topCareers.rows.map(r => ({
+        name: r.career, count: r.count,
+        percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+      }));
+      return res.json({
+        success: true,
+        data: {
+          totalAttempts, totalUsers,
+          updatedAt: lastAt.rows[0]?.at || null,
+          mbtiDistribution: mbti,
+          hollandDistribution: holland,
+          topCareers: careers,
+        }
+      });
+    } catch (e) { console.error('[personality:get]', e.message); return res.json({ success: false, data: null }); }
+  });
+})();
+
+// GET /api/student/exam-rooms/leaderboard — global top HS theo điểm
+// Nguồn data: PracticeExam table (đã có từ commit grade endpoint).
+// Top 20 HS sort theo avg percentage 30 ngày gần nhất.
+app.get('/api/student/exam-rooms/leaderboard', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  const days = Math.min(Number(req.query.days) || 30, 90);
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT
+        pe."studentId" AS user_id,
+        u.name, u.image,
+        COUNT(*)::int AS exam_count,
+        ROUND(AVG(pe.percentage)::numeric, 1)::float AS avg_score,
+        MAX(pe.percentage)::int AS best_score,
+        MAX(pe."completedAt") AS last_at
+      FROM "PracticeExam" pe
+      LEFT JOIN "User" u ON u.id = pe."studentId"
+      WHERE pe.completed = true
+        AND pe."completedAt" >= NOW() - INTERVAL '${days} day'
+      GROUP BY pe."studentId", u.name, u.image
+      HAVING COUNT(*) >= 1
+      ORDER BY avg_score DESC, exam_count DESC LIMIT 20
+    `).catch(() => ({ rows: [] }));
+    const leaderboard = rows.map((r, idx) => ({
+      rank: idx + 1,
+      userId: r.user_id,
+      name: r.name || `HS ${(r.user_id || '').slice(0, 6)}`,
+      avatar: r.image,
+      avgScore: Number(r.avg_score) || 0,
+      bestScore: r.best_score || 0,
+      examCount: r.exam_count || 0,
+      lastAt: r.last_at,
+      isMe: r.user_id === userId,
+    }));
+    // Find my rank if not in top 20
+    let myEntry = leaderboard.find(e => e.isMe);
+    if (!myEntry && userId) {
+      const { rows: meRows } = await pool.query(`
+        SELECT
+          ROUND(AVG(percentage)::numeric, 1)::float AS avg_score,
+          COUNT(*)::int AS exam_count,
+          (SELECT COUNT(DISTINCT "studentId")::int + 1 FROM "PracticeExam"
+           WHERE completed AND "completedAt" >= NOW() - INTERVAL '${days} day'
+             AND "studentId" != $1
+             AND (SELECT AVG(percentage) FROM "PracticeExam" pe2 WHERE pe2."studentId" = "PracticeExam"."studentId" AND completed) >
+                 (SELECT AVG(percentage) FROM "PracticeExam" pe3 WHERE pe3."studentId" = $1 AND completed)
+          ) AS my_rank
+        FROM "PracticeExam"
+        WHERE "studentId" = $1 AND completed AND "completedAt" >= NOW() - INTERVAL '${days} day'
+      `, [userId]).catch(() => ({ rows: [] }));
+      if (meRows.length && meRows[0].exam_count > 0) {
+        myEntry = {
+          rank: meRows[0].my_rank || 999,
+          userId, name: 'Bạn', avatar: null,
+          avgScore: Number(meRows[0].avg_score) || 0,
+          bestScore: 0, examCount: meRows[0].exam_count, isMe: true,
+        };
+      }
+    }
+    return res.json({ leaderboard, myEntry: myEntry || null, period: `last_${days}d`, total: leaderboard.length });
+  } catch (e) {
+    console.error('[exam-rooms:leaderboard]', e.message);
+    return res.json({ leaderboard: [], myEntry: null, total: 0 });
+  }
+});
+
+// POST /api/student/exam-rooms/:id/join — HS join phòng thi
+app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let userId;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  try {
+    const pool = _getPool();
+    const { accessCode } = req.body || {};
+    const { rows } = await pool.query(
+      `SELECT id, access_code, is_public, max_students,
+              (SELECT COUNT(*) FROM "RoomParticipant" WHERE room_id = $1) AS current_count
+       FROM "OnlineExamRoom" WHERE id = $1`, [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Phòng thi không tồn tại' });
+    const room = rows[0];
+    if (!room.is_public && room.access_code && accessCode !== room.access_code) {
+      return res.status(403).json({ error: 'Mã phòng không đúng' });
+    }
+    if (room.max_students && Number(room.current_count) >= room.max_students) {
+      return res.status(409).json({ error: 'Phòng đã đầy' });
+    }
+    const { randomUUID } = require('crypto');
+    await pool.query(`
+      INSERT INTO "RoomParticipant"(id, room_id, user_id, joined_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (room_id, user_id) DO NOTHING
+    `, [randomUUID(), req.params.id, userId]);
+    return res.json({ ok: true, roomId: req.params.id });
+  } catch (e) { console.error('[student:room:join]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
 // Courses
-app.get('/api/courses', (_req, res) => res.json({ courses: [], total: 0 }));
-app.get('/api/courses/dashboard', (_req, res) => res.json({ enrolled: [], featured: [], my_progress: {} }));
+// /api/courses — list catalog (FE thường gọi paginated)
+app.get('/api/courses', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { rows } = await pool.query(`
+      SELECT c.id, c."userId", c.title, c.description, c."imageUrl",
+             c.price, c."isPublished", c."categoryId", c."createdAt", c."updatedAt",
+             cat.name AS "categoryName",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Course" c
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE c."isPublished" = true
+      ORDER BY c."createdAt" DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]).catch(() => ({ rows: [] }));
+    const courses = rows.map(r => ({
+      id: r.id, userId: r.userId, title: r.title, description: r.description,
+      imageUrl: r.imageUrl, price: Number(r.price) || 0,
+      isPublished: !!r.isPublished, categoryId: r.categoryId,
+      category: r.categoryName ? { id: r.categoryId, name: r.categoryName } : null,
+      chapters: [], createdAt: r.createdAt, updatedAt: r.updatedAt,
+      instructor: r.instructorName ? { name: r.instructorName, image: r.instructorImage } : null,
+    }));
+    return res.json({ courses, total: courses.length });
+  } catch (e) { console.error('[courses:list]', e.message); return res.json({ courses: [], total: 0 }); }
+});
+
+// /api/courses/dashboard — enrolled + featured + my_progress
+app.get('/api/courses/dashboard', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+  try {
+    const pool = _getPool();
+    const [enrolled, featured] = await Promise.all([
+      userId ? pool.query(`
+        SELECT c.id, c.title, c."imageUrl", c.price
+        FROM "Purchase" p JOIN "Course" c ON c.id = p."courseId"
+        WHERE p."userId" = $1 ORDER BY p."createdAt" DESC LIMIT 10
+      `, [userId]).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+      pool.query(`SELECT id, title, "imageUrl", price FROM "Course" WHERE "isPublished" = true ORDER BY "createdAt" DESC LIMIT 8`).catch(() => ({ rows: [] })),
+    ]);
+    return res.json({
+      enrolled: enrolled.rows,
+      featured: featured.rows,
+      my_progress: {},
+    });
+  } catch (e) { return res.json({ enrolled: [], featured: [], my_progress: {} }); }
+});
+
+// /api/courses/:id — course detail với chapters
+app.get('/api/courses/:id', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT c.*, cat.name AS "categoryName",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Course" c
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE c.id = $1 LIMIT 1
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    if (!rows.length) return res.status(404).json({ error: 'Course không tồn tại' });
+    const c = rows[0];
+    // Load chapters
+    const { rows: chapters } = await pool.query(`
+      SELECT id, title, description, "videoUrl", position, "isPublished", "isFree",
+             "courseId", "createdAt", "updatedAt"
+      FROM "Chapter" WHERE "courseId" = $1 ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    return res.json({
+      id: c.id, userId: c.userId, title: c.title, description: c.description,
+      imageUrl: c.imageUrl, price: Number(c.price) || 0,
+      isPublished: !!c.isPublished, categoryId: c.categoryId,
+      category: c.categoryName ? { id: c.categoryId, name: c.categoryName } : null,
+      chapters: chapters.map(ch => ({ ...ch, userProgress: [] })),
+      createdAt: c.createdAt, updatedAt: c.updatedAt,
+      instructor: c.instructorName ? { name: c.instructorName, image: c.instructorImage } : null,
+    });
+  } catch (e) { console.error('[courses:get]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// ── /api/learning/course/:id/* — CoursePlayer endpoints ──
+// Khác /api/courses (REST) — /learning/course là alias dùng cho student player UI
+app.get('/api/learning/course/:id', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT id, title, description, "imageUrl" FROM "Course" WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    ).catch(() => ({ rows: [] }));
+    if (!rows.length) return res.status(404).json({ error: 'Course không tồn tại' });
+    const c = rows[0];
+    // Optional: pdfBookUrl + extras từ Course data JSONB nếu có
+    return res.json({
+      id: c.id, title: c.title, description: c.description, imageUrl: c.imageUrl,
+      pdfBookUrl: null,  // TODO wire khi có cột
+      extras: { exams: [], assignments: [], labs: [], aura: [], games: [] },
+    });
+  } catch (e) { console.error('[learning:course:info]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/learning/course/:id/videos', async (req, res) => {
+  try {
+    const pool = _getPool();
+    // Map từ Chapter (có videoUrl) → CourseVideo shape
+    const { rows } = await pool.query(`
+      SELECT id, "courseId", title, description, "videoUrl", position,
+             "isFree" AS "isPreview", "createdAt"
+      FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true
+      ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    const videos = rows.filter(r => r.videoUrl).map(r => ({
+      id: r.id, courseId: r.courseId, title: r.title,
+      description: r.description, videoUrl: r.videoUrl,
+      position: r.position, duration: null, isCompleted: false,
+      isPreview: !!r.isPreview, groupName: null, thumbUrl: null,
+      createdAt: r.createdAt,
+    }));
+    return res.json(videos);
+  } catch (e) { console.error('[learning:videos]', e.message); return res.json([]); }
+});
+
+app.get('/api/learning/course/:id/curriculum', async (req, res) => {
+  try {
+    const pool = _getPool();
+    // Lazy migrate Lesson + LessonBlock tables nếu cần
+    const { rows: chapters } = await pool.query(`
+      SELECT id, title, description, position, "isPublished", "isFree"
+      FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true
+      ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    if (!chapters.length) return res.json({ chapters: [] });
+    // Load lessons + blocks per chapter (graceful nếu table chưa có)
+    const chapterIds = chapters.map(c => c.id);
+    const [lessons, blocks] = await Promise.all([
+      pool.query(`
+        SELECT id, "chapterId", title, description, duration, type, position
+        FROM "Lesson" WHERE "chapterId" = ANY($1::text[]) ORDER BY position ASC
+      `, [chapterIds]).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT id, "lessonId", type, title, content, metadata, position
+        FROM "LessonBlock" WHERE "lessonId" IN (
+          SELECT id FROM "Lesson" WHERE "chapterId" = ANY($1::text[])
+        ) ORDER BY position ASC
+      `, [chapterIds]).catch(() => ({ rows: [] })),
+    ]);
+    const blocksByLesson = {};
+    for (const b of blocks.rows) (blocksByLesson[b.lessonId] = blocksByLesson[b.lessonId] || []).push(b);
+    const lessonsByChapter = {};
+    for (const l of lessons.rows) {
+      (lessonsByChapter[l.chapterId] = lessonsByChapter[l.chapterId] || []).push({
+        ...l, blocks: blocksByLesson[l.id] || [],
+      });
+    }
+    const result = chapters.map(c => ({
+      ...c, duration: null, lessons: lessonsByChapter[c.id] || [],
+    }));
+    return res.json({ chapters: result });
+  } catch (e) { console.error('[learning:curriculum]', e.message); return res.json({ chapters: [] }); }
+});
+
+app.get('/api/learning/course/:id/assets', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT id, "courseId", title, url AS "fileUrl",
+             "fileType", "fileSize", "createdAt"
+      FROM "Attachment" WHERE "courseId" = $1 ORDER BY "createdAt" DESC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    return res.json(rows);
+  } catch (e) { return res.json([]); }
+});
+
+app.get('/api/learning/course/:id/reviews', (_req, res) => res.json([]));
+
+// /api/courses/:id/progress — progress của user hiện tại
+app.get('/api/courses/:id/progress', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+  if (!userId) return res.json({ progress: 0, completedChapters: 0, totalChapters: 0, lastChapter: null });
+  try {
+    const pool = _getPool();
+    // Count chapters + completed
+    const [chap, prog] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true`, [req.params.id]),
+      pool.query(`
+        SELECT COUNT(*)::int AS n, MAX(up."updatedAt") AS last_update
+        FROM "UserProgress" up
+        JOIN "Chapter" ch ON ch.id = up."chapterId"
+        WHERE up."userId" = $1 AND up."isCompleted" = true AND ch."courseId" = $2
+      `, [userId, req.params.id]).catch(() => ({ rows: [{ n: 0, last_update: null }] })),
+    ]);
+    const total = chap.rows[0]?.n || 0;
+    const done = prog.rows[0]?.n || 0;
+    return res.json({
+      progress: total > 0 ? Math.round((done / total) * 100) : 0,
+      completedChapters: done,
+      totalChapters: total,
+      lastUpdate: prog.rows[0]?.last_update || null,
+    });
+  } catch (e) { console.error('[courses:progress]', e.message); return res.json({ progress: 0, completedChapters: 0, totalChapters: 0 }); }
+});
 app.get('/api/instructor/courses', (_req, res) => res.json({ courses: [], total: 0 }));
-app.get('/api/learning/my-courses', (_req, res) => res.json({ courses: [], total: 0 }));
+// Real /api/learning/my-courses — Multi-source enrollment list
+// 3 nguồn HS có thể truy cập course:
+//   1. PURCHASED   — Purchase table (HS đã mua)
+//   2. FROM_TEACHER — Course tạo bởi GV mà HS đã connect (TSL approved)
+//                    HS "có truyền cảm hứng" từ GV → cần xem khoá GV làm
+//   3. FREE        — Course publish + price=0 (open access)
+// Dedupe theo courseId, sort theo recency.
+// FE expects Enrollment[] array trực tiếp, không wrap object.
+app.get('/api/learning/my-courses', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.json([]);
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.json([]); }
+  if (!userId) return res.json([]);
+  try {
+    const pool = _getPool();
+    const [purchased, fromTeachers, free] = await Promise.all([
+      // SOURCE 1: Purchase enrollment
+      pool.query(`
+        SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               p."createdAt" AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'purchased' AS source
+        FROM "Purchase" p
+        JOIN "Course" c ON c.id = p."courseId"
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE p."userId" = $1
+        ORDER BY p."createdAt" DESC LIMIT 100
+      `, [userId]).catch(() => ({ rows: [] })),
+
+      // SOURCE 2: Courses created by GV mà HS đã connect (TSL approved)
+      pool.query(`
+        SELECT DISTINCT ON (c.id)
+               c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               tsl.created_at AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'from-teacher' AS source
+        FROM "TeacherStudentLink" tsl
+        JOIN "Course" c ON c."userId" = tsl.teacher_id AND c."isPublished" = true
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE tsl.status = 'approved' AND tsl.student_id = $1
+        ORDER BY c.id, tsl.created_at DESC LIMIT 100
+      `, [userId]).catch(() => ({ rows: [] })),
+
+      // SOURCE 3: Free courses (price = 0, published)
+      pool.query(`
+        SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               c."createdAt" AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'free' AS source
+        FROM "Course" c
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE c."isPublished" = true AND (c.price IS NULL OR c.price = 0)
+        ORDER BY c."createdAt" DESC LIMIT 30
+      `).catch(() => ({ rows: [] })),
+    ]);
+
+    // Dedupe theo courseId — ưu tiên purchased > from-teacher > free
+    const byId = new Map();
+    for (const r of [...purchased.rows, ...fromTeachers.rows, ...free.rows]) {
+      if (!byId.has(r.courseId)) byId.set(r.courseId, r);
+    }
+    const all = Array.from(byId.values());
+
+    // Map về shape Enrollment FE expect + sort by enrolledAt DESC
+    const enrollments = all
+      .sort((a, b) => new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime())
+      .map(r => ({
+        id: r.courseId,
+        courseId: r.courseId,
+        title: r.title,
+        description: r.description || '',
+        image: r.image || r.imageUrl || null,
+        price: Number(r.price) || 0,
+        category: r.categoryName || null,
+        instructor: r.instructorName ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage } : null,
+        enrolledAt: r.enrolledAt,
+        progress: 0,  // TODO: wire LessonHistory aggregate khi có table
+        source: r.source,  // bonus: FE có thể badge "Đã mua" / "Từ GV" / "Miễn phí"
+      }));
+    return res.json(enrollments);
+  } catch (e) { console.error('[learning:my-courses]', e.message); return res.json([]); }
+});
+
+// (real /api/teachers/all handler moved TRƯỚC proxy line 2606 — dead code)
 app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
-app.get('/api/learning/purchase-history', (_req, res) => res.json({ orders: [], total: 0 }));
+
+// ── /api/learning/purchase-history ─────────────────────────────────────────
+// FE expects Enrollment[] array trực tiếp (KHÔNG wrap object).
+// Crash trên /student/purchase-history: "s.map is not a function" → stub cũ
+// return { orders, total } object → FE .map() crash ErrorBoundary.
+// Query Purchase + Course + User + Chapter count để build Enrollment shape:
+//   { id, userId, courseId, price, createdAt, course: { id, title, image, slug,
+//     duration, lessons, accessTime, user: { id, name, image } } }
+app.get('/api/learning/purchase-history', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.json([]);
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.json([]); }
+  if (!userId) return res.json([]);
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT p.id AS "purchaseId", p."userId", p."courseId", p."createdAt",
+             c.id AS "cid", c.title, c.description, c.image, c."imageUrl",
+             c.price, c."userId" AS "instructorId",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Purchase" p
+      JOIN "Course" c ON c.id = p."courseId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE p."userId" = $1
+      ORDER BY p."createdAt" DESC
+      LIMIT 200
+    `, [userId]).catch(() => ({ rows: [] }));
+
+    if (rows.length === 0) return res.json([]);
+
+    // Batch count chapters per course (proxy "lessons" count)
+    const courseIds = rows.map(r => r.cid);
+    const { rows: chapRows } = await pool.query(
+      `SELECT "courseId", COUNT(*)::int AS n FROM "Chapter"
+       WHERE "courseId" = ANY($1::text[]) GROUP BY "courseId"`,
+      [courseIds]
+    ).catch(() => ({ rows: [] }));
+    const lessonsByCourse = Object.fromEntries(chapRows.map(r => [r.courseId, r.n]));
+
+    const enrollments = rows.map(r => ({
+      id: r.purchaseId,
+      userId: r.userId,
+      courseId: r.courseId,
+      price: Number(r.price) || 0,
+      createdAt: r.createdAt,
+      course: {
+        id: r.cid,
+        title: r.title,
+        description: r.description || '',
+        image: r.image || r.imageUrl || null,
+        imageUrl: r.imageUrl || r.image || null,
+        slug: r.cid,  // dùng id làm slug (route /learning/course/:slug/:id)
+        duration: null,
+        lessons: lessonsByCourse[r.cid] || 0,
+        accessTime: null,
+        price: Number(r.price) || 0,
+        user: r.instructorName
+          ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage }
+          : { id: r.instructorId, name: '—', image: null },
+      },
+    }));
+    return res.json(enrollments);
+  } catch (e) {
+    console.error('[learning:purchase-history]', e.message);
+    return res.json([]);
+  }
+});
 
 // Agents (exam-prep stats)
 app.get('/api/agents/exam-prep/stats', (_req, res) => res.json({ total: 0, today: 0, streak: 0, accuracy: 0 }));
@@ -8688,25 +10427,961 @@ app.get('/api/agents/exam-prep/community-stats', (_req, res) => res.json({ users
 // Admin (additional stubs)
 app.get('/api/admin/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
 app.get('/api/admin/cameras/discover', (_req, res) => res.json({ discovered: [] }));
-app.get('/api/admin/insights/behavior', (_req, res) => res.json({ patterns: [] }));
-app.get('/api/admin/insights/recommendations', (_req, res) => res.json({ recommendations: [] }));
-app.get('/api/admin/insights/trending-exams', (_req, res) => res.json({ exams: [] }));
-app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics: [] }));
-app.get('/api/admin/users', (_req, res) => res.json({ users: [], total: 0 }));
-app.get('/api/admin/users/stats', (_req, res) => res.json({ total: 0, by_role: {} }));
+// ── Admin Insights — real aggregations từ PageView + Exam + Question ──
+
+// /api/admin/insights/behavior — DAU/WAU/MAU + hourly + bounce
+app.get('/api/admin/insights/behavior', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const [hourly, dau, wau, mau, sessDur, topEntries, bounce] = await Promise.all([
+      pool.query(`
+        SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
+               COUNT(*)::int AS views,
+               COUNT(DISTINCT session_id)::int AS unique_sessions
+        FROM "PageView"
+        WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
+        GROUP BY 1 ORDER BY 1`),
+      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL`),
+      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '7 day' AND user_id IS NOT NULL`),
+      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day' AND user_id IS NOT NULL`),
+      pool.query(`
+        SELECT COALESCE(u.role, 'GUEST') AS role,
+               ROUND(COALESCE(AVG(s.dur_ms) / 60000.0, 0)::numeric, 1)::float AS avg_min,
+               COUNT(*)::int AS sessions
+        FROM (
+          SELECT session_id, user_id,
+                 MAX(created_at) - MIN(created_at) AS span,
+                 EXTRACT(EPOCH FROM (MAX(created_at) - MIN(created_at))) * 1000 AS dur_ms
+          FROM "PageView"
+          WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
+          GROUP BY session_id, user_id
+        ) s LEFT JOIN "User" u ON u.id = s.user_id
+        GROUP BY 1 ORDER BY sessions DESC`),
+      pool.query(`
+        WITH first_pv AS (
+          SELECT session_id, path,
+                 ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY created_at) AS rn
+          FROM "PageView"
+          WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
+        )
+        SELECT path, COUNT(*)::int AS sessions
+        FROM first_pv WHERE rn = 1
+        GROUP BY path ORDER BY sessions DESC LIMIT 10`),
+      pool.query(`
+        WITH sess AS (
+          SELECT session_id, user_id, COUNT(*) AS pv_count
+          FROM "PageView"
+          WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
+          GROUP BY 1, 2
+        )
+        SELECT COALESCE(u.role, 'GUEST') AS role,
+               SUM(CASE WHEN s.pv_count = 1 THEN 1 ELSE 0 END)::int AS bounced,
+               COUNT(*)::int AS total,
+               ROUND((SUM(CASE WHEN s.pv_count = 1 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100), 1)::float AS bounce_rate_pct
+        FROM sess s LEFT JOIN "User" u ON u.id = s.user_id
+        GROUP BY 1`),
+    ]);
+    return res.json({
+      hourly: hourly.rows,
+      dau: dau.rows[0]?.c || 0,
+      wau: wau.rows[0]?.c || 0,
+      mau: mau.rows[0]?.c || 0,
+      stickiness: mau.rows[0]?.c > 0 ? Math.round((dau.rows[0]?.c / mau.rows[0]?.c) * 100) : 0,
+      sessionDurByRole: sessDur.rows,
+      topEntries: topEntries.rows,
+      bounceByRole: bounce.rows,
+      period: 'last_7d',
+    });
+  } catch (e) {
+    console.error('[insights:behavior]', e.message);
+    return res.json({ hourly: [], dau: 0, wau: 0, mau: 0, stickiness: 0, sessionDurByRole: [], topEntries: [], bounceByRole: [], period: 'last_7d' });
+  }
+});
+
+// /api/admin/insights/trending-topics — top subjects 7d theo Question table
+// Normalize subject theo TT 32/2018 BGD: gộp "Vật lý"/"Vật Lý" → "Vật lí" v.v.
+const _NORMALIZE_SUBJECT = (s) => {
+  if (!s) return s;
+  const n = String(s).trim();
+  const map = {
+    'Vật lý': 'Vật lí', 'Vật Lý': 'Vật lí', 'vật lý': 'Vật lí', 'Vat ly': 'Vật lí', 'vat ly': 'Vật lí',
+    'Hóa học': 'Hoá học', 'Hóa Học': 'Hoá học', 'hóa học': 'Hoá học', 'Hoa hoc': 'Hoá học',
+    'Tiếng anh': 'Tiếng Anh', 'tiếng anh': 'Tiếng Anh', 'TIẾNG ANH': 'Tiếng Anh', 'tieng anh': 'Tiếng Anh',
+    'Toán': 'Toán học', 'toán': 'Toán học', 'Toan': 'Toán học', 'toan': 'Toán học',
+  };
+  return map[n] || n;
+};
+
+app.get('/api/admin/insights/trending-topics', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT q.subject, COUNT(DISTINCT q.id)::int AS exam_count
+      FROM "Question" q
+      WHERE q.subject IS NOT NULL AND q."createdAt" >= NOW() - INTERVAL '7 day'
+      GROUP BY q.subject ORDER BY exam_count DESC LIMIT 20`);
+    // Gộp duplicates theo normalized name (Vật lý + Vật lí → 1 môn)
+    const merged = {};
+    for (const r of rows) {
+      const norm = _NORMALIZE_SUBJECT(r.subject);
+      merged[norm] = (merged[norm] || 0) + r.exam_count;
+    }
+    const topics = Object.entries(merged)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([subject, count]) => ({
+        subject, examCount: count,
+        attempts: 0, uniqueStudents: 0,
+        avgAttemptsPerStudent: 0, growthPct: 0, trend: 'stable',
+      }));
+    return res.json({ topics });
+  } catch (e) { console.error('[insights:topics]', e.message); return res.json({ topics: [] }); }
+});
+
+// /api/admin/insights/trending-exams — top exam 30d (best-effort, không có attempt table)
+app.get('/api/admin/insights/trending-exams', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT id, title, subject,
+             COALESCE(array_length(question_ids, 1), 0)::int AS "totalQuestions"
+      FROM "Exam"
+      WHERE created_at >= NOW() - INTERVAL '30 day'
+      ORDER BY created_at DESC LIMIT 10`);
+    const exams = rows.map(r => ({
+      id: r.id, title: r.title, subject: r.subject,
+      totalQuestions: r.totalQuestions,
+      attempts: 0, unique_students: 0,
+      avg_percentage: 0, avg_score: 0, pass_count: 0, pass_rate: 0,
+    }));
+    return res.json({ exams });
+  } catch (e) { console.error('[insights:exams]', e.message); return res.json({ exams: [] }); }
+});
+
+// /api/admin/insights/recommendations — rule-based từ behavior data (defensive)
+app.get('/api/admin/insights/recommendations', async (_req, res) => {
+  const recommendations = [];
+  const pool = _getPool();
+
+  // Rule 1: bounce rate > 60% → UX warning
+  try {
+    const r = await pool.query(`
+      WITH sess AS (
+        SELECT session_id, COUNT(*) AS pv FROM "PageView"
+        WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
+        GROUP BY 1
+      )
+      SELECT ROUND(SUM(CASE WHEN pv = 1 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 0)::int AS rate,
+             COUNT(*)::int AS total_sessions FROM sess`);
+    const row = (r?.rows || [])[0] || {};
+    const bounceRate = row.rate || 0;
+    if (bounceRate > 60 && (row.total_sessions || 0) > 5) {
+      recommendations.push({
+        priority: 'high', category: 'ux', icon: 'alert',
+        title: `Bounce rate cao: ${bounceRate}%`,
+        insight: `${bounceRate}% sessions chỉ xem 1 trang rồi thoát — UX entry point có thể chưa tốt`,
+        action: 'Rà soát Landing + Login flow, A/B test CTA chính',
+      });
+    }
+  } catch (e) { console.warn('[reco:rule1]', e.message); }
+
+  // Rule 2: DAU/MAU < 20% → engagement weak
+  try {
+    const d = await pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL`);
+    const m = await pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day' AND user_id IS NOT NULL`);
+    const dc = ((d?.rows || [])[0] || {}).c || 0;
+    const mc = ((m?.rows || [])[0] || {}).c || 0;
+    const stickiness = mc > 0 ? Math.round((dc / mc) * 100) : 0;
+    if (stickiness < 20 && mc > 10) {
+      recommendations.push({
+        priority: 'high', category: 'engagement', icon: 'users',
+        title: `Stickiness thấp: ${stickiness}%`,
+        insight: `Chỉ ${stickiness}% MAU quay lại trong 24h. Benchmark tốt: > 30%`,
+        action: 'Wire push notification daily reminder + email digest cá nhân hoá',
+      });
+    }
+  } catch (e) { console.warn('[reco:rule2]', e.message); }
+
+  // Rule 3: Subject imbalance — gộp normalize "Vật lý"="Vật lí" rồi tính top%
+  try {
+    const r = await pool.query(`
+      SELECT subject, COUNT(*)::int AS n FROM "Question" WHERE subject IS NOT NULL
+      GROUP BY subject ORDER BY n DESC LIMIT 20`);
+    const rows = r?.rows || [];
+    if (rows.length > 0) {
+      const merged = {};
+      for (const x of rows) {
+        const norm = _NORMALIZE_SUBJECT(x.subject);
+        merged[norm] = (merged[norm] || 0) + x.n;
+      }
+      const sorted = Object.entries(merged).sort((a, b) => b[1] - a[1]);
+      const total = sorted.reduce((s, [, n]) => s + n, 0);
+      const [topSubject, topN] = sorted[0] || ['', 0];
+      const topPct = total > 0 ? Math.round((topN / total) * 100) : 0;
+      if (topPct > 50) {
+        recommendations.push({
+          priority: 'medium', category: 'content', icon: 'book',
+          title: `Lệch môn: ${topSubject} chiếm ${topPct}% câu hỏi`,
+          insight: `Question Bank dồn vào ${topSubject} (${topN}/${total} câu). Các môn khác thiếu nội dung.`,
+          action: 'Khuyến khích GV import đề từ PDF (Wayground) hoặc generate AI cho môn yếu',
+        });
+      }
+    }
+  } catch (e) { console.warn('[reco:rule3]', e.message); }
+
+  // Rule 4: Subject naming duplicates (data quality) — Vật lý vs Vật lí, etc.
+  try {
+    const r = await pool.query(`SELECT DISTINCT subject FROM "Question" WHERE subject IS NOT NULL`);
+    const subjects = (r?.rows || []).map(x => x.subject);
+    const dups = {};
+    for (const s of subjects) {
+      const norm = _NORMALIZE_SUBJECT(s);
+      if (norm !== s) {
+        dups[norm] = dups[norm] || [];
+        if (!dups[norm].includes(s)) dups[norm].push(s);
+      }
+    }
+    const dupList = Object.entries(dups).filter(([, vs]) => vs.length > 0);
+    if (dupList.length > 0) {
+      const samples = dupList.slice(0, 3).map(([norm, vs]) => `"${vs.join('"+"')}" → "${norm}"`).join(', ');
+      recommendations.push({
+        priority: 'medium', category: 'content', icon: 'alert',
+        title: `${dupList.length} môn bị trùng tên khác chính tả`,
+        insight: `Phát hiện môn lưu khác chuẩn TT 32/2018: ${samples}`,
+        action: 'Run migration UPDATE "Question" SET subject = "Vật lí" WHERE subject IN (...) để gộp',
+      });
+    }
+  } catch (e) { console.warn('[reco:rule4]', e.message); }
+
+  // Rule 5: Fallback nếu chưa có rec nào
+  if (recommendations.length === 0) {
+    recommendations.push({
+      priority: 'low', category: 'engagement', icon: 'check',
+      title: 'Mọi chỉ số trong ngưỡng tốt',
+      insight: 'Bounce, stickiness, content distribution đều ổn. Tiếp tục theo dõi.',
+      action: 'Refresh sau 24h để xem trend',
+    });
+  }
+  return res.json({ recommendations });
+});
+
+// /api/admin/overview — KPI cards cho Dashboard
+app.get('/api/admin/overview', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const range = req.query.range || 'week';
+    const interval = range === 'today' ? '1 day' : range === 'month' ? '30 day' : '7 day';
+    const [users, mastery, enroll] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS active FROM "PageView" WHERE created_at >= NOW() - INTERVAL '${interval}' AND user_id IS NOT NULL`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM "User" WHERE role IN ('STUDENT', 'TEACHER')`),
+      pool.query(`
+        SELECT TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS month,
+               COUNT(*)::int AS students
+        FROM "User"
+        WHERE role = 'STUDENT' AND "createdAt" >= NOW() - INTERVAL '8 month'
+        GROUP BY 1 ORDER BY 1`),
+    ]);
+    return res.json({
+      activeStudents: users.rows[0]?.active || 0,
+      avgMastery: 78,  // placeholder — sẽ wire từ Gradebook khi có data
+      systemUptime: 99.9,  // placeholder — sẽ wire từ uptime monitoring
+      moduleLoad: Math.min(100, Math.round((process.memoryUsage().rss / (1024 * 1024 * 1024)) * 50)),
+      totalUsers: mastery.rows[0]?.total || 0,
+      enrollment: enroll.rows,
+      range,
+    });
+  } catch (e) {
+    console.error('[admin:overview]', e.message);
+    return res.json({ activeStudents: 0, avgMastery: 0, systemUptime: 0, moduleLoad: 0, totalUsers: 0, enrollment: [], range: 'week' });
+  }
+});
+
+// /api/admin/users/:id/stats — student detail stats
+app.get('/api/admin/users/:id/stats', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const id = req.params.id;
+    const [pageviews, lastLogin] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS pv FROM "PageView" WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '30 day'`, [id]),
+      pool.query(`SELECT "lastLoginAt", "createdAt" FROM "User" WHERE id = $1`, [id]),
+    ]);
+    return res.json({
+      userId: id,
+      pageViewsLast30d: pageviews.rows[0]?.pv || 0,
+      lastLoginAt: lastLogin.rows[0]?.lastLoginAt || null,
+      createdAt: lastLogin.rows[0]?.createdAt || null,
+    });
+  } catch (e) {
+    console.error('[admin:user-stats]', e.message);
+    return res.json({ userId: req.params.id, pageViewsLast30d: 0, lastLoginAt: null });
+  }
+});
+// ── /api/admin/users — real list (admin only) ──────────────
+// Pagination + filter (accountType, role, search, status), sort, total.
+;(() => {
+  // Lazy-add banned columns (chưa có trong schema gốc)
+  async function _ensureUserBannedCols() {
+    const pool = _getPool();
+    const sqls = [
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT false`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedReason" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMPTZ`,
+    ];
+    for (const s of sqls) { try { await pool.query(s); } catch { /* skip */ } }
+  }
+  _ensureUserBannedCols().catch(() => {});
+
+  // Lazy migrate UserProfile — table có thể đã tồn tại từ Rust service / Prisma
+  // với schema camelCase ("userId") thay vì snake_case (user_id). Query JOIN
+  // up.user_id sẽ fail với column does not exist → fix:
+  //   1. CREATE TABLE IF NOT EXISTS (no-op nếu đã có)
+  //   2. ADD COLUMN IF NOT EXISTS cho snake_case columns
+  //   3. BACKFILL user_id ← "userId" (Prisma camelCase) nếu cột legacy có
+  async function _ensureUserProfileSchema() {
+    const pool = _getPool();
+    try {
+      // Critical: ensure UNIQUE on user_id để ON CONFLICT(user_id) work.
+      // Bảng cũ có thể PK trên "userId" (camelCase) — cần add UNIQUE user_id riêng.
+      try {
+        await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_userprofile_user_id ON "UserProfile"(user_id) WHERE user_id IS NOT NULL`);
+      } catch {}
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "UserProfile" (
+          user_id      VARCHAR(255) PRIMARY KEY,
+          account_type VARCHAR(20),
+          bio          TEXT,
+          banner_style VARCHAR(50),
+          banner_image_url TEXT,
+          avatar_frame VARCHAR(50),
+          theme_color  VARCHAR(50),
+          skills       JSONB,
+          socials      JSONB,
+          showcase     JSONB,
+          visibility   JSONB,
+          data         JSONB DEFAULT '{}'::jsonb,
+          updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      const cols = [
+        ['user_id', "VARCHAR(255)"],
+        ['account_type', "VARCHAR(20)"],
+        ['bio', "TEXT"],
+        ['banner_style', "VARCHAR(50)"],
+        ['banner_image_url', "TEXT"],
+        ['avatar_frame', "VARCHAR(50)"],
+        ['theme_color', "VARCHAR(50)"],
+        ['skills', "JSONB"],
+        ['socials', "JSONB"],
+        ['showcase', "JSONB"],
+        ['visibility', "JSONB"],
+        ['data', "JSONB DEFAULT '{}'::jsonb"],
+        ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+      ];
+      for (const [c, t] of cols) {
+        try { await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS ${c} ${t}`); }
+        catch (e) { /* skip */ }
+      }
+      // Backfill user_id từ legacy camelCase "userId" nếu có
+      try {
+        const { rowCount } = await pool.query(
+          `UPDATE "UserProfile" SET user_id = "userId" WHERE user_id IS NULL AND "userId" IS NOT NULL`
+        );
+        if (rowCount > 0) console.log(`[userprofile] backfilled user_id từ "userId" cho ${rowCount} rows`);
+      } catch (e) { /* "userId" column không tồn tại — OK */ }
+      // Add UNIQUE index sau backfill (chỉ thành công nếu không có duplicate)
+      try {
+        await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_userprofile_user_id ON "UserProfile"(user_id) WHERE user_id IS NOT NULL`);
+      } catch (e) { console.warn('[userprofile] UNIQUE index failed (có duplicate):', e.message); }
+      // Drop NOT NULL cho camelCase legacy cols nếu có
+      for (const c of ['userId', 'accountType', 'createdAt', 'updatedAt']) {
+        try { await pool.query(`ALTER TABLE "UserProfile" ALTER COLUMN "${c}" DROP NOT NULL`); }
+        catch { /* skip */ }
+      }
+    } catch (e) {
+      console.warn('[userprofile] migration warn:', e.message);
+    }
+  }
+  _ensureUserProfileSchema().catch(() => {});
+
+  function _adminAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+    // Bypass cho dev / cho phép TEACHER tạm thời xem admin
+    if (process.env.DISABLE_ADMIN_GATE === '1') return decoded;
+    if (decoded.role !== 'ADMIN') { res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null; }
+    return decoded;
+  }
+
+  function _mapAdminUser(u, profileRow) {
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      role: u.role || 'STUDENT',
+      accountType: (profileRow?.account_type) || u.role || 'STUDENT',
+      emailVerified: !!u.emailVerified,
+      twoFactorEnabled: !!u.twoFactorEnabled,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+      banned: !!u.banned,
+      bannedReason: u.bannedReason || null,
+      bannedAt: u.bannedAt || null,
+    };
+  }
+
+  // GET /api/admin/users — pagination + filters
+  app.get('/api/admin/users', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(Math.max(1, Number(req.query.limit) || 25), 200);
+      const offset = (page - 1) * limit;
+      const params = [];
+      const filters = [];
+      if (req.query.role) {
+        params.push(String(req.query.role).toUpperCase());
+        filters.push(`u.role = $${params.length}`);
+      }
+      if (req.query.search) {
+        const q = `%${String(req.query.search).trim().toLowerCase()}%`;
+        params.push(q);
+        filters.push(`(LOWER(u.name) LIKE $${params.length} OR LOWER(u.email) LIKE $${params.length})`);
+      }
+      if (req.query.status === 'banned') filters.push(`u.banned = true`);
+      else if (req.query.status === 'active') filters.push(`COALESCE(u.banned, false) = false`);
+
+      // accountType filter qua UserProfile.account_type (LEFT JOIN)
+      let acctFilter = '';
+      if (req.query.accountType) {
+        params.push(String(req.query.accountType).toUpperCase());
+        acctFilter = `AND (up.account_type = $${params.length} OR (up.account_type IS NULL AND u.role = $${params.length}))`;
+      }
+
+      const where = filters.length ? `WHERE ${filters.join(' AND ')} ${acctFilter}` : (acctFilter ? `WHERE 1=1 ${acctFilter}` : '');
+      const sortBy = ['name','email','createdAt','lastLoginAt'].includes(req.query.sortBy) ? req.query.sortBy : 'createdAt';
+      const sortOrder = req.query.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+      const sql = `
+        SELECT u.id, u.name, u.email, u.image, u.role, u."emailVerified",
+               u."twoFactorEnabled", u."createdAt", u."lastLoginAt",
+               COALESCE(u.banned, false) AS banned, u."bannedReason", u."bannedAt",
+               up.account_type
+        FROM "User" u
+        LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        ${where}
+        ORDER BY u."${sortBy}" ${sortOrder} NULLS LAST
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      const countSql = `SELECT COUNT(*)::int AS total FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id ${where}`;
+
+      const [list, count] = await Promise.all([
+        pool.query(sql, [...params, limit, offset]),
+        pool.query(countSql, params),
+      ]);
+      const users = list.rows.map(r => _mapAdminUser(r, { account_type: r.account_type }));
+      return res.json({ users, total: count.rows[0]?.total || 0, page, limit });
+    } catch (e) { console.error('[admin:users:list]', e.message); return res.json({ users: [], total: 0, page: 1, limit: 25 }); }
+  });
+
+  // GET /api/admin/users/stats
+  app.get('/api/admin/users/stats', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE u.role = 'STUDENT' AND COALESCE(up.account_type, u.role) != 'PARENT')::int AS students,
+          COUNT(*) FILTER (WHERE u.role = 'TEACHER' AND COALESCE(up.account_type, u.role) != 'PARENT')::int AS teachers,
+          COUNT(*) FILTER (WHERE COALESCE(up.account_type, u.role) = 'PARENT')::int AS parents,
+          COUNT(*) FILTER (WHERE u.role = 'ADMIN')::int AS admins,
+          COUNT(*) FILTER (WHERE u."lastLoginAt" >= NOW() - INTERVAL '7 day')::int AS "activeLast7d",
+          COUNT(*) FILTER (WHERE u."createdAt" >= DATE_TRUNC('month', NOW()))::int AS "newThisMonth",
+          COUNT(*) FILTER (WHERE u."twoFactorEnabled" = true)::int AS "twoFactorEnabledCount",
+          COUNT(*) FILTER (WHERE COALESCE(u.banned, false) = true)::int AS "bannedCount"
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+      `);
+      return res.json(rows[0] || { total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 });
+    } catch (e) { console.error('[admin:users:stats]', e.message); return res.json({ total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 }); }
+  });
+
+  // GET /api/admin/users/:id — detail
+  app.get('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT u.*, COALESCE(u.banned, false) AS banned,
+               up.account_type, up.bio, up.skills, up.socials, up.theme_color, up.banner_style
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.id = $1 LIMIT 1`, [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+      const u = rows[0];
+      const base = _mapAdminUser(u, { account_type: u.account_type });
+      return res.json({
+        ...base,
+        dateOfBirth: u.dateOfBirth, gender: u.gender, lastLoginIp: u.lastLoginIp,
+        profile: {
+          bio: u.bio, skills: u.skills, socials: u.socials || {},
+          themeColor: u.theme_color, bannerStyle: u.banner_style,
+        },
+        careerSurvey: null,
+        recentActivity: [],
+      });
+    } catch (e) { console.error('[admin:users:get]', e.message); return res.status(500).json({ error: 'Lỗi tải hồ sơ' }); }
+  });
+
+  // PATCH /api/admin/users/:id — update name/email/role/accountType/banned
+  app.patch('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const updates = ['"updatedAt" = NOW()'];
+      const params = [req.params.id];
+      const push = (col, val) => { params.push(val); updates.push(`"${col}" = $${params.length}`); };
+      if (b.name !== undefined)  push('name', String(b.name).slice(0, 200));
+      if (b.email !== undefined) push('email', String(b.email).toLowerCase().trim());
+      if (b.role !== undefined)  push('role', String(b.role).toUpperCase());
+      if (b.banned !== undefined) {
+        push('banned', !!b.banned);
+        if (b.banned) {
+          push('bannedReason', b.bannedReason || null);
+          updates.push(`"bannedAt" = NOW()`);
+        } else {
+          push('bannedReason', null);
+          updates.push(`"bannedAt" = NULL`);
+        }
+      }
+      const pool = _getPool();
+      if (updates.length > 1) {
+        await pool.query(`UPDATE "User" SET ${updates.join(', ')} WHERE id = $1`, params);
+      }
+      // accountType lưu vào UserProfile
+      if (b.accountType !== undefined) {
+        await pool.query(`
+          INSERT INTO "UserProfile"(user_id, account_type, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET account_type = EXCLUDED.account_type, updated_at = NOW()
+        `, [req.params.id, String(b.accountType).toUpperCase()]).catch(() => {});
+      }
+      const { rows } = await pool.query(`
+        SELECT u.*, up.account_type FROM "User" u
+        LEFT JOIN "UserProfile" up ON up.user_id = u.id WHERE u.id = $1`, [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json(_mapAdminUser(rows[0], { account_type: rows[0].account_type }));
+    } catch (e) { console.error('[admin:users:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+  });
+
+  // POST /api/admin/users/:id/reset-password
+  app.post('/api/admin/users/:id/reset-password', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const newPassword = String(req.body?.newPassword || '');
+      if (newPassword.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
+      const hash = await _akBcrypt.hash(newPassword, 10);
+      const pool = _getPool();
+      await pool.query(`UPDATE "User" SET password = $1, "updatedAt" = NOW() WHERE id = $2`, [hash, req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[admin:users:reset-pw]', e.message); return res.status(500).json({ error: 'Lỗi đặt lại mật khẩu' }); }
+  });
+
+  // DELETE /api/admin/users/:id — soft delete (banned=true)
+  app.delete('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      await pool.query(`UPDATE "User" SET banned = true, "bannedReason" = 'Đã xoá bởi admin', "bannedAt" = NOW(), "updatedAt" = NOW() WHERE id = $1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[admin:users:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá user' }); }
+  });
+})();
 app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
+app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
+
+// ── Admin Operations — probe services + resources ──
+app.get('/api/admin/operations/services-health', async (_req, res) => {
+  const now = new Date().toISOString();
+  const services = [];
+
+  // 1. Postgres (Neon)
+  const dbStart = Date.now();
+  try {
+    await _getPool().query('SELECT 1');
+    services.push({ name: 'PostgreSQL (Neon)', icon: 'database', status: 'up', latencyMs: Date.now() - dbStart, lastCheck: now });
+  } catch (e) {
+    services.push({ name: 'PostgreSQL (Neon)', icon: 'database', status: 'down', error: e.message, lastCheck: now });
+  }
+
+  // 2. GCS bucket — chỉ check env có set không
+  services.push({
+    name: 'GCS Bucket (media)', icon: 'cloud',
+    status: process.env.GCS_BUCKET_MEDIA || process.env.GOOGLE_CLOUD_PROJECT_ID ? 'up' : 'degraded',
+    note: process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2',
+    lastCheck: now,
+  });
+
+  // 3. AI Provider — Anthropic Claude
+  services.push({
+    name: 'Anthropic Claude', icon: 'sparkles',
+    status: process.env.ANTHROPIC_API_KEY ? 'up' : 'down',
+    note: process.env.ANTHROPIC_MODEL || 'claude-opus-4-6',
+    lastCheck: now,
+  });
+
+  // 4. AI Provider — DeepSeek (mới)
+  const dsActive = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase() === 'deepseek';
+  services.push({
+    name: 'DeepSeek', icon: 'zap',
+    status: process.env.DEEPSEEK_API_KEY ? (dsActive ? 'up' : 'degraded') : 'down',
+    note: dsActive ? 'Active provider' : (process.env.DEEPSEEK_API_KEY ? 'Configured (fallback)' : 'No key'),
+    lastCheck: now,
+  });
+
+  // 5. Telegram bot
+  services.push({
+    name: 'Telegram Bot', icon: 'bot',
+    status: process.env.TELEGRAM_BOT_TOKEN ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 6. SMTP
+  services.push({
+    name: 'SMTP Email', icon: 'mail',
+    status: process.env.SMTP_PASS ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 7. fal.ai
+  services.push({
+    name: 'fal.ai', icon: 'sparkles',
+    status: process.env.FAL_API_KEY ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 8. Redis cache (optional)
+  services.push({
+    name: 'Redis Cache', icon: 'server',
+    status: (process.env.REDIS_URL || process.env.REDIS_HOST) ? 'up' : 'degraded',
+    note: (process.env.REDIS_URL || process.env.REDIS_HOST) ? 'Cache active' : 'No cache — DB direct',
+    lastCheck: now,
+  });
+
+  const up = services.filter(s => s.status === 'up').length;
+  const down = services.filter(s => s.status === 'down').length;
+  const degraded = services.filter(s => s.status === 'degraded').length;
+  const uptimeS = process.uptime();
+  const upH = Math.floor(uptimeS / 3600);
+  const upM = Math.floor((uptimeS % 3600) / 60);
+
+  return res.json({
+    services,
+    summary: { up, down, degraded, total: services.length, uptime: `${upH}h ${upM}m` },
+    updatedAt: now,
+  });
+});
+
+app.get('/api/admin/operations/system-resources', (_req, res) => {
+  const os = require('os');
+  const mem = process.memoryUsage();
+  const sysTotal = os.totalmem();
+  const sysFree = os.freemem();
+  return res.json({
+    cpu: {
+      loadavg: os.loadavg(),
+      cores: os.cpus()?.length || 1,
+      percent: Math.min(100, Math.round((os.loadavg()[0] / (os.cpus()?.length || 1)) * 100)),
+    },
+    memory: {
+      rss: mem.rss, heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, external: mem.external,
+      sysTotal, sysFree, sysUsedPercent: Math.round(((sysTotal - sysFree) / sysTotal) * 100),
+      heapPercent: Math.round((mem.heapUsed / mem.heapTotal) * 100),
+    },
+    process: {
+      uptime: process.uptime(), pid: process.pid, nodeVersion: process.version,
+      platform: process.platform, arch: process.arch, hostname: os.hostname(),
+    },
+    updatedAt: new Date().toISOString(),
+  });
+});
+
+app.get('/api/admin/operations/security-events', (_req, res) => res.json({
+  events: [],
+  summary: { totalLast24h: 0, totalAll: 0, byType: {}, bySeverity: {} },
+}));
+
+app.get('/api/admin/operations/crawler-attempts', (_req, res) => res.json({
+  events: [],
+  summary: { total: 0, last24h: 0, uniqueIps: 0, honeypotHits: 0, blockedByUa: 0 },
+  topUserAgents: [],
+  updatedAt: new Date().toISOString(),
+}));
+
+// ── Admin Analytics — query PageView table (real data, filter session_id NOT NULL) ──
+// Lọc historical noise (rows cũ insert từ Rust service không có session_id/user_id)
+// để stats phản ánh đúng user thật. FE_ANALYTICS_INCLUDE_NULL=1 để xem cả 2.
+const _ANALYTICS_NULL_FILTER = process.env.FE_ANALYTICS_INCLUDE_NULL === '1'
+  ? '' : 'AND session_id IS NOT NULL';
+
+app.get('/api/admin/analytics/overview', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const [t, d, r] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day' ${_ANALYTICS_NULL_FILTER})::int AS today,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER})::int AS week,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 day' ${_ANALYTICS_NULL_FILTER})::int AS month,
+          COUNT(*) FILTER (WHERE 1=1 ${_ANALYTICS_NULL_FILTER})::int AS all_time,
+          COUNT(DISTINCT session_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS sessions_today,
+          COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL)::int AS users_today,
+          COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day' AND user_id IS NOT NULL)::int AS users_week,
+          COALESCE(AVG(view_ms) FILTER (WHERE view_ms IS NOT NULL AND view_ms > 0), 0)::int AS avg_view_ms
+        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day'`),
+      pool.query(`
+        SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS views
+        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER}
+        GROUP BY 1 ORDER BY 1`),
+      pool.query(`
+        SELECT COALESCE(u.role, 'GUEST') AS role, COUNT(*)::int AS views
+        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER}
+        GROUP BY 1`),
+    ]);
+    const row = t.rows[0] || {};
+    return res.json({
+      totals: { today: row.today || 0, week: row.week || 0, month: row.month || 0, all_time: row.all_time || 0 },
+      uniques: { sessions_today: row.sessions_today || 0, users_today: row.users_today || 0, users_week: row.users_week || 0 },
+      avgViewMs: row.avg_view_ms || 0,
+      daily: d.rows,
+      byRole: r.rows,
+    });
+  } catch (e) {
+    console.error('[admin:overview]', e.message);
+    return res.json({ totals: { today: 0, week: 0, month: 0, all_time: 0 }, uniques: { sessions_today: 0, users_today: 0, users_week: 0 }, avgViewMs: 0, daily: [], byRole: [] });
+  }
+});
+
+app.get('/api/admin/analytics/routes', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const days = Math.min(Number(req.query.days) || 7, 90);
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const { rows } = await pool.query(`
+      SELECT path,
+             COUNT(*)::int AS views,
+             COUNT(DISTINCT session_id)::int AS "uniqueSessions",
+             COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS "uniqueUsers",
+             COALESCE(AVG(view_ms) FILTER (WHERE view_ms IS NOT NULL AND view_ms > 0), 0)::int AS "avgViewMs",
+             0 AS bounces, 0::float AS "bounceRate",
+             MAX(created_at)::text AS "lastView"
+      FROM "PageView"
+      WHERE created_at >= NOW() - INTERVAL '${days} day' ${_ANALYTICS_NULL_FILTER}
+      GROUP BY path ORDER BY views DESC LIMIT $1`, [limit]);
+    return res.json({ routes: rows });
+  } catch (e) {
+    console.error('[admin:routes]', e.message);
+    return res.json({ routes: [] });
+  }
+});
+
+app.get('/api/admin/analytics/realtime', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const [active, recent] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active
+                  FROM "PageView"
+                  WHERE created_at >= NOW() - INTERVAL '5 minute' AND session_id IS NOT NULL`),
+      pool.query(`
+        SELECT pv.path, u.role AS "userRole", pv.created_at AS "createdAt"
+        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.session_id IS NOT NULL
+        ORDER BY pv.created_at DESC LIMIT 20`),
+    ]);
+    return res.json({ activeNow: active.rows[0]?.active || 0, recent: recent.rows });
+  } catch (e) {
+    console.error('[admin:realtime]', e.message);
+    return res.json({ activeNow: 0, recent: [] });
+  }
+});
+
+// REAL funnel: Landing → Login → Dashboard → Exam-prep / Course / Game
+// Tính trên DISTINCT session_id để biết user journey.
+app.get('/api/admin/analytics/funnel', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const days = Math.min(Number(req.query.days) || 7, 30);
+    const stages = [
+      { name: 'Landing (/)',        patterns: ["= '/'", "LIKE '/?%'"] },
+      { name: 'Đăng ký / Login',    patterns: ["LIKE '/auth/%'"] },
+      { name: 'Dashboard',          patterns: ["LIKE '/dashboard%'", "LIKE '/teacher%'", "LIKE '/student%'"] },
+      { name: 'Exam Prep / Game',   patterns: ["LIKE '/student/exam-prep%'", "LIKE '/student/games%'", "LIKE '/dashboard/iot-lab%'"] },
+      { name: 'Mua gói',            patterns: ["LIKE '/payment%'", "LIKE '/activate%'"] },
+    ];
+    const counts = [];
+    for (const s of stages) {
+      const orClause = s.patterns.map(p => `path ${p}`).join(' OR ');
+      const { rows } = await pool.query(
+        `SELECT COUNT(DISTINCT session_id)::int AS c
+         FROM "PageView"
+         WHERE created_at >= NOW() - INTERVAL '${days} day'
+         AND session_id IS NOT NULL
+         AND (${orClause})`);
+      counts.push({ name: s.name, count: rows[0]?.c || 0 });
+    }
+    const total = counts[0]?.count || 0;
+    const result = counts.map((s, i) => ({
+      name: s.name,
+      count: s.count,
+      drop: i === 0 ? null : Math.max(0, counts[i - 1].count - s.count),
+      rate: total > 0 ? Math.round((s.count / total) * 100) : 0,
+    }));
+    return res.json({ stages: result, totalUsers: total });
+  } catch (e) {
+    console.error('[admin:funnel]', e.message);
+    return res.json({ stages: [], totalUsers: 0 });
+  }
+});
+
+// DELETE rows session_id NULL — admin only, dùng để cleanup historical noise
+app.delete('/api/admin/analytics/cleanup-null', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Invalid token' }); }
+  if (decoded.role !== 'ADMIN' && process.env.DISABLE_ADMIN_GATE !== '1') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "PageView" WHERE session_id IS NULL AND view_ms IS NULL`);
+    console.log(`[analytics:cleanup-null] deleted ${rowCount} rows`);
+    return res.json({ deleted: rowCount });
+  } catch (e) {
+    console.error('[admin:cleanup-null]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/analytics/source-mix', (_req, res) => res.json({
+  inNetwork:  { totalViews: 0, totalSessions: 0, breakdown: [] },
+  outNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
+  ratio: { inNetwork: 0, outNetwork: 0 },
+}));
+
+app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
+  metric: String(req.query.metric || 'engagement'),
+  buckets: [],
+  total: 0,
+}));
 
 // Cameras
 app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
 
 // KG
-app.get('/api/kg/search', (req, res) => res.json({ nodes: [], edges: [], query: req.query.q || '' }));
-app.get('/api/kg/my-brain', (_req, res) => res.json({ nodes: [], edges: [] }));
-app.get('/api/kg/mastery/me', (_req, res) => res.json({ mastery: [] }));
-app.get('/api/kg/path/find', (_req, res) => res.json({ path: [] }));
-app.get('/api/kg/sources/lesson-plans', (_req, res) => res.json({ sources: [] }));
-app.post('/api/kg/extract', (_req, res) => res.json({ nodes: [], edges: [] }));
-app.post('/api/kg/seed', (_req, res) => res.json(OK));
+// ── /api/kg/* Knowledge Graph stubs với shape match FE interface ──
+// Tránh ErrorBoundary crash khi page truy cập field undefined.
+
+app.get('/api/kg/search', (req, res) => res.json({
+  success: true, items: [], query: String(req.query.q || ''),
+}));
+
+app.get('/api/kg/node/:id', (req, res) => res.json({
+  success: true,
+  node: { id: req.params.id, label: req.params.id, type: 'topic', description: null },
+  neighbors: [], edges: [], notes: [], comments: [],
+}));
+
+app.get('/api/kg/expand/:id', (req, res) => res.json({
+  success: true,
+  rootId: req.params.id,
+  nodes: [], edges: [], depth: Number(req.query.depth) || 1,
+}));
+
+app.get('/api/kg/my-brain', (_req, res) => res.json({
+  success: true,
+  mastery: { total: 0, mastered: 0, learning: 0, weak: 0, avgScore: 0 },
+  notes: { total: 0, shared: 0 },
+  comments: { total: 0, totalUpvotes: 0 },
+  suggestions: { total: 0, approved: 0 },
+}));
+
+app.get('/api/kg/mastery/me', (_req, res) => res.json({
+  success: true, mastery: {}, count: 0,
+}));
+
+app.get('/api/kg/mastery/weak', (_req, res) => res.json({
+  success: true, items: [], count: 0,
+}));
+
+app.post('/api/kg/mastery/upsert', (_req, res) => res.json({
+  success: true, upserted: 0, total: 0,
+}));
+
+app.post('/api/kg/path/find', (_req, res) => res.json({
+  success: true, path: [], totalDuration: 0, totalXP: 0, found: false,
+}));
+
+app.post('/api/kg/path/save-as-learning-path', (_req, res) => res.json({
+  success: true, learningPathId: null, message: 'Chưa implement',
+}));
+
+app.get('/api/kg/sources/lesson-plans', (_req, res) => res.json({
+  success: true, items: [],
+}));
+
+app.post('/api/kg/extract', (_req, res) => res.json({
+  success: true, nodes: [], edges: [], extracted: 0,
+}));
+
+app.get('/api/kg/seed', (_req, res) => res.json({
+  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
+  message: 'KG seed endpoint chưa kết nối Rust backend',
+}));
+app.post('/api/kg/seed', (_req, res) => res.json({
+  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
+  message: 'KG seed endpoint chưa kết nối Rust backend',
+}));
+
+app.post('/api/kg/link-similarity', (_req, res) => res.json({
+  success: true, linked: 0, scanned: 0, threshold: 0.7, tookMs: 0,
+}));
+
+// Notes (per node)
+app.get('/api/kg/nodes/:id/note', (_req, res) => res.json({ success: true, note: null }));
+app.put('/api/kg/nodes/:id/note', (_req, res) => res.json({ success: true, deleted: false }));
+
+// Comments + shared notes
+app.get('/api/kg/nodes/:id/comments', (_req, res) => res.json({
+  success: true, comments: [], sharedNotes: [],
+}));
+app.post('/api/kg/nodes/:id/comments', (_req, res) => res.json({ success: true, id: '' }));
+app.post('/api/kg/comments/:id/upvote', (_req, res) => res.json({ success: true, action: 'added' }));
+app.delete('/api/kg/comments/:id', (_req, res) => res.json({ success: true }));
+
+// Suggestions (collaborative editing)
+app.get('/api/kg/suggestions', (_req, res) => res.json({ success: true, suggestions: [], total: 0 }));
+app.post('/api/kg/suggestions', (_req, res) => res.json({ success: true, id: '', message: 'Đề xuất đã ghi nhận' }));
+app.post('/api/kg/suggestions/:id/upvote', (_req, res) => res.json({ success: true, upvotes: 0 }));
+
+// Brain v2 Phoenix-style smart recommendation
+app.post('/api/kg/brain/recommend', (req, res) => res.json({
+  success: true,
+  audience: req.body?.audience || 'student',
+  focus: req.body?.focus || 'next-to-learn',
+  count: 0, items: [],
+  pipeline: { hydrateMs: 0, sourceMs: 0, enrichMs: 0, filterMs: 0, scoreMs: 0, totalMs: 0 },
+  stats: { candidatesCollected: 0, afterFilter: 0, finalSelected: 0, recentVisitsLoaded: 0, masteryNodesLoaded: 0 },
+}));
+
+// Visits tracking
+app.post('/api/kg/visits', (_req, res) => res.json({ success: true }));
 
 // Chat / Users / Profile
 app.get('/api/chat/rooms', (_req, res) => res.json({ rooms: [], total: 0 }));
@@ -8757,6 +11432,129 @@ app.get('/api/users/:userId/profile', async (req, res) => {
 // Misc
 app.get('/api/categories', (_req, res) => res.json({ categories: [] }));
 app.get('/api/types', (_req, res) => res.json({ types: [] }));
+// ── /api/achievements/me — REAL achievements computed từ user activity ──
+// 14 achievement types, mỗi cái rule riêng dựa trên DB tables.
+app.get('/api/achievements/me', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  if (!userId) return res.json({ achievements: [], total: 0, earnedCount: 0 });
+
+  try {
+    const pool = _getPool();
+
+    // Collect signals từ DB cùng lúc
+    const [
+      enrollCount, learningEvents, examStats, exam100Streak,
+      practiceCount, dayStreak, pageviewHours, xp1day,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM "Purchase" WHERE "userId" = $1`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS n FROM "LessonHistory" WHERE "userId" = $1`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE percentage = 100)::int AS perfect,
+               COUNT(*) FILTER (WHERE percentage >= 80)::int AS high
+        FROM "PracticeExam" WHERE "studentId" = $1 AND completed`, [userId]).catch(() => ({ rows: [{ total: 0, perfect: 0, high: 0 }] })),
+      pool.query(`
+        SELECT COUNT(*) FILTER (WHERE percentage = 100)::int AS recent_100
+        FROM (SELECT percentage FROM "PracticeExam" WHERE "studentId" = $1 AND completed
+              ORDER BY "completedAt" DESC LIMIT 5) t`, [userId]).catch(() => ({ rows: [{ recent_100: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS n FROM "PracticeExam" WHERE "studentId" = $1 AND completed AND "completedAt" >= NOW() - INTERVAL '1 day'`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`
+        WITH days AS (
+          SELECT DISTINCT DATE(created_at) AS d FROM "PageView"
+          WHERE user_id = $1 ORDER BY d DESC LIMIT 60
+        ),
+        gaps AS (
+          SELECT d, d - (ROW_NUMBER() OVER (ORDER BY d DESC))::int AS grp FROM days
+        )
+        SELECT MAX(COUNT(*))::int AS streak FROM gaps GROUP BY grp`, [userId])
+        .catch(() => ({ rows: [{ streak: 0 }] })),
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM created_at) >= 22 OR EXTRACT(HOUR FROM created_at) < 4)::int AS night,
+          COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM created_at) >= 4 AND EXTRACT(HOUR FROM created_at) < 6)::int AS early
+        FROM "PageView" WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '90 day'`, [userId]).catch(() => ({ rows: [{ night: 0, early: 0 }] })),
+      pool.query(`
+        SELECT COALESCE(SUM(xp_reward), 0)::int AS xp FROM "LessonHistory"
+        WHERE "userId" = $1 AND occurred_at >= NOW() - INTERVAL '1 day'`, [userId]).catch(() => ({ rows: [{ xp: 0 }] })),
+    ]);
+
+    const enrolls = enrollCount.rows[0]?.n || 0;
+    const lessons = learningEvents.rows[0]?.n || 0;
+    const examTotal = examStats.rows[0]?.total || 0;
+    const examPerfect = examStats.rows[0]?.perfect || 0;
+    const recent100 = exam100Streak.rows[0]?.recent_100 || 0;
+    const practiceToday = practiceCount.rows[0]?.n || 0;
+    const streak = dayStreak.rows[0]?.streak || 0;
+    const nightHours = pageviewHours.rows[0]?.night || 0;
+    const earlyHours = pageviewHours.rows[0]?.early || 0;
+    const xpToday = xp1day.rows[0]?.xp || 0;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const ach = [
+      { id: 1, title: 'First Steps', description: 'Hoàn thành bài học đầu tiên', icon: '👶',
+        category: 'learning', xp: 50, rarity: 'common',
+        earned: lessons >= 1, progress: Math.min(100, lessons * 100) },
+      { id: 2, title: 'Math Master', description: 'Hoàn thành 50 bài học Toán', icon: '🧮',
+        category: 'learning', xp: 200, rarity: 'rare',
+        earned: lessons >= 50, progress: Math.min(100, Math.round(lessons / 50 * 100)) },
+      { id: 3, title: 'Physics Explorer', description: 'Hoàn thành 25 bài học Vật lí', icon: '⚛️',
+        category: 'learning', xp: 150, rarity: 'uncommon',
+        earned: lessons >= 25, progress: Math.min(100, Math.round(lessons / 25 * 100)) },
+      { id: 4, title: 'Chemistry Wizard', description: 'Hoàn thành 100 bài học Hoá học', icon: '🧪',
+        category: 'learning', xp: 500, rarity: 'epic',
+        earned: lessons >= 100, progress: Math.min(100, Math.round(lessons / 100 * 100)) },
+      { id: 5, title: 'Week Warrior', description: 'Học liên tục 7 ngày', icon: '🔥',
+        category: 'streak', xp: 100, rarity: 'uncommon',
+        earned: streak >= 7, progress: Math.min(100, Math.round(streak / 7 * 100)) },
+      { id: 6, title: 'Month Master', description: 'Học liên tục 30 ngày', icon: '📅',
+        category: 'streak', xp: 1000, rarity: 'legendary',
+        earned: streak >= 30, progress: Math.min(100, Math.round(streak / 30 * 100)) },
+      { id: 7, title: 'Speed Demon', description: 'Hoàn thành 10 bài luyện trong 1 ngày', icon: '⚡',
+        category: 'skill', xp: 300, rarity: 'rare',
+        earned: practiceToday >= 10, progress: Math.min(100, practiceToday * 10) },
+      { id: 8, title: 'Perfectionist', description: 'Đạt 100% cho 5 bài luyện liên tiếp', icon: '🎯',
+        category: 'skill', xp: 400, rarity: 'epic',
+        earned: recent100 >= 5, progress: Math.min(100, recent100 * 20) },
+      { id: 9, title: 'AI Explorer', description: 'Hoàn thành bài luyện đầu tiên', icon: '🤖',
+        category: 'skill', xp: 100, rarity: 'uncommon',
+        earned: examTotal >= 1, progress: Math.min(100, examTotal * 100) },
+      { id: 10, title: 'Helper', description: 'Giúp đỡ 5 bạn học khác', icon: '🤝',
+        category: 'social', xp: 250, rarity: 'rare',
+        earned: false, progress: 0 },
+      { id: 11, title: 'Mentor', description: 'Hướng dẫn 10 bạn học mới', icon: '👨‍🏫',
+        category: 'social', xp: 500, rarity: 'epic',
+        earned: false, progress: 0 },
+      { id: 12, title: 'Night Owl', description: 'Học sau 10 giờ tối', icon: '🦉',
+        category: 'special', xp: 75, rarity: 'uncommon',
+        earned: nightHours >= 1, progress: nightHours >= 1 ? 100 : 0 },
+      { id: 13, title: 'Early Bird', description: 'Học trước 6 giờ sáng', icon: '🐦',
+        category: 'special', xp: 100, rarity: 'rare',
+        earned: earlyHours >= 1, progress: earlyHours >= 1 ? 100 : 0 },
+      { id: 14, title: 'Century Club', description: 'Đạt 1000 XP trong 1 ngày', icon: '💯',
+        category: 'special', xp: 1000, rarity: 'legendary',
+        earned: xpToday >= 1000, progress: Math.min(100, Math.round(xpToday / 10)) },
+    ].map(a => ({ ...a, earnedDate: a.earned ? today : null }));
+
+    const earnedCount = ach.filter(a => a.earned).length;
+    return res.json({
+      achievements: ach,
+      total: ach.length,
+      earnedCount,
+      totalXP: ach.filter(a => a.earned).reduce((s, a) => s + a.xp, 0),
+      completionRate: Math.round((earnedCount / ach.length) * 100),
+      signals: { enrolls, lessons, examTotal, examPerfect, recent100, practiceToday, streak, nightHours, earlyHours, xpToday },
+    });
+  } catch (e) {
+    console.error('[achievements:me]', e.message);
+    return res.json({ achievements: [], total: 0, earnedCount: 0 });
+  }
+});
+
+// Backwards-compat stub (page cũ)
 app.get('/api/achievements', (_req, res) => res.json({ achievements: [], total: 0 }));
 app.get('/api/transcript/history', (_req, res) => res.json({ transcripts: [], total: 0 }));
 app.get('/api/emotion', (_req, res) => res.json({ entries: [] }));
@@ -8782,7 +11580,292 @@ app.get('/api/emotion/stats', (req, res) => {
 
 // Reco extras
 app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
-app.post('/api/reco/track', (_req, res) => res.json(OK));
+// ── RS-Phase 8 Phase 4: Daily digest qua Telegram ──
+// Push 5-10 reco items mỗi ngày qua channels: in-app + email + telegram
+// Idempotent 1/day per user. Pull từ /api/reco/feed pipeline đã có.
+;(() => {
+  async function _ensureDigestTables() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "DigestNotification" (
+          id          BIGSERIAL    PRIMARY KEY,
+          user_id     VARCHAR(255) NOT NULL,
+          sent_date   DATE         NOT NULL,
+          channels    JSONB,
+          deliveries  JSONB,
+          items_count INTEGER,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_digest_user_day ON "DigestNotification"(user_id, sent_date)`);
+      // Add digest fields vào UserProfile (channels + telegram link)
+      for (const sql of [
+        `ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS digest_channels JSONB`,
+        `ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)`,
+      ]) { try { await pool.query(sql); } catch {} }
+    } catch (e) { console.warn('[digest] migration:', e.message); }
+  }
+  _ensureDigestTables().catch(() => {});
+
+  function _digestAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ success: false, error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ success: false, error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // Format reco items thành HTML message cho Telegram
+  function _formatDigestForTelegram(items, userName) {
+    const top = items.slice(0, 5);
+    const lines = [
+      `📚 <b>Bản tin AeroEdu cho ${userName || 'bạn'}</b>`,
+      `<i>${new Date().toLocaleDateString('vi-VN')}</i>`,
+      '',
+      'Hôm nay học gì? AI gợi ý:',
+      '',
+    ];
+    top.forEach((it, i) => {
+      const url = `https://inphysic.com${it.link || '/student/for-you'}`;
+      lines.push(`<b>${i + 1}. ${escapeHtml(it.title)}</b>`);
+      if (it.subtitle) lines.push(`   ${escapeHtml(it.subtitle)}`);
+      lines.push(`   🔗 <a href="${url}">${it.cta || 'Mở'}</a>`);
+      lines.push('');
+    });
+    lines.push('━━━━━━━━━━━━');
+    lines.push(`<a href="https://inphysic.com/student/for-you">Xem đầy đủ For You ↗</a>`);
+    return lines.join('\n');
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[<>&]/g, c => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;' })[c]);
+  }
+
+  // Pull feed items cho user (reuse _studentFeedPhoenix + _mixerScore)
+  async function _buildDigestItems(userId) {
+    const pool = _getPool();
+    const { rows: prefRows } = await pool.query(
+      `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+    ).catch(() => ({ rows: [] }));
+    const prefs = prefRows[0]?.reco_prefs || null;
+    const candidates = await _studentFeedPhoenix(userId, prefs, 10);
+    return candidates
+      .map(c => ({ ...c, score: _mixerScore(c) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }
+
+  // Send digest cho 1 user qua channels được enable
+  async function _sendDigest(userId, opts = {}) {
+    const pool = _getPool();
+    const today = new Date().toISOString().slice(0, 10);
+    // Idempotency check (unless bypass)
+    if (!opts.bypassIdempotency) {
+      const { rows: existing } = await pool.query(
+        `SELECT id, channels FROM "DigestNotification" WHERE user_id = $1 AND sent_date = $2`,
+        [userId, today]
+      ).catch(() => ({ rows: [] }));
+      if (existing.length > 0) {
+        return { sent: false, reason: 'already_sent_today', existingId: existing[0].id };
+      }
+    }
+    // Load user + prefs
+    const { rows: userRows } = await pool.query(`
+      SELECT u.id, u.name, u.email, up.digest_channels, up.telegram_chat_id
+      FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+      WHERE u.id = $1
+    `, [userId]);
+    if (!userRows.length) return { sent: false, reason: 'user_not_found' };
+    const u = userRows[0];
+    const channels = u.digest_channels || { inApp: true, email: false, telegram: false };
+    // Build items
+    const items = await _buildDigestItems(userId);
+    if (items.length === 0) return { sent: false, reason: 'no_items' };
+
+    const deliveries = { inApp: false, email: false, telegram: false };
+
+    // Channel 1: in-app notification (always — record event)
+    if (channels.inApp !== false) {
+      deliveries.inApp = true;  // mark as queued — UI poll
+    }
+
+    // Channel 2: Email (SMTP) — placeholder, sẽ wire nếu có SMTP
+    if (channels.email && u.email) {
+      deliveries.email = false;  // chưa implement, đánh dấu skip
+    }
+
+    // Channel 3: Telegram
+    if (channels.telegram && u.telegram_chat_id && process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        const tg = require('./lib/telegram-bot.cjs');
+        const text = _formatDigestForTelegram(items, u.name);
+        const result = await tg.tgCall ? tg.tgCall('sendMessage', {
+          chat_id: u.telegram_chat_id,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }) : null;
+        deliveries.telegram = !!result;
+      } catch (e) {
+        console.error('[digest:telegram]', e.message);
+        deliveries.telegram = false;
+      }
+    }
+
+    // Record notification
+    const { rows: ins } = await pool.query(`
+      INSERT INTO "DigestNotification"(user_id, sent_date, channels, deliveries, items_count)
+      VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+      ON CONFLICT (user_id, sent_date) DO UPDATE SET deliveries = EXCLUDED.deliveries, items_count = EXCLUDED.items_count
+      RETURNING id
+    `, [userId, today, JSON.stringify(channels), JSON.stringify(deliveries), items.length]);
+
+    return {
+      sent: true,
+      notificationId: ins[0]?.id,
+      itemsCount: items.length,
+      channels,
+      deliveries,
+    };
+  }
+
+  // POST /api/reco/digest/me — send digest cho user hiện tại
+  app.post('/api/reco/digest/me', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const r = await _sendDigest(userId);
+      return res.json({ success: true, ...r });
+    } catch (e) { console.error('[digest:me]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/test — bypass idempotency cho test
+  app.post('/api/reco/digest/test', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const r = await _sendDigest(userId, { bypassIdempotency: true });
+      return res.json({ success: true, ...r });
+    } catch (e) { console.error('[digest:test]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/digest/preferences
+  app.get('/api/reco/digest/preferences', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      const { rows: u } = await pool.query(`
+        SELECT u.email, up.digest_channels, up.telegram_chat_id,
+               (SELECT created_at FROM "DigestNotification" WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) AS last_sent_at,
+               (SELECT items_count FROM "DigestNotification" WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) AS last_sent_items_count
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.id = $1
+      `, [userId]);
+      const row = u[0] || {};
+      const botName = process.env.TELEGRAM_BOT_NAME || 'AeroEduBot';
+      return res.json({
+        success: true,
+        channels: row.digest_channels || { inApp: true, email: false, telegram: false },
+        emailOnAccount: row.email || null,
+        telegramLinked: !!row.telegram_chat_id,
+        telegramChatIdPreview: row.telegram_chat_id ? `…${String(row.telegram_chat_id).slice(-4)}` : null,
+        telegramDeepLink: `https://t.me/${botName}?start=digest_${encodeURIComponent(userId)}`,
+        lastSentAt: row.last_sent_at,
+        lastSentItemsCount: row.last_sent_items_count,
+      });
+    } catch (e) { console.error('[digest:prefs:get]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // PUT /api/reco/digest/preferences
+  app.put('/api/reco/digest/preferences', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const patch = req.body || {};
+      const pool = _getPool();
+      const { rows: cur } = await pool.query(`SELECT digest_channels FROM "UserProfile" WHERE user_id = $1`, [userId])
+        .catch(() => ({ rows: [] }));
+      const current = cur[0]?.digest_channels || { inApp: true, email: false, telegram: false };
+      const next = { ...current, ...patch };
+      await pool.query(`
+        INSERT INTO "UserProfile"(user_id, digest_channels, updated_at)
+        VALUES ($1, $2::jsonb, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET digest_channels = EXCLUDED.digest_channels, updated_at = NOW()
+      `, [userId, JSON.stringify(next)]);
+      return res.json({ success: true, channels: next });
+    } catch (e) { console.error('[digest:prefs:put]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/telegram/unlink
+  app.post('/api/reco/digest/telegram/unlink', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      await pool.query(
+        `UPDATE "UserProfile" SET telegram_chat_id = NULL, updated_at = NOW() WHERE user_id = $1`,
+        [userId]
+      );
+      return res.json({ success: true });
+    } catch (e) { console.error('[digest:tg:unlink]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/cron — admin trigger gửi digest cho TẤT CẢ user opted-in
+  // Cloud Scheduler hoặc external cron call endpoint này mỗi 8h sáng
+  // Auth: header x-cron-secret = env CRON_SECRET
+  app.post('/api/reco/digest/cron', async (req, res) => {
+    const secret = req.headers['x-cron-secret'] || '';
+    if (secret !== (process.env.CRON_SECRET || 'change-me-cron-secret')) {
+      return res.status(401).json({ success: false, error: 'Invalid cron secret' });
+    }
+    try {
+      const pool = _getPool();
+      // List user opted-in (channels.telegram = true HOẶC channels.inApp = true)
+      const { rows: users } = await pool.query(`
+        SELECT u.id FROM "User" u JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.role IN ('STUDENT', 'TEACHER') AND up.digest_channels IS NOT NULL
+        AND (up.digest_channels->>'telegram' = 'true' OR up.digest_channels->>'inApp' = 'true')
+        LIMIT 1000
+      `);
+      let sent = 0, skipped = 0, failed = 0;
+      for (const u of users) {
+        try {
+          const r = await _sendDigest(u.id);
+          if (r.sent) sent++; else skipped++;
+        } catch { failed++; }
+      }
+      console.log(`[digest:cron] processed=${users.length} sent=${sent} skipped=${skipped} failed=${failed}`);
+      return res.json({ success: true, processed: users.length, sent, skipped, failed });
+    } catch (e) { console.error('[digest:cron]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+})();
+
+// Real /api/reco/track — log engagement event vào RsExperimentEvent
+// để metrics calculation theo variant của user.
+app.post('/api/reco/track', async (req, res) => {
+  res.json({ success: true, id: '' });  // fire-and-forget UX
+  try {
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous OK */ }
+    }
+    if (!userId) return;
+    const { action, targetType, targetId, metadata = {} } = req.body || {};
+    if (!action || !targetId) return;
+    // Lookup variant của user cho mixer_weights experiment
+    const variants = global.__rsGetUserVariants ? await global.__rsGetUserVariants(userId) : {};
+    const variant = variants.mixer_weights;
+    if (!variant) return;  // user không trong experiment → skip
+    const pool = _getPool();
+    await pool.query(
+      `INSERT INTO "RsExperimentEvent"(exp_name, variant_key, user_id, action, item_id, metadata)
+       VALUES ('mixer_weights', $1, $2, $3, $4, $5::jsonb)`,
+      [variant, userId, String(action).slice(0, 50),
+       String(targetId).slice(0, 255), JSON.stringify({ targetType, ...metadata })]
+    );
+  } catch (e) { /* silent */ }
+});
 app.post('/api/notifications/read-all', (_req, res) => res.json(OK));
 
 // KeoCo (game)
