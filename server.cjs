@@ -2253,6 +2253,67 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ── GCS signed-URL upload (VideoUploader) — TRƯỚC proxy ──
+// Browser PUT file trực tiếp lên GCS, không qua Cloud Run → tiết kiệm
+// bandwidth + không bị giới hạn 32MB request body của Cloud Run.
+;(() => {
+  let _storage = null;
+  function _getStorage() {
+    if (_storage) return _storage;
+    try {
+      const { Storage } = require('@google-cloud/storage');
+      if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+        try {
+          const creds = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS);
+          _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2', credentials: creds });
+        } catch { _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2' }); }
+      } else {
+        _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2' });
+      }
+    } catch (e) { console.error('[gcs] init:', e.message); }
+    return _storage;
+  }
+  const BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+
+  // POST /api/upload/video-signed-url { filename, contentType, courseId? }
+  app.post('/api/upload/video-signed-url', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+    try {
+      const storage = _getStorage();
+      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
+      const { filename = 'video.mp4', contentType = 'video/mp4', courseId } = req.body || {};
+      // Validate content type
+      if (!/^(video|audio)\//.test(contentType)) {
+        return res.status(400).json({ error: 'contentType phải là video/* hoặc audio/*' });
+      }
+      // Safe filename: timestamp + random + sanitized original
+      const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+      const userId = decoded.userId || decoded.id || decoded.sub || 'anon';
+      const prefix = courseId ? `courses/${String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_')}`
+                              : `uploads/${String(userId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      const gcsPath = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+      const file = storage.bucket(BUCKET).file(gcsPath);
+      const [uploadUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 60 * 60 * 1000,  // 1h
+        contentType,
+      });
+      const publicUrl = `https://storage.googleapis.com/${BUCKET}/${gcsPath}`;
+      return res.json({ uploadUrl, publicUrl, contentType, gcsPath });
+    } catch (e) {
+      console.error('[upload:signed-url]', e.message);
+      return res.status(500).json({ error: 'Lỗi tạo signed URL: ' + e.message });
+    }
+  });
+})();
+
 // ── Stub student-cams (camera webcam HS làm bài) — TRƯỚC proxy ──
 // Endpoint thực sẽ join với ExamSubmission + WebcamSession table.
 // Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.

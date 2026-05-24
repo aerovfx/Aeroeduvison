@@ -19,7 +19,9 @@ import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 
 interface Props {
-  courseId: string
+  /** courseId hoặc generic identifier (vd: "learning-path", "assignment").
+   * Optional — nếu thiếu, BE auto fallback uploads/{userId}/ */
+  courseId?: string
   /** Loại media: video hoặc audio (signed URL endpoint accept cả 2) */
   mediaType?: 'video' | 'audio'
   /** Max size MB. Default 500 cho video, 100 cho audio */
@@ -97,10 +99,7 @@ export default function VideoUploader({
 
   const startUpload = async () => {
     if (!file) return
-    if (!courseId) {
-      setError('Thiếu courseId — không thể upload')
-      return
-    }
+    // courseId optional — BE fallback uploads/{userId}/
     setError(null)
     setUploading(true)
     setProgress(0)
