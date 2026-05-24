@@ -469,12 +469,26 @@ if (USE_NODEJS_AUTH) {
   });
 
   // ── POST /api/auth/register ───────────────────────────────
+  // Body: { email, password, name, role?: STUDENT|TEACHER, accountType?: STUDENT|TEACHER|PARENT }
+  // role là enum DB (STUDENT/TEACHER); accountType là UI sub-type (PARENT chia chung TEACHER role).
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { email, password, name } = req.body || {};
+      const { email, password, name, role: roleInput, accountType: acctInput } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email và mật khẩu không được để trống' });
       }
+
+      // Validate role — chỉ chấp nhận STUDENT hoặc TEACHER (ADMIN không tự đăng ký được)
+      const allowedRoles = ['STUDENT', 'TEACHER'];
+      const role = allowedRoles.includes(String(roleInput).toUpperCase())
+        ? String(roleInput).toUpperCase()
+        : 'STUDENT';  // default fallback
+
+      // Validate accountType — UI sub-type lưu vào UserProfile.account_type
+      const allowedAcct = ['STUDENT', 'TEACHER', 'PARENT'];
+      const accountType = allowedAcct.includes(String(acctInput).toUpperCase())
+        ? String(acctInput).toUpperCase()
+        : role;  // fallback theo role
 
       const pool = getPool();
       const existing = await pool.query(
@@ -496,16 +510,37 @@ if (USE_NODEJS_AUTH) {
           id, email, name, password, role, image,
           "emailVerified", "twoFactorEnabled", "failedLoginAttempts",
           "createdAt", "updatedAt"
-        ) VALUES ($1,$2,$3,$4,'STUDENT',NULL,NULL,false,0,$5,$6)`,
-        [id, email.toLowerCase().trim(), displayName, hash, now, now]
+        ) VALUES ($1,$2,$3,$4,$5,NULL,NULL,false,0,$6,$7)`,
+        [id, email.toLowerCase().trim(), displayName, hash, role, now, now]
       );
+
+      // Lưu accountType vào UserProfile để PARENT bền qua thiết bị
+      // (best-effort: bảng có thể chưa tồn tại — bọc try-catch)
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "UserProfile" (
+            user_id      VARCHAR(255) PRIMARY KEY,
+            account_type VARCHAR(20),
+            data         JSONB DEFAULT '{}'::jsonb,
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        await pool.query(
+          `INSERT INTO "UserProfile"(user_id, account_type, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO UPDATE SET account_type = EXCLUDED.account_type, updated_at = NOW()`,
+          [id, accountType]
+        );
+      } catch (e) {
+        console.warn('[auth:register] UserProfile save failed:', e.message);
+      }
 
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
       const user = rows[0];
       const token = issueToken(user);
-      console.log(`[auth:register] ✅ ${user.email}`);
+      console.log(`[auth:register] ✅ ${user.email} role=${role} accountType=${accountType}`);
       return res.status(201).json({
-        user: publicUser(user),
+        user: { ...publicUser(user), accountType },
         tokens: { accessToken: token, refreshToken: '' },
       });
     } catch (err) {
@@ -1111,6 +1146,1369 @@ app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
 app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
 
+// ── Career Survey + Teacher CPD (Knowledge Graph) — DB-backed
+// /api/users/me/career-survey GET/POST — khảo sát nghề nghiệp GV/PH/HS
+// /api/teachers/cpd          GET/POST — Continuing Professional Development log
+// Cần persistence để GV không mất tiến độ khi reload trang.
+
+async function _ensureKGTables() {
+  const pool = _getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "UserCareerSurvey" (
+      user_id     VARCHAR(255) PRIMARY KEY,
+      data        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+      completed   BOOLEAN      NOT NULL DEFAULT false,
+      updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('UserCareerSurvey', [
+    ['data',       "JSONB DEFAULT '{}'::jsonb"],
+    ['completed',  "BOOLEAN DEFAULT false"],
+    ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await _dropLegacyNotNull('UserCareerSurvey', ['userId','data','completed','createdAt','updatedAt']);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "TeacherCPD" (
+      user_id     VARCHAR(255) PRIMARY KEY,
+      progress    JSONB        NOT NULL DEFAULT '{}'::jsonb,
+      cpd_log     JSONB        NOT NULL DEFAULT '[]'::jsonb,
+      lat         NUMERIC,
+      lon         NUMERIC,
+      province    VARCHAR(100),
+      updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('TeacherCPD', [
+    ['progress',   "JSONB DEFAULT '{}'::jsonb"],
+    ['cpd_log',    "JSONB DEFAULT '[]'::jsonb"],
+    ['lat',        "NUMERIC"],
+    ['lon',        "NUMERIC"],
+    ['province',   "VARCHAR(100)"],
+    ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await _dropLegacyNotNull('TeacherCPD', ['userId','progress','cpdLog','lat','lon','province','createdAt','updatedAt']);
+}
+_ensureKGTables().catch(e => console.error('[kg] migration error:', e.message));
+
+function _kgAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+// GET /api/users/me/career-survey → { completed, data }
+app.get('/api/users/me/career-survey', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT data, completed FROM "UserCareerSurvey" WHERE user_id = $1`,
+      [decoded.sub]);
+    if (!rows.length) return res.json({ completed: false, data: null });
+    return res.json({ completed: rows[0].completed, data: rows[0].data });
+  } catch (e) { console.error('[career-survey:get]', e.message); return res.json({ completed: false, data: null }); }
+});
+
+// POST /api/users/me/career-survey { ...SurveyData } — upsert
+app.post('/api/users/me/career-survey', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const data = req.body || {};
+    const completed = !data.skipped;
+    const pool = _getPool();
+    await pool.query(`
+      INSERT INTO "UserCareerSurvey"(user_id, data, completed, updated_at)
+      VALUES ($1, $2::jsonb, $3, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        data = EXCLUDED.data, completed = EXCLUDED.completed, updated_at = NOW()
+    `, [decoded.sub, JSON.stringify(data), completed]);
+    return res.json({ ok: true, completed });
+  } catch (e) { console.error('[career-survey:post]', e.message); return res.status(500).json({ error: 'Lỗi lưu khảo sát' }); }
+});
+
+// GET /api/teachers/cpd → { progress, cpdLog, lat, lon, province }
+app.get('/api/teachers/cpd', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT progress, cpd_log, lat, lon, province FROM "TeacherCPD" WHERE user_id = $1`,
+      [decoded.sub]);
+    if (!rows.length) return res.json({ progress: {}, cpdLog: [], lat: null, lon: null, province: null });
+    const r = rows[0];
+    return res.json({ progress: r.progress || {}, cpdLog: r.cpd_log || [], lat: r.lat, lon: r.lon, province: r.province });
+  } catch (e) { console.error('[cpd:get]', e.message); return res.json({ progress: {}, cpdLog: [] }); }
+});
+
+// POST /api/teachers/cpd { progress, cpdLog?, lat?, lon?, province? } — upsert
+app.post('/api/teachers/cpd', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const { progress = {}, cpdLog = null, lat = null, lon = null, province = null } = req.body || {};
+    const pool = _getPool();
+    if (cpdLog !== null) {
+      await pool.query(`
+        INSERT INTO "TeacherCPD"(user_id, progress, cpd_log, lat, lon, province, updated_at)
+        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          progress = EXCLUDED.progress, cpd_log = EXCLUDED.cpd_log,
+          lat = COALESCE(EXCLUDED.lat, "TeacherCPD".lat),
+          lon = COALESCE(EXCLUDED.lon, "TeacherCPD".lon),
+          province = COALESCE(EXCLUDED.province, "TeacherCPD".province),
+          updated_at = NOW()
+      `, [decoded.sub, JSON.stringify(progress), JSON.stringify(cpdLog), lat, lon, province]);
+    } else {
+      await pool.query(`
+        INSERT INTO "TeacherCPD"(user_id, progress, lat, lon, province, updated_at)
+        VALUES ($1, $2::jsonb, $3, $4, $5, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          progress = EXCLUDED.progress,
+          lat = COALESCE(EXCLUDED.lat, "TeacherCPD".lat),
+          lon = COALESCE(EXCLUDED.lon, "TeacherCPD".lon),
+          province = COALESCE(EXCLUDED.province, "TeacherCPD".province),
+          updated_at = NOW()
+      `, [decoded.sub, JSON.stringify(progress), lat, lon, province]);
+    }
+    return res.json({ ok: true });
+  } catch (e) { console.error('[cpd:post]', e.message); return res.status(500).json({ error: 'Lỗi lưu CPD' }); }
+});
+
+// ── Teacher Exams CRUD — TRƯỚC proxy teacher-service ──
+// /api/teacher/exams* dùng cùng bảng "Exam" (đã có _ensureExamTables ở dưới).
+// Cần POST/upload-pdf/answer-key cho CreateExam page.
+
+// POST /api/teacher/exams — tạo đề thi mới (return { id } hoặc { exam: {id} })
+app.post('/api/teacher/exams', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = _getPool();
+    // Build description với metadata (subject, examType, passingScore, shuffle, sourceType)
+    const meta = JSON.stringify({
+      subject: b.subject, examType: b.examType,
+      passingScore: b.passingScore, shuffle: b.shuffle,
+      sourceType: b.sourceType, description: b.description || '',
+    });
+    const { rows } = await pool.query(`
+      INSERT INTO "Exam"(id, teacher_id, title, description, subject, grade, duration_min,
+                         total_points, status, settings)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
+      RETURNING id, title, status, created_at`,
+      [id, decoded.sub, String(b.title || 'Đề mới').slice(0, 500),
+       b.description || null, b.subject || null, b.grade || null,
+       Number(b.duration) || 45, Number(b.totalQuestions) || 0,
+       b.status || 'draft', meta]);
+    return res.json({ id: rows[0].id, exam: rows[0] });
+  } catch (e) { console.error('[teacher-exams:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo đề thi' }); }
+});
+
+// GET /api/teacher/exams/:id — detail + hydrate questions
+app.get('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+    const pool = _getPool();
+    // Cho phép xem đề của mình HOẶC public — match qua ANY của mọi user ID
+    const { rows } = await pool.query(
+      `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
+      [req.params.id, myIds]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+    const r = rows[0];
+    const settings = r.settings || {};
+    const qIds = Array.isArray(r.question_ids) ? r.question_ids : [];
+    const pointsMap = settings.pointsMap || {};
+
+    // Hydrate question rows + giữ thứ tự theo qIds
+    let questions = [];
+    if (qIds.length > 0) {
+      const { rows: qRows } = await pool.query(
+        `SELECT id, content, type, subject, grade, chapter, difficulty,
+                options, answer, explanation, tags, created_at, updated_at
+         FROM "Question" WHERE id = ANY($1::text[])`,
+        [qIds.map(String)]);
+      const byId = new Map(qRows.map(q => [q.id, q]));
+      questions = qIds.map((qid, idx) => {
+        const q = byId.get(String(qid));
+        if (!q) return null;
+        return {
+          id: q.id, order: idx + 1,
+          points: Number(pointsMap[q.id]) || 1,
+          content: q.content || '',
+          questionType: q.type || 'multiple_choice',
+          type: q.type || 'multiple_choice',
+          subject: q.subject, grade: q.grade, chapter: q.chapter,
+          difficulty: q.difficulty,
+          options: q.options || [],
+          correctAnswer: q.answer || '',
+          answer: q.answer || '',
+          explanation: q.explanation || null,
+          tags: q.tags || [],
+          createdAt: q.created_at, updatedAt: q.updated_at,
+        };
+      }).filter(Boolean);
+    }
+
+    return res.json({
+      exam: {
+        id: r.id, title: r.title, description: r.description,
+        subject: r.subject || settings.subject,
+        grade: r.grade, examType: settings.examType,
+        duration: r.duration_min, totalPoints: r.total_points,
+        totalQuestions: qIds.length,
+        status: r.status, sourceType: settings.sourceType,
+        passingScore: settings.passingScore, shuffle: settings.shuffle,
+        questionIds: qIds,
+        answerKey: settings.answerKey || [],
+        visibility: r.visibility || 'private',
+        isOwner: !!r.is_owner,
+        teacherId: r.teacher_id,
+        createdAt: r.created_at, updatedAt: r.updated_at,
+      },
+      questions,
+    });
+  } catch (e) { console.error('[teacher-exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
+});
+
+// PUT /api/teacher/exams/:id — full update (alias của PATCH cho frontend)
+app.put('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const updates = ['updated_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    const map = { title: 'title', subject: 'subject', grade: 'grade',
+                  duration: 'duration_min', description: 'description', status: 'status' };
+    for (const [key, col] of Object.entries(map)) {
+      if (b[key] !== undefined) { params.push(b[key]); updates.push(`${col} = $${params.length}`); }
+    }
+    if (b.visibility !== undefined && ['private','public'].includes(b.visibility)) {
+      params.push(b.visibility); updates.push(`visibility = $${params.length}`);
+    }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:put]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// POST /api/teacher/exams/:id/publish — đổi status + isPublic
+app.post('/api/teacher/exams/:id/publish', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const status = req.body?.status || 'published';
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET status = $1, updated_at = NOW() WHERE id = $2 AND teacher_id = $3`,
+      [status, req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true, status });
+  } catch (e) { console.error('[teacher-exams:publish]', e.message); return res.status(500).json({ error: 'Lỗi publish' }); }
+});
+
+// POST /api/teacher/exams/:id/questions/attach — gắn nhiều câu hỏi từ QB
+app.post('/api/teacher/exams/:id/questions/attach', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const ids = Array.isArray(req.body?.questionIds) ? req.body.questionIds
+              : Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ error: 'Thiếu questionIds[]' });
+    const pool = _getPool();
+    // Append unique IDs vào Exam.question_ids JSONB
+    const { rows } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    const cur = Array.isArray(rows[0].question_ids) ? rows[0].question_ids : [];
+    const merged = Array.from(new Set([...cur, ...ids.map(String)]));
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(merged), req.params.id]);
+    return res.json({ ok: true, attached: merged.length - cur.length, total: merged.length });
+  } catch (e) { console.error('[teacher-exams:attach]', e.message); return res.status(500).json({ error: 'Lỗi gắn câu hỏi' }); }
+});
+
+// DELETE /api/teacher/exams/:id/questions/:qid — gỡ câu hỏi khỏi đề
+app.delete('/api/teacher/exams/:id/questions/:qid', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    const cur = Array.isArray(rows[0].question_ids) ? rows[0].question_ids : [];
+    const next = cur.filter(x => String(x) !== String(req.params.qid));
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(next), req.params.id]);
+    return res.json({ ok: true, total: next.length });
+  } catch (e) { console.error('[teacher-exams:detach]', e.message); return res.status(500).json({ error: 'Lỗi gỡ câu hỏi' }); }
+});
+
+// POST /api/teacher/exams/:id/questions/reorder — sắp xếp lại
+app.post('/api/teacher/exams/:id/questions/reorder', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const ids = Array.isArray(req.body?.questionIds) ? req.body.questionIds : [];
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW()
+       WHERE id = $2 AND teacher_id = $3`,
+      [JSON.stringify(ids), req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:reorder]', e.message); return res.status(500).json({ error: 'Lỗi sắp xếp' }); }
+});
+
+// PATCH /api/teacher/exams/:id/questions/:qid — update points (lưu vào settings.pointsMap)
+app.patch('/api/teacher/exams/:id/questions/:qid', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const points = Number(req.body?.points);
+    if (!Number.isFinite(points)) return res.status(400).json({ error: 'Points phải là số' });
+    const pool = _getPool();
+    const { rowCount } = await pool.query(`
+      UPDATE "Exam"
+      SET settings = jsonb_set(COALESCE(settings, '{}'::jsonb), $1, to_jsonb($2::numeric)),
+          updated_at = NOW()
+      WHERE id = $3 AND teacher_id = $4`,
+      [`{pointsMap,${req.params.qid}}`, points, req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:points]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật điểm' }); }
+});
+
+// POST /api/teacher/exams/:id/questions — tạo câu hỏi mới TRONG đề (insert + attach)
+app.post('/api/teacher/exams/:id/questions', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const q = req.body || {};
+    const { randomUUID } = require('crypto');
+    const qid = randomUUID();
+    const pool = _getPool();
+    // Verify exam ownership
+    const { rows: exams } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!exams.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    // Insert question
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, content, type, subject, grade, difficulty, options, answer, explanation, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)`,
+      [qid, decoded.sub, q.content || '', q.type || 'multiple_choice',
+       q.subject || null, q.grade || null, q.difficulty || 'TH',
+       JSON.stringify(q.options || []), q.answer || q.correctAnswer || '',
+       q.explanation || null, JSON.stringify(q.tags || [])]);
+    // Attach to exam
+    const cur = Array.isArray(exams[0].question_ids) ? exams[0].question_ids : [];
+    const merged = [...cur, qid];
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(merged), req.params.id]);
+    return res.json({ ok: true, question: { id: qid } });
+  } catch (e) { console.error('[teacher-exams:newq]', e.message); return res.status(500).json({ error: 'Lỗi tạo câu hỏi' }); }
+});
+
+// POST /api/teacher/exams/upload-pdf — stub 501 (cần GCS storage)
+app.post('/api/teacher/exams/upload-pdf', (_req, res) =>
+  res.status(501).json({ error: 'Upload PDF cần GCS bucket — đang phát triển' }));
+
+// POST /api/teacher/exams/:id/answer-key — lưu đáp án vào settings JSONB
+app.post('/api/teacher/exams/:id/answer-key', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const questions = Array.isArray(req.body?.questions) ? req.body.questions : [];
+    const pool = _getPool();
+    const { rowCount } = await pool.query(`
+      UPDATE "Exam"
+      SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
+          updated_at = NOW()
+      WHERE id = $2 AND teacher_id = $3`,
+      [JSON.stringify({ answerKey: questions }), req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    return res.json({ ok: true, count: questions.length });
+  } catch (e) { console.error('[teacher-exams:answer-key]', e.message); return res.status(500).json({ error: 'Lỗi lưu đáp án' }); }
+});
+
+// PATCH /api/teacher/exams/:id — partial update
+app.patch('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const updates = ['updated_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    const map = { title: 'title', subject: 'subject', grade: 'grade',
+                  duration: 'duration_min', description: 'description', status: 'status' };
+    for (const [key, col] of Object.entries(map)) {
+      if (b[key] !== undefined) { params.push(b[key]); updates.push(`${col} = $${params.length}`); }
+    }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:patch]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// DELETE /api/teacher/exams/:id
+app.delete('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:del]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+});
+
+// ── Online Exam Room CRUD ─────────────────────────────────────
+// Phòng thi online thời gian thực — GV tạo, HS join bằng access code.
+;(() => {
+  async function _ensureOnlineRoomTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "OnlineExamRoom" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        teacher_id    VARCHAR(255) NOT NULL,
+        exam_id       VARCHAR(36),
+        name          VARCHAR(500) NOT NULL DEFAULT 'Phòng thi mới',
+        description   TEXT,
+        status        VARCHAR(20)  DEFAULT 'draft',
+        start_time    TIMESTAMPTZ,
+        end_time      TIMESTAMPTZ,
+        duration      INTEGER      DEFAULT 45,
+        access_code   VARCHAR(20),
+        is_public     BOOLEAN      DEFAULT false,
+        max_students  INTEGER,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('OnlineExamRoom', [
+      ['teacher_id', "VARCHAR(255)"], ['exam_id', "VARCHAR(36)"],
+      ['name', "VARCHAR(500)"], ['description', "TEXT"],
+      ['status', "VARCHAR(20) DEFAULT 'draft'"],
+      ['start_time', "TIMESTAMPTZ"], ['end_time', "TIMESTAMPTZ"],
+      ['duration', "INTEGER DEFAULT 45"], ['access_code', "VARCHAR(20)"],
+      ['is_public', "BOOLEAN DEFAULT false"], ['max_students', "INTEGER"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('OnlineExamRoom', ['teacherId','examId','name','description','status','startTime','endTime','duration','accessCode','isPublic','maxStudents','createdAt','updatedAt','userId','ownerId']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_room_teacher ON "OnlineExamRoom"(teacher_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_room_access_code ON "OnlineExamRoom"(access_code)`);
+  }
+  _ensureOnlineRoomTable().catch(e => console.error('[online-exam-room] migration:', e.message));
+
+  function roomAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  function roomRow(r) {
+    return {
+      id: r.id, name: r.name, description: r.description,
+      status: r.status || 'draft',
+      startTime: r.start_time, endTime: r.end_time,
+      duration: r.duration || 45,
+      accessCode: r.access_code, isPublic: !!r.is_public,
+      maxStudents: r.max_students,
+      examId: r.exam_id,
+      _count: { participants: 0, questions: 0 },
+    };
+  }
+
+  // GET /api/online-exam-room — list rooms GV tạo
+  app.get('/api/online-exam-room', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "OnlineExamRoom" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 100`,
+        [decoded.userId || decoded.id || decoded.sub]);
+      return res.json({ rooms: rows.map(roomRow), total: rows.length });
+    } catch (e) { console.error('[room:list]', e.message); return res.json({ rooms: [], total: 0 }); }
+  });
+
+  // POST /api/online-exam-room — tạo phòng
+  app.post('/api/online-exam-room', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const { randomUUID, randomBytes } = require('crypto');
+      const id = randomUUID();
+      const accessCode = (b.accessCode || randomBytes(3).toString('hex')).toUpperCase();
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "OnlineExamRoom"(id, teacher_id, exam_id, name, description, status,
+          start_time, end_time, duration, access_code, is_public, max_students)
+        VALUES ($1::text,$2::text,$3,$4::text,$5,$6::text,$7,$8,$9,$10::text,$11,$12)
+        RETURNING *`,
+        [id, userId, b.examId || null, String(b.name || 'Phòng thi mới').slice(0, 500),
+         b.description || null, b.status || 'draft',
+         b.startTime || null, b.endTime || null, Number(b.duration) || 45,
+         accessCode, !!b.isPublic, b.maxStudents || null]);
+      return res.json({ room: roomRow(rows[0]) });
+    } catch (e) { console.error('[room:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo phòng thi' }); }
+  });
+
+  // GET /api/online-exam-room/:id
+  app.get('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "OnlineExamRoom" WHERE id = $1`,
+        [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy phòng' });
+      return res.json({ room: roomRow(rows[0]) });
+    } catch (e) { console.error('[room:get]', e.message); return res.status(500).json({ error: 'Lỗi tải phòng' }); }
+  });
+
+  // PUT /api/online-exam-room/:id — update (status, etc)
+  app.put('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.id, userId];
+      const map = { name: 'name', description: 'description', status: 'status',
+                    examId: 'exam_id', startTime: 'start_time', endTime: 'end_time',
+                    duration: 'duration', isPublic: 'is_public', maxStudents: 'max_students' };
+      for (const [k, col] of Object.entries(map)) {
+        if (b[k] !== undefined) { params.push(b[k]); updates.push(`${col} = $${params.length}`); }
+      }
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "OnlineExamRoom" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
+        params);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy phòng (hoặc không phải chủ)' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[room:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật phòng' }); }
+  });
+
+  // DELETE /api/online-exam-room/:id
+  app.delete('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "OnlineExamRoom" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, userId]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy phòng' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[room:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá phòng' }); }
+  });
+
+  // GET /api/online-exam-room/:id/schedule — schedule (stub empty)
+  app.get('/api/online-exam-room/:id/schedule', (_req, res) =>
+    res.json({ schedules: [], total: 0 }));
+
+  // POST /api/online-exam-room/join — HS/GV join bằng accessCode hoặc roomId
+  app.post('/api/online-exam-room/join', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const { accessCode, roomId } = req.body || {};
+      const pool = _getPool();
+      let row;
+      if (roomId) {
+        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE id = $1`, [roomId]);
+        row = r.rows[0];
+      } else if (accessCode) {
+        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE access_code = $1`,
+          [String(accessCode).toUpperCase()]);
+        row = r.rows[0];
+      }
+      if (!row) return res.status(404).json({ error: 'Mã phòng không hợp lệ' });
+      return res.json({ ok: true, roomId: row.id });
+    } catch (e) { console.error('[room:join]', e.message); return res.status(500).json({ error: 'Lỗi join phòng' }); }
+  });
+})();
+
+// ── Teacher-Student Link (kết nối GV-HS) — TRƯỚC proxy teacher-service ──
+;(() => {
+  async function _ensureTSLTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "TeacherStudentLink" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        student_id  VARCHAR(255),
+        student_email VARCHAR(255),
+        status      VARCHAR(20)  DEFAULT 'pending',
+        direction   VARCHAR(20)  DEFAULT 'teacher_invites',
+        message     TEXT,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('TeacherStudentLink', [
+      ['teacher_id', "VARCHAR(255)"], ['student_id', "VARCHAR(255)"],
+      ['student_email', "VARCHAR(255)"], ['status', "VARCHAR(20) DEFAULT 'pending'"],
+      ['direction', "VARCHAR(20) DEFAULT 'teacher_invites'"], ['message', "TEXT"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('TeacherStudentLink', ['teacherId','studentId','studentEmail','status','direction','message','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_teacher ON "TeacherStudentLink"(teacher_id, status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_student ON "TeacherStudentLink"(student_id, status)`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "TeacherInviteLink" (
+        token       VARCHAR(64)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        label       VARCHAR(200),
+        max_uses    INTEGER,
+        used_count  INTEGER      DEFAULT 0,
+        expires_at  TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('TeacherInviteLink', [
+      ['teacher_id', "VARCHAR(255)"], ['label', "VARCHAR(200)"],
+      ['max_uses', "INTEGER"], ['used_count', "INTEGER DEFAULT 0"],
+      ['expires_at', "TIMESTAMPTZ"], ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('TeacherInviteLink', ['teacherId','label','maxUses','usedCount','expiresAt','createdAt']);
+  }
+  _ensureTSLTable().catch(e => console.error('[tsl] migration:', e.message));
+
+  function tslAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET /api/teacher-student-link/pending → { incoming, outgoing }
+  app.get('/api/teacher-student-link/pending', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows: incoming } = await pool.query(
+        `SELECT * FROM "TeacherStudentLink"
+         WHERE status = 'pending' AND direction = 'student_requests' AND teacher_id = ANY($1::text[])
+         ORDER BY created_at DESC`, [myIds]);
+      const { rows: outgoing } = await pool.query(
+        `SELECT * FROM "TeacherStudentLink"
+         WHERE status = 'pending' AND direction = 'teacher_invites' AND teacher_id = ANY($1::text[])
+         ORDER BY created_at DESC`, [myIds]);
+      return res.json({ incoming, outgoing });
+    } catch (e) { console.error('[tsl:pending]', e.message); return res.json({ incoming: [], outgoing: [] }); }
+  });
+
+  // GET /api/teacher/my-students — list HS đã approved
+  app.get('/api/teacher/my-students', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT tsl.id AS link_id, tsl.student_id, tsl.student_email, tsl.created_at,
+               u.name, u.email, u.image, u.role
+        FROM "TeacherStudentLink" tsl
+        LEFT JOIN "User" u ON u.id = tsl.student_id
+        WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
+        ORDER BY tsl.created_at DESC LIMIT 500`, [myIds]);
+      const students = rows.map(r => ({
+        id: r.student_id, linkId: r.link_id, email: r.email || r.student_email,
+        name: r.name || (r.student_email ? r.student_email.split('@')[0] : '(Chưa tên)'),
+        image: r.image, role: r.role || 'STUDENT', linkedAt: r.created_at,
+      }));
+      return res.json({ students, total: students.length });
+    } catch (e) { console.error('[tsl:my-students]', e.message); return res.json({ students: [], total: 0 }); }
+  });
+
+  // POST /api/teacher-student-link/request — HS request kết nối với GV (email)
+  app.post('/api/teacher-student-link/request', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { teacherEmail, message } = req.body || {};
+      if (!teacherEmail) return res.status(400).json({ error: 'Thiếu teacherEmail' });
+      const pool = _getPool();
+      const { rows: teachers } = await pool.query(
+        `SELECT id FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+        [String(teacherEmail).toLowerCase().trim()]);
+      if (!teachers.length) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction, message)
+        VALUES ($1, $2, $3, 'pending', 'student_requests', $4)`,
+        [linkId, teachers[0].id, myId, message || null]);
+      return res.json({ ok: true, linkId });
+    } catch (e) { console.error('[tsl:request]', e.message); return res.status(500).json({ error: 'Lỗi gửi yêu cầu' }); }
+  });
+
+  // POST /api/teacher-student-link/invite — GV mời HS (email)
+  app.post('/api/teacher-student-link/invite', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { studentEmail, message } = req.body || {};
+      if (!studentEmail) return res.status(400).json({ error: 'Thiếu studentEmail' });
+      const pool = _getPool();
+      const { rows: students } = await pool.query(
+        `SELECT id FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
+        [String(studentEmail).toLowerCase().trim()]);
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, student_email, status, direction, message)
+        VALUES ($1, $2, $3, $4, 'pending', 'teacher_invites', $5)`,
+        [linkId, myId, students[0]?.id || null, String(studentEmail).toLowerCase().trim(), message || null]);
+      return res.json({ ok: true, linkId });
+    } catch (e) { console.error('[tsl:invite]', e.message); return res.status(500).json({ error: 'Lỗi mời HS' }); }
+  });
+
+  // POST /api/teacher-student-link/:id/approve
+  app.post('/api/teacher-student-link/:id/approve', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "TeacherStudentLink" SET status = 'approved', updated_at = NOW()
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:approve]', e.message); return res.status(500).json({ error: 'Lỗi duyệt' }); }
+  });
+
+  // POST /api/teacher-student-link/:id/reject
+  app.post('/api/teacher-student-link/:id/reject', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "TeacherStudentLink" SET status = 'rejected', updated_at = NOW()
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:reject]', e.message); return res.status(500).json({ error: 'Lỗi từ chối' }); }
+  });
+
+  // DELETE /api/teacher-student-link/:id — unlink
+  app.delete('/api/teacher-student-link/:id', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "TeacherStudentLink"
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // GET /api/users/search?q=...&role=STUDENT
+  app.get('/api/users/search', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const q = String(req.query.q || '').trim();
+      const role = req.query.role;
+      if (q.length < 2) return res.json({ users: [] });
+      const pool = _getPool();
+      const params = [`%${q.toLowerCase()}%`];
+      let where = `(LOWER(email) LIKE $1 OR LOWER(name) LIKE $1)`;
+      if (role) { params.push(role); where += ` AND role = $${params.length}`; }
+      const { rows } = await pool.query(
+        `SELECT id, email, name, role, image FROM "User" WHERE ${where} LIMIT 20`, params);
+      return res.json({ users: rows });
+    } catch (e) { console.error('[users:search]', e.message); return res.json({ users: [] }); }
+  });
+
+  // ── Invite Link ────────────────────────────────────
+  // POST /api/teacher-student-link/invite-link/create
+  app.post('/api/teacher-student-link/invite-link/create', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { label, maxUses, expiresInDays } = req.body || {};
+      const { randomBytes } = require('crypto');
+      const token = randomBytes(16).toString('hex');
+      const expiresAt = expiresInDays ? new Date(Date.now() + Number(expiresInDays) * 86400_000) : null;
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "TeacherInviteLink"(token, teacher_id, label, max_uses, expires_at)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [token, myId, label || null, maxUses ? Number(maxUses) : null, expiresAt]);
+      const url = `https://inphysic.com/teacher-invite/${token}`;
+      return res.json({ token, url, label: label || null, maxUses: maxUses || null, expiresAt });
+    } catch (e) { console.error('[tsl:link-create]', e.message); return res.status(500).json({ error: 'Lỗi tạo link mời' }); }
+  });
+
+  // GET /api/teacher-student-link/invite-link/list
+  app.get('/api/teacher-student-link/invite-link/list', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT token, label, max_uses AS "maxUses", used_count AS "usedCount",
+                expires_at AS "expiresAt", created_at AS "createdAt"
+         FROM "TeacherInviteLink" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC LIMIT 50`,
+        [myIds]);
+      const links = rows.map(r => ({ ...r, url: `https://inphysic.com/teacher-invite/${r.token}` }));
+      return res.json({ links });
+    } catch (e) { console.error('[tsl:link-list]', e.message); return res.json({ links: [] }); }
+  });
+
+  // DELETE /api/teacher-student-link/invite-link/:token
+  app.delete('/api/teacher-student-link/invite-link/:token', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "TeacherInviteLink" WHERE token = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.token, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:link-delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá link' }); }
+  });
+
+  // GET /api/teacher-student-link/invite-link/:token/info — public, không cần auth
+  app.get('/api/teacher-student-link/invite-link/:token/info', async (req, res) => {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT til.label, til.max_uses AS "maxUses", til.used_count AS "usedCount",
+               til.expires_at AS "expiresAt", u.name AS "teacherName", u.email AS "teacherEmail", u.image AS "teacherImage"
+        FROM "TeacherInviteLink" til
+        LEFT JOIN "User" u ON u.id = til.teacher_id
+        WHERE til.token = $1`, [req.params.token]);
+      if (!rows.length) return res.status(404).json({ error: 'Link không hợp lệ' });
+      const r = rows[0];
+      const expired = r.expiresAt && new Date(r.expiresAt) < new Date();
+      const full = r.maxUses && r.usedCount >= r.maxUses;
+      if (expired) return res.status(410).json({ error: 'Link đã hết hạn' });
+      if (full) return res.status(410).json({ error: 'Link đã đạt giới hạn sử dụng' });
+      return res.json({
+        teacher: { name: r.teacherName, email: r.teacherEmail, image: r.teacherImage },
+        label: r.label, maxUses: r.maxUses, usedCount: r.usedCount, expiresAt: r.expiresAt,
+      });
+    } catch (e) { console.error('[tsl:link-info]', e.message); return res.status(500).json({ error: 'Lỗi tải link' }); }
+  });
+
+  // POST /api/teacher-student-link/invite-link/:token/join
+  app.post('/api/teacher-student-link/invite-link/:token/join', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      const { rows: links } = await pool.query(
+        `SELECT * FROM "TeacherInviteLink" WHERE token = $1`, [req.params.token]);
+      if (!links.length) return res.status(404).json({ error: 'Link không hợp lệ' });
+      const link = links[0];
+      if (link.expires_at && new Date(link.expires_at) < new Date()) return res.status(410).json({ error: 'Link đã hết hạn' });
+      if (link.max_uses && link.used_count >= link.max_uses) return res.status(410).json({ error: 'Link đã đạt giới hạn' });
+      // Tạo link approved ngay (HS click vào → tự động kết nối)
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction)
+        VALUES ($1, $2, $3, 'approved', 'student_requests')`,
+        [linkId, link.teacher_id, myId]);
+      await pool.query(`UPDATE "TeacherInviteLink" SET used_count = used_count + 1 WHERE token = $1`, [req.params.token]);
+      return res.json({ ok: true, status: 'approved', linkId, message: 'Đã kết nối thành công với GV.' });
+    } catch (e) { console.error('[tsl:link-join]', e.message); return res.status(500).json({ error: 'Lỗi kết nối' }); }
+  });
+})();
+
+// ── Lesson Plans CRUD — TRƯỚC proxy teacher-service ──
+// Bảng "LessonPlan" được migrate ở section riêng (line ~6582).
+// Handlers ở đây để Express match trước proxy /api/teacher/*.
+;(() => {
+  function lpAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  function lpRow(r) {
+    return {
+      id: r.id, title: r.title, subject: r.subject, grade: r.grade,
+      tags: r.tags || [], wordCount: r.word_count || 0,
+      isArchived: !!r.is_archived,
+      format: r.format || 'html', latexProjectId: r.latex_project_id,
+      gcsBackupUrl: r.gcs_backup_url, gcsBackupAt: r.gcs_backup_at,
+      lastSavedAt: r.last_saved_at,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+      contentPreview: r.content ? String(r.content).slice(0, 200) : '',
+    };
+  }
+  // Helper: match teacher_id qua ANY của mọi JWT field
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET list
+  app.get('/api/teacher/lesson-plans', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT id, title, subject, grade, tags, word_count, is_archived, format,
+               latex_project_id, gcs_backup_url, gcs_backup_at, last_saved_at,
+               created_at, updated_at, content, teacher_id
+        FROM "LessonPlan" WHERE teacher_id = ANY($1::text[]) ORDER BY updated_at DESC LIMIT 200
+      `, [_ids(decoded)]);
+      return res.json({ plans: rows.map(lpRow), count: rows.length });
+    } catch (e) { console.error('[lp:list]', e.message); return res.json({ plans: [], count: 0 }); }
+  });
+
+  // GET detail
+  app.get('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "LessonPlan" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _ids(decoded)]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+      const r = rows[0];
+      return res.json({ ...lpRow(r), content: r.content || '', contentJson: r.content_json || null });
+    } catch (e) { console.error('[lp:get]', e.message); return res.status(500).json({ error: 'Lỗi tải giáo án' }); }
+  });
+
+  // POST create
+  app.post('/api/teacher/lesson-plans', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { title = 'Giáo án mới', content = '', contentJson = null,
+              subject = null, grade = null, tags = [] } = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const wordCount = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "LessonPlan"(id, teacher_id, title, subject, grade, tags, content, content_json, word_count)
+        VALUES ($1::text,$2::text,$3::text,$4,$5,$6::jsonb,$7::text,$8::jsonb,$9)
+        RETURNING *
+      `, [id, myId, String(title).slice(0, 500), subject, grade,
+          JSON.stringify(Array.isArray(tags) ? tags : []),
+          String(content), contentJson ? JSON.stringify(contentJson) : null, wordCount]);
+      const r = rows[0];
+      return res.json({ plan: { ...lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+    } catch (e) { console.error('[lp:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo giáo án' }); }
+  });
+
+  // PATCH update / auto-save
+  app.patch('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const { title, content, contentJson, subject, grade, tags, isArchived } = req.body || {};
+      const updates = ['updated_at = NOW()', 'last_saved_at = NOW()'];
+      const params = [req.params.id, _ids(decoded)];
+      if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
+      if (subject !== undefined)      { params.push(subject);                       updates.push(`subject = $${params.length}`); }
+      if (grade !== undefined)        { params.push(grade);                         updates.push(`grade = $${params.length}`); }
+      if (tags !== undefined)         { params.push(JSON.stringify(Array.isArray(tags) ? tags : [])); updates.push(`tags = $${params.length}::jsonb`); }
+      if (content !== undefined) {
+        const wc = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+        params.push(String(content)); updates.push(`content = $${params.length}`);
+        params.push(wc);              updates.push(`word_count = $${params.length}`);
+      }
+      if (contentJson !== undefined)  { params.push(contentJson ? JSON.stringify(contentJson) : null); updates.push(`content_json = $${params.length}::jsonb`); }
+      if (isArchived !== undefined)   { params.push(!!isArchived);                  updates.push(`is_archived = $${params.length}`); }
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `UPDATE "LessonPlan" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[]) RETURNING *`,
+        params);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án hoặc không có quyền' });
+      const r = rows[0];
+      return res.json({ plan: { ...lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+    } catch (e) { console.error('[lp:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu giáo án' }); }
+  });
+
+  // DELETE
+  app.delete('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "LessonPlan" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _ids(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // Stubs GCS
+  app.post('/api/teacher/lesson-plans/:id/backup', (_req, res) => res.status(501).json({ error: 'GCS backup chưa khả dụng' }));
+  app.post('/api/teacher/lesson-plans/from-latex', (_req, res) => res.status(501).json({ error: 'Import từ LaTeX chưa khả dụng' }));
+  app.get('/api/teacher/lesson-plans-gcs', (_req, res) => res.json({ snapshots: [], count: 0, bucket: '', prefix: '' }));
+  app.delete('/api/teacher/lesson-plans-gcs/:filename', (_req, res) => res.status(501).json({ error: 'GCS delete chưa khả dụng' }));
+})();
+
+// ── Gradebook (TT58/TT22) — TRƯỚC proxy teacher-service ──
+// Migration "Gradebook" table được khai báo ở section riêng (line ~7170+,
+// trong block ClassSubject+Gradebook). Handler ở đây để bypass proxy.
+;(() => {
+  function _gbAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _gbIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET /api/teacher/gradebook?classId=&subject=&semester=
+  app.get('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _gbAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester } = req.query;
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _gbIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const [studs, grds] = await Promise.all([
+        pool.query(
+          `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
+                  ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh"
+           FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+          [classId]),
+        pool.query(
+          `SELECT student_id AS "studentId", ddgtx, ddggk, ddgck,
+                  note_progress AS "noteProgress", note_record AS "noteRecord"
+           FROM "Gradebook" WHERE class_id = $1 AND subject = $2 AND semester = $3`,
+          [classId, subject, semester]).catch(() => ({ rows: [] })),
+      ]);
+      const grades = {};
+      for (const g of grds.rows) {
+        grades[g.studentId] = {
+          ddgtx: Array.isArray(g.ddgtx) ? g.ddgtx.map(v => v == null ? null : Number(v)) : [],
+          ddggk: g.ddggk == null ? null : Number(g.ddggk),
+          ddgck: g.ddgck == null ? null : Number(g.ddgck),
+          noteProgress: g.noteProgress || '',
+          noteRecord:   g.noteRecord   || '',
+        };
+      }
+      return res.json({ students: studs.rows, grades });
+    } catch (e) { console.error('[gb:get]', e.message); return res.status(500).json({ error: 'Lỗi tải sổ điểm' }); }
+  });
+
+  // POST /api/teacher/gradebook — body: { classId, subject, semester, rows: [...] }
+  app.post('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _gbAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester, rows = [] } = req.body || {};
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows phải là array' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _gbIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const { randomUUID } = require('crypto');
+      const clamp = v => {
+        if (v == null || v === '') return null;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.min(10, Math.round(n * 100) / 100));
+      };
+      let saved = 0;
+      for (const r of rows) {
+        if (!r?.studentId) continue;
+        const ddgtx = Array.isArray(r.ddgtx) ? r.ddgtx.map(clamp) : [];
+        const ddggk = clamp(r.ddggk);
+        const ddgck = clamp(r.ddgck);
+        const noteP = r.noteProgress != null ? String(r.noteProgress) : null;
+        const noteR = r.noteRecord   != null ? String(r.noteRecord)   : null;
+        await pool.query(`
+          INSERT INTO "Gradebook"(id, class_id, subject, semester, student_id,
+                                  ddgtx, ddggk, ddgck, note_progress, note_record, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,NOW())
+          ON CONFLICT (class_id, subject, semester, student_id) DO UPDATE
+            SET ddgtx = EXCLUDED.ddgtx, ddggk = EXCLUDED.ddggk, ddgck = EXCLUDED.ddgck,
+                note_progress = EXCLUDED.note_progress, note_record = EXCLUDED.note_record,
+                updated_at = NOW()
+        `, [randomUUID(), classId, subject, semester, r.studentId,
+            JSON.stringify(ddgtx), ddggk, ddgck, noteP, noteR]);
+        saved++;
+      }
+      return res.json({ ok: true, saved });
+    } catch (e) { console.error('[gb:save]', e.message); return res.status(500).json({ error: 'Lỗi lưu sổ điểm' }); }
+  });
+})();
+
+// ── GCS signed-URL upload (VideoUploader) — TRƯỚC proxy ──
+// Browser PUT file trực tiếp lên GCS, không qua Cloud Run → tiết kiệm
+// bandwidth + không bị giới hạn 32MB request body của Cloud Run.
+;(() => {
+  let _storage = null;
+  function _getStorage() {
+    if (_storage) return _storage;
+    try {
+      const { Storage } = require('@google-cloud/storage');
+      if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+        try {
+          const creds = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS);
+          _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2', credentials: creds });
+        } catch { _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2' }); }
+      } else {
+        _storage = new Storage({ projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2' });
+      }
+    } catch (e) { console.error('[gcs] init:', e.message); }
+    return _storage;
+  }
+  const BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+
+  // POST /api/upload/video-signed-url { filename, contentType, courseId? }
+  app.post('/api/upload/video-signed-url', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+    try {
+      const storage = _getStorage();
+      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
+      const { filename = 'video.mp4', contentType = 'video/mp4', courseId } = req.body || {};
+      // Validate content type
+      if (!/^(video|audio)\//.test(contentType)) {
+        return res.status(400).json({ error: 'contentType phải là video/* hoặc audio/*' });
+      }
+      // Safe filename: timestamp + random + sanitized original
+      const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+      const userId = decoded.userId || decoded.id || decoded.sub || 'anon';
+      const prefix = courseId ? `courses/${String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_')}`
+                              : `uploads/${String(userId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      const gcsPath = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+      const file = storage.bucket(BUCKET).file(gcsPath);
+      const [uploadUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 60 * 60 * 1000,  // 1h
+        contentType,
+      });
+      const publicUrl = `https://storage.googleapis.com/${BUCKET}/${gcsPath}`;
+      return res.json({ uploadUrl, publicUrl, contentType, gcsPath });
+    } catch (e) {
+      console.error('[upload:signed-url]', e.message);
+      return res.status(500).json({ error: 'Lỗi tạo signed URL: ' + e.message });
+    }
+  });
+})();
+
+// ── Stub student-cams (camera webcam HS làm bài) — TRƯỚC proxy ──
+// Endpoint thực sẽ join với ExamSubmission + WebcamSession table.
+// Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.
+app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], count: 0 }));
+
+// ── Learning Paths (LearningPathBuilder.tsx) — TRƯỚC proxy ──
+;(() => {
+  async function _ensureLPTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "LearningPath" (
+        id           VARCHAR(36)  PRIMARY KEY,
+        teacher_id   VARCHAR(255) NOT NULL,
+        name         VARCHAR(500) NOT NULL,
+        description  TEXT,
+        subject      VARCHAR(100),
+        difficulty   VARCHAR(20),
+        modules      JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        competencies JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        path_rubric  JSONB,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('LearningPath', [
+      ['teacher_id',   "VARCHAR(255)"],
+      ['name',         "VARCHAR(500)"],
+      ['description',  "TEXT"],
+      ['subject',      "VARCHAR(100)"],
+      ['difficulty',   "VARCHAR(20)"],
+      ['modules',      "JSONB DEFAULT '[]'::jsonb"],
+      ['competencies', "JSONB DEFAULT '[]'::jsonb"],
+      ['path_rubric',  "JSONB"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('LearningPath', ['teacherId','name','description','subject','difficulty','modules','competencies','pathRubric','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_lp_teacher ON "LearningPath"(teacher_id, updated_at DESC)`);
+
+    // Assignment 1-N: 1 path → nhiều HS
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "LearningPathAssignment" (
+        id             VARCHAR(36)  PRIMARY KEY,
+        path_id        VARCHAR(36)  NOT NULL,
+        student_id     VARCHAR(255) NOT NULL,
+        student_name   VARCHAR(255),
+        student_email  VARCHAR(255),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('LearningPathAssignment', [
+      ['path_id',       "VARCHAR(36)"],
+      ['student_id',    "VARCHAR(255)"],
+      ['student_name',  "VARCHAR(255)"],
+      ['student_email', "VARCHAR(255)"],
+      ['created_at',    "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('LearningPathAssignment', ['pathId','studentId','studentName','studentEmail','createdAt']);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_lp_assign ON "LearningPathAssignment"(path_id, student_id)`);
+  }
+  _ensureLPTable().catch(e => console.error('[learning-paths] migration:', e.message));
+
+  function _lpAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _lpIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET list
+  app.get('/api/teacher/learning-paths', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _lpIds(decoded);
+      const { rows: paths } = await pool.query(
+        `SELECT id, name, description, subject, difficulty, modules, competencies,
+                path_rubric AS "pathRubric", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "LearningPath" WHERE teacher_id = ANY($1::text[]) ORDER BY updated_at DESC LIMIT 200`,
+        [myIds]);
+      if (!paths.length) return res.json({ paths: [] });
+      const ids = paths.map(p => p.id);
+      const { rows: assigns } = await pool.query(
+        `SELECT id, path_id AS "pathId", student_id AS "studentId",
+                student_name AS "studentName", student_email AS "studentEmail"
+         FROM "LearningPathAssignment" WHERE path_id = ANY($1::text[])`, [ids]);
+      const byPath = {};
+      for (const a of assigns) (byPath[a.pathId] = byPath[a.pathId] || []).push(a);
+      const result = paths.map(p => ({ ...p, assignments: byPath[p.id] || [] }));
+      return res.json({ paths: result });
+    } catch (e) { console.error('[lp:list]', e.message); return res.json({ paths: [] }); }
+  });
+
+  // POST create
+  app.post('/api/teacher/learning-paths', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const b = req.body || {};
+      if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Thiếu tên path' });
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "LearningPath"(id, teacher_id, name, description, subject, difficulty,
+                                   modules, competencies, path_rubric)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)
+      `, [id, myId, String(b.name).slice(0,500), b.description || null,
+          b.subject || null, b.difficulty || null,
+          JSON.stringify(Array.isArray(b.modules) ? b.modules : []),
+          JSON.stringify(Array.isArray(b.competencies) ? b.competencies : []),
+          b.pathRubric ? JSON.stringify(b.pathRubric) : null]);
+      // assignTo HS
+      const assignTo = Array.isArray(b.assignTo) ? b.assignTo : [];
+      for (const a of assignTo) {
+        if (!a?.studentId) continue;
+        try {
+          await pool.query(
+            `INSERT INTO "LearningPathAssignment"(id, path_id, student_id, student_name, student_email)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [randomUUID(), id, a.studentId, a.studentName || null, a.studentEmail || null]);
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      return res.json({ ok: true, id });
+    } catch (e) { console.error('[lp:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo path' }); }
+  });
+
+  // PATCH update
+  app.patch('/api/teacher/learning-paths/:id', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.id, _lpIds(decoded)];
+      const push = (col, val, cast = '') => { params.push(val); updates.push(`${col} = $${params.length}${cast}`); };
+      if (b.name        !== undefined) push('name',        String(b.name).slice(0,500));
+      if (b.description !== undefined) push('description', b.description || null);
+      if (b.subject     !== undefined) push('subject',     b.subject || null);
+      if (b.difficulty  !== undefined) push('difficulty',  b.difficulty || null);
+      if (b.modules      !== undefined) push('modules',      JSON.stringify(Array.isArray(b.modules) ? b.modules : []), '::jsonb');
+      if (b.competencies !== undefined) push('competencies', JSON.stringify(Array.isArray(b.competencies) ? b.competencies : []), '::jsonb');
+      if (b.pathRubric   !== undefined) push('path_rubric',  b.pathRubric ? JSON.stringify(b.pathRubric) : null, '::jsonb');
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "LearningPath" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        params);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại hoặc không có quyền' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật path' }); }
+  });
+
+  // DELETE
+  app.delete('/api/teacher/learning-paths/:id', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      // Verify owner
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "LearningPath" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _lpIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại' });
+      await pool.query(`DELETE FROM "LearningPathAssignment" WHERE path_id = $1`, [req.params.id]);
+      await pool.query(`DELETE FROM "LearningPath" WHERE id = $1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá path' }); }
+  });
+
+  // POST assign — body: { students: [{ studentId, studentName, studentEmail }, ...] }
+  app.post('/api/teacher/learning-paths/:id/assign', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "LearningPath" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _lpIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại' });
+      const list = Array.isArray(req.body?.students) ? req.body.students : [];
+      const { randomUUID } = require('crypto');
+      let added = 0;
+      for (const a of list) {
+        if (!a?.studentId) continue;
+        try {
+          await pool.query(
+            `INSERT INTO "LearningPathAssignment"(id, path_id, student_id, student_name, student_email)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [randomUUID(), req.params.id, a.studentId, a.studentName || null, a.studentEmail || null]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      return res.json({ ok: true, added });
+    } catch (e) { console.error('[lp:assign]', e.message); return res.status(500).json({ error: 'Lỗi gán HS' }); }
+  });
+})();
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
@@ -1268,6 +2666,108 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
       return res.json(mapCourse(row, category, purchRows.rows, chapRows.rows));
     } catch (err) {
       console.error('[instructor:course-get] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/courses — tạo khoá học ───────────
+  app.post('/api/instructor/courses', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const b = req.body || {};
+      const title = String(b.title || '').trim();
+      if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề khoá học' });
+
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = getIPool();
+
+      // Verify categoryId exists, else null (tránh FK violation)
+      let categoryId = b.categoryId || null;
+      if (categoryId) {
+        const { rowCount } = await pool.query(`SELECT 1 FROM "Category" WHERE id = $1`, [categoryId]);
+        if (!rowCount) categoryId = null;
+      }
+
+      const description = b.overview != null ? String(b.overview) : null;
+      const imageUrl    = b.image    != null ? String(b.image)    : null;
+      const price       = b.regularPrice != null ? Number(b.regularPrice) : 0;
+
+      const { rows } = await pool.query(
+        `INSERT INTO "Course" (id, "userId", "schoolId", title, description, "imageUrl",
+                               price, "isPublished", "categoryId", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'default-school', $3, $4, $5, $6, false, $7, NOW(), NOW())
+         RETURNING *`,
+        [id, userId, title.slice(0, 500), description, imageUrl, price, categoryId]
+      );
+
+      const row = rows[0];
+      const [chapRows, purchRows, userRow, catRow] = await Promise.all([
+        pool.query(`SELECT id, "isPublished" AS ispublished FROM "Chapter" WHERE "courseId" = $1`, [id]),
+        pool.query(`SELECT id FROM "Purchase" WHERE "courseId" = $1`, [id]),
+        pool.query(`SELECT name, image FROM "User" WHERE id = $1`, [userId]),
+        categoryId ? pool.query(`SELECT id, name FROM "Category" WHERE id = $1`, [categoryId]) : Promise.resolve({ rows: [] }),
+      ]);
+      const fullRow = {
+        ...row,
+        userName: userRow.rows[0]?.name || null,
+        userImage: userRow.rows[0]?.image || null,
+      };
+      console.log(`[instructor:create] ✅ Course ${id} for user ${userId}`);
+      return res.status(201).json(mapCourse(fullRow, catRow.rows[0] || null, purchRows.rows, chapRows.rows));
+    } catch (err) {
+      console.error('[instructor:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/instructor/courses/:id — cập nhật khoá học ──
+  app.patch('/api/instructor/courses/:id', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const b = req.body || {};
+      const updates = ['"updatedAt" = NOW()'];
+      const params = [req.params.id, userId];
+      const push = (col, val) => { params.push(val); updates.push(`"${col}" = $${params.length}`); };
+
+      if (b.title       !== undefined) push('title',       String(b.title).slice(0, 500));
+      if (b.overview    !== undefined) push('description', b.overview != null ? String(b.overview) : null);
+      if (b.image       !== undefined) push('imageUrl',    b.image    != null ? String(b.image)    : null);
+      if (b.regularPrice !== undefined) push('price',      b.regularPrice != null ? Number(b.regularPrice) : 0);
+      if (b.categoryId  !== undefined) {
+        let cid = b.categoryId || null;
+        if (cid) {
+          const pool = getIPool();
+          const { rowCount } = await pool.query(`SELECT 1 FROM "Category" WHERE id = $1`, [cid]);
+          if (!rowCount) cid = null;
+        }
+        push('categoryId', cid);
+      }
+
+      const pool = getIPool();
+      const { rows } = await pool.query(
+        `UPDATE "Course" SET ${updates.join(', ')}
+         WHERE id = $1 AND "userId" = $2 RETURNING *`,
+        params
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+
+      const row = rows[0];
+      const [chapRows, purchRows, userRow, catRow] = await Promise.all([
+        pool.query(`SELECT id, "isPublished" AS ispublished FROM "Chapter" WHERE "courseId" = $1`, [row.id]),
+        pool.query(`SELECT id FROM "Purchase" WHERE "courseId" = $1`, [row.id]),
+        pool.query(`SELECT name, image FROM "User" WHERE id = $1`, [userId]),
+        row.categoryId ? pool.query(`SELECT id, name FROM "Category" WHERE id = $1`, [row.categoryId]) : Promise.resolve({ rows: [] }),
+      ]);
+      const fullRow = { ...row, userName: userRow.rows[0]?.name || null, userImage: userRow.rows[0]?.image || null };
+      console.log(`[instructor:patch] ✅ Course ${row.id}`);
+      return res.json(mapCourse(fullRow, catRow.rows[0] || null, purchRows.rows, chapRows.rows));
+    } catch (err) {
+      console.error('[instructor:patch] ❌', err.message);
       return res.status(500).json({ error: err.message });
     }
   });
@@ -1444,7 +2944,65 @@ if (USE_NODEJS_QUESTIONS) {
   });
 
   // ── POST /api/questions/batch  (bulk import) ───────────────
+  // Insert questions với teacher_id = real user ID từ JWT (không phải literal 'teacher')
+  // Cũng set vào cả "teacher_id" snake_case (handler mới) và "createdBy" camelCase (legacy)
+  // để GET /api/question-bank?scope=mine WHERE teacher_id=$me match được.
+  // POST /api/questions/claim-orphan — claim ownership các câu hỏi import bằng
+  // JWT cũ (teacher_id='teacher-user') cho user hiện tại. Chỉ áp dụng cho các
+  // câu được tạo trong 7 ngày gần nhất (avoid claim toàn bộ orphan DB).
+  app.post('/api/questions/claim-orphan', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const d = _akVerify(auth.slice(7));
+        userId = d.userId || d.id || d.sub;
+      } catch {}
+    }
+    if (!userId || userId === 'teacher-user') {
+      return res.status(401).json({ error: 'Cần đăng nhập với tài khoản thật (UUID)' });
+    }
+    try {
+      const pool = getQPool();
+      const { rowCount } = await pool.query(`
+        UPDATE "Question"
+        SET teacher_id = $1, "createdBy" = $1
+        WHERE teacher_id IN ('teacher-user', 'teacher')
+          AND "createdAt" >= NOW() - INTERVAL '7 days'
+      `, [userId]);
+      console.log(`[claim-orphan] user=${userId} claimed ${rowCount} questions`);
+      return res.json({ ok: true, claimed: rowCount });
+    } catch (e) {
+      console.error('[claim-orphan]', e.message);
+      return res.status(500).json({ error: 'Lỗi claim ownership' });
+    }
+  });
+
   app.post('/api/questions/batch', async (req, res) => {
+    // Auth: lấy userId thực từ Bearer — ưu tiên decoded.userId/id, fallback sub
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    let decodedDebug = null;
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const decoded = _akVerify(auth.slice(7));
+        decodedDebug = { sub: decoded.sub, userId: decoded.userId, id: decoded.id, email: decoded.email, role: decoded.role };
+        userId = decoded.userId || decoded.id || decoded.sub;
+      } catch (e) {
+        console.warn('[questions:batch] JWT verify failed:', e.message);
+      }
+    } else {
+      console.warn('[questions:batch] No Bearer header');
+    }
+    if (!userId) {
+      console.warn('[questions:batch] No userId from JWT, decoded=', decodedDebug);
+      return res.status(401).json({ success: false, error: 'Unauthorized — login lại' });
+    }
+    // Cho phép literal 'teacher-user' (legacy account) — không reject, chỉ log warning
+    if (userId === 'teacher-user' || userId === 'teacher' || userId === 'anon') {
+      console.warn('[questions:batch] WARN: legacy userId=', userId, '— consider re-login for clean ownership');
+    }
+
     try {
       const pool = getQPool();
       const { questions = [] } = req.body || {};
@@ -1454,28 +3012,67 @@ if (USE_NODEJS_QUESTIONS) {
 
       const now = new Date();
       let inserted = 0;
+      let failed = 0;
+      const errors = [];
       for (const q of questions) {
-        if (!q.content) continue;
+        if (!q.content) { failed++; continue; }
         const id = randomUUID();
         const tags = [...new Set([q.topic, q.subject, ...(q.tags || [])].filter(Boolean))];
-        await pool.query(
-          `INSERT INTO "Question"
-             (id, topic, subject, grade, "questionType", difficulty, content, options,
-              "correctAnswer", explanation, "learningObjectives", tags,
-              "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt", "usageCount")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,false,$13,$14,$15,$16,0)
-           ON CONFLICT (id) DO NOTHING`,
-          [id, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
-           q.grade || 'Khối 12', q.questionType || 'MCQ', q.difficulty || 'MEDIUM',
-           q.content, q.options || [], q.correctAnswer || '', q.explanation || '',
-           q.learningObjectives || [], tags, q.status || 'Hoạt động',
-           'teacher', now, now]
-        ).catch(() => {});
-        inserted++;
+        const optionsJson = JSON.stringify(q.options || []);
+        const tagsJson = JSON.stringify(tags);
+        try {
+          // Try modern schema first (snake_case + JSONB + teacher_id + visibility)
+          // NOTE: cast $::text rõ ràng và KHÔNG reuse $N giữa nhiều cột để
+          // tránh "inconsistent types deduced for parameter" (PG strict).
+          const correctAns = q.correctAnswer || q.answer || '';
+          await pool.query(
+            `INSERT INTO "Question"
+               (id, teacher_id, "createdBy", topic, subject, grade, "questionType", type,
+                difficulty, content, options, "correctAnswer", answer, explanation,
+                "learningObjectives", tags, "aiGenerated", "humanReviewed", status,
+                visibility, "createdAt", "updatedAt", "usageCount")
+             VALUES ($1::text,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::text,
+                     $9::text,$10::text,$11::jsonb,$12::text,$13::text,$14::text,
+                     $15::jsonb,$16::jsonb,false,false,$17::text,'private',$18,$19,0)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              id,                                              // $1  id
+              userId,                                          // $2  teacher_id
+              userId,                                          // $3  createdBy
+              q.topic || q.subject || 'Chung',                 // $4  topic
+              q.subject || 'Vật lý',                           // $5  subject
+              q.grade || 'Khối 12',                            // $6  grade
+              q.questionType || 'MCQ',                         // $7  questionType (camelCase)
+              q.questionType || 'multiple_choice',             // $8  type (snake)
+              q.difficulty || 'MEDIUM',                        // $9
+              q.content,                                       // $10
+              optionsJson,                                     // $11 jsonb
+              correctAns,                                      // $12 correctAnswer
+              correctAns,                                      // $13 answer
+              q.explanation || '',                             // $14
+              JSON.stringify(q.learningObjectives || []),      // $15 jsonb
+              tagsJson,                                        // $16 jsonb
+              q.status || 'Hoạt động',                         // $17 status
+              now,                                             // $18 createdAt
+              now,                                             // $19 updatedAt
+            ]
+          );
+          inserted++;
+        } catch (e) {
+          failed++;
+          // Log MỌI lỗi vào server logs (đầy đủ) để debug
+          if (failed <= 3) {
+            console.error(`[questions:batch] insert fail Q${inserted+failed}:`, e.message);
+          }
+          if (errors.length < 3) errors.push(`Q${inserted+failed}: ${e.message.slice(0, 150)}`);
+        }
       }
 
-      console.log(`[questions:batch] ✅ ${inserted}/${questions.length} inserted`);
-      return res.json({ success: true, data: { inserted, total: questions.length } });
+      console.log(`[questions:batch] user=${userId} ✅ ${inserted}/${questions.length} inserted, ${failed} failed`);
+      return res.json({
+        success: true,
+        data: { inserted, failed, total: questions.length, errors: errors.length ? errors : undefined },
+      });
     } catch (err) {
       console.error('[questions:batch] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
@@ -1713,6 +3310,64 @@ if (USE_NODEJS_QUESTIONS) {
         return res.status(400).json({ error: 'message_required', reply: 'Câu hỏi không được để trống.' });
       }
 
+      // Ensure the final message from the user is the new query. If history
+      // already ends with the current user message we don't duplicate it.
+      const messages = [...history];
+      const lastMsg = messages[messages.length - 1];
+      if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== message) {
+        messages.push({ role: 'user', content: message });
+      }
+
+      // ── Provider routing: deepseek HOẶC Anthropic ──
+      // AI_PREFERRED_PROVIDER=deepseek → DeepSeek (OpenAI-compatible)
+      // Default → Anthropic Claude (như cũ)
+      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+      const useDeepseek = (prefProvider === 'deepseek' && process.env.DEEPSEEK_API_KEY) ||
+                          (!process.env.ANTHROPIC_API_KEY && process.env.DEEPSEEK_API_KEY);
+
+      if (useDeepseek) {
+        try {
+          const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+          const dsMessages = [
+            { role: 'system', content: buildSystemPrompt(subject) },
+            ...messages,
+          ];
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: dsModel,
+              messages: dsMessages,
+              max_tokens: AI_TUTOR_MAX_TOKENS,
+              temperature: 0.5,
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 200)}`);
+          }
+          const dsJson = await dsResp.json();
+          const reply = (dsJson.choices?.[0]?.message?.content || '').trim()
+            || 'Xin lỗi, tôi chưa tạo được câu trả lời. Bạn thử đặt lại câu hỏi nhé.';
+          const latencyMs = Date.now() - startedAt;
+          console.log(`[ai-tutor] ok provider=deepseek model=${dsModel} subject="${subject}" latency=${latencyMs}ms tokens=${dsJson.usage?.completion_tokens || '?'}`);
+          return res.json({ reply, model: dsModel, usage: dsJson.usage || null, provider: 'deepseek' });
+        } catch (e) {
+          console.error('[ai-tutor:deepseek]', e.message);
+          // Fall through to Anthropic if Anthropic key tồn tại
+          if (!process.env.ANTHROPIC_API_KEY) {
+            return res.status(503).json({
+              error: 'ai_unavailable',
+              reply: 'Dịch vụ AI hiện chưa sẵn sàng (DeepSeek lỗi, Anthropic chưa cấu hình).',
+            });
+          }
+        }
+      }
+
+      // ── Anthropic Claude (default) ──
       let client;
       try {
         client = getAnthropic();
@@ -1722,14 +3377,6 @@ if (USE_NODEJS_QUESTIONS) {
           error: 'ai_unavailable',
           reply: 'Dịch vụ AI hiện chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
         });
-      }
-
-      // Ensure the final message from the user is the new query. If history
-      // already ends with the current user message we don't duplicate it.
-      const messages = [...history];
-      const lastMsg = messages[messages.length - 1];
-      if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== message) {
-        messages.push({ role: 'user', content: message });
       }
 
       const completion = await client.messages.create({
@@ -1751,12 +3398,13 @@ if (USE_NODEJS_QUESTIONS) {
       reply = reply.trim() || 'Xin lỗi, tôi chưa tạo được câu trả lời. Bạn thử đặt lại câu hỏi nhé.';
 
       const latencyMs = Date.now() - startedAt;
-      console.log(`[ai-tutor] ok model=${AI_TUTOR_MODEL} subject="${subject}" latency=${latencyMs}ms tokens=${completion.usage ? completion.usage.output_tokens : '?'}`);
+      console.log(`[ai-tutor] ok provider=anthropic model=${AI_TUTOR_MODEL} subject="${subject}" latency=${latencyMs}ms tokens=${completion.usage ? completion.usage.output_tokens : '?'}`);
 
       return res.json({
         reply,
         model: completion.model || AI_TUTOR_MODEL,
         usage: completion.usage || null,
+        provider: 'anthropic',
       });
     } catch (err) {
       const status = err && err.status ? err.status : 500;
@@ -3310,6 +4958,189 @@ if (USE_NODEJS_QUESTIONS) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// ASSIGNMENTS extras — /from-exam + /:id/targets (kết nối GV→lớp/HS)
+// Phải nằm SAU block assignments chính (để table sẵn) + TRƯỚC catch-all
+// ════════════════════════════════════════════════════════════════════════
+;(() => {
+  async function _ensureAsgnTargetTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AssignmentTarget" (
+        id              VARCHAR(36)  PRIMARY KEY,
+        assignment_id   VARCHAR(255) NOT NULL,
+        type            VARCHAR(20)  NOT NULL,
+        target_id       VARCHAR(255) NOT NULL,
+        label           VARCHAR(255),
+        teacher_id      VARCHAR(255) NOT NULL,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('AssignmentTarget', [
+      ['assignment_id', "VARCHAR(255)"],
+      ['type',          "VARCHAR(20)"],
+      ['target_id',     "VARCHAR(255)"],
+      ['label',         "VARCHAR(255)"],
+      ['teacher_id',    "VARCHAR(255)"],
+      ['created_at',    "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('AssignmentTarget', ['assignmentId','type','targetType','targetId','label','teacherId','createdAt']);
+    // Backfill nếu Rust service đã có legacy camelCase rows
+    await _backfillSnakeFromCamel('AssignmentTarget', [
+      ['assignment_id', ['assignmentId']],
+      ['type',          ['targetType']],
+      ['target_id',     ['targetId']],
+      ['teacher_id',    ['teacherId']],
+    ]);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_asgn_target ON "AssignmentTarget"(assignment_id, type, target_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_asgn_target_asgn ON "AssignmentTarget"(assignment_id)`);
+  }
+  _ensureAsgnTargetTable().catch(e => console.error('[assignment-targets] migration:', e.message));
+
+  function _asgnAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // Verify GV sở hữu assignment
+  async function _ownsAsgn(assignmentId, decoded) {
+    const pool = _getPool();
+    const myIds = _ids(decoded);
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM assignments WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR user_id = ANY($2::text[]))`,
+      [assignmentId, myIds]);
+    return rowCount > 0;
+  }
+
+  // POST /api/assignments/from-exam — tạo assignment từ Exam có sẵn
+  app.post('/api/assignments/from-exam', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      const { examId, title: titleOverride, description, dueDate, duration } = req.body || {};
+      if (!examId) return res.status(400).json({ error: 'Thiếu examId' });
+      const pool = _getPool();
+      const myIds = _ids(decoded);
+      // Load Exam (chấp nhận cả snake_case lẫn camelCase legacy)
+      const { rows: exams } = await pool.query(
+        `SELECT * FROM "Exam" WHERE id = $1 LIMIT 1`, [examId]);
+      if (!exams.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const exam = exams[0];
+      const examOwner = exam.teacher_id || exam.teacherId || exam.user_id || exam.userId;
+      if (examOwner && !myIds.includes(examOwner)) {
+        // Cho phép nếu exam public
+        const isPublic = exam.visibility === 'public' || exam.is_public === true || exam.isPublic === true;
+        if (!isPublic) return res.status(403).json({ error: 'Đề thi không thuộc quyền của bạn' });
+      }
+      const { randomBytes } = require('crypto');
+      const id = 'asgn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      const qrToken = randomBytes(18).toString('base64url');
+      const title = String(titleOverride || exam.title || 'Bài tập').slice(0, 500);
+      const subj = exam.subject || 'Chung';
+      const desc = String(description || exam.description || '').slice(0, 5000);
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const dur = Number(duration) || Number(exam.duration) || Number(exam.duration_minutes) || 45;
+      const due = dueDate ? new Date(dueDate) : null;
+      await pool.query(
+        `INSERT INTO assignments
+           (id, title, description, subject, assignment_type, status, difficulty,
+            duration, xp_reward, user_id, teacher_id, qr_token, max_score, due_date,
+            content, tags, ai_generated)
+         VALUES ($1,$2,$3,$4,'quiz','published','medium',$5,150,$6,$6,$7,10,$8,$9,$10,false)`,
+        [id, title, desc, subj, dur, myId, qrToken, due,
+         JSON.stringify({ examId, source: 'from-exam' }),
+         JSON.stringify(['từ-đề-thi'])]);
+      const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      return res.status(201).json({
+        id, title, description: desc, subject: subj, type: 'quiz', status: 'published',
+        difficulty: 'medium', duration: dur, xpReward: 150, maxScore: 10,
+        teacherId: myId, qrToken, scanUrl: `${proto}://${host}/a/${qrToken}`,
+        dueDate: due ? due.toISOString() : null, content: '', tags: ['từ-đề-thi'],
+        assignedAt: new Date().toISOString(), aiGenerated: false,
+      });
+    } catch (e) { console.error('[asgn:from-exam]', e.message); return res.status(500).json({ error: 'Lỗi tạo bài tập từ đề thi' }); }
+  });
+
+  // GET /api/assignments/:id/targets → { targets: [...] }
+  app.get('/api/assignments/:id/targets', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, type, target_id AS "targetId", label, created_at AS "createdAt"
+         FROM "AssignmentTarget" WHERE assignment_id = $1 ORDER BY created_at DESC`,
+        [req.params.id]);
+      return res.json({ targets: rows });
+    } catch (e) { console.error('[asgn:targets:list]', e.message); return res.json({ targets: [] }); }
+  });
+
+  // POST /api/assignments/:id/targets — body: { classIds?: [], studentIds?: [] }
+  app.post('/api/assignments/:id/targets', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const { classIds = [], studentIds = [] } = req.body || {};
+      const pool = _getPool();
+      const { randomUUID } = require('crypto');
+      let added = 0;
+      // Insert class targets — lookup label từ Class table
+      for (const cid of classIds) {
+        if (!cid) continue;
+        const { rows: cls } = await pool.query(`SELECT name, grade FROM "Class" WHERE id = $1`, [cid]);
+        const label = cls[0] ? `${cls[0].name}${cls[0].grade ? ' (Khối ' + cls[0].grade + ')' : ''}` : `Lớp ${cid.slice(0,8)}`;
+        try {
+          await pool.query(
+            `INSERT INTO "AssignmentTarget"(id, assignment_id, type, target_id, label, teacher_id)
+             VALUES ($1,$2,'class',$3,$4,$5)`,
+            [randomUUID(), req.params.id, cid, label, myId]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; /* dup skip */ }
+      }
+      // Insert student targets — lookup label từ ClassStudent hoặc User
+      for (const sid of studentIds) {
+        if (!sid) continue;
+        let label = `HS ${sid.slice(0,8)}`;
+        try {
+          const { rows: u } = await pool.query(`SELECT ho_ten FROM "ClassStudent" WHERE id = $1 LIMIT 1`, [sid]);
+          if (u[0]?.ho_ten) label = u[0].ho_ten;
+          else {
+            const { rows: u2 } = await pool.query(`SELECT name, email FROM "User" WHERE id = $1 LIMIT 1`, [sid]);
+            if (u2[0]) label = u2[0].name || u2[0].email || label;
+          }
+        } catch { /* ignore lookup err */ }
+        try {
+          await pool.query(
+            `INSERT INTO "AssignmentTarget"(id, assignment_id, type, target_id, label, teacher_id)
+             VALUES ($1,$2,'student',$3,$4,$5)`,
+            [randomUUID(), req.params.id, sid, label, myId]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      // TODO: notification cho HS — hiện chưa wire vào notifications table
+      return res.json({ ok: true, added, notified: 0 });
+    } catch (e) { console.error('[asgn:targets:add]', e.message); return res.status(500).json({ error: 'Lỗi giao bài' }); }
+  });
+
+  // DELETE /api/assignments/:id/targets/:type/:targetId
+  app.delete('/api/assignments/:id/targets/:type/:targetId', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "AssignmentTarget" WHERE assignment_id = $1 AND type = $2 AND target_id = $3`,
+        [req.params.id, req.params.type, decodeURIComponent(req.params.targetId)]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy target' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[asgn:targets:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá target' }); }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════════════
 // KÉO CO KIẾN THỨC — Knowledge Tug-of-War
 //   /api/keoco/*   teacher CRUD + public scan/join/answer + 1v1 challenge
 // Two modes:
@@ -4816,15 +6647,319 @@ if (USE_NODEJS_QUESTIONS) {
   });
 }
 
+// ── Exam Matrix Node.js handlers — TRƯỚC proxy media-service (offline) ──
+// Bảng "ExamMatrix" persist matrix do GV tự tạo (manual) hoặc số hoá (PDF).
+// Module-scope IIFE để khai báo helpers + table migration mà không phụ thuộc scope.
+;(() => {
+  async function _ensureMatrixTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ExamMatrix" (
+        id              VARCHAR(36)  PRIMARY KEY,
+        teacher_id      VARCHAR(255) NOT NULL,
+        name            VARCHAR(500) NOT NULL DEFAULT 'Ma trận mới',
+        subject         VARCHAR(100),
+        grade           VARCHAR(50),
+        exam_type       VARCHAR(50),
+        duration_min    INTEGER      DEFAULT 45,
+        total_score     NUMERIC      DEFAULT 10,
+        total_questions INTEGER      DEFAULT 0,
+        type            VARCHAR(20)  DEFAULT 'manual',
+        school_year     VARCHAR(20),
+        description     TEXT,
+        sections        JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        topics          JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        status          VARCHAR(30)  DEFAULT 'Hoàn tất',
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('ExamMatrix', [
+      ['teacher_id',      "VARCHAR(255)"], ['name', "VARCHAR(500)"],
+      ['subject',         "VARCHAR(100)"], ['grade', "VARCHAR(50)"],
+      ['exam_type',       "VARCHAR(50)"], ['duration_min', "INTEGER DEFAULT 45"],
+      ['total_score',     "NUMERIC DEFAULT 10"], ['total_questions', "INTEGER DEFAULT 0"],
+      ['type',            "VARCHAR(20) DEFAULT 'manual'"], ['school_year', "VARCHAR(20)"],
+      ['description',     "TEXT"], ['sections', "JSONB DEFAULT '[]'::jsonb"],
+      ['topics',          "JSONB DEFAULT '[]'::jsonb"], ['status', "VARCHAR(30) DEFAULT 'Hoàn tất'"],
+      ['created_at',      "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('ExamMatrix', ['teacherId','userId','ownerId','name','subject','grade','examType','duration','durationMin','totalScore','totalPoints','totalQuestions','type','schoolYear','description','sections','topics','status','createdAt','updatedAt']);
+    await _backfillSnakeFromCamel('ExamMatrix', [
+      ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+      ['exam_type',    ['examType']],
+      ['duration_min', ['duration', 'durationMin']],
+      ['total_score',  ['totalScore']],
+      ['total_questions', ['totalQuestions']],
+      ['school_year',  ['schoolYear']],
+    ]);
+    // Legacy sections/topics có thể TEXT/JSONB — đảm bảo JSONB
+    for (const col of ['sections', 'topics']) {
+      try { await pool.query(`ALTER TABLE "ExamMatrix" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); } catch {}
+    }
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_matrix_teacher ON "ExamMatrix"(teacher_id, created_at DESC)`);
+  }
+  _ensureMatrixTable().catch(e => console.error('[exam-matrix] migration:', e.message));
+
+  function mxAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  function mxRow(r) {
+    return {
+      id: r.id, name: r.name, grade: r.grade || '',
+      examType: r.exam_type || '', type: r.type || 'manual',
+      subject: r.subject || '', schoolYear: r.school_year || '',
+      description: r.description || '', duration: r.duration_min,
+      totalScore: Number(r.total_score) || 0, totalQuestions: r.total_questions || 0,
+      status: r.status || 'Hoàn tất',
+      sections: r.sections || [], topics: r.topics || [],
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    };
+  }
+
+  // GET /api/exam-matrices?status=...&examType=...
+  app.get('/api/exam-matrices', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const filters = ['teacher_id = $1']; const params = [decoded.sub];
+      const status = req.query.status;
+      if (status && status !== 'Tất cả') { params.push(status); filters.push(`status = $${params.length}`); }
+      const examType = req.query.examType;
+      if (examType && examType !== 'Tất cả loại đề') { params.push(examType); filters.push(`exam_type = $${params.length}`); }
+      const { rows } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE ${filters.join(' AND ')} ORDER BY created_at DESC LIMIT 200`,
+        params);
+      return res.json({ matrices: rows.map(mxRow), total: rows.length });
+    } catch (e) { console.error('[exam-matrix:list]', e.message); return res.json({ matrices: [], total: 0 }); }
+  });
+
+  // POST /api/exam-matrices
+  app.post('/api/exam-matrices', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "ExamMatrix"(id, teacher_id, name, subject, grade, exam_type, duration_min,
+                                 total_score, total_questions, type, school_year, description,
+                                 sections, topics, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,'Hoàn tất')
+        RETURNING *`,
+        [id, decoded.sub, String(b.name || 'Ma trận mới').slice(0, 500),
+         b.subject || null, b.grade || null, b.examType || null,
+         Number(b.duration) || 45, Number(b.totalScore) || 10,
+         Number(b.totalQuestions) || 0, b.type || 'manual',
+         b.schoolYear || null, b.description || null,
+         JSON.stringify(b.sections || []), JSON.stringify(b.topics || [])]);
+      const matrix = mxRow(rows[0]);
+      return res.json({ id, matrix });
+    } catch (e) { console.error('[exam-matrix:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo ma trận' }); }
+  });
+
+  // GET /api/exam-matrices/:id
+  app.get('/api/exam-matrices/:id', async (req, res) => {
+    if (req.params.id.startsWith('sample-')) return res.status(404).json({ error: 'Ma trận mẫu chỉ để tham khảo' });
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      // ExamMatrixDetail page làm setMatrix(r.data) trực tiếp → trả root level
+      // ExamMatrixCreate (edit mode) cũng đọc r.data.id trực tiếp.
+      const m = mxRow(rows[0]);
+      return res.json({ ...m, matrix: m });  // root + nested để backward compat
+    } catch (e) { console.error('[exam-matrix:get]', e.message); return res.status(500).json({ error: 'Lỗi tải ma trận' }); }
+  });
+
+  // PUT /api/exam-matrices/:id
+  app.put('/api/exam-matrices/:id', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const pool = _getPool();
+      const { rowCount } = await pool.query(`
+        UPDATE "ExamMatrix" SET name=$1, subject=$2, grade=$3, exam_type=$4, duration_min=$5,
+          total_score=$6, total_questions=$7, type=$8, school_year=$9, description=$10,
+          sections=$11::jsonb, topics=$12::jsonb, updated_at=NOW()
+        WHERE id=$13 AND teacher_id=$14`,
+        [String(b.name || '').slice(0,500), b.subject || null, b.grade || null,
+         b.examType || null, Number(b.duration) || 45, Number(b.totalScore) || 10,
+         Number(b.totalQuestions) || 0, b.type || 'manual', b.schoolYear || null,
+         b.description || null, JSON.stringify(b.sections || []),
+         JSON.stringify(b.topics || []), req.params.id, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[exam-matrix:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+  });
+
+  // DELETE /api/exam-matrices/:id
+  app.delete('/api/exam-matrices/:id', async (req, res) => {
+    if (req.params.id.startsWith('sample-')) return res.status(400).json({ error: 'Không xoá được mẫu' });
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[exam-matrix:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // POST /api/exam-matrices/:id/duplicate
+  app.post('/api/exam-matrices/:id/duplicate', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows: src } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!src.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      const s = src[0];
+      const { randomUUID } = require('crypto');
+      const newId = randomUUID();
+      await pool.query(`
+        INSERT INTO "ExamMatrix"(id, teacher_id, name, subject, grade, exam_type, duration_min,
+          total_score, total_questions, type, school_year, description, sections, topics, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)`,
+        [newId, decoded.sub, `${s.name} (bản sao)`, s.subject, s.grade, s.exam_type,
+         s.duration_min, s.total_score, s.total_questions, s.type, s.school_year,
+         s.description, JSON.stringify(s.sections || []), JSON.stringify(s.topics || []),
+         'Hoàn tất']);
+      return res.json({ id: newId });
+    } catch (e) { console.error('[exam-matrix:dup]', e.message); return res.status(500).json({ error: 'Lỗi nhân bản' }); }
+  });
+
+  // POST /api/exam-matrices/digitize — stub 501 (cần AI vision service)
+  app.post('/api/exam-matrices/digitize', (_req, res) =>
+    res.status(501).json({ error: 'Số hoá PDF cần media-service AI — đang phát triển' }));
+})();
+
+// ── Document Digitization (/teacher/document-digitization) ──
+// TRƯỚC proxy media-service — media-service offline → đăng ký Node.js handlers.
+;(() => {
+  async function _ensureDocTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Document" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        teacher_id    VARCHAR(255) NOT NULL,
+        filename      VARCHAR(500) NOT NULL,
+        display_name  VARCHAR(500),
+        gcs_url       TEXT,
+        gcs_path      VARCHAR(1000),
+        mime_type     VARCHAR(100),
+        size_bytes    BIGINT,
+        status        VARCHAR(50)  DEFAULT 'pending',
+        page_count    INTEGER,
+        ocr_text      TEXT,
+        metadata      JSONB,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('Document', [
+      ['teacher_id',   "VARCHAR(255)"],
+      ['filename',     "VARCHAR(500)"],
+      ['display_name', "VARCHAR(500)"],
+      ['gcs_url',      "TEXT"],
+      ['gcs_path',     "VARCHAR(1000)"],
+      ['mime_type',    "VARCHAR(100)"],
+      ['size_bytes',   "BIGINT"],
+      ['status',       "VARCHAR(50) DEFAULT 'pending'"],
+      ['page_count',   "INTEGER"],
+      ['ocr_text',     "TEXT"],
+      ['metadata',     "JSONB"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('Document', ['teacherId','filename','displayName','gcsUrl','gcsPath','mimeType','sizeBytes','status','pageCount','ocrText','metadata','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_doc_teacher ON "Document"(teacher_id, created_at DESC)`);
+  }
+  _ensureDocTable().catch(e => console.error('[documents] migration:', e.message));
+
+  function _docAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _docIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET /api/documents?status=
+  app.get('/api/documents', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _docIds(decoded);
+      const params = [myIds];
+      let where = `teacher_id = ANY($1::text[])`;
+      if (req.query.status && req.query.status !== 'Tất cả') {
+        params.push(req.query.status);
+        where += ` AND status = $${params.length}`;
+      }
+      const { rows } = await pool.query(
+        `SELECT id, filename, display_name AS "displayName", gcs_url AS "gcsUrl",
+                mime_type AS "mimeType", size_bytes AS "sizeBytes", status,
+                page_count AS "pageCount", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "Document" WHERE ${where} ORDER BY created_at DESC LIMIT 200`,
+        params);
+      return res.json({ documents: rows, total: rows.length });
+    } catch (e) { console.error('[doc:list]', e.message); return res.json({ documents: [], total: 0 }); }
+  });
+
+  // DELETE /api/documents/:id
+  app.delete('/api/documents/:id', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "Document" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _docIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[doc:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá tài liệu' }); }
+  });
+
+  // POST /api/documents — tạo metadata sau khi upload GCS xong (FE call sau VideoUploader-style)
+  app.post('/api/documents', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { filename, displayName, gcsUrl, gcsPath, mimeType, sizeBytes } = req.body || {};
+      if (!filename) return res.status(400).json({ error: 'Thiếu filename' });
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "Document"(id, teacher_id, filename, display_name, gcs_url, gcs_path,
+                                mime_type, size_bytes, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'uploaded')`,
+        [id, myId, String(filename).slice(0,500),
+         displayName || filename, gcsUrl || null, gcsPath || null,
+         mimeType || null, sizeBytes || null]);
+      return res.json({ ok: true, id });
+    } catch (e) { console.error('[doc:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo tài liệu' }); }
+  });
+})();
+
 // ── media-service routes (only if MEDIA_SERVICE_URL is external) ──
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exam-matrices'));
+// Skip /api/exam-matrices + /api/documents — đã có Node.js handlers ở trên
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/media'));
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/documents'));
 if (!USE_NODEJS_QUESTIONS) {
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/questions'));
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/question-bank'));
 }
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
+// app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));  // Disabled — Node.js handlers below at line ~7057
 
 // ── Shared module-scope DB pool — phải khai báo TRƯỚC mọi _ensure*Table()
 // (getPool() ở line 133 bị block-scoped trong if(USE_NODEJS_AUTH){} với
@@ -4865,6 +7000,30 @@ async function _dropLegacyNotNull(table, legacyCols) {
   }
 }
 
+// Helper: BACKFILL data từ cột camelCase legacy sang cột snake_case mới
+// VD: UPDATE "Question" SET teacher_id = COALESCE(teacher_id, "teacherId", "userId", "createdBy")
+// Critical để data của GV cũ (tạo trên Rust service) vẫn truy cập được qua handler mới.
+async function _backfillSnakeFromCamel(table, mappings) {
+  const pool = _getPool();
+  for (const [snakeCol, camelCols] of mappings) {
+    try {
+      const coalesceArgs = [snakeCol, ...camelCols.map(c => `"${c}"`)].join(', ');
+      const { rowCount } = await pool.query(
+        `UPDATE "${table}" SET ${snakeCol} = COALESCE(${coalesceArgs})
+         WHERE ${snakeCol} IS NULL AND (${camelCols.map(c => `"${c}" IS NOT NULL`).join(' OR ')})`
+      );
+      if (rowCount > 0) {
+        console.log(`[backfill] ${table}.${snakeCol}: copied ${rowCount} rows from legacy ${camelCols.join('/')}`);
+      }
+    } catch (e) {
+      // Có thể fail nếu cột legacy không tồn tại — silent skip
+      if (!e.message.includes('does not exist')) {
+        console.warn(`[backfill] ${table}.${snakeCol}:`, e.message.slice(0, 100));
+      }
+    }
+  }
+}
+
 // ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
 // latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
@@ -4888,11 +7047,19 @@ async function _ensureLatexProjectTable() {
     ['title',        "VARCHAR(500) DEFAULT 'Tài liệu LaTeX mới'"],
     ['main_content', "TEXT DEFAULT ''"],
     ['folder_id',    "VARCHAR(36)"],
+    ['visibility',   "VARCHAR(20) DEFAULT 'private'"],
     ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LatexProject', ['userId','title','mainContent','folderId','createdAt','updatedAt','ownerId']);
+  // BACKFILL: legacy camelCase columns (userId/ownerId) → user_id mới
+  await _backfillSnakeFromCamel('LatexProject', [
+    ['user_id',      ['userId', 'ownerId', 'createdBy']],
+    ['title',        ['title']],   // tên cột giống — chỉ COALESCE để no-op nếu NULL
+    ['main_content', ['mainContent', 'content']],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_visibility ON "LatexProject"(visibility)`);
 }
 _ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
 
@@ -4918,12 +7085,27 @@ function _latexRowToProject(r) {
 app.get('/api/latex-projects', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
+    const scope = req.query.scope || 'mine';  // 'mine' | 'public' | 'all'
     const pool = _getPool();
+    let where;
+    const params = [decoded.sub];
+    if (scope === 'public') {
+      where = `visibility = 'public' AND user_id != $1`;
+    } else if (scope === 'all') {
+      where = `user_id = $1 OR visibility = 'public'`;
+    } else {
+      where = `user_id = $1`;
+    }
     const { rows } = await pool.query(`
-      SELECT id, title, folder_id, created_at, updated_at, ''::text AS main_content
-      FROM "LatexProject" WHERE user_id = $1 ORDER BY updated_at DESC
-    `, [decoded.sub]);
-    const data = rows.map(_latexRowToProject);
+      SELECT id, title, folder_id, visibility, user_id, created_at, updated_at, ''::text AS main_content,
+             (user_id = $1) AS is_owner
+      FROM "LatexProject" WHERE ${where} ORDER BY updated_at DESC LIMIT 200
+    `, params);
+    const data = rows.map(r => ({
+      ..._latexRowToProject(r),
+      visibility: r.visibility || 'private',
+      isOwner: !!r.is_owner,
+    }));
     return res.json({ success: true, data, count: data.length });
   } catch (e) { console.error('[latex-projects:list]', e.message); return res.status(500).json({ error: 'Lỗi tải danh sách' }); }
 });
@@ -4950,30 +7132,40 @@ app.get('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    // Cho phép xem tài liệu của mình HOẶC public của người khác
     const { rows } = await pool.query(`
-      SELECT id, title, main_content, folder_id, created_at, updated_at
-      FROM "LatexProject" WHERE id = $1 AND user_id = $2
+      SELECT id, title, main_content, folder_id, visibility, user_id,
+             created_at, updated_at, (user_id = $2) AS is_owner
+      FROM "LatexProject"
+      WHERE id = $1 AND (user_id = $2 OR visibility = 'public')
     `, [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-    return res.json({ success: true, data: _latexRowToProject(rows[0]) });
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu (hoặc không có quyền truy cập)' });
+    return res.json({ success: true, data: {
+      ..._latexRowToProject(rows[0]),
+      visibility: rows[0].visibility || 'private',
+      isOwner: !!rows[0].is_owner,
+    }});
   } catch (e) { console.error('[latex-projects:get]', e.message); return res.status(500).json({ error: 'Lỗi tải tài liệu' }); }
 });
 
-// PUT /api/latex-projects/:id { title?, mainContent? }
+// PUT /api/latex-projects/:id { title?, mainContent?, visibility? } — chỉ owner
 app.put('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
-    const { title, mainContent } = req.body || {};
+    const { title, mainContent, visibility } = req.body || {};
     const updates = ['updated_at = NOW()'];
     const params = [req.params.id, decoded.sub];
     if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
     if (mainContent !== undefined)  { params.push(String(mainContent));          updates.push(`main_content = $${params.length}`); }
+    if (visibility !== undefined && ['private','public'].includes(visibility)) {
+      params.push(visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "LatexProject" SET ${updates.join(', ')} WHERE id = $1 AND user_id = $2`,
       params
     );
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa' });
     return res.json({ success: true });
   } catch (e) { console.error('[latex-projects:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu tài liệu' }); }
 });
@@ -4998,6 +7190,130 @@ app.get('/api/latex-projects/:id/collaborators', (_req, res) => res.json({ succe
 app.post('/api/latex-projects/:id/versions/restore', (_req, res) => res.status(501).json({ error: 'Versions chưa khả dụng' }));
 app.post('/api/latex-projects/:id/collaborators', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
 app.delete('/api/latex-projects/:id/collaborators/:userId', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
+
+// POST /api/latex-projects/:id/to-pdf-exam — convert LaTeX project → Exam
+// Body: { phanIAnswers, phanIIAnswers, phanIIIAnswers, phanIVQuestions, public }
+// Tạo Exam mới, lưu answers vào settings.answerKey, return { examId, examTitle,
+// totalQuestions, sectionCounts: { phanI, phanII, phanIII, phanIV } }
+app.post('/api/latex-projects/:id/to-pdf-exam', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const phanI = Array.isArray(b.phanIAnswers) ? b.phanIAnswers : [];
+    const phanII = Array.isArray(b.phanIIAnswers) ? b.phanIIAnswers : [];
+    const phanIII = Array.isArray(b.phanIIIAnswers) ? b.phanIIIAnswers : [];
+    const phanIV = Array.isArray(b.phanIVQuestions) ? b.phanIVQuestions : [];
+    const sectionCounts = {
+      phanI: phanI.filter(Boolean).length,
+      phanII: phanII.filter(Boolean).length,
+      phanIII: phanIII.filter(Boolean).length,
+      phanIV: phanIV.length,
+    };
+    const totalQuestions = sectionCounts.phanI + sectionCounts.phanII +
+                           sectionCounts.phanIII + sectionCounts.phanIV;
+
+    const pool = _getPool();
+    // Load LatexProject để lấy title
+    const { rows: projects } = await pool.query(
+      `SELECT title, main_content FROM "LatexProject" WHERE id = $1 AND user_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!projects.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu LaTeX' });
+    const project = projects[0];
+
+    // Tạo Exam
+    const { randomUUID } = require('crypto');
+    const examId = randomUUID();
+    const examTitle = project.title || 'Đề thi từ LaTeX';
+    const settings = JSON.stringify({
+      sourceType: 'latex_import',
+      latexProjectId: req.params.id,
+      isPublic: !!b.public,
+      answerKey: {
+        phanI, phanII, phanIII, phanIV,
+      },
+      sectionCounts,
+    });
+    await pool.query(`
+      INSERT INTO "Exam"(id, teacher_id, title, description, status, settings)
+      VALUES ($1,$2,$3,$4,'published',$5::jsonb)`,
+      [examId, decoded.sub, examTitle,
+       `Đề tạo tự động từ tài liệu LaTeX (${totalQuestions} câu)`, settings]);
+
+    return res.json({
+      examId, examTitle, totalQuestions, sectionCounts,
+    });
+  } catch (e) {
+    console.error('[latex-to-exam]', e.message);
+    return res.status(500).json({ error: 'Lỗi tạo đề từ LaTeX' });
+  }
+});
+
+// POST /api/latex-projects/compile — biên dịch LaTeX → PDF qua tectonic
+// Docker image đã có tectonic ở /usr/local/bin/tectonic + cache /home/appuser/.cache/Tectonic
+app.post('/api/latex-projects/compile', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { content = '', projectId = null } = req.body || {};
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
+    }
+    const { randomUUID } = require('crypto');
+    const fs = require('fs');
+    const path = require('path');
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    // Tmp dir riêng cho mỗi compile để tránh race
+    const sessionId = randomUUID();
+    const tmpDir = `/tmp/latex-${sessionId}`;
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const texFile = path.join(tmpDir, 'main.tex');
+    fs.writeFileSync(texFile, content, 'utf-8');
+
+    let pdfBuffer = null;
+    let logOutput = '';
+    try {
+      const { stdout, stderr } = await execAsync(
+        `tectonic --outdir "${tmpDir}" "${texFile}"`,
+        { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 }
+      );
+      logOutput = `${stdout}\n${stderr}`;
+      const pdfPath = path.join(tmpDir, 'main.pdf');
+      if (fs.existsSync(pdfPath)) {
+        pdfBuffer = fs.readFileSync(pdfPath);
+      }
+    } catch (err) {
+      logOutput = (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + err.message;
+    } finally {
+      // Cleanup tmp dir (best-effort)
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+
+    if (!pdfBuffer) {
+      return res.status(422).json({
+        error: 'Biên dịch LaTeX thất bại',
+        log: logOutput.slice(-3000),  // last 3KB của log để debug
+      });
+    }
+    // Optional: update LatexProject.updated_at + main_content nếu projectId given
+    if (projectId) {
+      try {
+        const pool = _getPool();
+        await pool.query(
+          `UPDATE "LatexProject" SET main_content = $1, updated_at = NOW()
+           WHERE id = $2 AND user_id = $3`,
+          [content, projectId, decoded.sub]);
+      } catch { /* silent */ }
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', String(pdfBuffer.length));
+    return res.end(pdfBuffer);
+  } catch (e) {
+    console.error('[latex-compile]', e.message);
+    return res.status(500).json({ error: 'Lỗi server khi biên dịch' });
+  }
+});
 
 // (Proxy cũ disable — latex-service offline. Có thể bật lại khi service up)
 // app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
@@ -5156,29 +7472,35 @@ function _classAuth(req, res) {
   try { return _akVerify(auth.slice(7)); }
   catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
 }
+// Helper: dedupe tất cả JWT fields → match teacher_id qua ANY array
+// Sửa bug: GV tạo lớp ngày trước với decoded.userId, hôm sau login lại
+// JWT trả decoded.sub khác id → "Bạn chưa có lớp nào" mặc dù có lớp.
+const _classIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
 
 // GET /api/classes → { classes: [...] }
 app.get('/api/classes', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    const myIds = _classIds(decoded);
     const { rows } = await pool.query(`
       SELECT c.id, c.name, c.grade, c.school_year AS "schoolYear", c.description,
              c.context_type, c.institution_name, c.created_at AS "createdAt",
              COALESCE((SELECT COUNT(*) FROM "ClassStudent" cs WHERE cs.class_id = c.id), 0)::int AS "studentCount"
-      FROM "Class" c WHERE c.teacher_id = $1 ORDER BY c.created_at DESC
-    `, [decoded.sub]);
+      FROM "Class" c WHERE c.teacher_id = ANY($1::text[]) ORDER BY c.created_at DESC
+    `, [myIds]);
     return res.json({ classes: rows });
   } catch (e) {
     // Bảng ClassStudent có thể chưa tồn tại — fallback query bỏ join
     try {
       const pool = _getPool();
+      const myIds = _classIds(decoded);
       const { rows } = await pool.query(`
         SELECT id, name, grade, school_year AS "schoolYear", description,
                context_type, institution_name, created_at AS "createdAt",
                0 AS "studentCount"
-        FROM "Class" WHERE teacher_id = $1 ORDER BY created_at DESC
-      `, [decoded.sub]);
+        FROM "Class" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC
+      `, [myIds]);
       return res.json({ classes: rows });
     } catch (e2) {
       console.error('[classes:list]', e2.message);
@@ -5213,8 +7535,8 @@ app.delete('/api/classes/:id', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount } = await pool.query(
-      `DELETE FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]
+      `DELETE FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]
     );
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
     return res.json({ ok: true });
@@ -5227,7 +7549,7 @@ app.patch('/api/classes/:id', async (req, res) => {
   try {
     const { name, grade, schoolYear, description, context_type, institution_name } = req.body || {};
     const updates = [];
-    const params = [req.params.id, decoded.sub];
+    const params = [req.params.id, _classIds(decoded)];
     if (name !== undefined)              { params.push(String(name).slice(0,200));            updates.push(`name = $${params.length}`); }
     if (grade !== undefined)             { params.push(String(grade).slice(0,50));            updates.push(`grade = $${params.length}`); }
     if (schoolYear !== undefined)        { params.push(String(schoolYear).slice(0,20));       updates.push(`school_year = $${params.length}`); }
@@ -5237,7 +7559,7 @@ app.patch('/api/classes/:id', async (req, res) => {
     if (!updates.length) return res.json({ ok: true });
     const pool = _getPool();
     const { rowCount } = await pool.query(
-      `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
+      `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[])`,
       params
     );
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
@@ -5250,10 +7572,10 @@ app.get('/api/classes/:id/students', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
-    // Verify lớp thuộc teacher
+    // Verify lớp thuộc teacher (match qua mọi JWT id field)
     const { rowCount } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]);
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
     const { rows } = await pool.query(
       `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
@@ -5275,8 +7597,8 @@ app.post('/api/classes/:id/students/import', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount: ok } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [classId, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [classId, _classIds(decoded)]);
     if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
 
     const { randomUUID } = require('crypto');
@@ -5332,8 +7654,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount: ok } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]);
     if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
     const { rowCount } = await pool.query(
       `DELETE FROM "ClassStudent" WHERE id = $1 AND class_id = $2`,
@@ -5342,6 +7664,206 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
     return res.json({ ok: true });
   } catch (e) { console.error('[classes:students:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá HS' }); }
 });
+
+// ── Class Subjects + Gradebook (TT58/TT22 Bộ GD&ĐT) ──────────────
+;(() => {
+  async function _ensureGradebookTables() {
+    const pool = _getPool();
+    // Môn học của 1 lớp (subject list per class)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ClassSubject" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        class_id    VARCHAR(36)  NOT NULL,
+        teacher_id  VARCHAR(255) NOT NULL,
+        subject     VARCHAR(100) NOT NULL,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('ClassSubject', [
+      ['class_id',   "VARCHAR(36)"],
+      ['teacher_id', "VARCHAR(255)"],
+      ['subject',    "VARCHAR(100)"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('ClassSubject', ['classId','teacherId','subject','createdAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_classsubj_class ON "ClassSubject"(class_id)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_classsubj ON "ClassSubject"(class_id, subject)`);
+
+    // Bảng điểm: 1 row mỗi (class, subject, semester, student)
+    // ddgtx: JSONB array điểm thường xuyên; ddggk/ddgck: điểm giữa kì/cuối kì
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Gradebook" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        class_id      VARCHAR(36)  NOT NULL,
+        subject       VARCHAR(100) NOT NULL,
+        semester      VARCHAR(10)  NOT NULL,
+        student_id    VARCHAR(36)  NOT NULL,
+        ddgtx         JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        ddggk         NUMERIC(4,2),
+        ddgck         NUMERIC(4,2),
+        note_progress TEXT,
+        note_record   TEXT,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('Gradebook', [
+      ['class_id',     "VARCHAR(36)"],
+      ['subject',      "VARCHAR(100)"],
+      ['semester',     "VARCHAR(10)"],
+      ['student_id',   "VARCHAR(36)"],
+      ['ddgtx',        "JSONB DEFAULT '[]'::jsonb"],
+      ['ddggk',        "NUMERIC(4,2)"],
+      ['ddgck',        "NUMERIC(4,2)"],
+      ['note_progress',"TEXT"],
+      ['note_record',  "TEXT"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('Gradebook', ['classId','subject','semester','studentId','ddgtx','ddggk','ddgck','noteProgress','noteRecord','createdAt','updatedAt']);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_gradebook ON "Gradebook"(class_id, subject, semester, student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_gradebook_class ON "Gradebook"(class_id, subject, semester)`);
+  }
+  _ensureGradebookTables().catch(e => console.error('[gradebook] migration:', e.message));
+
+  // GET /api/classes/:classId/subjects → { subjects: string[] }
+  app.get('/api/classes/:classId/subjects', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      // Verify lớp thuộc GV
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const { rows } = await pool.query(
+        `SELECT subject FROM "ClassSubject" WHERE class_id = $1 ORDER BY subject`,
+        [req.params.classId]);
+      return res.json({ subjects: rows.map(r => r.subject) });
+    } catch (e) { console.error('[gb:subjects:list]', e.message); return res.json({ subjects: [] }); }
+  });
+
+  // POST /api/classes/:classId/subjects — body: { subject }
+  app.post('/api/classes/:classId/subjects', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const subject = String(req.body?.subject || '').trim();
+      if (!subject) return res.status(400).json({ error: 'Thiếu tên môn' });
+      if (subject.length > 100) return res.status(400).json({ error: 'Tên môn quá dài (max 100 ký tự)' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại hoặc không thuộc quyền của bạn' });
+      const { randomUUID } = require('crypto');
+      try {
+        await pool.query(
+          `INSERT INTO "ClassSubject"(id, class_id, teacher_id, subject) VALUES ($1,$2,$3,$4)`,
+          [randomUUID(), req.params.classId, decoded.sub, subject]);
+      } catch (e) {
+        if (e.code === '23505') return res.status(409).json({ error: `Môn "${subject}" đã tồn tại trong lớp này` });
+        throw e;
+      }
+      return res.json({ ok: true, subject });
+    } catch (e) { console.error('[gb:subjects:add]', e.message); return res.status(500).json({ error: 'Lỗi thêm môn' }); }
+  });
+
+  // DELETE /api/classes/:classId/subjects/:subject — gỡ môn (kèm điểm)
+  app.delete('/api/classes/:classId/subjects/:subject', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const subject = decodeURIComponent(req.params.subject);
+      await pool.query(`DELETE FROM "Gradebook" WHERE class_id = $1 AND subject = $2`, [req.params.classId, subject]);
+      await pool.query(`DELETE FROM "ClassSubject" WHERE class_id = $1 AND subject = $2`, [req.params.classId, subject]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[gb:subjects:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá môn' }); }
+  });
+
+  // GET /api/teacher/gradebook?classId=&subject=&semester=
+  app.get('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester } = req.query;
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _classIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const [studs, grds] = await Promise.all([
+        pool.query(
+          `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
+                  ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh"
+           FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+          [classId]),
+        pool.query(
+          `SELECT student_id AS "studentId", ddgtx, ddggk, ddgck,
+                  note_progress AS "noteProgress", note_record AS "noteRecord"
+           FROM "Gradebook" WHERE class_id = $1 AND subject = $2 AND semester = $3`,
+          [classId, subject, semester]),
+      ]);
+      const grades = {};
+      for (const g of grds.rows) {
+        grades[g.studentId] = {
+          ddgtx: Array.isArray(g.ddgtx) ? g.ddgtx.map(v => v == null ? null : Number(v)) : [],
+          ddggk: g.ddggk == null ? null : Number(g.ddggk),
+          ddgck: g.ddgck == null ? null : Number(g.ddgck),
+          noteProgress: g.noteProgress || '',
+          noteRecord:   g.noteRecord   || '',
+        };
+      }
+      return res.json({ students: studs.rows, grades });
+    } catch (e) { console.error('[gb:get]', e.message); return res.status(500).json({ error: 'Lỗi tải sổ điểm' }); }
+  });
+
+  // POST /api/teacher/gradebook — body: { classId, subject, semester, rows: [...] }
+  app.post('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester, rows = [] } = req.body || {};
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows phải là array' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _classIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const { randomUUID } = require('crypto');
+      const clamp = v => {
+        if (v == null || v === '') return null;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.min(10, Math.round(n * 100) / 100));
+      };
+      let saved = 0;
+      for (const r of rows) {
+        if (!r?.studentId) continue;
+        const ddgtx = Array.isArray(r.ddgtx) ? r.ddgtx.map(clamp) : [];
+        const ddggk = clamp(r.ddggk);
+        const ddgck = clamp(r.ddgck);
+        const noteP = r.noteProgress != null ? String(r.noteProgress) : null;
+        const noteR = r.noteRecord   != null ? String(r.noteRecord)   : null;
+        await pool.query(`
+          INSERT INTO "Gradebook"(id, class_id, subject, semester, student_id,
+                                  ddgtx, ddggk, ddgck, note_progress, note_record, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,NOW())
+          ON CONFLICT (class_id, subject, semester, student_id) DO UPDATE
+            SET ddgtx = EXCLUDED.ddgtx, ddggk = EXCLUDED.ddggk, ddgck = EXCLUDED.ddgck,
+                note_progress = EXCLUDED.note_progress, note_record = EXCLUDED.note_record,
+                updated_at = NOW()
+        `, [randomUUID(), classId, subject, semester, r.studentId,
+            JSON.stringify(ddgtx), ddggk, ddgck, noteP, noteR]);
+        saved++;
+      }
+      return res.json({ ok: true, saved });
+    } catch (e) { console.error('[gb:save]', e.message); return res.status(500).json({ error: 'Lỗi lưu sổ điểm' }); }
+  });
+})();
 
 // ── Analytics pageview — PHẢI trước catch-all /api proxy ────────
 // Rust aero-backend không serve /api/analytics/pageview → 503 spam console
@@ -5410,7 +7932,7 @@ app.post('/api/notifications/:id/read', (_req, res) => res.json({ ok: true }));
 app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true }));
 
 // Exam matrices list (media-service) — UI đã có SAMPLE_MATRICES fallback
-app.get('/api/exam-matrices', (_req, res) => res.json({ matrices: [], total: 0 }));
+// (exam-matrices CRUD moved above proxy — line ~4950)
 
 // Recommendation feed (reco-service)
 // Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
@@ -5555,6 +8077,15 @@ async function _ensureLessonPlanTable() {
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
+  await _backfillSnakeFromCamel('LessonPlan', [
+    ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+    ['word_count',   ['wordCount']],
+  ]);
+  // Legacy tags/content_json có thể TEXT[] hoặc TEXT — migrate sang JSONB
+  for (const col of ['tags', 'content_json']) {
+    try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); }
+    catch { /* skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
@@ -5718,9 +8249,25 @@ async function _ensureExamTables() {
     ['subject', "VARCHAR(100)"], ['grade', "VARCHAR(50)"], ['chapter', "VARCHAR(200)"],
     ['difficulty', "VARCHAR(20) DEFAULT 'TH'"], ['options', "JSONB DEFAULT '[]'::jsonb"],
     ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
+    ['visibility', "VARCHAR(20) DEFAULT 'private'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
-  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId']);
+  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId','topic','questionType','correctAnswer','qualityScore','usageCount','aiGenerated','humanReviewed','status','createdBy']);
+  // BACKFILL critical: GV cũ tạo Question trên Rust service với teacherId/createdBy/authorId
+  // → handler mới query WHERE teacher_id=$me → empty → GV tưởng mất data
+  await _backfillSnakeFromCamel('Question', [
+    ['teacher_id', ['teacherId', 'createdBy', 'authorId', 'ownerId', 'userId']],
+    ['type',       ['type', 'questionType']],
+    ['answer',     ['answer', 'correctAnswer']],
+  ]);
+  // Legacy Question.options từ Rust service là TEXT[] → quiz-publish handler
+  // JSON.stringify ra '["..."]' không khớp PG array literal '{...}' → 500.
+  // Migrate sang JSONB cho options + tags + learningObjectives.
+  for (const col of ['options', 'tags', 'learningObjectives']) {
+    try {
+      await pool.query(`ALTER TABLE "Question" ALTER COLUMN "${col}" TYPE JSONB USING to_jsonb("${col}")`);
+    } catch { /* đã JSONB sẵn — skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
 
   // Exams
@@ -5747,10 +8294,35 @@ async function _ensureExamTables() {
     ['duration_min', "INTEGER DEFAULT 45"], ['total_points', "NUMERIC DEFAULT 10"],
     ['question_ids', "JSONB DEFAULT '[]'::jsonb"], ['settings', "JSONB DEFAULT '{}'::jsonb"],
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
+    ['visibility', "VARCHAR(20) DEFAULT 'private'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
-  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId']);
+  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId','examType','duration','totalScore','totalQuestions','passingScore','shuffle','sourceType','userId']);
+  // BACKFILL: legacy GV data sang teacher_id
+  await _backfillSnakeFromCamel('Exam', [
+    ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+    ['duration_min', ['duration', 'durationMin']],
+    ['total_points', ['totalScore', 'totalPoints']],
+  ]);
+  // Same fix cho Exam — legacy questionIds/settings có thể là array/text
+  for (const col of ['question_ids', 'settings']) {
+    try {
+      await pool.query(`ALTER TABLE "Exam" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`);
+    } catch { /* đã JSONB hoặc legacy column khác — skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_teacher ON "Exam"(teacher_id, created_at DESC)`);
+
+  // Add ExamQuestion + ExamQuestion legacy cleanup (cũng có "examId" camelCase NOT NULL)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "ExamQuestion" (
+      id           VARCHAR(36)  PRIMARY KEY,
+      "examId"     VARCHAR(36),
+      "questionId" VARCHAR(36),
+      "order"      INTEGER,
+      points       NUMERIC DEFAULT 1
+    )
+  `);
+  await _dropLegacyNotNull('ExamQuestion', ['examId','questionId','order','points','createdAt','updatedAt']);
 }
 _ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
 
@@ -5762,15 +8334,37 @@ function _examAuth(req, res) {
 }
 
 // ── Question Bank CRUD ──
+// Visibility: 'private' (default) — chỉ GV tạo xem; 'public' — mọi GV xem & sử dụng
 app.get('/api/question-bank', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const scope = req.query.scope || 'all';
+    // CONSISTENT với POST /api/questions/batch: prefer userId/id over sub
+    // (vì JWT có thể có nhiều ID fields, phải match cùng logic để isOwner chuẩn)
+    const me = decoded.userId || decoded.id || decoded.sub;
+    // Tất cả ID có thể của user — match nếu teacher_id == bất kỳ một cái nào
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
+    let where;
+    const params = [myIds];
+    if (scope === 'mine') {
+      where = `teacher_id = ANY($1::text[])`;
+    } else if (scope === 'public') {
+      where = `visibility = 'public' AND NOT (teacher_id = ANY($1::text[]))`;
+    } else {
+      where = `teacher_id = ANY($1::text[]) OR visibility = 'public'`;
+    }
     const { rows } = await pool.query(
-      `SELECT * FROM "Question" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 500`,
-      [decoded.sub]
+      `SELECT *, (teacher_id = ANY($1::text[])) AS is_owner FROM "Question"
+       WHERE ${where} ORDER BY created_at DESC LIMIT 500`,
+      params
     );
-    return res.json({ questions: rows, total: rows.length });
+    const questions = rows.map(r => ({
+      ...r,
+      visibility: r.visibility || 'private',
+      isOwner: !!r.is_owner,
+    }));
+    return res.json({ questions, total: questions.length, _debug: { me, myIds } });
   } catch (e) { console.error('[question-bank:list]', e.message); return res.json({ questions: [], total: 0 }); }
 });
 
@@ -5795,18 +8389,97 @@ app.post('/api/question-bank', async (req, res) => {
 
 app.patch('/api/question-bank/:id', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
+  const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+  const myId = decoded.userId || decoded.id || decoded.sub;
   try {
+    const pool = _getPool();
+    // 1) Kiểm tra ownership
+    const { rows: existing } = await pool.query(
+      `SELECT * FROM "Question" WHERE id = $1`, [req.params.id]);
+    if (!existing.length) return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
+    const orig = existing[0];
+    const isOwner = myIds.includes(orig.teacher_id) || myIds.includes(orig.createdBy);
+
+    // 2) Build update payload từ req.body
     const fields = ['content', 'type', 'subject', 'grade', 'chapter', 'difficulty', 'answer', 'explanation'];
     const jsonFields = ['options', 'tags'];
-    const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
-    for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
-    for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
-    const pool = _getPool();
-    const { rowCount } = await pool.query(
-      `UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
-    return res.json({ ok: true });
+    const allowVisibility = req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility);
+
+    // 3a) Nếu IS OWNER → UPDATE in-place (logic cũ)
+    if (isOwner) {
+      const updates = ['updated_at = NOW()']; const params = [req.params.id];
+      for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
+      for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+      if (allowVisibility) { params.push(req.body.visibility); updates.push(`visibility = $${params.length}`); }
+      await pool.query(`UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1`, params);
+      return res.json({ ok: true, action: 'updated', id: req.params.id });
+    }
+
+    // 3b) Nếu NOT OWNER → CLONE câu hỏi với edit của user + teacher_id mới
+    // (visibility câu mới = 'private' default — user phải chủ động share lại)
+    const { randomUUID } = require('crypto');
+    const newId = randomUUID();
+    // Merge: original fields + user's overrides
+    const merged = {
+      content:     req.body.content     ?? orig.content,
+      type:        req.body.type        ?? orig.type,
+      subject:     req.body.subject     ?? orig.subject,
+      grade:       req.body.grade       ?? orig.grade,
+      chapter:     req.body.chapter     ?? orig.chapter,
+      difficulty:  req.body.difficulty  ?? orig.difficulty,
+      answer:      req.body.answer      ?? orig.answer,
+      explanation: req.body.explanation ?? orig.explanation,
+      options:     req.body.options     ?? orig.options,
+      tags:        req.body.tags        ?? orig.tags,
+    };
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, "createdBy", content, type, subject, grade,
+                              chapter, difficulty, options, answer, explanation, tags,
+                              visibility, status, "createdAt", "updatedAt")
+       VALUES ($1::text,$2::text,$2::text,$3::text,$4::text,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,
+               'private','active',NOW(),NOW())`,
+      [newId, myId, merged.content, merged.type, merged.subject, merged.grade,
+       merged.chapter, merged.difficulty, JSON.stringify(merged.options || []),
+       merged.answer, merged.explanation, JSON.stringify(merged.tags || [])]);
+    console.log(`[qb:clone-on-edit] user=${myId} cloned ${req.params.id} → ${newId}`);
+    return res.json({
+      ok: true,
+      action: 'cloned',
+      id: newId,
+      originalId: req.params.id,
+      message: 'Câu hỏi gốc của GV khác — đã tạo bản sao thuộc sở hữu của bạn để chỉnh sửa.',
+    });
   } catch (e) { console.error('[question-bank:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// POST /api/question-bank/:id/duplicate — explicit clone (không edit)
+// Tạo bản sao thuộc sở hữu của user hiện tại, visibility=private mặc định.
+app.post('/api/question-bank/:id/duplicate', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  const myId = decoded.userId || decoded.id || decoded.sub;
+  try {
+    const pool = _getPool();
+    // Cho phép duplicate câu của mình HOẶC câu public
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+    const { rows } = await pool.query(
+      `SELECT * FROM "Question" WHERE id = $1
+       AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
+      [req.params.id, myIds]);
+    if (!rows.length) return res.status(404).json({ error: 'Câu hỏi không tồn tại hoặc không công khai' });
+    const orig = rows[0];
+    const { randomUUID } = require('crypto');
+    const newId = randomUUID();
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, "createdBy", content, type, subject, grade,
+                              chapter, difficulty, options, answer, explanation, tags,
+                              visibility, status, "createdAt", "updatedAt")
+       VALUES ($1::text,$2::text,$2::text,$3::text,$4::text,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,
+               'private','active',NOW(),NOW())`,
+      [newId, myId, orig.content, orig.type, orig.subject, orig.grade,
+       orig.chapter, orig.difficulty, JSON.stringify(orig.options || []),
+       orig.answer, orig.explanation, JSON.stringify(orig.tags || [])]);
+    return res.json({ ok: true, id: newId, originalId: req.params.id });
+  } catch (e) { console.error('[qb:dup]', e.message); return res.status(500).json({ error: 'Lỗi nhân bản' }); }
 });
 
 app.delete('/api/question-bank/:id', async (req, res) => {
@@ -5830,25 +8503,41 @@ app.get('/api/questions/taxonomy', (_req, res) => res.json({
 app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.content || '', changes: [] }));
 
 // ── Exams CRUD ──
+// /api/exams + /api/teacher/exams — list đề: của mình + public của người khác
+// Sử dụng ANY(myIds) để match mọi JWT field (userId/id/sub/email)
+function _examListWhere(scope) {
+  if (scope === 'mine') return `teacher_id = ANY($1::text[])`;
+  if (scope === 'public') return `visibility = 'public' AND NOT (teacher_id = ANY($1::text[]))`;
+  return `teacher_id = ANY($1::text[]) OR visibility = 'public'`;
+}
 app.get('/api/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
+    const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
-      `SELECT id, title, description, subject, grade, duration_min, total_points, status, created_at, updated_at,
-              jsonb_array_length(question_ids) AS question_count
-       FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
-    return res.json({ exams: rows, total: rows.length });
+      `SELECT id, title, description, subject, grade, duration_min, total_points, status,
+              visibility, teacher_id, created_at, updated_at,
+              jsonb_array_length(question_ids) AS question_count,
+              (teacher_id = ANY($1::text[])) AS is_owner
+       FROM "Exam" WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [myIds]);
+    const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
+    return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
 });
 
 app.get('/api/teacher/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
+    const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
-      `SELECT * FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
-    return res.json({ exams: rows, total: rows.length });
+      `SELECT *, (teacher_id = ANY($1::text[])) AS is_owner FROM "Exam"
+       WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [myIds]);
+    const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
+    return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[teacher-exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
 });
 
@@ -5874,10 +8563,14 @@ app.get('/api/exams/:id', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    // Cho phép xem đề của mình HOẶC public
     const { rows } = await pool.query(
-      `SELECT * FROM "Exam" WHERE id = $1 AND teacher_id = $2`, [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
-    return res.json({ exam: rows[0] });
+      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+    const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
+    return res.json({ exam });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
 });
 
@@ -5889,10 +8582,13 @@ app.patch('/api/exams/:id', async (req, res) => {
     const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
     for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
     for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+    if (req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility)) {
+      params.push(req.body.visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa đề này' });
     return res.json({ ok: true });
   } catch (e) { console.error('[exams:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
 });
@@ -6015,10 +8711,48 @@ app.post('/api/kg/seed', (_req, res) => res.json(OK));
 // Chat / Users / Profile
 app.get('/api/chat/rooms', (_req, res) => res.json({ rooms: [], total: 0 }));
 app.get('/api/chat/users/search', (_req, res) => res.json({ users: [] }));
-app.get('/api/users/search', (_req, res) => res.json({ users: [] }));
+// (real /api/users/search handler ở TSL block ~line 1940)
 app.get('/api/users/me/profile', (_req, res) => res.json({ profile: null }));
 app.get('/api/profile', (_req, res) => res.json({ profile: null }));
 app.patch('/api/users/me/profile', (_req, res) => res.json(OK));
+
+// GET /api/users/:userId/profile — public profile (PublicProfile.tsx)
+app.get('/api/users/:userId/profile', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    // Literal placeholder "teacher-user" → 404 gracefully (không proxy aero-backend)
+    if (userId === 'teacher-user' || userId === 'student-user' || userId === 'me') {
+      return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    }
+    const pool = _getPool();
+    // Lookup theo id HOẶC email HOẶC slug-like name
+    const { rows: users } = await pool.query(
+      `SELECT id, name, email, image, role, "createdAt"
+       FROM "User"
+       WHERE id = $1 OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)
+       LIMIT 1`, [userId]);
+    if (!users.length) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    const u = users[0];
+    // Load profile decoration nếu có
+    let profile = null;
+    try {
+      const { rows: profs } = await pool.query(
+        `SELECT bio, banner_style AS "bannerStyle", banner_image_url AS "bannerImageUrl",
+                avatar_frame AS "avatarFrame", theme_color AS "themeColor",
+                skills, socials, showcase, visibility,
+                updated_at AS "updatedAt"
+         FROM "UserProfile" WHERE user_id = $1 LIMIT 1`, [u.id]);
+      if (profs[0]) profile = { id: u.id, userId: u.id, ...profs[0] };
+    } catch { /* UserProfile table có thể chưa tồn tại */ }
+    return res.json({
+      user: { id: u.id, name: u.name, image: u.image, role: u.role || 'STUDENT', createdAt: u.createdAt },
+      profile, stats: null, achievements: [],
+    });
+  } catch (e) {
+    console.error('[users:profile]', e.message);
+    return res.status(500).json({ error: 'Lỗi tải hồ sơ' });
+  }
+});
 
 // Misc
 app.get('/api/categories', (_req, res) => res.json({ categories: [] }));
@@ -6044,9 +8778,7 @@ app.get('/api/emotion/stats', (req, res) => {
     },
   });
 });
-app.get('/api/assignments', (_req, res) => res.json({ assignments: [], total: 0 }));
-app.get('/api/assignments/recommended', (_req, res) => res.json({ recommendations: [] }));
-app.post('/api/assignments/from-exam', (_req, res) => res.status(501).json({ error: 'Chưa khả dụng' }));
+// (real handlers at line ~4145 + IIFE ~4560 cover /api/assignments + /from-exam + /:id/targets)
 
 // Reco extras
 app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
@@ -6072,12 +8804,104 @@ app.get('/api/media', (_req, res) => res.json({ media: [], total: 0 }));
 app.post('/api/media/upload', (_req, res) => res.status(501).json({ error: 'Media upload cần GCS — chưa khả dụng' }));
 
 // Exam matrix detail/actions (chưa implement)
-app.get('/api/exam-matrices/:id', (_req, res) => res.status(404).json({ error: 'Ma trận không tồn tại' }));
-app.post('/api/exam-matrices', (_req, res) => res.status(501).json({ error: 'Tạo matrix qua /teacher/exam-matrix/create' }));
-app.post('/api/exam-matrices/digitize', (_req, res) => res.status(501).json({ error: 'Số hoá cần media-service' }));
+// (exam-matrices CRUD moved above proxy — line ~4950)
 
 // XP / Gamification
 app.post('/api/exam-xp/award', (_req, res) => res.json(OK));
+// /api/exam-xp/me — XP của user hiện tại (shape XpMe)
+app.get('/api/exam-xp/me', (_req, res) => res.json({
+  totalXp: 0, examCount: 0, level: 1, nextLevelXp: 500, xpToNext: 500, history: [],
+}));
+
+// ── Grading Answer Keys CRUD ──
+// Bảng "AnswerKey" lưu đáp án mẫu cho chấm tự động (multiple choice, T/F, short)
+;(() => {
+  async function _ensureAnswerKeyTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AnswerKey" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        name        VARCHAR(500) NOT NULL DEFAULT 'Đáp án mới',
+        exam_id     VARCHAR(36),
+        data        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('AnswerKey', [
+      ['teacher_id', "VARCHAR(255)"], ['name', "VARCHAR(500)"],
+      ['exam_id', "VARCHAR(36)"], ['data', "JSONB DEFAULT '{}'::jsonb"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('AnswerKey', ['teacherId','name','examId','data','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_answerkey_teacher ON "AnswerKey"(teacher_id, created_at DESC)`);
+  }
+  _ensureAnswerKeyTable().catch(e => console.error('[answer-keys] migration:', e.message));
+
+  function akAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // GET /api/grading/answer-keys
+  app.get('/api/grading/answer-keys', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, name, exam_id AS "examId", data, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "AnswerKey" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC LIMIT 100`,
+        [myIds]);
+      // Frontend shape: { keys: [{ ...data spread, dbId, name, examId, createdAt }] }
+      const keys = rows.map(r => ({ ...(r.data || {}), dbId: r.id, name: r.name, examId: r.examId, createdAt: r.createdAt }));
+      return res.json({ keys, total: keys.length });
+    } catch (e) { console.error('[answer-keys:list]', e.message); return res.json({ keys: [], total: 0 }); }
+  });
+
+  // POST /api/grading/answer-keys — body có name + data (any shape)
+  app.post('/api/grading/answer-keys', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const name = String(b.name || 'Đáp án mới').slice(0, 500);
+      const { name: _n, examId, ...data } = b;
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "AnswerKey"(id, teacher_id, name, exam_id, data)
+         VALUES ($1::text, $2::text, $3::text, $4, $5::jsonb)`,
+        [id, myId, name, examId || null, JSON.stringify(data)]);
+      return res.json({ ok: true, key: { id } });
+    } catch (e) { console.error('[answer-keys:create]', e.message); return res.status(500).json({ error: 'Lỗi lưu đáp án' }); }
+  });
+
+  // DELETE /api/grading/answer-keys/:id
+  app.delete('/api/grading/answer-keys/:id', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "AnswerKey" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy đáp án' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[answer-keys:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+})();
+
+// ── Stubs cho IoT/Camera (chưa có service thực) — tránh 503 spam ──
+app.get('/api/iot/classroom/:id', (_req, res) => res.status(404).json({ error: 'IoT service offline — dùng mock data' }));
+app.get('/api/camera/recording', (_req, res) => res.json({ recordings: [], total: 0 }));
+app.post('/api/camera/recording', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
+app.post('/api/camera/recording/:id/stop', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
+app.get('/api/camera/file/:filename', (_req, res) => res.status(404).json({ error: 'File không tồn tại — demo MP4 chưa upload GCS' }));
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
