@@ -8721,11 +8721,26 @@ app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
         ...current, ...patch,
         completedAt: patch.skipped ? null : (patch.completedAt || new Date().toISOString()),
       };
-      await pool.query(`
-        INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at)
-        VALUES ($1, $2::jsonb, NOW())
-        ON CONFLICT (user_id) DO UPDATE SET reco_prefs = EXCLUDED.reco_prefs, updated_at = NOW()
-      `, [userId, JSON.stringify(next)]);
+      // Fallback SELECT-then-UPDATE/INSERT nếu ON CONFLICT không có UNIQUE constraint
+      try {
+        await pool.query(`
+          INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at)
+          VALUES ($1, $2::jsonb, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET reco_prefs = EXCLUDED.reco_prefs, updated_at = NOW()
+        `, [userId, JSON.stringify(next)]);
+      } catch (e) {
+        // Schema cũ không có UNIQUE → manual upsert
+        const { rowCount } = await pool.query(
+          `UPDATE "UserProfile" SET reco_prefs = $1::jsonb, updated_at = NOW() WHERE user_id = $2`,
+          [JSON.stringify(next), userId]
+        );
+        if (rowCount === 0) {
+          await pool.query(
+            `INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at) VALUES ($1, $2::jsonb, NOW())`,
+            [userId, JSON.stringify(next)]
+          );
+        }
+      }
       return res.json({ success: true, prefs: next });
     } catch (e) { console.error('[reco:onboarding:put]', e.message); return res.status(500).json({ success: false, error: e.message }); }
   });
@@ -9417,7 +9432,71 @@ app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], tota
 app.get('/api/courses', (_req, res) => res.json({ courses: [], total: 0 }));
 app.get('/api/courses/dashboard', (_req, res) => res.json({ enrolled: [], featured: [], my_progress: {} }));
 app.get('/api/instructor/courses', (_req, res) => res.json({ courses: [], total: 0 }));
-app.get('/api/learning/my-courses', (_req, res) => res.json({ courses: [], total: 0 }));
+// Real /api/learning/my-courses — danh sách Course HS đã enrol (Purchase table)
+// FE expects Enrollment[] array trực tiếp, không wrap object.
+app.get('/api/learning/my-courses', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.json([]);  // FE expects array, không 401
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.json([]); }
+  if (!userId) return res.json([]);
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+             c.price, c."userId" AS "instructorId",
+             cat.name AS "categoryName",
+             p."createdAt" AS "enrolledAt",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Purchase" p
+      JOIN "Course" c ON c.id = p."courseId"
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE p."userId" = $1
+      ORDER BY p."createdAt" DESC LIMIT 100
+    `, [userId]).catch(() => ({ rows: [] }));
+    // Map về shape Enrollment FE expect
+    const enrollments = rows.map(r => ({
+      id: r.courseId,
+      courseId: r.courseId,
+      title: r.title,
+      description: r.description || '',
+      image: r.image || r.imageUrl || null,
+      price: Number(r.price) || 0,
+      category: r.categoryName || null,
+      instructor: r.instructorName ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage } : null,
+      enrolledAt: r.enrolledAt,
+      progress: 0,  // wire khi có LessonHistory aggregate
+    }));
+    return res.json(enrollments);
+  } catch (e) { console.error('[learning:my-courses]', e.message); return res.json([]); }
+});
+
+// Real /api/teachers/all — DS GV cho HS discover (MyTeachers page)
+// Shape: { teachers: [{ id, name, email, image, role, cpdSummary, classCount }] }
+app.get('/api/teachers/all', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.email, u.image, u.role,
+             u."createdAt",
+             (SELECT COUNT(*)::int FROM "Class" WHERE teacher_id = u.id) AS "classCount",
+             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount"
+      FROM "User" u
+      WHERE u.role IN ('TEACHER', 'ADMIN') AND COALESCE(u.banned, false) = false
+      ORDER BY u."createdAt" DESC LIMIT 200
+    `).catch(() => ({ rows: [] }));
+    const teachers = rows.map(r => ({
+      id: r.id, name: r.name || r.email?.split('@')[0] || 'GV',
+      email: r.email, image: r.image, role: r.role,
+      classCount: r.classCount || 0,
+      studentCount: r.studentCount || 0,
+      createdAt: r.createdAt,
+      cpdSummary: null,  // TODO: aggregate từ TeacherCPD
+    }));
+    return res.json({ teachers, total: teachers.length });
+  } catch (e) { console.error('[teachers:all]', e.message); return res.json({ teachers: [], total: 0 }); }
+});
 app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
 app.get('/api/learning/purchase-history', (_req, res) => res.json({ orders: [], total: 0 }));
 
@@ -9743,6 +9822,11 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
   async function _ensureUserProfileSchema() {
     const pool = _getPool();
     try {
+      // Critical: ensure UNIQUE on user_id để ON CONFLICT(user_id) work.
+      // Bảng cũ có thể PK trên "userId" (camelCase) — cần add UNIQUE user_id riêng.
+      try {
+        await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_userprofile_user_id ON "UserProfile"(user_id) WHERE user_id IS NOT NULL`);
+      } catch {}
       await pool.query(`
         CREATE TABLE IF NOT EXISTS "UserProfile" (
           user_id      VARCHAR(255) PRIMARY KEY,
@@ -9786,6 +9870,10 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
         );
         if (rowCount > 0) console.log(`[userprofile] backfilled user_id từ "userId" cho ${rowCount} rows`);
       } catch (e) { /* "userId" column không tồn tại — OK */ }
+      // Add UNIQUE index sau backfill (chỉ thành công nếu không có duplicate)
+      try {
+        await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_userprofile_user_id ON "UserProfile"(user_id) WHERE user_id IS NOT NULL`);
+      } catch (e) { console.warn('[userprofile] UNIQUE index failed (có duplicate):', e.message); }
       // Drop NOT NULL cho camelCase legacy cols nếu có
       for (const c of ['userId', 'accountType', 'createdAt', 'updatedAt']) {
         try { await pool.query(`ALTER TABLE "UserProfile" ALTER COLUMN "${c}" DROP NOT NULL`); }
