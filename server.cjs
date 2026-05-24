@@ -1702,6 +1702,131 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ── Lesson Plans CRUD — TRƯỚC proxy teacher-service ──
+// Bảng "LessonPlan" được migrate ở section riêng (line ~6582).
+// Handlers ở đây để Express match trước proxy /api/teacher/*.
+;(() => {
+  function lpAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  function lpRow(r) {
+    return {
+      id: r.id, title: r.title, subject: r.subject, grade: r.grade,
+      tags: r.tags || [], wordCount: r.word_count || 0,
+      isArchived: !!r.is_archived,
+      format: r.format || 'html', latexProjectId: r.latex_project_id,
+      gcsBackupUrl: r.gcs_backup_url, gcsBackupAt: r.gcs_backup_at,
+      lastSavedAt: r.last_saved_at,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+      contentPreview: r.content ? String(r.content).slice(0, 200) : '',
+    };
+  }
+  // Helper: match teacher_id qua ANY của mọi JWT field
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET list
+  app.get('/api/teacher/lesson-plans', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT id, title, subject, grade, tags, word_count, is_archived, format,
+               latex_project_id, gcs_backup_url, gcs_backup_at, last_saved_at,
+               created_at, updated_at, content, teacher_id
+        FROM "LessonPlan" WHERE teacher_id = ANY($1::text[]) ORDER BY updated_at DESC LIMIT 200
+      `, [_ids(decoded)]);
+      return res.json({ plans: rows.map(lpRow), count: rows.length });
+    } catch (e) { console.error('[lp:list]', e.message); return res.json({ plans: [], count: 0 }); }
+  });
+
+  // GET detail
+  app.get('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "LessonPlan" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _ids(decoded)]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+      const r = rows[0];
+      return res.json({ ...lpRow(r), content: r.content || '', contentJson: r.content_json || null });
+    } catch (e) { console.error('[lp:get]', e.message); return res.status(500).json({ error: 'Lỗi tải giáo án' }); }
+  });
+
+  // POST create
+  app.post('/api/teacher/lesson-plans', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { title = 'Giáo án mới', content = '', contentJson = null,
+              subject = null, grade = null, tags = [] } = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const wordCount = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "LessonPlan"(id, teacher_id, title, subject, grade, tags, content, content_json, word_count)
+        VALUES ($1::text,$2::text,$3::text,$4,$5,$6::jsonb,$7::text,$8::jsonb,$9)
+        RETURNING *
+      `, [id, myId, String(title).slice(0, 500), subject, grade,
+          JSON.stringify(Array.isArray(tags) ? tags : []),
+          String(content), contentJson ? JSON.stringify(contentJson) : null, wordCount]);
+      const r = rows[0];
+      return res.json({ plan: { ...lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+    } catch (e) { console.error('[lp:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo giáo án' }); }
+  });
+
+  // PATCH update / auto-save
+  app.patch('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const { title, content, contentJson, subject, grade, tags, isArchived } = req.body || {};
+      const updates = ['updated_at = NOW()', 'last_saved_at = NOW()'];
+      const params = [req.params.id, _ids(decoded)];
+      if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
+      if (subject !== undefined)      { params.push(subject);                       updates.push(`subject = $${params.length}`); }
+      if (grade !== undefined)        { params.push(grade);                         updates.push(`grade = $${params.length}`); }
+      if (tags !== undefined)         { params.push(JSON.stringify(Array.isArray(tags) ? tags : [])); updates.push(`tags = $${params.length}::jsonb`); }
+      if (content !== undefined) {
+        const wc = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+        params.push(String(content)); updates.push(`content = $${params.length}`);
+        params.push(wc);              updates.push(`word_count = $${params.length}`);
+      }
+      if (contentJson !== undefined)  { params.push(contentJson ? JSON.stringify(contentJson) : null); updates.push(`content_json = $${params.length}::jsonb`); }
+      if (isArchived !== undefined)   { params.push(!!isArchived);                  updates.push(`is_archived = $${params.length}`); }
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `UPDATE "LessonPlan" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[]) RETURNING *`,
+        params);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án hoặc không có quyền' });
+      const r = rows[0];
+      return res.json({ plan: { ...lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+    } catch (e) { console.error('[lp:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu giáo án' }); }
+  });
+
+  // DELETE
+  app.delete('/api/teacher/lesson-plans/:id', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "LessonPlan" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _ids(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // Stubs GCS
+  app.post('/api/teacher/lesson-plans/:id/backup', (_req, res) => res.status(501).json({ error: 'GCS backup chưa khả dụng' }));
+  app.post('/api/teacher/lesson-plans/from-latex', (_req, res) => res.status(501).json({ error: 'Import từ LaTeX chưa khả dụng' }));
+  app.get('/api/teacher/lesson-plans-gcs', (_req, res) => res.json({ snapshots: [], count: 0, bucket: '', prefix: '' }));
+  app.delete('/api/teacher/lesson-plans-gcs/:filename', (_req, res) => res.status(501).json({ error: 'GCS delete chưa khả dụng' }));
+})();
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
