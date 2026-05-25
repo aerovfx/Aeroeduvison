@@ -78,6 +78,107 @@ interface ScoreDistributionData {
 
 type ScoreMetric = 'engagement' | 'exam' | 'mastery'
 
+// ── YouTube-style audience demographics ────────────────────
+interface BucketCount { label: string; count: number }
+interface AudienceData {
+  days: number
+  totalViews: number
+  devices: BucketCount[]
+  os: BucketCount[]
+  browsers: BucketCount[]
+  countries: BucketCount[]
+  regions: BucketCount[]
+  cities: BucketCount[]
+  screenSizes: BucketCount[]
+  languages: BucketCount[]
+  timezones: BucketCount[]
+  roles: BucketCount[]
+  ageGroups: BucketCount[]
+  updatedAt: string
+}
+
+// Flag emoji cho 2-letter ISO country code (vẽ qua codepoint regional indicator)
+function flagEmoji(cc: string): string {
+  if (!cc || cc.length !== 2) return '🌐'
+  const codePoints = cc.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0))
+  return String.fromCodePoint(...codePoints)
+}
+
+const COUNTRY_NAMES_VI: Record<string, string> = {
+  VN: 'Việt Nam', US: 'Hoa Kỳ', CN: 'Trung Quốc', JP: 'Nhật Bản', KR: 'Hàn Quốc',
+  TH: 'Thái Lan', SG: 'Singapore', AU: 'Úc', GB: 'Anh', DE: 'Đức',
+  FR: 'Pháp', RU: 'Nga', IN: 'Ấn Độ', CA: 'Canada', MY: 'Malaysia',
+  ID: 'Indonesia', PH: 'Philippines', LA: 'Lào', KH: 'Campuchia', HK: 'Hồng Kông',
+  TW: 'Đài Loan',
+}
+
+const DEVICE_LABELS_VI: Record<string, string> = {
+  mobile: 'Điện thoại', desktop: 'Máy tính', tablet: 'Máy tính bảng',
+  bot: 'Bot/Crawler', unknown: 'Không rõ',
+}
+
+const DEVICE_ICONS: Record<string, string> = {
+  mobile: '📱', desktop: '🖥️', tablet: '📲', bot: '🤖', unknown: '❓',
+}
+
+const OS_ICONS: Record<string, string> = {
+  Windows: '🪟', macOS: '🍎', iOS: '📱', Android: '🤖',
+  Linux: '🐧', ChromeOS: '🌐', Bot: '🤖', Other: '⚙️',
+}
+
+const BROWSER_ICONS: Record<string, string> = {
+  Chrome: '🟢', Safari: '🧭', Firefox: '🦊', Edge: '🌊',
+  Opera: '🎭', IE: '🌐', Bot: '🤖', Other: '🌍',
+}
+
+// Generic horizontal bar list — dùng cho mọi bucket aggregation
+function HorizontalBarList({
+  data, total, colors, labelMap, icons, maxRows = 8, emptyText = 'Chưa có dữ liệu',
+}: {
+  data: BucketCount[]
+  total: number
+  colors?: string[]
+  labelMap?: Record<string, string>
+  icons?: Record<string, string>
+  maxRows?: number
+  emptyText?: string
+}) {
+  if (!data || data.length === 0) {
+    return <p className="text-xs text-white/30 italic py-4 text-center">{emptyText}</p>
+  }
+  const top = data.slice(0, maxRows)
+  const palette = colors || ['#a78bfa','#22d3ee','#10b981','#f59e0b','#ec4899','#6366f1','#f97316','#84cc16']
+  return (
+    <div className="space-y-2">
+      {top.map((b, i) => {
+        const pct = total > 0 ? (b.count / total) * 100 : 0
+        const color = palette[i % palette.length]
+        const displayLabel = labelMap?.[b.label] || b.label
+        const icon = icons?.[b.label]
+        return (
+          <div key={b.label}>
+            <div className="flex items-center justify-between text-xs mb-1 gap-2">
+              <span className="text-white/80 font-semibold truncate flex items-center gap-1.5">
+                {icon && <span className="text-base leading-none">{icon}</span>}
+                {displayLabel}
+              </span>
+              <span className="text-white/50 font-mono whitespace-nowrap">
+                {b.count.toLocaleString('vi-VN')} <span className="text-white/30">({pct.toFixed(1)}%)</span>
+              </span>
+            </div>
+            <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${pct}%`, background: color, boxShadow: `0 0 6px ${color}50` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 const BUCKET_LABELS: Record<string, string> = {
   teacher:        'Khoá GV (/teacher)',
   courses:        'Khoá học',
@@ -449,6 +550,10 @@ export default function AdminAnalytics() {
   const [scoreDist, setScoreDist] = useState<ScoreDistributionData | null>(null)
   const [scoreLoading, setScoreLoading] = useState(false)
 
+  // YouTube-style audience demographics
+  const [audience, setAudience] = useState<AudienceData | null>(null)
+  const [audienceLoading, setAudienceLoading] = useState(true)
+
   // Load overview + routes
   useEffect(() => {
     let cancel = false
@@ -509,6 +614,17 @@ export default function AdminAnalytics() {
       .finally(() => { if (!cancel) setScoreLoading(false) })
     return () => { cancel = true }
   }, [scoreMetric, refreshTs])
+
+  // Load YouTube-style audience demographics
+  useEffect(() => {
+    let cancel = false
+    setAudienceLoading(true)
+    api.get<AudienceData>(`/admin/analytics/audience?days=${period}`)
+      .then(r => { if (!cancel) setAudience(r.data) })
+      .catch(() => { if (!cancel) setAudience(null) })
+      .finally(() => { if (!cancel) setAudienceLoading(false) })
+    return () => { cancel = true }
+  }, [period, refreshTs])
 
   const totalRoleViews = useMemo(
     () => (overview?.byRole || []).reduce((s, r) => s + r.views, 0),
@@ -760,6 +876,206 @@ export default function AdminAnalytics() {
             </div>
           </div>
         )}
+
+        {/* ─── YOUTUBE-STYLE AUDIENCE DEMOGRAPHICS ────────────────── */}
+        <div className="rounded-2xl bg-gradient-to-br from-purple-500/[0.04] to-blue-500/[0.04] border border-purple-500/20 p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-white/90 flex items-center gap-2 uppercase tracking-wider">
+                <PieChart className="w-4 h-4 text-purple-400" />
+                Phân tích đối tượng (YouTube-style) — {period} ngày
+              </h2>
+              <p className="text-[11px] text-white/40 mt-0.5">
+                Thiết bị · Hệ điều hành · Trình duyệt · Quốc gia · Vùng miền · Độ tuổi · Vai trò
+              </p>
+            </div>
+            {audience && (
+              <span className="text-[10px] text-white/40 font-mono">
+                {audience.totalViews.toLocaleString('vi-VN')} lượt xem mẫu
+              </span>
+            )}
+          </div>
+
+          {audienceLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+            </div>
+          ) : !audience ? (
+            <p className="text-center text-white/40 italic py-8 text-sm">
+              Không tải được dữ liệu audience
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* DEVICES */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Cpu className="w-3.5 h-3.5 text-blue-400" />
+                  Thiết bị
+                </h3>
+                <HorizontalBarList
+                  data={audience.devices}
+                  total={audience.totalViews}
+                  colors={['#3b82f6','#a78bfa','#10b981','#f59e0b','#94a3b8']}
+                  labelMap={DEVICE_LABELS_VI}
+                  icons={DEVICE_ICONS}
+                />
+              </div>
+
+              {/* OPERATING SYSTEMS */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                  Hệ điều hành
+                </h3>
+                <HorizontalBarList
+                  data={audience.os}
+                  total={audience.totalViews}
+                  colors={['#06b6d4','#10b981','#f59e0b','#a78bfa','#ec4899','#94a3b8']}
+                  icons={OS_ICONS}
+                />
+              </div>
+
+              {/* BROWSERS */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Network className="w-3.5 h-3.5 text-purple-400" />
+                  Trình duyệt
+                </h3>
+                <HorizontalBarList
+                  data={audience.browsers}
+                  total={audience.totalViews}
+                  colors={['#22c55e','#0ea5e9','#f97316','#3b82f6','#94a3b8']}
+                  icons={BROWSER_ICONS}
+                />
+              </div>
+
+              {/* COUNTRIES — flag emoji + country name VI */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">🌍</span>
+                  Quốc gia (Top 10)
+                </h3>
+                {audience.countries.length === 0 ? (
+                  <p className="text-xs text-white/30 italic py-4 text-center">
+                    Geo headers chưa active — cấu hình Cloudflare cf-ipcountry hoặc Cloud Run x-appengine-country
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {audience.countries.slice(0, 10).map((c, i) => {
+                      const pct = audience.totalViews > 0 ? (c.count / audience.totalViews) * 100 : 0
+                      const palette = ['#3b82f6','#a78bfa','#10b981','#f59e0b','#ec4899','#06b6d4','#f97316','#22c55e','#8b5cf6','#94a3b8']
+                      const color = palette[i % palette.length]
+                      return (
+                        <div key={c.label}>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-white/80 font-semibold truncate flex items-center gap-1.5">
+                              <span className="text-base leading-none">{flagEmoji(c.label)}</span>
+                              {COUNTRY_NAMES_VI[c.label] || c.label}
+                            </span>
+                            <span className="text-white/50 font-mono whitespace-nowrap">
+                              {c.count.toLocaleString('vi-VN')} <span className="text-white/30">({pct.toFixed(1)}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: color, boxShadow: `0 0 6px ${color}50` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* CITIES (proxy "vùng miền") */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">🏙️</span>
+                  Vùng miền · Thành phố
+                </h3>
+                {audience.cities.length === 0 ? (
+                  <div className="text-xs text-white/30 italic py-2">
+                    <p>Top region/city (cần Cloudflare/CDN gửi cf-region, cf-ipcity):</p>
+                    <ul className="mt-1 list-disc list-inside text-white/40 text-[10px]">
+                      <li>Cloudflare Workers tự động</li>
+                      <li>Cloud Run + Cloud CDN</li>
+                      <li>Vercel: x-vercel-ip-city</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <HorizontalBarList
+                    data={audience.cities}
+                    total={audience.totalViews}
+                    colors={['#ec4899','#f59e0b','#a78bfa','#06b6d4','#10b981']}
+                  />
+                )}
+              </div>
+
+              {/* SCREEN SIZES */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">📐</span>
+                  Kích thước màn hình
+                </h3>
+                <HorizontalBarList
+                  data={audience.screenSizes}
+                  total={audience.totalViews}
+                  colors={['#f97316','#3b82f6','#a78bfa','#10b981','#94a3b8']}
+                />
+              </div>
+
+              {/* LANGUAGES */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">🗣️</span>
+                  Ngôn ngữ
+                </h3>
+                <HorizontalBarList
+                  data={audience.languages}
+                  total={audience.totalViews}
+                  colors={['#a78bfa','#22d3ee','#10b981','#f59e0b']}
+                />
+              </div>
+
+              {/* TIMEZONES */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">🕐</span>
+                  Múi giờ
+                </h3>
+                <HorizontalBarList
+                  data={audience.timezones}
+                  total={audience.totalViews}
+                  colors={['#06b6d4','#a78bfa','#ec4899','#f59e0b']}
+                />
+              </div>
+
+              {/* AGE GROUPS */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <h3 className="text-[11px] font-black text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="text-base leading-none">🎂</span>
+                  Độ tuổi
+                </h3>
+                {audience.ageGroups.length === 0 || audience.ageGroups.every(a => a.label === 'Unknown') ? (
+                  <p className="text-xs text-white/30 italic py-4 text-center">
+                    Chưa có user nào nhập ngày sinh<br />
+                    <span className="text-[10px] text-white/20">
+                      (lưu dob vào UserProfile.data-{'>'}'dob' qua /profile/edit)
+                    </span>
+                  </p>
+                ) : (
+                  <HorizontalBarList
+                    data={audience.ageGroups.filter(a => a.label !== 'Unknown')}
+                    total={audience.ageGroups.filter(a => a.label !== 'Unknown').reduce((s, x) => s + x.count, 0)}
+                    colors={['#10b981','#22d3ee','#3b82f6','#a78bfa','#ec4899','#94a3b8']}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Top routes table */}
         <div className="rounded-2xl bg-white/[0.02] border border-white/10 overflow-hidden">

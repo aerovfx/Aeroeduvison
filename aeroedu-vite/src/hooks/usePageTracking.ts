@@ -31,24 +31,49 @@ function getSessionId(): string {
   return sid
 }
 
+// ── YouTube-style demographics — gửi 1 lần per session để BE log device/browser/lang ──
+// Sau khi BE parse User-Agent + Geo headers + body screen → đủ data cho
+// /admin/analytics/audience phân tích device/OS/browser/country/screen/timezone.
+function getDemographics() {
+  try {
+    return {
+      screen: {
+        w: typeof window !== 'undefined' && window.screen ? window.screen.width  : null,
+        h: typeof window !== 'undefined' && window.screen ? window.screen.height : null,
+      },
+      lang: typeof navigator !== 'undefined' ? navigator.language : null,
+      tz: typeof Intl !== 'undefined'
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : null,
+    }
+  } catch {
+    return {}
+  }
+}
+
 function sendBeacon(payload: Record<string, unknown>) {
   try {
     const body = JSON.stringify(payload)
-    // Prefer sendBeacon (survives page unload) — fall back to fetch
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' })
-      navigator.sendBeacon(ENDPOINT_BEACON, blob)
-    } else {
-      // axios chứa Authorization header tự động — quan trọng để biết role
-      // nhưng sendBeacon không gửi header tuỳ chỉnh được. Dùng fetch keepalive.
-      fetch(ENDPOINT_BEACON, {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': 'application/json' },
-        keepalive: true,
-        credentials: 'include',
-      }).catch(() => {})
-    }
+    const token = sessionStorage.getItem('aeroedu_access_token')
+    // Ưu tiên fetch keepalive: hỗ trợ Authorization header → BE biết user role.
+    // sendBeacon không gửi headers tuỳ chỉnh được nên user_id luôn null khi
+    // exit qua beacon — đó là lý do analytics thấy 0 unique users trước đây.
+    fetch(ENDPOINT_BEACON, {
+      method: 'POST',
+      body,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      keepalive: true,
+      credentials: 'include',
+    }).catch(() => {
+      // Last-resort fallback: sendBeacon (sống qua page unload nhưng anonymous)
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' })
+        navigator.sendBeacon(ENDPOINT_BEACON, blob)
+      }
+    })
   } catch { /* never throw */ }
 }
 
@@ -82,12 +107,15 @@ export function usePageTracking() {
 
     // 2. Send ENTRY trang mới (qua axios để có Authorization header)
     if (currentPath !== prevPathRef.current) {
+      const demo = getDemographics()
       // Dynamic import api để tránh circular dep với services/api.ts
       import('@/services/api').then(({ api }) => {
         api.post(ENDPOINT_AXIOS, {
           path: currentPath,
           referrer: prevPathRef.current || prevReferrerRef.current,
           sessionId,
+          // YouTube-style demographics — BE parse + lưu vào PageView
+          ...demo,
         }).catch(() => { /* silent — analytics không được fail UX */ })
       }).catch(() => {})
     }

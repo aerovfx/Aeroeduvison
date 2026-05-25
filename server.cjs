@@ -8372,10 +8372,82 @@ async function _ensurePageViewTable() {
     ['view_ms',    "INTEGER"],
     ['referrer',   "VARCHAR(500)"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    // ── YouTube-style demographics ──
+    ['user_agent', "TEXT"],
+    ['device_type',"VARCHAR(20)"],   // mobile/desktop/tablet/bot/unknown
+    ['os',         "VARCHAR(30)"],   // Windows/macOS/Linux/iOS/Android/Other
+    ['browser',    "VARCHAR(30)"],   // Chrome/Safari/Firefox/Edge/Opera/Other
+    ['screen_w',   "SMALLINT"],
+    ['screen_h',   "SMALLINT"],
+    ['country',    "VARCHAR(2)"],    // ISO 3166-1 alpha-2 (e.g. VN, US)
+    ['region',     "VARCHAR(100)"],  // tỉnh/thành (best-effort)
+    ['city',       "VARCHAR(100)"],
+    ['language',   "VARCHAR(10)"],   // navigator.language (vi-VN, en-US...)
+    ['timezone',   "VARCHAR(60)"],   // Intl tz (Asia/Ho_Chi_Minh...)
+    ['ip_hash',    "VARCHAR(64)"],   // SHA256 hex của IP (privacy-preserving)
   ]);
   await _dropLegacyNotNull('PageView', ['sessionId','userId','viewMs','createdAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_created ON "PageView"(created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_path ON "PageView"(path)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_device ON "PageView"(device_type) WHERE device_type IS NOT NULL`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_country ON "PageView"(country) WHERE country IS NOT NULL`);
+}
+
+// ── User-Agent parser (lightweight regex, no external deps) ──
+// Phù hợp với 95% trường hợp phổ biến. Bot/edge UA → "Other".
+function _parseUA(ua) {
+  if (!ua || typeof ua !== 'string') return { device: 'unknown', os: 'Other', browser: 'Other' };
+  const s = ua;
+  // Bot detection FIRST (UA chứa bot/crawler/spider)
+  if (/bot|crawler|spider|google|bing|yahoo|baidu|duckduck|slurp|facebookexternalhit|telegram|twitterbot/i.test(s)) {
+    return { device: 'bot', os: 'Bot', browser: 'Bot' };
+  }
+  // Device type
+  let device = 'desktop';
+  if (/iPad|Tablet|PlayBook|Silk/.test(s)) device = 'tablet';
+  else if (/Mobi|Android|iPhone|iPod|webOS|Opera Mini|IEMobile/.test(s)) device = 'mobile';
+  // OS
+  let os = 'Other';
+  if (/Windows NT/.test(s)) os = 'Windows';
+  else if (/Mac OS X|Macintosh/.test(s) && !/iPhone|iPad|iPod/.test(s)) os = 'macOS';
+  else if (/iPhone|iPad|iPod/.test(s)) os = 'iOS';
+  else if (/Android/.test(s)) os = 'Android';
+  else if (/Linux/.test(s)) os = 'Linux';
+  else if (/CrOS/.test(s)) os = 'ChromeOS';
+  // Browser (order matters — Edge/Chrome contain each other UA strings)
+  let browser = 'Other';
+  if (/Edg\//.test(s)) browser = 'Edge';
+  else if (/OPR\/|Opera/.test(s)) browser = 'Opera';
+  else if (/Firefox\//.test(s)) browser = 'Firefox';
+  else if (/Chrome\//.test(s) && !/Edg\//.test(s)) browser = 'Chrome';
+  else if (/Safari\//.test(s) && !/Chrome\//.test(s)) browser = 'Safari';
+  else if (/MSIE|Trident/.test(s)) browser = 'IE';
+  return { device, os, browser };
+}
+
+// SHA256 IP hash — privacy-preserving (không thể reverse → email/IP gốc)
+function _hashIp(ip) {
+  if (!ip) return null;
+  try {
+    const { createHash } = require('crypto');
+    return createHash('sha256').update(String(ip) + (process.env.PAGEVIEW_IP_SALT || 'aeroedu-salt')).digest('hex').slice(0, 32);
+  } catch { return null; }
+}
+
+// Extract geo từ Cloud Run / Cloudflare / proxy headers (no external lookup)
+function _extractGeo(req) {
+  const h = req.headers || {};
+  return {
+    country: (h['cf-ipcountry'] || h['x-appengine-country'] || h['x-vercel-ip-country'] || '').slice(0, 2).toUpperCase() || null,
+    region: (h['cf-region'] || h['x-appengine-region'] || h['x-vercel-ip-country-region'] || '').slice(0, 100) || null,
+    city: (h['cf-ipcity'] || h['x-appengine-city'] || h['x-vercel-ip-city'] || '').slice(0, 100) || null,
+  };
+}
+
+function _clientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || null;
 }
 _ensurePageViewTable().catch(e => console.error('[pageview] migration error:', e.message));
 
@@ -8383,7 +8455,9 @@ app.post('/api/analytics/pageview', async (req, res) => {
   // 204 trước khi insert — fire-and-forget, không block UX
   res.status(204).end();
   try {
-    const { path = '', sessionId = null, viewMs = null, referrer = null } = req.body || {};
+    const b = req.body || {};
+    const { path = '', sessionId = null, viewMs = null, referrer = null,
+            screen = null, lang = null, tz = null } = b;
     if (!path) return;
     // Optional auth: nếu có Bearer token hợp lệ → log user_id
     let userId = null;
@@ -8391,13 +8465,30 @@ app.post('/api/analytics/pageview', async (req, res) => {
     if (auth.startsWith('Bearer ')) {
       try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous OK */ }
     }
+    // Parse UA + geo headers — best-effort, dùng cho YouTube-style demographics
+    const ua = String(req.headers['user-agent'] || '').slice(0, 500);
+    const parsed = _parseUA(ua);
+    const geo = _extractGeo(req);
+    const ipHash = _hashIp(_clientIp(req));
+    const screenW = screen && typeof screen.w === 'number' ? Math.max(0, Math.min(screen.w, 9999)) : null;
+    const screenH = screen && typeof screen.h === 'number' ? Math.max(0, Math.min(screen.h, 9999)) : null;
+    const language = lang ? String(lang).slice(0, 10) : null;
+    const timezone = tz ? String(tz).slice(0, 60) : null;
+
     const pool = _getPool();
     await pool.query(
-      `INSERT INTO "PageView"(path, session_id, user_id, view_ms, referrer)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [String(path).slice(0,500), sessionId ? String(sessionId).slice(0,60) : null,
-       userId, typeof viewMs === 'number' ? Math.max(0, Math.min(viewMs, 86_400_000)) : null,
-       referrer ? String(referrer).slice(0,500) : null]
+      `INSERT INTO "PageView"(
+         path, session_id, user_id, view_ms, referrer,
+         user_agent, device_type, os, browser, screen_w, screen_h,
+         country, region, city, language, timezone, ip_hash
+       ) VALUES ($1,$2,$3,$4,$5, $6,$7,$8,$9,$10,$11, $12,$13,$14,$15,$16,$17)`,
+      [String(path).slice(0,500),
+       sessionId ? String(sessionId).slice(0,60) : null,
+       userId,
+       typeof viewMs === 'number' ? Math.max(0, Math.min(viewMs, 86_400_000)) : null,
+       referrer ? String(referrer).slice(0,500) : null,
+       ua || null, parsed.device, parsed.os, parsed.browser, screenW, screenH,
+       geo.country, geo.region, geo.city, language, timezone, ipHash]
     );
   } catch (e) {
     // Best-effort — không log mỗi request để tránh spam log
@@ -11788,6 +11879,130 @@ app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
   buckets: [],
   total: 0,
 }));
+
+// ── /api/admin/analytics/audience — YouTube-style demographics ──
+// Aggregations từ PageView (device/OS/browser/country/screen/lang)
+// + User/UserProfile (role/grade/age bucket nếu có dob trong data JSONB)
+// Query days = 7|30|90 (default 30)
+app.get('/api/admin/analytics/audience', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const days = Math.max(1, Math.min(365, parseInt(String(req.query.days || '30'), 10) || 30));
+
+    const sinceClause = `created_at >= NOW() - INTERVAL '${days} day'`;
+
+    // Helper: trả về top N + sum của các bucket còn lại gộp "Other"
+    const topN = (rows, n = 10, otherLabel = 'Other') => {
+      const all = rows.map(r => ({ label: r.label || 'Unknown', count: Number(r.n) || 0 }));
+      if (all.length <= n) return all;
+      const top = all.slice(0, n);
+      const otherCount = all.slice(n).reduce((s, x) => s + x.count, 0);
+      return [...top, { label: otherLabel, count: otherCount }];
+    };
+
+    const [
+      deviceR, osR, browserR, countryR, regionR, cityR,
+      screenR, langR, tzR, roleR, ageR, totalR,
+    ] = await Promise.all([
+      pool.query(`SELECT COALESCE(device_type,'unknown') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} GROUP BY 1 ORDER BY 2 DESC`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(os,'Other') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} GROUP BY 1 ORDER BY 2 DESC`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(browser,'Other') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} GROUP BY 1 ORDER BY 2 DESC`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(country,'??') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} AND country IS NOT NULL
+                  GROUP BY 1 ORDER BY 2 DESC LIMIT 20`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(region,'Unknown') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} AND region IS NOT NULL
+                  GROUP BY 1 ORDER BY 2 DESC LIMIT 15`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(city,'Unknown') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} AND city IS NOT NULL
+                  GROUP BY 1 ORDER BY 2 DESC LIMIT 15`)
+        .catch(() => ({ rows: [] })),
+      // Screen size buckets: <480 (small mobile), <768 (mobile), <1024 (tablet), <1440 (laptop), else desktop
+      pool.query(`
+        SELECT
+          CASE
+            WHEN screen_w IS NULL THEN 'Unknown'
+            WHEN screen_w < 480  THEN '< 480 (small mobile)'
+            WHEN screen_w < 768  THEN '480-767 (mobile)'
+            WHEN screen_w < 1024 THEN '768-1023 (tablet)'
+            WHEN screen_w < 1440 THEN '1024-1439 (laptop)'
+            ELSE '≥ 1440 (desktop)'
+          END AS label,
+          COUNT(*)::int AS n
+        FROM "PageView" WHERE ${sinceClause} GROUP BY 1 ORDER BY 2 DESC`).catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(language,'Unknown') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} AND language IS NOT NULL
+                  GROUP BY 1 ORDER BY 2 DESC LIMIT 10`)
+        .catch(() => ({ rows: [] })),
+      pool.query(`SELECT COALESCE(timezone,'Unknown') AS label, COUNT(*)::int AS n
+                  FROM "PageView" WHERE ${sinceClause} AND timezone IS NOT NULL
+                  GROUP BY 1 ORDER BY 2 DESC LIMIT 10`)
+        .catch(() => ({ rows: [] })),
+      // Role breakdown — join User table
+      pool.query(`
+        SELECT COALESCE(u.role, 'GUEST') AS label, COUNT(*)::int AS n
+        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.${sinceClause}
+        GROUP BY 1 ORDER BY 2 DESC`).catch(() => ({ rows: [] })),
+      // Age bucket — từ UserProfile.data->>'dob' nếu có
+      // Bucket: 6-12, 13-15, 16-17, 18-22, 23-29, 30+
+      pool.query(`
+        SELECT
+          CASE
+            WHEN dob IS NULL THEN 'Unknown'
+            WHEN age_yr < 13 THEN '6-12 (Tiểu học)'
+            WHEN age_yr < 16 THEN '13-15 (THCS)'
+            WHEN age_yr < 18 THEN '16-17 (THPT)'
+            WHEN age_yr < 23 THEN '18-22 (ĐH)'
+            WHEN age_yr < 30 THEN '23-29'
+            ELSE '30+'
+          END AS label,
+          COUNT(DISTINCT user_id)::int AS n
+        FROM (
+          SELECT DISTINCT pv.user_id,
+                 (up.data->>'dob')::date AS dob,
+                 EXTRACT(YEAR FROM AGE(NOW(), (up.data->>'dob')::date))::int AS age_yr
+          FROM "PageView" pv
+          LEFT JOIN "UserProfile" up ON up.user_id = pv.user_id
+          WHERE pv.${sinceClause} AND pv.user_id IS NOT NULL
+        ) sub
+        GROUP BY 1 ORDER BY 2 DESC`).catch(() => ({ rows: [] })),
+      // Tổng views trong khoảng — denominator cho %
+      pool.query(`SELECT COUNT(*)::int AS n FROM "PageView" WHERE ${sinceClause}`)
+        .catch(() => ({ rows: [{ n: 0 }] })),
+    ]);
+
+    const total = totalR.rows[0]?.n || 0;
+
+    return res.json({
+      days,
+      totalViews: total,
+      devices: deviceR.rows.map(r => ({ label: r.label, count: r.n })),
+      os: topN(osR.rows, 8),
+      browsers: topN(browserR.rows, 8),
+      countries: countryR.rows.map(r => ({ label: r.label, count: r.n })),
+      regions: regionR.rows.map(r => ({ label: r.label, count: r.n })),
+      cities: cityR.rows.map(r => ({ label: r.label, count: r.n })),
+      screenSizes: screenR.rows.map(r => ({ label: r.label, count: r.n })),
+      languages: langR.rows.map(r => ({ label: r.label, count: r.n })),
+      timezones: tzR.rows.map(r => ({ label: r.label, count: r.n })),
+      roles: roleR.rows.map(r => ({ label: r.label, count: r.n })),
+      ageGroups: ageR.rows.map(r => ({ label: r.label, count: r.n })),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error('[admin:analytics:audience]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 // Cameras
 app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
