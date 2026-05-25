@@ -1400,37 +1400,116 @@ app.post('/api/teacher/exams', async (req, res) => {
 });
 
 // GET /api/teacher/exams/:id — detail + hydrate questions
+// FIX 2026-05-24: schema mismatch — exam tạo qua quiz-publish/duplicate dùng
+// "userId" camelCase (line 717, 863), exam tạo qua POST /api/teacher/exams
+// dùng teacher_id snake_case (line 1390). Backfill chỉ chạy 1 lần lúc startup
+// → exam tạo sau đó không được sync → 404 "Không tìm thấy đề".
+// → COALESCE cả 2 column trong WHERE; "isPublic" + visibility cả 2 schema.
 app.get('/api/teacher/exams/:id', async (req, res) => {
   const decoded = _kgAuth(req, res); if (!decoded) return;
   try {
     const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
-    // Cho phép xem đề của mình HOẶC public — match qua ANY của mọi user ID
-    const { rows } = await pool.query(
-      `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
-       WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
-      [req.params.id, myIds]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+
+    // Try modern schema first (teacher_id + visibility)
+    let rows = [];
+    try {
+      const r = await pool.query(
+        `SELECT *,
+                (COALESCE(teacher_id, "userId"::text) = ANY($2::text[])) AS is_owner
+         FROM "Exam"
+         WHERE id = $1 AND (
+           teacher_id = ANY($2::text[])
+           OR "userId" = ANY($2::text[])
+           OR visibility = 'public'
+           OR "isPublic" = true
+         )`,
+        [req.params.id, myIds]);
+      rows = r.rows;
+    } catch (e1) {
+      // Một số legacy column có thể không tồn tại — fallback minimal query
+      console.warn('[teacher:exams:get] modern query failed, fallback:', e1.message.slice(0, 100));
+      const r = await pool.query(
+        `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
+        [req.params.id, myIds]);
+      rows = r.rows;
+    }
+
+    if (!rows.length) {
+      // Diagnostic: check xem exam có tồn tại không (giúp debug nhanh)
+      const { rows: exists } = await pool.query(
+        `SELECT id, teacher_id, "userId" FROM "Exam" WHERE id = $1 LIMIT 1`,
+        [req.params.id]).catch(() => ({ rows: [] }));
+      if (exists[0]) {
+        console.log(`[teacher:exams:get] 403 — exam ${req.params.id} tồn tại nhưng owner = ${exists[0].teacher_id || exists[0].userId}, request from = ${myIds.join(',')}`);
+        return res.status(403).json({ error: 'Đề thi này không thuộc về bạn (hoặc chưa public)' });
+      }
+      return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+    }
+
+    // Backfill teacher_id nếu chỉ có "userId" — để các handler khác hoạt động
+    const r0 = rows[0];
+    if (!r0.teacher_id && r0.userId) {
+      pool.query(`UPDATE "Exam" SET teacher_id = $1 WHERE id = $2 AND teacher_id IS NULL`,
+        [String(r0.userId), req.params.id])
+        .catch(() => {/* silent */});
+      r0.teacher_id = r0.userId;
+    }
     const r = rows[0];
     const settings = r.settings || {};
-    const qIds = Array.isArray(r.question_ids) ? r.question_ids : [];
+    let qIds = Array.isArray(r.question_ids) ? r.question_ids : [];
     const pointsMap = settings.pointsMap || {};
 
-    // Hydrate question rows + giữ thứ tự theo qIds
+    // Legacy schema fallback: exam tạo qua quiz-publish/duplicate dùng
+    // ExamQuestion join table thay vì question_ids JSONB → load từ đó
+    let legacyPoints = {};
+    if (qIds.length === 0) {
+      try {
+        const { rows: eqRows } = await pool.query(
+          `SELECT "questionId", "order", points
+           FROM "ExamQuestion"
+           WHERE "examId" = $1
+           ORDER BY "order" ASC NULLS LAST`, [req.params.id]);
+        qIds = eqRows.map(eq => eq.questionId).filter(Boolean);
+        for (const eq of eqRows) legacyPoints[eq.questionId] = Number(eq.points) || 1;
+      } catch { /* không có ExamQuestion → bỏ qua */ }
+    }
+
+    // Hydrate question rows — fallback giữa 2 schema (snake_case mới + camelCase legacy)
     let questions = [];
     if (qIds.length > 0) {
       const { rows: qRows } = await pool.query(
-        `SELECT id, content, type, subject, grade, chapter, difficulty,
-                options, answer, explanation, tags, created_at, updated_at
+        `SELECT id, content,
+                COALESCE(type, "questionType") AS type,
+                COALESCE(subject, '') AS subject,
+                COALESCE(grade, '') AS grade,
+                COALESCE(chapter, topic) AS chapter,
+                difficulty,
+                options,
+                COALESCE(answer, "correctAnswer") AS answer,
+                explanation, tags,
+                COALESCE(created_at, "createdAt") AS created_at,
+                COALESCE(updated_at, "updatedAt") AS updated_at
          FROM "Question" WHERE id = ANY($1::text[])`,
-        [qIds.map(String)]);
+        [qIds.map(String)]).catch(async () => {
+          // Nếu camelCase không tồn tại → fallback chỉ snake_case
+          const { rows } = await pool.query(
+            `SELECT id, content, type, subject, grade, chapter, difficulty,
+                    options, answer, explanation, tags, created_at, updated_at
+             FROM "Question" WHERE id = ANY($1::text[])`,
+            [qIds.map(String)]);
+          return { rows };
+        });
       const byId = new Map(qRows.map(q => [q.id, q]));
       questions = qIds.map((qid, idx) => {
         const q = byId.get(String(qid));
         if (!q) return null;
+        const pts = pointsMap[q.id] != null ? Number(pointsMap[q.id])
+                  : legacyPoints[q.id] != null ? Number(legacyPoints[q.id])
+                  : 1;
         return {
-          id: q.id, order: idx + 1,
-          points: Number(pointsMap[q.id]) || 1,
+          id: q.id, order: idx + 1, points: pts,
           content: q.content || '',
           questionType: q.type || 'multiple_choice',
           type: q.type || 'multiple_choice',
@@ -1450,17 +1529,21 @@ app.get('/api/teacher/exams/:id', async (req, res) => {
       exam: {
         id: r.id, title: r.title, description: r.description,
         subject: r.subject || settings.subject,
-        grade: r.grade, examType: settings.examType,
-        duration: r.duration_min, totalPoints: r.total_points,
-        totalQuestions: qIds.length,
+        grade: r.grade,
+        examType: settings.examType || r.examType || 'Trắc nghiệm',
+        // Fallback duration/totalPoints giữa 2 schema (snake mới ↔ camel legacy)
+        duration: r.duration_min || r.duration || 45,
+        totalPoints: r.total_points || r.totalScore || 10,
+        totalQuestions: qIds.length || r.totalQuestions || 0,
         status: r.status, sourceType: settings.sourceType,
         passingScore: settings.passingScore, shuffle: settings.shuffle,
         questionIds: qIds,
         answerKey: settings.answerKey || [],
-        visibility: r.visibility || 'private',
+        visibility: r.visibility || (r.isPublic ? 'public' : 'private'),
         isOwner: !!r.is_owner,
-        teacherId: r.teacher_id,
-        createdAt: r.created_at, updatedAt: r.updated_at,
+        teacherId: r.teacher_id || r.userId || null,
+        createdAt: r.created_at || r.createdAt,
+        updatedAt: r.updated_at || r.updatedAt,
       },
       questions,
     });
