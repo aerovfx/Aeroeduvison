@@ -87,6 +87,7 @@ const StemTimelinePage    = lazy(() => import('@/pages/stem/StemTimeline'))
 const StemCreatePage      = lazy(() => import('@/pages/stem/StemCreate'))
 const StemTemplatesPage   = lazy(() => import('@/pages/stem/StemTemplates'))
 const TeacherStemProjects = lazy(() => import('@/pages/teacher/StemProjects'))
+const TeacherStemProjectDetail = lazy(() => import('@/pages/teacher/StemProjectDetail'))
 const StemJoinByToken     = lazy(() => import('@/pages/stem/JoinByToken'))
 
 // ── Courses ─────────────────────────────────────────────────
@@ -506,7 +507,7 @@ export function AppRouter() {
               {/* Đã port */}
               <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
               <Route path="/teacher/stem-projects"          element={<TeacherStemProjects />} />
-              <Route path="/teacher/stem-projects/:id"      element={<StemEditPage />} />{/* reuse student edit canvas */}
+              <Route path="/teacher/stem-projects/:id"      element={<TeacherStemProjectDetail />} />{/* Tabs: tasks/logs/feedback/milestones */}
               <Route path="/teacher/sprint"                 element={<TeacherSprintPage />} />
               <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
               <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />

@@ -3371,10 +3371,103 @@ app.get('/api/teachers/all', async (req, res) => {
       `);
       await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_stemmember_pair ON "StemProjectMember"(project_id, student_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemmember_project ON "StemProjectMember"(project_id)`);
+
+      // ── Mở rộng: tasks + progress logs + feedback + milestones ──
+      // User: "có giao nhiệm vụ, theo dõi tiến trình và feedback từng ngày.
+      //        Đánh giá từng giai đoạn"
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemTask" (
+          id           VARCHAR(36)  PRIMARY KEY,
+          project_id   VARCHAR(36)  NOT NULL,
+          title        VARCHAR(500) NOT NULL,
+          description  TEXT,
+          assigned_to  JSONB        DEFAULT '[]'::jsonb,
+          status       VARCHAR(20)  DEFAULT 'pending',
+          priority     VARCHAR(10)  DEFAULT 'medium',
+          due_date     TIMESTAMPTZ,
+          points       INTEGER      DEFAULT 0,
+          completed_at TIMESTAMPTZ,
+          created_by   VARCHAR(255) NOT NULL,
+          created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemtask_project ON "StemTask"(project_id, status)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemProgressLog" (
+          id           VARCHAR(36)  PRIMARY KEY,
+          project_id   VARCHAR(36)  NOT NULL,
+          student_id   VARCHAR(255) NOT NULL,
+          log_date     DATE         NOT NULL DEFAULT CURRENT_DATE,
+          content      TEXT         NOT NULL,
+          hours_spent  NUMERIC      DEFAULT 0,
+          task_id      VARCHAR(36),
+          attachments  JSONB        DEFAULT '[]'::jsonb,
+          created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemlog_project ON "StemProgressLog"(project_id, log_date DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemlog_student ON "StemProgressLog"(student_id, log_date DESC)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemFeedback" (
+          id           VARCHAR(36)  PRIMARY KEY,
+          project_id   VARCHAR(36)  NOT NULL,
+          author_id    VARCHAR(255) NOT NULL,
+          target_type  VARCHAR(20)  NOT NULL,
+          target_id    VARCHAR(36),
+          content      TEXT         NOT NULL,
+          rating       SMALLINT,
+          feedback_type VARCHAR(20) DEFAULT 'suggestion',
+          created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemfb_project ON "StemFeedback"(project_id, created_at DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemfb_target ON "StemFeedback"(target_type, target_id)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemMilestone" (
+          id           VARCHAR(36)  PRIMARY KEY,
+          project_id   VARCHAR(36)  NOT NULL,
+          title        VARCHAR(500) NOT NULL,
+          description  TEXT,
+          phase_order  SMALLINT     DEFAULT 0,
+          status       VARCHAR(20)  DEFAULT 'pending',
+          due_date     TIMESTAMPTZ,
+          criteria     JSONB        DEFAULT '[]'::jsonb,
+          score        NUMERIC,
+          max_score    NUMERIC      DEFAULT 10,
+          evaluation   TEXT,
+          evaluated_at TIMESTAMPTZ,
+          created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stemms_project ON "StemMilestone"(project_id, phase_order)`);
+
       _stemReady = true;
     } catch (e) { console.warn('[stem-projects] migration:', e.message); }
   }
   _ensureStemTables().catch(() => {});
+
+  // Helper: verify teacher owns project (used cho tất cả mutation tasks/logs/feedback/milestones)
+  async function _verifyTeacherOwnsProject(pool, projectId, myIds) {
+    const { rowCount } = await pool.query(
+      `SELECT id FROM "StemProject" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [projectId, myIds]
+    );
+    return rowCount > 0;
+  }
+  // Helper: verify student is member of project (cho student post logs)
+  async function _verifyStudentMember(pool, projectId, studentIds) {
+    const { rowCount } = await pool.query(
+      `SELECT id FROM "StemProjectMember"
+       WHERE project_id = $1 AND student_id = ANY($2::text[]) AND status = 'active'`,
+      [projectId, studentIds]
+    );
+    return rowCount > 0;
+  }
 
   function stemAuth(req, res) {
     const auth = req.headers.authorization || '';
@@ -3660,6 +3753,420 @@ app.get('/api/teachers/all', async (req, res) => {
       `, [myIds]).catch(() => ({ rows: [] }));
       return res.json({ projects: rows, total: rows.length });
     } catch (e) { console.error('[student:stem-projects]', e.message); return res.json({ projects: [], total: 0 }); }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // STEM PROJECT MONITORING — Tasks · Logs · Feedback · Milestones
+  // GV giám sát dự án như 1 khoá học: giao nhiệm vụ, theo dõi tiến trình hàng
+  // ngày, feedback per-task / per-log, đánh giá theo phase với rubric.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ── TASKS ──────────────────────────────────────────────────
+  // GET tasks của project
+  app.get('/api/teacher/stem-projects/:id/tasks', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      // Cho phép cả GV (owner) lẫn member HS xem tasks
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền truy cập' });
+      const { rows } = await pool.query(
+        `SELECT * FROM "StemTask" WHERE project_id = $1 ORDER BY priority DESC, due_date ASC NULLS LAST, created_at DESC`,
+        [req.params.id]
+      );
+      return res.json({ tasks: rows, isOwner });
+    } catch (e) { console.error('[stem:tasks:list]', e.message); return res.json({ tasks: [] }); }
+  });
+
+  // POST task — GV giao nhiệm vụ
+  app.post('/api/teacher/stem-projects/:id/tasks', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.id, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV chủ dự án mới giao nhiệm vụ' });
+      }
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemTask"(id, project_id, title, description, assigned_to,
+                               status, priority, due_date, points, created_by)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10)
+        RETURNING *
+      `, [
+        id, req.params.id,
+        String(b.title || 'Nhiệm vụ mới').slice(0, 500),
+        b.description || null,
+        JSON.stringify(Array.isArray(b.assignedTo) ? b.assignedTo : []),
+        b.status || 'pending',
+        b.priority || 'medium',
+        b.dueDate || null,
+        Number(b.points) || 0,
+        decoded.sub,
+      ]);
+      return res.json({ task: rows[0] });
+    } catch (e) { console.error('[stem:tasks:create]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // PATCH task — update status / fields (cả GV và HS được assign)
+  app.patch('/api/teacher/stem-projects/:projectId/tasks/:taskId', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.projectId, myIds);
+      // HS đã được assign cũng được update status
+      const { rows: tRows } = await pool.query(
+        `SELECT assigned_to FROM "StemTask" WHERE id = $1 AND project_id = $2`,
+        [req.params.taskId, req.params.projectId]
+      );
+      if (!tRows.length) return res.status(404).json({ error: 'Không tìm thấy task' });
+      const assignedTo = Array.isArray(tRows[0].assigned_to) ? tRows[0].assigned_to : [];
+      const isAssignee = assignedTo.some(uid => myIds.includes(uid));
+      if (!isOwner && !isAssignee) return res.status(403).json({ error: 'Không có quyền sửa task' });
+
+      const b = req.body || {};
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.taskId];
+      const fields = isOwner
+        ? { title: 'title', description: 'description', status: 'status', priority: 'priority', points: 'points' }
+        : { status: 'status' };  // HS chỉ được đổi status
+      for (const [k, col] of Object.entries(fields)) {
+        if (b[k] !== undefined) { params.push(b[k]); updates.push(`${col} = $${params.length}`); }
+      }
+      if (isOwner && b.assignedTo !== undefined) { params.push(JSON.stringify(b.assignedTo)); updates.push(`assigned_to = $${params.length}::jsonb`); }
+      if (isOwner && b.dueDate !== undefined) { params.push(b.dueDate); updates.push(`due_date = $${params.length}`); }
+      if (b.status === 'completed') updates.push(`completed_at = NOW()`);
+      const { rows } = await pool.query(
+        `UPDATE "StemTask" SET ${updates.join(', ')} WHERE id = $1 RETURNING *`,
+        params
+      );
+      return res.json({ task: rows[0] });
+    } catch (e) { console.error('[stem:tasks:patch]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // DELETE task — chỉ GV
+  app.delete('/api/teacher/stem-projects/:projectId/tasks/:taskId', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.projectId, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV mới xoá task' });
+      }
+      await pool.query(`DELETE FROM "StemTask" WHERE id = $1 AND project_id = $2`,
+        [req.params.taskId, req.params.projectId]);
+      return res.json({ ok: true });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  });
+
+  // ── PROGRESS LOGS ───────────────────────────────────────────
+  // GET logs — GV xem all, HS xem own
+  app.get('/api/teacher/stem-projects/:id/logs', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền' });
+
+      const studentFilter = req.query.studentId ? [String(req.query.studentId)]
+                          : isOwner ? null : myIds;
+      const sql = studentFilter
+        ? `SELECT l.*, u.name AS student_name, u.image AS student_image,
+                  (SELECT COUNT(*) FROM "StemFeedback" f
+                   WHERE f.target_type = 'log' AND f.target_id = l.id)::int AS feedback_count
+           FROM "StemProgressLog" l
+           LEFT JOIN "User" u ON u.id = l.student_id
+           WHERE l.project_id = $1 AND l.student_id = ANY($2::text[])
+           ORDER BY l.log_date DESC, l.created_at DESC LIMIT 200`
+        : `SELECT l.*, u.name AS student_name, u.image AS student_image,
+                  (SELECT COUNT(*) FROM "StemFeedback" f
+                   WHERE f.target_type = 'log' AND f.target_id = l.id)::int AS feedback_count
+           FROM "StemProgressLog" l
+           LEFT JOIN "User" u ON u.id = l.student_id
+           WHERE l.project_id = $1
+           ORDER BY l.log_date DESC, l.created_at DESC LIMIT 200`;
+      const params = studentFilter ? [req.params.id, studentFilter] : [req.params.id];
+      const { rows } = await pool.query(sql, params);
+      return res.json({ logs: rows });
+    } catch (e) { console.error('[stem:logs:list]', e.message); return res.json({ logs: [] }); }
+  });
+
+  // POST log — HS hoặc GV ghi tiến trình
+  app.post('/api/teacher/stem-projects/:id/logs', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền ghi log' });
+
+      const b = req.body || {};
+      if (!b.content || !b.content.trim()) return res.status(400).json({ error: 'Cần nội dung tiến trình' });
+
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemProgressLog"(id, project_id, student_id, log_date, content,
+                                       hours_spent, task_id, attachments)
+        VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE), $5, $6, $7, $8::jsonb)
+        RETURNING *
+      `, [
+        id, req.params.id, decoded.sub,
+        b.logDate || null,
+        String(b.content).slice(0, 5000),
+        Number(b.hoursSpent) || 0,
+        b.taskId || null,
+        JSON.stringify(Array.isArray(b.attachments) ? b.attachments : []),
+      ]);
+      return res.json({ log: rows[0] });
+    } catch (e) { console.error('[stem:logs:create]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // ── FEEDBACK ────────────────────────────────────────────────
+  // GET feedbacks của project (filtered by target)
+  app.get('/api/teacher/stem-projects/:id/feedbacks', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền' });
+
+      const where = ['f.project_id = $1'];
+      const params = [req.params.id];
+      if (req.query.targetType) { params.push(req.query.targetType); where.push(`f.target_type = $${params.length}`); }
+      if (req.query.targetId) { params.push(req.query.targetId); where.push(`f.target_id = $${params.length}`); }
+
+      const { rows } = await pool.query(`
+        SELECT f.*, u.name AS author_name, u.image AS author_image, u.role AS author_role
+        FROM "StemFeedback" f
+        LEFT JOIN "User" u ON u.id = f.author_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY f.created_at DESC LIMIT 200
+      `, params);
+      return res.json({ feedbacks: rows });
+    } catch (e) { console.error('[stem:feedback:list]', e.message); return res.json({ feedbacks: [] }); }
+  });
+
+  // POST feedback — GV nhận xét task/log/milestone/project
+  app.post('/api/teacher/stem-projects/:id/feedbacks', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền feedback' });
+
+      const b = req.body || {};
+      if (!b.content || !b.content.trim()) return res.status(400).json({ error: 'Cần nội dung' });
+      const validTypes = ['task', 'log', 'milestone', 'project'];
+      const targetType = validTypes.includes(b.targetType) ? b.targetType : 'project';
+
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemFeedback"(id, project_id, author_id, target_type, target_id,
+                                    content, rating, feedback_type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `, [
+        id, req.params.id, decoded.sub,
+        targetType, b.targetId || null,
+        String(b.content).slice(0, 3000),
+        b.rating != null ? Math.max(0, Math.min(10, Number(b.rating))) : null,
+        b.feedbackType || 'suggestion',
+      ]);
+      return res.json({ feedback: rows[0] });
+    } catch (e) { console.error('[stem:feedback:create]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // ── MILESTONES ──────────────────────────────────────────────
+  // GET milestones — phase đánh giá
+  app.get('/api/teacher/stem-projects/:id/milestones', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền' });
+      const { rows } = await pool.query(
+        `SELECT * FROM "StemMilestone" WHERE project_id = $1 ORDER BY phase_order ASC, due_date ASC NULLS LAST`,
+        [req.params.id]
+      );
+      return res.json({ milestones: rows });
+    } catch (e) { return res.json({ milestones: [] }); }
+  });
+
+  // POST milestone — GV tạo phase đánh giá với criteria
+  app.post('/api/teacher/stem-projects/:id/milestones', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.id, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV mới tạo phase đánh giá' });
+      }
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const { rows } = await pool.query(`
+        INSERT INTO "StemMilestone"(id, project_id, title, description, phase_order,
+                                     status, due_date, criteria, max_score)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        RETURNING *
+      `, [
+        randomUUID(), req.params.id,
+        String(b.title || 'Phase mới').slice(0, 500),
+        b.description || null,
+        Number(b.phaseOrder) || 0,
+        b.status || 'pending',
+        b.dueDate || null,
+        JSON.stringify(Array.isArray(b.criteria) ? b.criteria : []),
+        Number(b.maxScore) || 10,
+      ]);
+      return res.json({ milestone: rows[0] });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  });
+
+  // PATCH milestone — GV đánh giá (chấm điểm + nhận xét)
+  app.patch('/api/teacher/stem-projects/:projectId/milestones/:msId', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.projectId, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV mới đánh giá' });
+      }
+      const b = req.body || {};
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.msId];
+      const fields = { title: 'title', description: 'description', status: 'status',
+                       phaseOrder: 'phase_order', dueDate: 'due_date', maxScore: 'max_score',
+                       evaluation: 'evaluation' };
+      for (const [k, col] of Object.entries(fields)) {
+        if (b[k] !== undefined) { params.push(b[k]); updates.push(`${col} = $${params.length}`); }
+      }
+      if (b.criteria !== undefined) { params.push(JSON.stringify(b.criteria)); updates.push(`criteria = $${params.length}::jsonb`); }
+      if (b.score !== undefined) {
+        params.push(Math.max(0, Number(b.score) || 0));
+        updates.push(`score = $${params.length}`);
+        updates.push(`evaluated_at = NOW()`);
+      }
+      const { rows } = await pool.query(
+        `UPDATE "StemMilestone" SET ${updates.join(', ')} WHERE id = $1 RETURNING *`,
+        params
+      );
+      return res.json({ milestone: rows[0] });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/teacher/stem-projects/:projectId/milestones/:msId', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.projectId, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV mới xoá phase' });
+      }
+      await pool.query(`DELETE FROM "StemMilestone" WHERE id = $1 AND project_id = $2`,
+        [req.params.msId, req.params.projectId]);
+      return res.json({ ok: true });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  });
+
+  // ── DASHBOARD — full project state cho GV monitor ──
+  app.get('/api/teacher/stem-projects/:id/dashboard', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      const isOwner = await _verifyTeacherOwnsProject(pool, req.params.id, myIds);
+      const isMember = !isOwner && await _verifyStudentMember(pool, req.params.id, myIds);
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Không có quyền' });
+
+      const [project, members, tasks, logs, feedbacks, milestones] = await Promise.all([
+        pool.query(`SELECT * FROM "StemProject" WHERE id = $1`, [req.params.id]),
+        pool.query(`
+          SELECT m.*, u.name, u.email, u.image
+          FROM "StemProjectMember" m
+          LEFT JOIN "User" u ON u.id = m.student_id
+          WHERE m.project_id = $1 AND m.status = 'active'
+          ORDER BY m.joined_at DESC
+        `, [req.params.id]),
+        pool.query(`SELECT * FROM "StemTask" WHERE project_id = $1
+                    ORDER BY priority DESC, due_date ASC NULLS LAST`, [req.params.id]),
+        pool.query(`
+          SELECT l.*, u.name AS student_name, u.image AS student_image,
+                 (SELECT COUNT(*) FROM "StemFeedback" f
+                  WHERE f.target_type = 'log' AND f.target_id = l.id)::int AS feedback_count
+          FROM "StemProgressLog" l
+          LEFT JOIN "User" u ON u.id = l.student_id
+          WHERE l.project_id = $1
+          ORDER BY l.log_date DESC, l.created_at DESC LIMIT 50
+        `, [req.params.id]),
+        pool.query(`
+          SELECT f.*, u.name AS author_name, u.image AS author_image
+          FROM "StemFeedback" f
+          LEFT JOIN "User" u ON u.id = f.author_id
+          WHERE f.project_id = $1
+          ORDER BY f.created_at DESC LIMIT 50
+        `, [req.params.id]),
+        pool.query(`SELECT * FROM "StemMilestone" WHERE project_id = $1
+                    ORDER BY phase_order ASC, due_date ASC NULLS LAST`, [req.params.id]),
+      ]);
+
+      // Aggregate stats
+      const allTasks = tasks.rows;
+      const stats = {
+        members: members.rows.length,
+        totalTasks: allTasks.length,
+        completedTasks: allTasks.filter(t => t.status === 'completed').length,
+        inProgressTasks: allTasks.filter(t => t.status === 'in-progress').length,
+        overdueTasks: allTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'completed').length,
+        totalLogs: logs.rows.length,
+        totalHours: logs.rows.reduce((s, l) => s + (Number(l.hours_spent) || 0), 0),
+        completedMilestones: milestones.rows.filter(m => m.status === 'completed').length,
+        totalMilestones: milestones.rows.length,
+        avgPhaseScore: (() => {
+          const scored = milestones.rows.filter(m => m.score != null);
+          if (scored.length === 0) return null;
+          return Math.round(scored.reduce((s, m) => s + (Number(m.score) / Number(m.max_score) * 10), 0) / scored.length * 10) / 10;
+        })(),
+      };
+
+      return res.json({
+        project: project.rows[0] || null,
+        members: members.rows,
+        tasks: allTasks,
+        logs: logs.rows,
+        feedbacks: feedbacks.rows,
+        milestones: milestones.rows,
+        stats,
+        isOwner,
+      });
+    } catch (e) {
+      console.error('[stem:dashboard]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
   });
 })();
 
