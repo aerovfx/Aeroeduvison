@@ -2316,6 +2316,85 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   app.get('/api/online-exam-room/:id/schedule', (_req, res) =>
     res.json({ schedules: [], total: 0 }));
 
+  // GET /api/teacher/exam-rooms/:roomId/leaderboard — per-room top thí sinh
+  // User: "tại mỗi phòng đều có bảng vinh danh leadboard riêng cho các vị trí top"
+  // Cho phép: chủ phòng (teacher_id) OR participant của phòng đã đọc leaderboard.
+  // Source: RoomParticipant.score (NUMERIC 5,2 — lưu % đúng 0-100).
+  //         totalQuestions: tính từ Exam.question_ids JSONB length (nếu phòng có examId).
+  //         score (correct count) = ROUND(percentage * totalQuestions / 100).
+  //         durationSec = submitted_at - joined_at.
+  // Sort: percentage DESC → durationSec ASC → submitted_at ASC.
+  app.get('/api/teacher/exam-rooms/:roomId/leaderboard', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const roomId = req.params.roomId;
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+      const pool = _getPool();
+
+      // 1. Verify quyền truy cập: chủ phòng OR đã join phòng
+      const { rows: roomRows } = await pool.query(
+        `SELECT id, teacher_id, exam_id FROM "OnlineExamRoom" WHERE id = $1`, [roomId]);
+      if (!roomRows.length) return res.status(404).json({ error: 'Phòng thi không tồn tại', items: [] });
+      const room = roomRows[0];
+
+      const isOwner = room.teacher_id === userId;
+      if (!isOwner) {
+        const { rowCount } = await pool.query(
+          `SELECT 1 FROM "RoomParticipant" WHERE room_id = $1 AND user_id = $2 LIMIT 1`,
+          [roomId, userId]).catch(() => ({ rowCount: 0 }));
+        if (!rowCount) return res.status(403).json({ error: 'Không có quyền xem leaderboard phòng này', items: [] });
+      }
+
+      // 2. Tổng số câu của đề thi (nếu phòng có gán Exam)
+      let totalQuestions = 0;
+      if (room.exam_id) {
+        const { rows: er } = await pool.query(
+          `SELECT COALESCE(jsonb_array_length(question_ids), 0)::int AS qc
+           FROM "Exam" WHERE id = $1`, [room.exam_id]).catch(() => ({ rows: [] }));
+        totalQuestions = er.length ? Number(er[0].qc) || 0 : 0;
+      }
+
+      // 3. Lấy participants đã hoàn thành — JOIN User để có name/image
+      const { rows: parts } = await pool.query(`
+        SELECT rp.user_id, rp.score, rp.joined_at, rp.submitted_at,
+               u.name AS student_name, u.image AS student_image,
+               EXTRACT(EPOCH FROM (rp.submitted_at - rp.joined_at))::int AS duration_sec
+        FROM "RoomParticipant" rp
+        LEFT JOIN "User" u ON u.id = rp.user_id
+        WHERE rp.room_id = $1 AND rp.completed = true AND rp.score IS NOT NULL
+        ORDER BY rp.score DESC NULLS LAST,
+                 (rp.submitted_at - rp.joined_at) ASC NULLS LAST,
+                 rp.submitted_at ASC NULLS LAST
+        LIMIT $2
+      `, [roomId, limit]).catch(() => ({ rows: [] }));
+
+      const items = parts.map((p, idx) => {
+        const percentage = Math.round((Number(p.score) || 0) * 10) / 10; // 1 decimal
+        const correct = totalQuestions > 0
+          ? Math.round((percentage / 100) * totalQuestions)
+          : Math.round(percentage); // fallback: dùng % như là score
+        const dur = p.duration_sec != null && p.duration_sec >= 0 ? Number(p.duration_sec) : null;
+        return {
+          rank: idx + 1,
+          studentId: p.user_id,
+          studentName: p.student_name || `HS ${(p.user_id || '').slice(0, 6)}`,
+          studentImage: p.student_image || null,
+          score: correct,
+          totalQuestions: totalQuestions || correct,
+          percentage,
+          durationSec: dur,
+          completedAt: p.submitted_at,
+        };
+      });
+
+      return res.json({ items, total: items.length, roomId, totalQuestions });
+    } catch (e) {
+      console.error('[room:leaderboard]', e.message);
+      return res.json({ items: [], total: 0, error: 'Lỗi tải leaderboard' });
+    }
+  });
+
   // POST /api/online-exam-room/join — HS/GV join bằng accessCode hoặc roomId
   app.post('/api/online-exam-room/join', async (req, res) => {
     const decoded = roomAuth(req, res); if (!decoded) return;

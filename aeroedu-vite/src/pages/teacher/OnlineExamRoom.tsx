@@ -7,7 +7,7 @@ import {
   Loader2, FileText, Timer, Globe, Lock, LogIn,
   BookOpen, CheckCircle2, AlertTriangle, CalendarClock,
   Zap, ChevronDown, ChevronUp, CalendarPlus, Pencil, Save, X,
-  Trophy, Medal, Crown,
+  Trophy, Medal, Crown, RotateCcw,
 } from "lucide-react"
 import toast from "react-hot-toast"
 
@@ -1584,9 +1584,195 @@ export default function OnlineExamRoomPage() {
               </div>
             )}
 
+            {/* ── Per-room Leaderboard (vinh danh top thí sinh trong phòng) ── */}
+            {selected && <RoomLeaderboard roomId={selected.id} roomName={selected.name} />}
+
           </div>{/* /right col */}
         </div>{/* /grid */}
       </div>{/* /main */}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// RoomLeaderboard — Bảng vinh danh top thí sinh CHO 1 PHÒNG THI
+// User: "tại mỗi phòng đều có bảng vinh danh leadboard riêng cho các vị trí top"
+// ──────────────────────────────────────────────────────────────────
+interface RoomLbEntry {
+  rank: number
+  studentId: string
+  studentName: string
+  studentImage: string | null
+  score: number
+  totalQuestions: number
+  percentage: number
+  durationSec: number | null
+  completedAt: string
+}
+
+function RoomLeaderboard({ roomId, roomName }: { roomId: string; roomName: string }) {
+  const [items, setItems] = useState<RoomLbEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<{ items: RoomLbEntry[] }>(`/teacher/exam-rooms/${roomId}/leaderboard?limit=20`)
+      .then(r => setItems(r.data.items || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [roomId, refreshKey])
+
+  const top3 = items.slice(0, 3)
+  const rest = items.slice(3, 20)
+
+  const fmtDur = (s: number | null) => {
+    if (!s) return '—'
+    const m = Math.floor(s / 60), ss = s % 60
+    return m === 0 ? `${ss}s` : `${m}p${ss > 0 ? ` ${ss}s` : ''}`
+  }
+
+  return (
+    <div className="rounded-xl p-5 space-y-3"
+      style={{ background: D.card, border: '1px solid rgba(251,191,36,0.4)', borderRadius: 12 }}>
+      <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Crown className="w-4 h-4" style={{ color: '#fbbf24' }} />
+          <span className="font-bold text-sm" style={{ color: D.text }}>Bảng vinh danh phòng</span>
+          {items.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+              {items.length} thí sinh
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1) }}
+            className="p-1 rounded hover:bg-white/5"
+            title="Refresh"
+          >
+            <RotateCcw className="w-3 h-3" style={{ color: D.muted }} />
+          </button>
+          {collapsed
+            ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} />
+            : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {!collapsed && (
+        <>
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#fbbf24' }} />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-6">
+              <Crown className="w-8 h-8 mx-auto mb-2" style={{ color: 'rgba(251,191,36,0.3)' }} />
+              <p className="text-xs" style={{ color: D.muted }}>
+                Chưa có thí sinh hoàn thành
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: D.muted2 }}>
+                Bảng sẽ tự cập nhật khi HS submit bài
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Top 3 podium */}
+              {top3.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {top3.map(e => {
+                    const isFirst = e.rank === 1
+                    const podiumBg = e.rank === 1
+                      ? 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.08))'
+                      : e.rank === 2
+                      ? 'linear-gradient(135deg, rgba(203,213,225,0.15), rgba(148,163,184,0.05))'
+                      : 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(234,88,12,0.05))'
+                    const podiumBorder = e.rank === 1 ? 'rgba(251,191,36,0.5)'
+                                       : e.rank === 2 ? 'rgba(203,213,225,0.4)'
+                                       : 'rgba(251,146,60,0.4)'
+                    return (
+                      <div key={e.studentId}
+                        className="rounded-lg p-2.5 text-center"
+                        style={{
+                          background: podiumBg,
+                          border: `1.5px solid ${podiumBorder}`,
+                          transform: isFirst ? 'scale(1.04)' : 'none',
+                        }}
+                      >
+                        <div className="mb-1.5">
+                          {e.rank === 1 && <Crown className="w-5 h-5 mx-auto" style={{ color: '#fbbf24' }} />}
+                          {e.rank === 2 && <Medal className="w-5 h-5 mx-auto" style={{ color: '#cbd5e1' }} />}
+                          {e.rank === 3 && <Medal className="w-5 h-5 mx-auto" style={{ color: '#fb923c' }} />}
+                        </div>
+                        {e.studentImage ? (
+                          <img src={e.studentImage} alt="" className="w-8 h-8 rounded-full mx-auto object-cover mb-1.5" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full mx-auto mb-1.5 flex items-center justify-center text-xs font-bold"
+                            style={{
+                              background: e.rank === 1 ? 'rgba(251,191,36,0.25)' : e.rank === 2 ? 'rgba(203,213,225,0.2)' : 'rgba(251,146,60,0.2)',
+                              color: e.rank === 1 ? '#fbbf24' : e.rank === 2 ? '#cbd5e1' : '#fb923c',
+                            }}>
+                            {e.studentName[0]?.toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <p className="font-bold text-xs truncate" style={{ color: D.text }} title={e.studentName}>
+                          {e.studentName}
+                        </p>
+                        <p className="text-base font-black mt-0.5" style={{
+                          color: e.percentage >= 80 ? '#34d399' : e.percentage >= 50 ? '#60a5fa' : '#f87171'
+                        }}>
+                          {e.percentage}%
+                        </p>
+                        <p className="text-[9px]" style={{ color: D.muted2 }}>
+                          {e.score}/{e.totalQuestions} · {fmtDur(e.durationSec)}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Rest 4-20 */}
+              {rest.length > 0 && (
+                <div className="space-y-0.5 pt-2" style={{ borderTop: `1px solid ${D.border}` }}>
+                  {rest.map(e => (
+                    <div key={e.studentId}
+                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/[0.03] transition-colors">
+                      <span className="text-xs font-bold w-5 text-center" style={{ color: D.muted }}>
+                        #{e.rank}
+                      </span>
+                      {e.studentImage ? (
+                        <img src={e.studentImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>
+                          {e.studentName[0]?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                      <span className="text-xs flex-1 truncate" style={{ color: D.text }}>
+                        {e.studentName}
+                      </span>
+                      <span className="text-xs font-bold"
+                        style={{ color: e.percentage >= 80 ? '#34d399' : e.percentage >= 50 ? '#60a5fa' : '#f87171' }}>
+                        {e.percentage}%
+                      </span>
+                      <span className="text-[10px]" style={{ color: D.muted2, minWidth: 40, textAlign: 'right' }}>
+                        {fmtDur(e.durationSec)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 mt-1 text-center text-[10px]" style={{ color: D.muted2, borderTop: `1px dashed ${D.border}` }}>
+                Sắp xếp theo % đúng → thời gian nhanh → submit sớm · Phòng "{roomName.slice(0, 40)}{roomName.length > 40 ? '…' : ''}"
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }
