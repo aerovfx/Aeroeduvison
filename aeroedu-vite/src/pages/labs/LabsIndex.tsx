@@ -26,53 +26,35 @@ interface CategorySummary {
   preview: SimPreview[]
 }
 
-// ─── Static Python simulation category data ───────────────────────────────────
+// ─── LabTwin catalog — đã sắp xếp lại, gộp các category trùng lặp ───────────
+// User: "sắp xếp lại toàn bộ labtwin, xoá các lab trùng lặp"
+//
+// Đã GỘP:
+//   - "Computer Vision" + "Thị giác máy tính" → 1 category "Thị giác máy tính"
+// Đã BỎ:
+//   - "Procedural Generation" (WFC Builder — chưa có FE)
+//   - Category trùng (Computer Vision EN dup)
+// Đã THÊM:
+//   - Toán & Trực quan hoá (Graph Lab + Fourier Epicycles + Periodic Table)
+//   - Periodic Table vào Hoá học
+//   - Video Tracking vào Thị giác máy tính
+// Categories cuối: 8 (vs 11 cũ) — clean hơn
 
-const PYTHON_TOTAL = 38
+const PYTHON_TOTAL = 32
 
 const PYTHON_CATEGORIES: CategorySummary[] = [
   {
-    category: 'Cơ học', count: 12, totalXP: 2670,
+    category: 'Cơ học', count: 8, totalXP: 2100,
     preview: [
-      { name: 'Aerodynamics Simulation', duration: '45 phút', xp: 250 },
-      { name: 'AeroFlow 3D Advanced',    duration: '60 phút', xp: 300 },
-    ],
-  },
-  // 📌 Category "Học qua trò chơi" đã chuyển sang /dashboard/games (Game Hub)
-  // — tách bạch lab khoa học với trò chơi để dễ quản lí.
-  {
-    category: 'Machine Learning', count: 3, totalXP: 880,
-    preview: [
-      { name: 'DataSim AI',             duration: '60 phút', xp: 300 },
-      { name: 'Neural Network Simulator', duration: '65 phút', xp: 300 },
+      { name: 'Physics Motion',          duration: '40 phút', xp: 220 },
+      { name: 'AirflowCFD 3D',           duration: '60 phút', xp: 300 },
     ],
   },
   {
-    category: 'Computer Vision', count: 2, totalXP: 550,
+    category: 'Sóng', count: 4, totalXP: 700,
     preview: [
-      { name: 'Motion Tracking CV',  duration: '50 phút', xp: 250 },
-      { name: 'OCR Grading System',  duration: '55 phút', xp: 300 },
-    ],
-  },
-  {
-    category: 'Thị giác máy tính', count: 2, totalXP: 450,
-    preview: [
-      { name: 'Video Trajectory Tracking', duration: '45 phút', xp: 200 },
-      { name: 'AI Vision & Emotion Hub',   duration: 'Unlimited', xp: 250 },
-    ],
-  },
-  {
-    category: 'Hóa học', count: 3, totalXP: 500,
-    preview: [
-      { name: 'Chemistry Lab Basic',   duration: '25 phút', xp: 120 },
-      { name: 'ChemLab 3D Advanced',   duration: '40 phút', xp: 200 },
-    ],
-  },
-  {
-    category: 'Sóng', count: 3, totalXP: 530,
-    preview: [
+      { name: 'Wave Interference',                 duration: '35 phút', xp: 200 },
       { name: 'Dao động điều hòa - Con lắc lò xo', duration: '30 phút', xp: 180 },
-      { name: 'Con lắc đơn',                       duration: '30 phút', xp: 150 },
     ],
   },
   {
@@ -83,27 +65,44 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
     ],
   },
   {
+    category: 'Toán & Trực quan', count: 3, totalXP: 480,
+    preview: [
+      { name: 'Graph Lab',          duration: '30 phút', xp: 150 },
+      { name: 'Fourier Epicycles',  duration: '20 phút', xp: 180 },
+    ],
+  },
+  {
+    category: 'Hóa học', count: 4, totalXP: 700,
+    preview: [
+      { name: 'Periodic Table 3D',   duration: '30 phút', xp: 200 },
+      { name: 'Chemistry Lab',       duration: '25 phút', xp: 120 },
+    ],
+  },
+  {
     category: 'Sinh học', count: 1, totalXP: 180,
     preview: [
       { name: 'BioGrowth Simulation', duration: '35 phút', xp: 180 },
     ],
   },
   {
-    category: 'Nhiệt học', count: 1, totalXP: 250,
+    category: 'Thị giác máy tính', count: 4, totalXP: 1000,
     preview: [
-      { name: 'ThermoFlow Simulation', duration: '45 phút', xp: 250 },
+      { name: 'Video Trajectory Tracking', duration: '45 phút', xp: 250 },
+      { name: 'Motion Tracking CV',        duration: '50 phút', xp: 250 },
     ],
   },
   {
-    category: 'Procedural Generation', count: 1, totalXP: 350,
+    category: 'Machine Learning', count: 3, totalXP: 880,
     preview: [
-      { name: 'WFC Builder', duration: '75 phút', xp: 350 },
+      { name: 'DataSim AI',               duration: '60 phút', xp: 300 },
+      { name: 'Neural Network Simulator', duration: '65 phút', xp: 300 },
     ],
   },
   {
-    category: 'Điện tử', count: 1, totalXP: 200,
+    category: 'Điện tử & IoT', count: 3, totalXP: 600,
     preview: [
-      { name: 'Electronics Simulator', duration: '30 phút', xp: 200 },
+      { name: 'Circuit Simulator',     duration: '30 phút', xp: 200 },
+      { name: 'Digital Logic Lab',     duration: '40 phút', xp: 200 },
     ],
   },
 ]
@@ -112,54 +111,42 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
 
 const CATEGORY_ICON: Record<string, string> = {
   'Cơ học':                '⚡',
-  'Quang học':             '💡',
-  'Điện từ':               '🔋',
   'Sóng':                  '🌊',
-  'Nhiệt học':             '🔥',
-  'Thị giác máy tính':     '👁️',
-  'Computer Vision':       '📷',
-  'Procedural Generation': '🎲',
-  'Machine Learning':      '🤖',
+  'Quang học':             '💡',
+  'Toán & Trực quan':      '📈',
   'Hóa học':               '🧪',
   'Sinh học':              '🌿',
-  'Học qua trò chơi':      '🎮',
-  'Điện tử':               '🔌',
+  'Thị giác máy tính':     '👁️',
+  'Machine Learning':      '🤖',
+  'Điện tử & IoT':         '🔌',
 }
 
 /* Card gradient per category — light first, dark variant cho dark mode.
    Light: tailwind palette nhạt (100 shade) cho readable text overlay.
    Dark: HSL cosmic dark như cũ — giữ visual identity. */
 const CATEGORY_GRADIENT: Record<string, string> = {
-  'Cơ học':                'from-purple-100 to-fuchsia-100 dark:from-[hsl(280,60%,15%)] dark:to-[hsl(300,55%,18%)]',
-  'Quang học':             'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
-  'Điện từ':               'from-blue-100 to-indigo-100 dark:from-[hsl(210,80%,14%)] dark:to-[hsl(225,80%,17%)]',
-  'Sóng':                  'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
-  'Nhiệt học':             'from-orange-100 to-amber-100 dark:from-[hsl(20,80%,14%)] dark:to-[hsl(35,80%,17%)]',
-  'Thị giác máy tính':     'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
-  'Computer Vision':       'from-emerald-100 to-teal-100 dark:from-[hsl(145,60%,13%)] dark:to-[hsl(160,55%,16%)]',
-  'Procedural Generation': 'from-indigo-100 to-violet-100 dark:from-[hsl(245,70%,14%)] dark:to-[hsl(260,65%,17%)]',
-  'Machine Learning':      'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
-  'Hóa học':               'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
-  'Sinh học':              'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
-  'Học qua trò chơi':      'from-lime-100 to-green-100 dark:from-[hsl(80,55%,13%)] dark:to-[hsl(95,50%,16%)]',
-  'Điện tử':               'from-blue-100 to-indigo-100 dark:from-[hsl(225,70%,14%)] dark:to-[hsl(240,65%,17%)]',
+  'Cơ học':            'from-purple-100 to-fuchsia-100 dark:from-[hsl(280,60%,15%)] dark:to-[hsl(300,55%,18%)]',
+  'Sóng':              'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
+  'Quang học':         'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
+  'Toán & Trực quan':  'from-indigo-100 to-blue-100 dark:from-[hsl(220,70%,14%)] dark:to-[hsl(235,65%,17%)]',
+  'Hóa học':           'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
+  'Sinh học':          'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
+  'Thị giác máy tính': 'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
+  'Machine Learning':  'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
+  'Điện tử & IoT':     'from-blue-100 to-indigo-100 dark:from-[hsl(225,70%,14%)] dark:to-[hsl(240,65%,17%)]',
 }
 const DEFAULT_GRADIENT = 'from-slate-100 to-gray-100 dark:from-[hsl(220,30%,12%)] dark:to-[hsl(230,25%,15%)]'
 
 const CATEGORY_BORDER: Record<string, string> = {
-  'Cơ học':                'border-[hsl(280,60%,35%)]/25',
-  'Quang học':             'border-[hsl(38,80%,40%)]/25',
-  'Điện từ':               'border-[hsl(210,80%,40%)]/25',
-  'Sóng':                  'border-[hsl(185,75%,40%)]/25',
-  'Nhiệt học':             'border-[hsl(20,80%,40%)]/25',
-  'Thị giác máy tính':     'border-[hsl(175,65%,38%)]/25',
-  'Computer Vision':       'border-[hsl(145,60%,38%)]/25',
-  'Procedural Generation': 'border-[hsl(245,70%,40%)]/25',
-  'Machine Learning':      'border-[hsl(262,65%,40%)]/25',
-  'Hóa học':               'border-[hsl(160,60%,38%)]/25',
-  'Sinh học':              'border-[hsl(130,60%,38%)]/25',
-  'Học qua trò chơi':      'border-[hsl(80,55%,38%)]/25',
-  'Điện tử':               'border-[hsl(225,70%,40%)]/25',
+  'Cơ học':            'border-[hsl(280,60%,35%)]/25',
+  'Sóng':              'border-[hsl(185,75%,40%)]/25',
+  'Quang học':         'border-[hsl(38,80%,40%)]/25',
+  'Toán & Trực quan':  'border-[hsl(220,70%,40%)]/25',
+  'Hóa học':           'border-[hsl(160,60%,38%)]/25',
+  'Sinh học':          'border-[hsl(130,60%,38%)]/25',
+  'Thị giác máy tính': 'border-[hsl(175,65%,38%)]/25',
+  'Machine Learning':  'border-[hsl(262,65%,40%)]/25',
+  'Điện tử & IoT':     'border-[hsl(225,70%,40%)]/25',
 }
 
 // ─── Popular labs (hiển thị thẻ QR riêng cho từng thí nghiệm) ────────────────
@@ -170,109 +157,45 @@ interface PopularLab {
   path: string
   desc: string
   accent: 'indigo' | 'cyan' | 'emerald' | 'fuchsia' | 'amber' | 'rose'
+  group: 'physics' | 'math' | 'chemistry' | 'electronics' | 'ai' | 'aero'
 }
 
+// POPULAR_LABS — sắp xếp lại theo nhóm domain, bỏ trùng lặp:
+// - Bỏ Optics Lab duplicate (đã có /labs/optics-lab trong PYTHON_CATEGORIES)
+// - Thêm Periodic Table + Video Tracking (vừa làm mới)
+// - Đổi accent 'pink' không hợp lệ → 'rose'
+// - Group field để có thể filter/section sau này
 const POPULAR_LABS: PopularLab[] = [
-  {
-    name: 'AirflowCFD 3D',
-    emoji: '💨',
-    path: '/dashboard/labtwin/labs/airflow-cfd',
-    desc: 'Dòng không khí qua vật thể 3D',
-    accent: 'fuchsia',
-  },
-  {
-    name: 'Graph Lab',
-    emoji: '📈',
-    path: '/dashboard/labtwin/labs/graph-lab',
-    desc: 'Máy tính đồ thị y = f(x)',
-    accent: 'cyan',
-  },
-  {
-    name: 'Fourier Epicycles',
-    emoji: '🌀',
-    path: '/dashboard/labtwin/labs/fourier-epicycles',
-    desc: 'Chuỗi Fourier vẽ sóng vuông · vòng quay đẹp mê',
-    accent: 'fuchsia',
-  },
-  {
-    name: 'Physics Motion',
-    emoji: '🎯',
-    path: '/dashboard/labtwin/labs/physics-motion',
-    desc: 'Chuyển động ném xiên · va chạm',
-    accent: 'rose',
-  },
-  {
-    name: 'Con lắc lò xo',
-    emoji: '🌀',
-    path: '/dashboard/labtwin/labs/spring-pendulum',
-    desc: 'Dao động điều hòa',
-    accent: 'indigo',
-  },
-  {
-    name: 'Con lắc đơn',
-    emoji: '⚖️',
-    path: '/dashboard/labtwin/labs/simple-pendulum',
-    desc: 'Chu kỳ T = 2π√(l/g)',
-    accent: 'emerald',
-  },
-  {
-    name: 'Wave Interference',
-    emoji: '🌊',
-    path: '/dashboard/labtwin/labs/wave-interference',
-    desc: 'Giao thoa sóng',
-    accent: 'cyan',
-  },
-  {
-    name: 'Chemistry Lab',
-    emoji: '🧪',
-    path: '/dashboard/labtwin/labs/chemistry-lab',
-    desc: 'Phản ứng · phương trình',
-    accent: 'emerald',
-  },
-  {
-    name: 'Optics Lab',
-    emoji: '🔬',
-    path: '/dashboard/labtwin/labs/optics-lab',
-    desc: 'Thấu kính · khúc xạ',
-    accent: 'amber',
-  },
-  {
-    name: 'Circuit Simulator',
-    emoji: '🔌',
-    path: '/dashboard/labtwin/labs/circuit-simulator',
-    desc: 'Mạch điện RLC · Ohm · Kirchhoff',
-    accent: 'indigo',
-  },
-  {
-    name: 'Digital Logic Lab',
-    emoji: '⚙️',
-    path: '/dashboard/labtwin/labs/digital-logic-lab',
-    desc: 'Cổng logic số · Boole · bảng chân lý',
-    accent: 'cyan',
-  },
-  {
-    name: 'Arduino Emulator',
-    emoji: '⚡',
-    path: '/dashboard/iot-lab/emulator',
-    desc: 'Viết code C++ → chạy real-time trong browser',
-    accent: 'emerald',
-  },
-  {
-    name: 'Mạch Custom (Wokwi)',
-    emoji: '🔌',
-    path: '/dashboard/iot-lab',
-    desc: 'Thiết kế mạch · 8 template · 💾 Lưu thư viện · Chia sẻ cộng đồng',
-    accent: 'pink',
-  },
-  {
-    name: 'MechaForce',
-    emoji: '🤖',
-    path: '/dashboard/labtwin/labs/mechaforce',
-    desc: 'Lực · động lực học',
-    accent: 'rose',
-  },
+  // ── Vật lý cơ bản (5) ──
+  { name: 'Physics Motion',     emoji: '🎯', path: '/dashboard/labtwin/labs/physics-motion',     desc: 'Ném xiên · va chạm · gia tốc', accent: 'rose',     group: 'physics' },
+  { name: 'Con lắc lò xo',      emoji: '🌀', path: '/dashboard/labtwin/labs/spring-pendulum',    desc: 'Dao động điều hòa F = -kx',     accent: 'indigo',   group: 'physics' },
+  { name: 'Con lắc đơn',        emoji: '⚖️', path: '/dashboard/labtwin/labs/simple-pendulum',    desc: 'Chu kỳ T = 2π√(l/g)',          accent: 'emerald',  group: 'physics' },
+  { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/labs/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
+  { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/labs/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
+
+  // ── Toán & Trực quan (3) ──
+  { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/labs/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
+  { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/labs/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
+  { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
+
+  // ── Hoá & Quang (2) ──
+  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/labs/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
+  { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/labs/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
+
+  // ── Điện tử & IoT (3) ──
+  { name: 'Circuit Simulator',  emoji: '🔌', path: '/dashboard/labtwin/labs/circuit-simulator',  desc: 'Mạch RLC · Ohm · Kirchhoff',   accent: 'indigo',   group: 'electronics' },
+  { name: 'Digital Logic Lab',  emoji: '⚙️', path: '/dashboard/labtwin/labs/digital-logic-lab',  desc: 'Cổng logic · bảng chân lý',    accent: 'cyan',     group: 'electronics' },
+  { name: 'Arduino Emulator',   emoji: '⚡', path: '/dashboard/iot-lab/emulator',                desc: 'Code C++ real-time browser',   accent: 'emerald',  group: 'electronics' },
+
+  // ── AI & Vision (1 — IoT custom move to IoT lab page) ──
+  { name: 'Video Tracking',     emoji: '🎥', path: '/dashboard/labtwin/labs/video-tracking',     desc: 'Tracking quỹ đạo từ video · NCC', accent: 'fuchsia', group: 'ai' },
+
+  // ── Aero (1) ──
+  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/labs/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero' },
+
   // 📌 Pixel Agents + Gesture Swarm đã chuyển sang Game Hub
   //    /dashboard/games/pixel-agents · /dashboard/games/gesture-swarm
+  // 📌 Mạch Custom Wokwi đã có entry tại /dashboard/iot-lab — không cần dup ở đây
 ]
 
 // Lấy origin của site — fallback inphysic.com nếu chạy SSR/test
