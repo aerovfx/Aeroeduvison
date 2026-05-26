@@ -8,7 +8,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Simulation {
+export interface Simulation {
   id: string
   name: string
   description: string
@@ -60,7 +60,7 @@ const CATEGORY_ICON: Record<string, string> = {
 
 // ─── Static Simulations Data (38 labs) ───────────────────────────────────────
 
-const SIMULATIONS: Simulation[] = [
+export const SIMULATIONS: Simulation[] = [
   {
     id: 'aerodynamics',
     name: 'Aerodynamics Simulation',
