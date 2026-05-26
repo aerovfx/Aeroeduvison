@@ -188,11 +188,23 @@ function NewKeyModal({ result, onClose }: { result: NewKeyResult; onClose: () =>
 
 /* ─────────────────────────── Setup guide ─────────────────────────── */
 
+// Config snippet — Mac/Linux dùng wrapper /bin/aeroedu-mcp
+// (Nếu user build từ source thì thay bằng node + /dist/index.js — xem Cách B Bước 2)
 const CLAUDE_CONFIG_JSON = `{
   "mcpServers": {
     "aeroedu": {
-      "command": "node",
-      "args": ["/path/to/mcp-server/dist/index.js"],
+      "command": "/path/to/aeroedu-mcp/bin/aeroedu-mcp",
+      "env": {
+        "AEROEDU_API_KEY": "AERO-your-key-here"
+      }
+    }
+  }
+}`
+
+const CLAUDE_CONFIG_JSON_WIN = `{
+  "mcpServers": {
+    "aeroedu": {
+      "command": "C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd",
       "env": {
         "AEROEDU_API_KEY": "AERO-your-key-here"
       }
@@ -263,36 +275,28 @@ const MCP_CLIENT_INFO: Record<McpClient, {
   },
 }
 
-function buildConfigSnippet(client: McpClient): string {
-  if (client === 'cursor') {
-    // Cursor mcp.json format giống Claude Desktop nhưng không có wrapper "mcpServers"
-    return `{
-  "mcpServers": {
-    "aeroedu": {
-      "command": "node",
-      "args": ["/path/to/mcp-server/dist/index.js"],
-      "env": {
-        "AEROEDU_API_KEY": "AERO-your-key-here"
-      }
-    }
-  }
-}`
-  }
+function buildConfigSnippet(client: McpClient, isWindows: boolean = false): string {
+  // Wrapper path — đơn giản hơn `node + dist/index.js`
+  const wrapperMac = '/path/to/aeroedu-mcp/bin/aeroedu-mcp'
+  const wrapperWin = 'C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd'
+  const wrapper = isWindows ? wrapperWin : wrapperMac
+
   if (client === 'cherry-studio') {
     // Cherry Studio dùng GUI — không phải JSON manual
     return `Form trong Settings → MCP Servers:
 
   Name:        aeroedu
   Type:        STDIO
-  Command:     node
-  Arguments:   /path/to/mcp-server/dist/index.js
+  Command:     ${wrapper}
+  Arguments:   (để trống)
   Env Vars:
     AEROEDU_API_KEY = AERO-your-key-here
 
   → Bấm Save → Enable toggle ✓`
   }
-  // Claude Desktop + Cline đều dùng JSON format giống nhau
-  return CLAUDE_CONFIG_JSON
+  // Claude Desktop + Cursor + Cline đều dùng JSON format giống nhau
+  // Mac/Linux: wrapper bash; Windows: wrapper .cmd
+  return isWindows ? CLAUDE_CONFIG_JSON_WIN : CLAUDE_CONFIG_JSON
 }
 
 interface Step {
@@ -304,8 +308,14 @@ interface Step {
 function SetupGuide() {
   const [open, setOpen] = useState(false)
   const [client, setClient] = useState<McpClient>('claude-desktop')
+  // Auto-detect OS từ navigator để default đúng snippet
+  const detectedOs: 'mac' | 'win' | 'linux' = typeof navigator !== 'undefined'
+    ? /Mac/i.test(navigator.platform) ? 'mac'
+      : /Win/i.test(navigator.platform) ? 'win' : 'linux'
+    : 'mac'
+  const [os, setOs] = useState<'mac' | 'win'>(detectedOs === 'win' ? 'win' : 'mac')
   const info = MCP_CLIENT_INFO[client]
-  const configSnippet = buildConfigSnippet(client)
+  const configSnippet = buildConfigSnippet(client, os === 'win')
 
   const steps: Step[] = [
     {
@@ -327,27 +337,103 @@ function SetupGuide() {
     },
     {
       icon: <Terminal className="w-4 h-4 text-blue-400" />,
-      title: 'Bước 2 — Tải & build MCP server (1 lần duy nhất)',
+      title: 'Bước 2 — Tải MCP server (chọn 1 trong 2 cách)',
       body: (
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Clone monorepo + build folder mcp-server (Node.js ≥ 18):</p>
-          <div className="relative">
-            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
+        <div className="space-y-4 text-sm text-muted-foreground">
+
+          {/* ── CÁCH A: Tải bản đóng gói (KHUYẾN NGHỊ — không cần git/npm) ── */}
+          <div className="rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                KHUYẾN NGHỊ
+              </span>
+              <p className="font-bold text-foreground text-sm">Cách A — Tải bản đóng gói</p>
+            </div>
+            <p className="text-xs">
+              Chỉ cần <strong>Node.js ≥ 18</strong> (tải <a href="https://nodejs.org" target="_blank" rel="noreferrer" className="text-emerald-300 underline">nodejs.org</a>).
+              Không cần git, không cần build.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <a
+                href="https://storage.googleapis.com/aeroedu-media-extreme-lattice-491123-p2/mcp/aeroedu-mcp-v0.5.0-mac.zip"
+                download
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg font-bold text-xs transition-all hover:scale-[1.02]"
+                style={{
+                  background: 'linear-gradient(135deg, #475569, #1e293b)',
+                  color: '#f1f5f9',
+                  border: '1px solid #64748b',
+                }}
+              >
+                <span className="text-base">🍎</span>
+                <div className="flex-1 text-left">
+                  <div>macOS / Linux</div>
+                  <div className="text-[10px] font-normal opacity-60">aeroedu-mcp-v0.5.0-mac.zip · 5.3 MB</div>
+                </div>
+              </a>
+              <a
+                href="https://storage.googleapis.com/aeroedu-media-extreme-lattice-491123-p2/mcp/aeroedu-mcp-v0.5.0-win.zip"
+                download
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg font-bold text-xs transition-all hover:scale-[1.02]"
+                style={{
+                  background: 'linear-gradient(135deg, #0078d4, #005a9e)',
+                  color: '#fff',
+                  border: '1px solid #1e88e5',
+                }}
+              >
+                <span className="text-base">🪟</span>
+                <div className="flex-1 text-left">
+                  <div>Windows</div>
+                  <div className="text-[10px] font-normal opacity-80">aeroedu-mcp-v0.5.0-win.zip · 5.3 MB</div>
+                </div>
+              </a>
+            </div>
+            <div className="rounded-lg bg-muted/40 border border-border p-2.5 mt-2">
+              <p className="text-[11px] font-bold text-foreground mb-1.5">Sau khi tải xong:</p>
+              <ol className="text-[11px] space-y-1 ml-4 list-decimal">
+                <li>Giải nén zip ra ổ đĩa, vd:
+                  <ul className="ml-3 mt-0.5 list-disc text-muted-foreground">
+                    <li>macOS/Linux: <code className="font-mono bg-muted/60 px-1 rounded">~/aeroedu-mcp/</code></li>
+                    <li>Windows: <code className="font-mono bg-muted/60 px-1 rounded">C:\aeroedu-mcp\</code></li>
+                  </ul>
+                </li>
+                <li>Đường dẫn để cấu hình ở Bước 3:
+                  <ul className="ml-3 mt-0.5 list-disc text-muted-foreground">
+                    <li>macOS/Linux: <code className="font-mono bg-muted/60 px-1 rounded text-[10px]">~/aeroedu-mcp/bin/aeroedu-mcp</code></li>
+                    <li>Windows: <code className="font-mono bg-muted/60 px-1 rounded text-[10px]">C:\aeroedu-mcp\bin\aeroedu-mcp.cmd</code></li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          {/* ── CÁCH B: Build từ source (cho dev) ── */}
+          <details className="rounded-xl border border-border bg-card/50 group">
+            <summary className="cursor-pointer flex items-center gap-2 p-3 hover:bg-muted/30 transition-colors">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                CHO DEV
+              </span>
+              <p className="font-bold text-foreground text-sm">Cách B — Build từ source code</p>
+              <ChevronDown className="w-4 h-4 ml-auto group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-3 pt-0 space-y-2">
+              <p className="text-xs">Cần git + Node.js ≥ 18:</p>
+              <div className="relative">
+                <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
 {`git clone https://github.com/aerovfx/aeroeduvision.git
 cd aeroeduvision/mcp-server
-npm install
-npm run build`}
-            </pre>
-            <CopyButton
-              text={`git clone https://github.com/aerovfx/aeroeduvision.git\ncd aeroeduvision/mcp-server\nnpm install\nnpm run build`}
-              className="absolute top-2 right-2"
-            />
-          </div>
-          <p className="text-xs">
-            Sau build xong, ghi nhớ đường dẫn TUYỆT ĐỐI tới{' '}
-            <code className="font-mono bg-muted/60 px-1 rounded">dist/index.js</code>.
-            Trên macOS: <code className="font-mono bg-muted/60 px-1 rounded">pwd</code> rồi ghép <code>/dist/index.js</code>.
-          </p>
+npm install && npm run build`}
+                </pre>
+                <CopyButton
+                  text={`git clone https://github.com/aerovfx/aeroeduvision.git\ncd aeroeduvision/mcp-server\nnpm install && npm run build`}
+                  className="absolute top-2 right-2"
+                />
+              </div>
+              <p className="text-xs">
+                Sau build xong, đường dẫn cấu hình:{' '}
+                <code className="font-mono bg-muted/60 px-1 rounded">[pwd]/dist/index.js</code>
+              </p>
+            </div>
+          </details>
         </div>
       ),
     },
@@ -409,6 +495,36 @@ npm run build`}
               : 'Thêm đoạn JSON sau (nếu file đã có mcpServers, chỉ cần thêm key aeroedu bên trong):'}
           </p>
 
+          {/* OS toggle — quyết định path style (wrapper bash vs .cmd) */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Hệ điều hành:</span>
+            <div className="flex gap-1 p-0.5 rounded-md bg-muted/40 border border-border">
+              <button
+                onClick={() => setOs('mac')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                  os === 'mac'
+                    ? 'bg-foreground/15 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🍎 macOS / Linux
+              </button>
+              <button
+                onClick={() => setOs('win')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                  os === 'win'
+                    ? 'bg-foreground/15 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🪟 Windows
+              </button>
+            </div>
+            <span className="text-[10px] text-muted-foreground/60">
+              (auto detect: {detectedOs === 'win' ? '🪟 Windows' : detectedOs === 'mac' ? '🍎 macOS' : '🐧 Linux'})
+            </span>
+          </div>
+
           {/* Config snippet — copy-paste */}
           <div className="relative">
             <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-words">
@@ -418,8 +534,11 @@ npm run build`}
           </div>
 
           <p className="text-xs">
-            Thay <code className="font-mono bg-muted/60 px-1 rounded">/path/to/mcp-server/dist/index.js</code> bằng đường dẫn THỰC từ Bước 2,
+            Thay <code className="font-mono bg-muted/60 px-1 rounded">{os === 'win' ? 'C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd' : '/path/to/aeroedu-mcp/bin/aeroedu-mcp'}</code> bằng đường dẫn THỰC tới folder vừa giải nén ở Bước 2,
             và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key từ Bước 1.
+          </p>
+          <p className="text-[11px] text-muted-foreground/70">
+            💡 Nếu build từ source (Cách B), thay bằng <code className="font-mono bg-muted/60 px-1 rounded">{`"command": "node", "args": ["/path/to/mcp-server/dist/index.js"]`}</code>
           </p>
 
           {/* DeepSeek-specific note */}

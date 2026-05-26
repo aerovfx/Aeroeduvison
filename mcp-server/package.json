@@ -11,7 +11,8 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "pack:release": "bash scripts/pack-release.sh"
   },
   "keywords": [
     "mcp",
