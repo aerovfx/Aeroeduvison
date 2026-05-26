@@ -17,8 +17,11 @@
  *   - Giữa: canvas trải phẳng + animation
  *   - Phải: công thức S/V live + face breakdown + progress ring
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, Text } from '@react-three/drei'
+import * as THREE from 'three'
 import { ArrowLeft, Home, Play, RotateCcw, Box, Layers, Sparkles } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -60,6 +63,338 @@ const FACE_COLORS = {
 const STROKE = { cube:'#4fc3f7', cuboid:'#a78bfa', cylinder:'#34d399', pyramid:'#f97316' }
 
 const round2 = (x: number) => Math.round(x * 100) / 100
+
+// ──────────────────────────────────────────────────────────────
+// R3F 3D Shape Renderers — unfold animation via lerp
+// ──────────────────────────────────────────────────────────────
+
+// Smooth easing for unfold transition
+const ease = (t: number) => 0.5 - Math.cos(Math.PI * t) / 2
+
+// Slow rotation for centered model
+function SpinningGroup({ children, t }: { children: React.ReactNode; t: number }) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame((_, dt) => {
+    if (ref.current && t < 0.3) {
+      // Auto-rotate slowly only when shape is closed (t < 0.3)
+      ref.current.rotation.y += dt * 0.15
+    }
+  })
+  return <group ref={ref}>{children}</group>
+}
+
+// ── CUBE 6 faces unfold into cross ─────────────────────────────
+function CubeUnfold({ a, t }: { a: number; t: number }) {
+  const e = ease(t)
+  const half = a / 2
+  // 6 faces: at t=0 = cube positions; at t=1 = flat cross in XY plane
+  // Cross layout (in XY plane, Z=0):
+  //         [Top    ]                 (y = +a)
+  // [Left][Front][Right][Back]        (y = 0, x = -a, 0, +a, +2a)
+  //         [Bottom ]                 (y = -a)
+  // Front face stays at center (x=0, y=0, z=0 in unfolded)
+  const faces = [
+    // {label, closed: [pos, rot], unfolded: [pos, rot]}
+    {
+      label: 'Trên', color: '#4fc3f7',
+      closedPos: [0, half, 0] as [number, number, number],
+      closedRot: [-Math.PI / 2, 0, 0] as [number, number, number],
+      unfoldedPos: [0, a, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+    {
+      label: 'Dưới', color: '#4fc3f7',
+      closedPos: [0, -half, 0] as [number, number, number],
+      closedRot: [Math.PI / 2, 0, 0] as [number, number, number],
+      unfoldedPos: [0, -a, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+    {
+      label: 'Trái', color: '#4fc3f7',
+      closedPos: [-half, 0, 0] as [number, number, number],
+      closedRot: [0, -Math.PI / 2, 0] as [number, number, number],
+      unfoldedPos: [-a, 0, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+    {
+      label: 'Phải', color: '#4fc3f7',
+      closedPos: [half, 0, 0] as [number, number, number],
+      closedRot: [0, Math.PI / 2, 0] as [number, number, number],
+      unfoldedPos: [a, 0, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+    {
+      label: 'Trước', color: '#4fc3f7',
+      closedPos: [0, 0, half] as [number, number, number],
+      closedRot: [0, 0, 0] as [number, number, number],
+      unfoldedPos: [0, 0, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+    {
+      label: 'Sau', color: '#4fc3f7',
+      closedPos: [0, 0, -half] as [number, number, number],
+      closedRot: [0, Math.PI, 0] as [number, number, number],
+      unfoldedPos: [2 * a, 0, 0] as [number, number, number],
+      unfoldedRot: [0, 0, 0] as [number, number, number],
+    },
+  ]
+  return (
+    <SpinningGroup t={t}>
+      {faces.map((f, i) => {
+        const px = f.closedPos[0] * (1 - e) + f.unfoldedPos[0] * e
+        const py = f.closedPos[1] * (1 - e) + f.unfoldedPos[1] * e
+        const pz = f.closedPos[2] * (1 - e) + f.unfoldedPos[2] * e
+        const rx = f.closedRot[0] * (1 - e) + f.unfoldedRot[0] * e
+        const ry = f.closedRot[1] * (1 - e) + f.unfoldedRot[1] * e
+        const rz = f.closedRot[2] * (1 - e) + f.unfoldedRot[2] * e
+        return (
+          <group key={i} position={[px, py, pz]} rotation={[rx, ry, rz]}>
+            <mesh>
+              <planeGeometry args={[a, a]} />
+              <meshStandardMaterial color={f.color} side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+            </mesh>
+            {/* Outline */}
+            <lineSegments>
+              <edgesGeometry args={[new THREE.PlaneGeometry(a, a)]} />
+              <lineBasicMaterial color="#4fc3f7" linewidth={2} />
+            </lineSegments>
+            {t > 0.6 && (
+              <Text position={[0, 0, 0.01]} fontSize={a * 0.18} color="#ffffff"
+                anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                {f.label}
+              </Text>
+            )}
+          </group>
+        )
+      })}
+    </SpinningGroup>
+  )
+}
+
+// ── CUBOID 6 faces — same cross pattern but with w/h/d ─────────
+function CuboidUnfold({ w, h, d, t }: { w: number; h: number; d: number; t: number }) {
+  const e = ease(t)
+  const hw = w / 2, hh = h / 2, hd = d / 2
+  // Net layout (cross in plane):
+  // Top (w×d) above Front (w×h)
+  // Left (d×h) Front (w×h) Right (d×h) Back (w×h)
+  // Bottom (w×d) below Front
+  const faces = [
+    // Front (center)
+    { closedPos: [0, 0, hd], closedRot: [0, 0, 0], unfoldedPos: [0, 0, 0], unfoldedRot: [0, 0, 0],
+      sizeW: w, sizeH: h, label: 'Trước' },
+    // Back
+    { closedPos: [0, 0, -hd], closedRot: [0, Math.PI, 0], unfoldedPos: [w + d, 0, 0], unfoldedRot: [0, 0, 0],
+      sizeW: w, sizeH: h, label: 'Sau' },
+    // Left
+    { closedPos: [-hw, 0, 0], closedRot: [0, -Math.PI / 2, 0], unfoldedPos: [-(w + d) / 2 - 0.001, 0, 0], unfoldedRot: [0, 0, 0],
+      sizeW: d, sizeH: h, label: 'Trái' },
+    // Right
+    { closedPos: [hw, 0, 0], closedRot: [0, Math.PI / 2, 0], unfoldedPos: [(w + d) / 2, 0, 0], unfoldedRot: [0, 0, 0],
+      sizeW: d, sizeH: h, label: 'Phải' },
+    // Top
+    { closedPos: [0, hh, 0], closedRot: [-Math.PI / 2, 0, 0], unfoldedPos: [0, (h + d) / 2, 0], unfoldedRot: [0, 0, 0],
+      sizeW: w, sizeH: d, label: 'Trên' },
+    // Bottom
+    { closedPos: [0, -hh, 0], closedRot: [Math.PI / 2, 0, 0], unfoldedPos: [0, -(h + d) / 2, 0], unfoldedRot: [0, 0, 0],
+      sizeW: w, sizeH: d, label: 'Dưới' },
+  ]
+  return (
+    <SpinningGroup t={t}>
+      {faces.map((f, i) => {
+        const px = f.closedPos[0] * (1 - e) + f.unfoldedPos[0] * e
+        const py = f.closedPos[1] * (1 - e) + f.unfoldedPos[1] * e
+        const pz = f.closedPos[2] * (1 - e) + f.unfoldedPos[2] * e
+        const rx = f.closedRot[0] * (1 - e) + f.unfoldedRot[0] * e
+        const ry = f.closedRot[1] * (1 - e) + f.unfoldedRot[1] * e
+        const rz = f.closedRot[2] * (1 - e) + f.unfoldedRot[2] * e
+        return (
+          <group key={i} position={[px, py, pz]} rotation={[rx, ry, rz]}>
+            <mesh>
+              <planeGeometry args={[f.sizeW, f.sizeH]} />
+              <meshStandardMaterial color="#a78bfa" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+            </mesh>
+            <lineSegments>
+              <edgesGeometry args={[new THREE.PlaneGeometry(f.sizeW, f.sizeH)]} />
+              <lineBasicMaterial color="#a78bfa" linewidth={2} />
+            </lineSegments>
+            {t > 0.6 && (
+              <Text position={[0, 0, 0.01]} fontSize={Math.min(f.sizeW, f.sizeH) * 0.18} color="#ffffff"
+                anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                {f.label}
+              </Text>
+            )}
+          </group>
+        )
+      })}
+    </SpinningGroup>
+  )
+}
+
+// ── CYLINDER — side rect unfolds from circle, top/bottom slide out ─
+function CylinderUnfold({ r, height, t }: { r: number; height: number; t: number }) {
+  const e = ease(t)
+  const circ = 2 * Math.PI * r
+  const hh = height / 2
+
+  return (
+    <SpinningGroup t={t}>
+      {/* Cylinder side (closed) → rectangle (unfolded) */}
+      {/* When t=0: full cylinder; when t=1: flat rect of size (circ × height) */}
+      {t < 0.5 ? (
+        <mesh position={[0, 0, 0]} rotation={[0, 0, 0]}>
+          <cylinderGeometry args={[r, r, height, 48, 1, true]} />
+          <meshStandardMaterial color="#34d399" side={THREE.DoubleSide} transparent opacity={0.85 * (1 - e * 1.5)} metalness={0.2} roughness={0.45} />
+        </mesh>
+      ) : null}
+      {/* Flat lateral rectangle */}
+      {t > 0.3 && (
+        <group position={[0, 0, 0]}>
+          <mesh position={[circ * 0.5 * e * 0.3, 0, 0]} rotation={[0, 0, 0]}>
+            <planeGeometry args={[circ * e, height]} />
+            <meshStandardMaterial color="#4fc3f7" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+          </mesh>
+          {t > 0.6 && (
+            <Text position={[circ * 0.5 * e * 0.3, 0, 0.01]} fontSize={r * 0.4} color="#ffffff"
+              anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+              {`2πr × h`}
+            </Text>
+          )}
+        </group>
+      )}
+      {/* Top circle: at t=0 on top of cylinder, slides up at t=1 */}
+      <mesh
+        position={[0, hh + e * (r + 0.5), 0]}
+        rotation={[Math.PI / 2 * e + Math.PI / 2 * (1 - e), 0, 0]}
+      >
+        <circleGeometry args={[r, 48]} />
+        <meshStandardMaterial color="#34d399" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+      </mesh>
+      {/* Bottom circle */}
+      <mesh
+        position={[0, -hh - e * (r + 0.5), 0]}
+        rotation={[Math.PI / 2 * e + Math.PI / 2 * (1 - e), 0, 0]}
+      >
+        <circleGeometry args={[r, 48]} />
+        <meshStandardMaterial color="#34d399" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+      </mesh>
+    </SpinningGroup>
+  )
+}
+
+// ── PYRAMID — 4 triangular faces fold out from base ────────────
+function PyramidUnfold({ a, slant, t }: { a: number; slant: number; t: number }) {
+  const e = ease(t)
+  const half = a / 2
+  // Apex height when closed
+  const apexH = Math.sqrt(Math.max(0, slant * slant - half * half))
+  // 4 triangle fold angles: at t=0, triangles point up to apex; at t=1, lie flat (rotated 90° outward)
+  // Fold rotation: from "leaning toward center top" to "flat outward"
+  const foldAngle = (Math.PI / 2) * e + (Math.atan2(apexH, half) - Math.PI / 2)
+
+  // Apex offset blends from (0, apexH, 0) toward each face's flat tip
+  return (
+    <SpinningGroup t={t}>
+      {/* Base square (always flat) */}
+      <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[a, a]} />
+        <meshStandardMaterial color="#f97316" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+      </mesh>
+      <lineSegments rotation={[Math.PI / 2, 0, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(a, a)]} />
+        <lineBasicMaterial color="#f97316" />
+      </lineSegments>
+      {t > 0.6 && (
+        <Text position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={a * 0.18}
+          color="#ffffff" anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+          Đáy
+        </Text>
+      )}
+
+      {/* 4 triangle faces */}
+      {[0, 1, 2, 3].map(i => {
+        const angle = (i * Math.PI) / 2  // 0, 90, 180, 270 around y-axis
+        // Each triangle hinges on one edge of base, points up toward apex when closed
+        const edgeMidX = Math.sin(angle) * half
+        const edgeMidZ = Math.cos(angle) * half
+        const triColor = ['#fbbf24', '#f59e0b', '#ef4444', '#f97316'][i]
+        return (
+          <group key={i}
+            position={[edgeMidX, 0, edgeMidZ]}
+            rotation={[0, angle, 0]}>
+            <group rotation={[-foldAngle, 0, 0]}>
+              {/* Triangle vertices: base from (-half,0,0) to (+half,0,0), apex at (0, slant, 0) */}
+              <mesh>
+                <bufferGeometry>
+                  <bufferAttribute attach="attributes-position" args={[new Float32Array([
+                    -half, 0, 0,
+                    half, 0, 0,
+                    0, slant, 0,
+                  ]), 3]} />
+                  <bufferAttribute attach="attributes-normal" args={[new Float32Array([
+                    0, 0, 1, 0, 0, 1, 0, 0, 1,
+                  ]), 3]} />
+                </bufferGeometry>
+                <meshStandardMaterial color={triColor} side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+              </mesh>
+              {/* Edges */}
+              <lineSegments>
+                <bufferGeometry>
+                  <bufferAttribute attach="attributes-position" args={[new Float32Array([
+                    -half, 0, 0, half, 0, 0,
+                    half, 0, 0, 0, slant, 0,
+                    0, slant, 0, -half, 0, 0,
+                  ]), 3]} />
+                </bufferGeometry>
+                <lineBasicMaterial color="#f97316" />
+              </lineSegments>
+              {t > 0.6 && (
+                <Text position={[0, slant * 0.35, 0.01]} fontSize={a * 0.15} color="#ffffff"
+                  anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+                  △
+                </Text>
+              )}
+            </group>
+          </group>
+        )
+      })}
+    </SpinningGroup>
+  )
+}
+
+// ── R3F Scene wrapper ─────────────────────────────────────────
+function GeometryScene({ shape, dims, t }: { shape: ShapeKey; dims: Dims; t: number }) {
+  const meta = SHAPE_META[shape]
+  return (
+    <>
+      {/* Lighting */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 8, 5]} intensity={0.8} color="#ffffff" />
+      <directionalLight position={[-5, 3, -5]} intensity={0.3} color={meta.color} />
+      <pointLight position={[0, 0, 5]} intensity={0.5} color={meta.color} />
+
+      {/* Center axes hint (subtle) */}
+      <gridHelper args={[20, 20, '#222', '#1a1a2a']} position={[0, -dims.a / 1.5, 0]} />
+
+      {/* Shape (centered automatically) */}
+      <Suspense fallback={null}>
+        {shape === 'cube' && <CubeUnfold a={dims.a} t={t} />}
+        {shape === 'cuboid' && <CuboidUnfold w={dims.w} h={dims.h} d={dims.d} t={t} />}
+        {shape === 'cylinder' && <CylinderUnfold r={dims.r} height={dims.height} t={t} />}
+        {shape === 'pyramid' && <PyramidUnfold a={dims.a} slant={dims.slant} t={t} />}
+      </Suspense>
+
+      <OrbitControls
+        enablePan={false}
+        enableDamping
+        dampingFactor={0.1}
+        minDistance={5}
+        maxDistance={30}
+        target={[0, 0, 0]}
+      />
+    </>
+  )
+}
 
 // ── Main component ────────────────────────────────────────────
 export default function GeometryUnfold() {
@@ -311,9 +646,21 @@ export default function GeometryUnfold() {
               <RotateCcw className="inline h-3 w-3 mr-1" /> Reset
             </button>
           </div>
-          <div className="flex-1 w-full rounded-2xl border border-white/10 overflow-hidden"
-            style={{ background: '#13162080', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
-            <canvas ref={canvasRef} className="block" />
+          <div className="flex-1 w-full rounded-2xl border border-white/10 overflow-hidden relative"
+            style={{ background: 'radial-gradient(ellipse at center, #1a1d2e 0%, #0a0a14 70%, #050505 100%)', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
+            <Canvas
+              camera={{ position: [0, 4, 14], fov: 45 }}
+              gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+              dpr={[1, 1.5]}>
+              <color attach="background" args={['#0a0a14']} />
+              <GeometryScene shape={shape} dims={dims} t={unfoldPct} />
+            </Canvas>
+            {/* Hint overlay */}
+            <div className="absolute bottom-2 right-3 text-[10px] text-white/30 uppercase tracking-[0.2em] font-mono pointer-events-none">
+              Drag · Scroll · Zoom
+            </div>
+            {/* Hide canvas ref usage to suppress unused warning */}
+            <canvas ref={canvasRef} className="hidden" />
           </div>
         </div>
 

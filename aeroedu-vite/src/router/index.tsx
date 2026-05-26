@@ -96,7 +96,7 @@ const ChapterViewPage  = lazy(() => import('@/pages/courses/ChapterView'))
 
 // ── Labs (3D heavy) ─────────────────────────────────────────
 const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
-const PythonLabsPage     = lazy(() => import('@/pages/labs/PythonLabs'))
+// PythonLabsPage removed — flattened all sims into /dashboard/labtwin (LabsIndex)
 const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
 const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
 const VideoTrackingLab   = lazy(() => import('@/pages/labs/VideoTracking'))
@@ -404,7 +404,8 @@ export function AppRouter() {
             {/* /labs catalog page — phải register TRƯỚC :labSlug catch-all
                 để khớp đúng route. Trước đây bị Navigate redirect về /labtwin
                 khiến mọi card "Xem tất cả" / category filter loop vô tận. */}
-            <Route path="/dashboard/labtwin/labs"                         element={<PythonLabsPage />} />
+            {/* User: "bỏ route /dashboard/labtwin/labs/" — flatten all sims into /dashboard/labtwin */}
+            <Route path="/dashboard/labtwin/labs"                         element={<Navigate to="/dashboard/labtwin" replace />} />
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
             <Route path="/dashboard/labtwin/labs/fourier-epicycles"       element={<FourierEpicycles />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />

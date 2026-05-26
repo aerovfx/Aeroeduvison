@@ -376,7 +376,7 @@ export default function LabsIndexPage() {
                   </p>
                 </div>
                 <Link
-                  to="/dashboard/labtwin/labs"
+                  to="/dashboard/labtwin"
                   className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
                 >
                   Xem tất cả
@@ -476,7 +476,7 @@ export default function LabsIndexPage() {
                       </p>
                     </div>
                   </div>
-                  <Link to="/dashboard/labtwin/labs"
+                  <Link to="/dashboard/labtwin"
                     className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all">
                     Tìm kiếm & filter
                     <ArrowRight className="h-4 w-4" />
@@ -759,7 +759,7 @@ export default function LabsIndexPage() {
                 </div>
                 <div className="pt-3 border-t border-blue-500/15">
                   <Link
-                    to="/dashboard/labtwin/labs"
+                    to="/dashboard/labtwin"
                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="h-4 w-4" />
@@ -786,7 +786,7 @@ export default function LabsIndexPage() {
                   </p>
                 </div>
                 <Link
-                  to="/dashboard/labtwin/labs"
+                  to="/dashboard/labtwin"
                   className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all text-sm"
                 >
                   Xem tất cả labs
@@ -855,7 +855,7 @@ export default function LabsIndexPage() {
                 Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! Mỗi thí nghiệm là một cuộc phiêu lưu mới! 🚀
               </p>
               <Link
-                to="/dashboard/labtwin/labs"
+                to="/dashboard/labtwin"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-white text-purple-600 hover:bg-gray-100 font-bold text-lg rounded-xl shadow-xl transition-all hover:scale-105"
               >
                 <FlaskConical className="h-6 w-6" />
