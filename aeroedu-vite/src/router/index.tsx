@@ -98,6 +98,7 @@ const ChapterViewPage  = lazy(() => import('@/pages/courses/ChapterView'))
 const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
 const PythonLabsPage     = lazy(() => import('@/pages/labs/PythonLabs'))
 const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
+const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
 const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
 const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
@@ -399,6 +400,7 @@ export function AppRouter() {
                 khiến mọi card "Xem tất cả" / category filter loop vô tận. */}
             <Route path="/dashboard/labtwin/labs"                         element={<PythonLabsPage />} />
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
+            <Route path="/dashboard/labtwin/labs/fourier-epicycles"       element={<FourierEpicycles />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />

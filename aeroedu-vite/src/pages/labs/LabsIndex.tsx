@@ -188,6 +188,13 @@ const POPULAR_LABS: PopularLab[] = [
     accent: 'cyan',
   },
   {
+    name: 'Fourier Epicycles',
+    emoji: '🌀',
+    path: '/dashboard/labtwin/labs/fourier-epicycles',
+    desc: 'Chuỗi Fourier vẽ sóng vuông · vòng quay đẹp mê',
+    accent: 'fuchsia',
+  },
+  {
     name: 'Physics Motion',
     emoji: '🎯',
     path: '/dashboard/labtwin/labs/physics-motion',
