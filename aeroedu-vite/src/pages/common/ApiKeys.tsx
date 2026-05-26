@@ -211,32 +211,46 @@ function SetupGuide() {
 
   const steps: Step[] = [
     {
-      icon: <Terminal className="w-4 h-4 text-blue-400" />,
-      title: 'Bước 1 — Tải MCP server',
+      icon: <Key className="w-4 h-4 text-purple-400" />,
+      title: 'Bước 1 — Tạo & sao chép API Key',
       body: (
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Clone hoặc tải bản build từ repository chính thức:</p>
-          <div className="relative">
-            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
-{`git clone https://github.com/aeroedu/mcp-hub.git
-cd mcp-hub && npm install && npm run build`}
-            </pre>
-            <CopyButton
-              text={`git clone https://github.com/aeroedu/mcp-hub.git\ncd mcp-hub && npm install && npm run build`}
-              className="absolute top-2 right-2"
-            />
-          </div>
-          <p className="text-xs">Yêu cầu: Node.js ≥ 18. Sau khi build xong, ghi nhớ đường dẫn tới <code className="font-mono bg-muted/60 px-1 rounded">dist/index.js</code>.</p>
+          <p>
+            Bấm nút <strong className="text-purple-300">"+ Tạo API Key mới"</strong> ở bảng trên →
+            đặt tên gợi nhớ (vd: <em>Claude MacBook</em>) → bấm Tạo.
+            Bảng popup sẽ hiện chuỗi <code className="font-mono bg-muted/60 px-1 rounded text-xs">AERO-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>.
+          </p>
+          <p className="text-rose-400 text-xs">
+            ⚠ Key chỉ hiện 1 LẦN DUY NHẤT — copy ngay trước khi đóng popup.
+            Nếu lỡ mất, xoá key cũ và tạo key mới.
+          </p>
         </div>
       ),
     },
     {
-      icon: <Key className="w-4 h-4 text-purple-400" />,
-      title: 'Bước 2 — Sao chép API Key',
+      icon: <Terminal className="w-4 h-4 text-blue-400" />,
+      title: 'Bước 2 — Tải & build MCP server (1 lần duy nhất)',
       body: (
-        <p className="text-sm text-muted-foreground">
-          Tạo key mới (hoặc dùng key có sẵn) ở bảng phía trên. Sao chép toàn bộ chuỗi <code className="font-mono bg-muted/60 px-1 rounded text-xs">AERO-...</code> vào clipboard.
-        </p>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>Clone monorepo + build folder mcp-server (Node.js ≥ 18):</p>
+          <div className="relative">
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
+{`git clone https://github.com/aerovfx/aeroeduvision.git
+cd aeroeduvision/mcp-server
+npm install
+npm run build`}
+            </pre>
+            <CopyButton
+              text={`git clone https://github.com/aerovfx/aeroeduvision.git\ncd aeroeduvision/mcp-server\nnpm install\nnpm run build`}
+              className="absolute top-2 right-2"
+            />
+          </div>
+          <p className="text-xs">
+            Sau build xong, ghi nhớ đường dẫn TUYỆT ĐỐI tới{' '}
+            <code className="font-mono bg-muted/60 px-1 rounded">dist/index.js</code>.
+            Trên macOS: <code className="font-mono bg-muted/60 px-1 rounded">pwd</code> rồi ghép <code>/dist/index.js</code>.
+          </p>
+        </div>
       ),
     },
     {
@@ -244,34 +258,57 @@ cd mcp-hub && npm install && npm run build`}
       title: 'Bước 3 — Cấu hình Claude Desktop',
       body: (
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Mở file cấu hình Claude Desktop tại{' '}
-            <code className="font-mono bg-muted/60 px-1 rounded text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</code>{' '}
-            (macOS) hoặc <code className="font-mono bg-muted/60 px-1 rounded text-xs">%APPDATA%\Claude\claude_desktop_config.json</code> (Windows), rồi thêm đoạn JSON sau:
-          </p>
+          <p>Mở file cấu hình Claude Desktop:</p>
+          <ul className="text-xs space-y-1 ml-4 list-disc">
+            <li><strong>macOS:</strong> <code className="font-mono bg-muted/60 px-1 rounded">~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+            <li><strong>Windows:</strong> <code className="font-mono bg-muted/60 px-1 rounded">%APPDATA%\Claude\claude_desktop_config.json</code></li>
+            <li><strong>Linux:</strong> <code className="font-mono bg-muted/60 px-1 rounded">~/.config/Claude/claude_desktop_config.json</code></li>
+          </ul>
+          <p>Thêm đoạn JSON sau (nếu file đã có <code>mcpServers</code>, chỉ cần thêm key <code>aeroedu</code> bên trong):</p>
           <div className="relative">
             <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-words">
               {CLAUDE_CONFIG_JSON}
             </pre>
             <CopyButton text={CLAUDE_CONFIG_JSON} className="absolute top-2 right-2" />
           </div>
-          <p className="text-xs">Thay <code className="font-mono bg-muted/60 px-1 rounded">/path/to/mcp-server/dist/index.js</code> bằng đường dẫn thực và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key của bạn.</p>
+          <p className="text-xs">
+            Thay <code className="font-mono bg-muted/60 px-1 rounded">/path/to/...</code> bằng đường dẫn THỰC từ Bước 2,
+            và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key từ Bước 1.
+          </p>
         </div>
       ),
     },
     {
       icon: <Zap className="w-4 h-4 text-amber-400" />,
-      title: 'Bước 4 — Khởi động & kiểm tra',
+      title: 'Bước 4 — Khởi động lại Claude Desktop & test',
       body: (
         <div className="text-sm text-muted-foreground space-y-2">
-          <p>Khởi động lại Claude Desktop. Trong cửa sổ chat mới, gõ:</p>
+          <p>
+            <strong>Quit hoàn toàn</strong> Claude Desktop (Cmd+Q trên macOS) rồi mở lại.
+            Trong cửa sổ chat mới, bạn sẽ thấy biểu tượng 🔌 ở góc dưới — bấm vào sẽ thấy <strong>"aeroedu"</strong> với 24 tools.
+          </p>
+          <p>Thử lệnh test:</p>
           <div className="relative">
-            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground">
-              {`/tools list`}
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground whitespace-pre-wrap">
+              {`Liệt kê 5 khoá học gần nhất của tôi (dùng aeroedu_course_list)`}
             </pre>
-            <CopyButton text="/tools list" className="absolute top-2 right-2" />
+            <CopyButton
+              text="Liệt kê 5 khoá học gần nhất của tôi (dùng aeroedu_course_list)"
+              className="absolute top-2 right-2"
+            />
           </div>
-          <p>Bạn sẽ thấy danh sách 24 MCP tools của AeroEdu (aeroedu_course_list, aeroedu_kg_query, …). Nếu không thấy, kiểm tra lại đường dẫn và API key.</p>
+          <p className="text-xs">
+            Claude sẽ gọi tool, MCP exchange API key → JWT (cached 90 ngày), trả về danh sách khoá học của bạn.
+          </p>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
+            <p className="font-medium text-amber-300 mb-1">Troubleshooting nhanh:</p>
+            <ul className="space-y-0.5 ml-3 list-disc text-amber-200/80">
+              <li>Không thấy "aeroedu" trong 🔌 → kiểm tra JSON syntax (có dấu phẩy thừa?)</li>
+              <li>Tool gọi báo "401 unauthorized" → key đã revoke hoặc sai → tạo key mới</li>
+              <li>Báo "Cannot find module" → đường dẫn dist/index.js sai → check lại pwd</li>
+              <li>Báo "503 DeepSeek" khi gọi quiz tools → tài khoản DeepSeek hết credit</li>
+            </ul>
+          </div>
         </div>
       ),
     },

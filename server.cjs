@@ -8847,7 +8847,19 @@ app.post('/api/auth/validate-key', async (req, res) => {
       const valid = await _akBcrypt.compare(key, row.key_hash);
       if (valid) {
         pool.query('UPDATE user_api_keys SET last_used_at=NOW() WHERE id=$1', [row.id]).catch(() => {});
-        return res.json({ ok: true, userId: row.user_id, role: row.role, name: row.name, email: row.email });
+        // Mint JWT cho MCP — _akVerify() ở các handler khác chỉ accept JWT,
+        // không accept raw AERO-xxx. JWT này không expire (ignoreExpiration=true).
+        // MCP client cache token này → dùng làm Bearer cho mọi request sau.
+        const jwt = _akJwt.sign(
+          { sub: row.user_id, userId: row.user_id, role: row.role,
+            email: row.email, name: row.name, src: 'api-key', keyId: row.id },
+          _akSecret(),
+          { expiresIn: '90d' }  // 90 ngày, có ignoreExpiration nên thực tế không hết
+        );
+        return res.json({
+          ok: true, jwt,
+          userId: row.user_id, role: row.role, name: row.name, email: row.email,
+        });
       }
     }
     return res.status(401).json({ ok: false, error: 'Key không hợp lệ hoặc đã bị thu hồi' });

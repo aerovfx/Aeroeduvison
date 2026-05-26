@@ -1,6 +1,6 @@
 {
   "name": "@aeroedu/mcp-hub",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "AeroEdu MCP server — Claude/Cursor thao tác trực tiếp với inphysic.com qua Model Context Protocol",
   "type": "module",
   "main": "dist/index.js",
