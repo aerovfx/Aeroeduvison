@@ -14,6 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
+  Atom,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -84,6 +85,7 @@ const studentSections: RouteSection[] = [
     titleKey: 'sectionLabsTools',
     routes: [
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab', badge: 'Mới' },
+      { icon: Atom,           labelKey: 'routePeriodicTable', href: '/dashboard/periodic-table', badge: '3D' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
       { icon: Gamepad2,       labelKey: 'routeGames',   href: '/dashboard/games',     badge: 'Game' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
@@ -162,6 +164,7 @@ const teacherSections: RouteSection[] = [
     routes: [
       { icon: Zap,            labelKey: 'routeStem',    href: '/teacher/stem-projects', badge: 'Mới' },
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab' },
+      { icon: Atom,           labelKey: 'routePeriodicTable', href: '/dashboard/periodic-table', badge: '3D' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },

@@ -127,6 +127,7 @@ const GestureSwarm       = lazy(() => import('@/pages/labs/GestureSwarm'))
 const AssemblySim        = lazy(() => import('@/pages/labs/AssemblySim'))
 const IoTLab             = lazy(() => import('@/pages/labs/IoTLab'))
 const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
+const PeriodicTablePage  = lazy(() => import('@/pages/labs/PeriodicTable'))
 
 // ── Teacher Pages (đã port) ──────────────────────────────────
 const TeacherDashboard      = lazy(() => import('@/pages/teacher/Dashboard'))
@@ -363,6 +364,7 @@ export function AppRouter() {
             <Route path="/dashboard/iot-lab/digital-logic"         element={<DigitalLogicLab />} />
             <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
             <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
+            <Route path="/dashboard/periodic-table"        element={<PeriodicTablePage />} />
             <Route path="/dashboard/learning"              element={<PageFallback />} />
             <Route path="/dashboard/learning/*"            element={<PageFallback />} />
             <Route path="/dashboard/logo-a-demo"           element={<PageFallback />} />
