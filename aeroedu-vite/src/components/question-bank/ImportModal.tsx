@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Trash2, Download,
   ClipboardPaste, Code2, Eraser, Sparkles, Send, Bot,
@@ -675,6 +675,17 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiLastResult, setAiLastResult] = useState<{ count: number; provider: string } | null>(null)
+  const [aiQuota, setAiQuota] = useState<{
+    used: number; limit: number | null; remaining: number | null;
+    source: 'admin' | 'paid' | 'free'; unlimited: boolean; resetAt?: string;
+  } | null>(null)
+
+  // Load quota on mount để hiển thị "còn N/20 lượt"
+  useEffect(() => {
+    api.get('/ai/generate-questions/quota')
+      .then(r => setAiQuota(r.data))
+      .catch(() => {})
+  }, [])
 
   const handleAiGenerate = async () => {
     const topic = aiTopic.trim()
@@ -703,11 +714,23 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
       setPastedJson(data.json)
       setPasteError(null)
       setAiLastResult({ count: data.count, provider: data.provider })
+      // Update quota từ response để hiển thị số lượt còn lại sau gen
+      if ((data as any).quota) setAiQuota((data as any).quota)
       toast.success(`AI sinh ${data.count} câu hỏi (${data.provider}). Bấm "Phân tích JSON" để xem trước.`)
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Lỗi gọi AI'
-      setAiError(msg)
-      toast.error(msg)
+      const status = err?.response?.status
+      const data = err?.response?.data
+      // Quota exceeded → update local quota + show clear message
+      if (status === 429 && data?.error === 'quota_exceeded') {
+        const msg = `${data.message} (${data.used}/${data.limit})`
+        setAiError(msg)
+        setAiQuota({ used: data.used, limit: data.limit, remaining: 0, source: 'free', unlimited: false, resetAt: data.retryAt })
+        toast.error(msg, { duration: 6000 })
+      } else {
+        const msg = data?.message || data?.error || err?.message || 'Lỗi gọi AI'
+        setAiError(msg)
+        toast.error(msg)
+      }
     } finally {
       setAiLoading(false)
     }
@@ -1050,15 +1073,39 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                         <Bot className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-200">AI Tạo câu hỏi tự động</p>
+                        <p className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                          AI Tạo câu hỏi tự động
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300">
+                            DeepSeek · MIỄN PHÍ
+                          </span>
+                        </p>
                         <p className="text-[10px] text-slate-400">Mô tả chủ đề → AI sinh JSON → 1 click import</p>
                       </div>
                     </div>
-                    {aiLastResult && (
-                      <span className="text-[10px] px-2 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
-                        ✓ Đã sinh {aiLastResult.count} câu ({aiLastResult.provider})
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {aiLastResult && (
+                        <span className="text-[10px] px-2 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
+                          ✓ Đã sinh {aiLastResult.count} câu
+                        </span>
+                      )}
+                      {aiQuota && (
+                        aiQuota.unlimited ? (
+                          <span className="text-[10px] px-2 py-1 rounded-full border bg-purple-500/15 border-purple-500/40 text-purple-300 font-bold">
+                            ∞ {aiQuota.source === 'admin' ? 'Admin' : 'Gói Pro'}
+                          </span>
+                        ) : (
+                          <span className={`text-[10px] px-2 py-1 rounded-full border font-bold ${
+                            (aiQuota.remaining ?? 0) === 0
+                              ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                              : (aiQuota.remaining ?? 0) <= 3
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                          }`} title={aiQuota.resetAt ? `Reset lúc ${new Date(aiQuota.resetAt).toLocaleString('vi-VN')}` : ''}>
+                            Còn {aiQuota.remaining}/{aiQuota.limit} lượt
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
 
                   {/* Topic input */}

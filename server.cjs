@@ -4395,9 +4395,118 @@ if (USE_NODEJS_QUESTIONS) {
     try { return JSON.parse(s); } catch { return null; }
   }
 
-  app.post('/api/ai/generate-questions', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
+  // ── AiQuotaLog table — daily quota tracking ──
+  // User: "tính năng AI cho việc ra đề ... cho free với tài khoản giáo viên
+  // bình thường được gen 20 lần/ngày"
+  // → Decouple từ entitlements (ai_tutor gating cũ là paid)
+  // → Free 20/day per teacher account
+  // → Admin + Pro plan teacher: unlimited
+  let _aiQuotaTableReady = false;
+  async function _ensureAiQuotaTable() {
+    if (_aiQuotaTableReady) return;
+    try {
+      const pool = _getPool();
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "AiQuotaLog" (
+          user_id  VARCHAR(255) NOT NULL,
+          feature  VARCHAR(50)  NOT NULL,
+          day      DATE         NOT NULL,
+          count    INTEGER      DEFAULT 0,
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (user_id, feature, day)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_aiquota_day ON "AiQuotaLog"(day DESC)`);
+      _aiQuotaTableReady = true;
+    } catch (e) { console.warn('[ai-quota] migration:', e.message); }
+  }
+  _ensureAiQuotaTable().catch(() => {});
+
+  const AI_GEN_QUOTA_DAILY = parseInt(process.env.AI_GEN_QUOTA_DAILY || '20', 10);
+
+  // Check + increment quota atomically. Returns:
+  //   { allowed: true, used, limit, remaining, source: 'admin'|'paid'|'free' }
+  //   { allowed: false, used, limit, retryAt }
+  async function _checkAiQuestionGenQuota(decoded) {
+    // Admin bypass
+    if (decoded.role === 'ADMIN') {
+      return { allowed: true, used: 0, limit: Infinity, remaining: Infinity, source: 'admin' };
+    }
+    // Pro plan teacher bypass — check entitlement quiz_generate
+    try {
+      const userKey = decoded.sub || decoded.userId || decoded.email;
+      const entitlements = require('./lib/entitlements.cjs');
+      const hasPaid = await entitlements.hasFeature(userKey, 'quiz_generate').catch(() => false);
+      if (hasPaid) {
+        return { allowed: true, used: 0, limit: Infinity, remaining: Infinity, source: 'paid' };
+      }
+    } catch { /* fall through */ }
+
+    // Free tier: 20/day check via AiQuotaLog
+    await _ensureAiQuotaTable();
+    const pool = _getPool();
+    const userKey = decoded.sub || decoded.userId || decoded.email;
+    const feature = 'ai_question_gen';
+
+    const { rows } = await pool.query(
+      `SELECT count FROM "AiQuotaLog"
+       WHERE user_id = $1 AND feature = $2 AND day = CURRENT_DATE`,
+      [userKey, feature]).catch(() => ({ rows: [] }));
+    const used = rows[0]?.count || 0;
+
+    if (used >= AI_GEN_QUOTA_DAILY) {
+      // Reset thời điểm: 00:00 mai
+      const tomorrow = new Date();
+      tomorrow.setHours(24, 0, 0, 0);
+      return {
+        allowed: false,
+        used, limit: AI_GEN_QUOTA_DAILY,
+        retryAt: tomorrow.toISOString(),
+      };
+    }
+
+    // Increment atomically
+    await pool.query(`
+      INSERT INTO "AiQuotaLog"(user_id, feature, day, count, updated_at)
+      VALUES ($1, $2, CURRENT_DATE, 1, NOW())
+      ON CONFLICT (user_id, feature, day) DO UPDATE
+        SET count = "AiQuotaLog".count + 1, updated_at = NOW()
+    `, [userKey, feature]);
+
+    return {
+      allowed: true,
+      used: used + 1,
+      limit: AI_GEN_QUOTA_DAILY,
+      remaining: AI_GEN_QUOTA_DAILY - used - 1,
+      source: 'free',
+    };
+  }
+
+  app.post('/api/ai/generate-questions', async (req, res) => {
     const startedAt = Date.now();
     try {
+      // ── AUTH: cần login (any role nhưng nhắm GV/Admin) ──
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'unauthorized', message: 'Đăng nhập trước khi dùng AI' });
+      }
+      let decoded;
+      try { decoded = _akVerify(auth.slice(7)); }
+      catch { return res.status(401).json({ error: 'invalid_token', message: 'Token không hợp lệ' }); }
+
+      // ── QUOTA: free GV 20/day, ADMIN + pro unlimited ──
+      const quotaCheck = await _checkAiQuestionGenQuota(decoded);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          error: 'quota_exceeded',
+          message: `Đã dùng hết ${quotaCheck.limit} lượt sinh câu hỏi AI miễn phí hôm nay. Reset lúc 0h00 mai.`,
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          retryAt: quotaCheck.retryAt,
+          upgradeUrl: '/payment',
+        });
+      }
+
       const body = req.body || {};
       const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
       if (!topic || topic.length < 3) {
@@ -4413,19 +4522,23 @@ if (USE_NODEJS_QUESTIONS) {
 
       const system = buildQuestionGenPrompt();
       const userMsg = buildQuestionGenUserMsg(topic, opts);
-      const maxTokens = parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4000', 10);
+      const maxTokens = parseInt(process.env.AI_GEN_MAX_TOKENS || '4000', 10);
 
-      // Provider routing — same pattern như ai-tutor
-      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
-      const useDeepseek = (prefProvider === 'deepseek' && process.env.DEEPSEEK_API_KEY) ||
-                          (!process.env.ANTHROPIC_API_KEY && process.env.DEEPSEEK_API_KEY);
-
+      // ── DEEPSEEK PRIMARY (user yêu cầu cụ thể) ──
+      // Anthropic chỉ fallback nếu DeepSeek down VÀ không có DEEPSEEK_API_KEY.
       let rawText = '';
       let provider = '';
       let model = '';
       let usage = null;
 
-      if (useDeepseek) {
+      if (!process.env.DEEPSEEK_API_KEY) {
+        return res.status(503).json({
+          error: 'deepseek_not_configured',
+          message: 'Tính năng AI ra đề cần DEEPSEEK_API_KEY (admin cấu hình).',
+        });
+      }
+
+      try {
         const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
         const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
@@ -4453,32 +4566,14 @@ if (USE_NODEJS_QUESTIONS) {
         provider = 'deepseek';
         model = dsModel;
         usage = dsJson.usage || null;
-      } else {
-        // Anthropic Claude
-        let client;
-        try { client = getAnthropic(); }
-        catch (err) {
-          return res.status(503).json({
-            error: 'ai_unavailable',
-            message: 'AI chưa cấu hình (ANTHROPIC_API_KEY hoặc DEEPSEEK_API_KEY).',
-          });
-        }
-        const completion = await client.messages.create({
-          model: AI_TUTOR_MODEL,
-          max_tokens: maxTokens,
-          system,
-          messages: [{ role: 'user', content: userMsg }],
+      } catch (deepseekErr) {
+        // DeepSeek fail → log + 503 (KHÔNG fallback Claude vì user yêu cầu rõ ràng dùng DeepSeek)
+        console.error('[ai:generate-questions] DeepSeek error:', deepseekErr.message);
+        return res.status(503).json({
+          error: 'deepseek_unavailable',
+          message: 'DeepSeek API tạm thời không phản hồi. Thử lại sau ít phút.',
+          detail: deepseekErr.message.slice(0, 200),
         });
-        if (Array.isArray(completion.content)) {
-          for (const block of completion.content) {
-            if (block && block.type === 'text' && typeof block.text === 'string') {
-              rawText += block.text;
-            }
-          }
-        }
-        provider = 'anthropic';
-        model = completion.model || AI_TUTOR_MODEL;
-        usage = completion.usage || null;
       }
 
       const parsed = extractJson(rawText);
@@ -4493,7 +4588,10 @@ if (USE_NODEJS_QUESTIONS) {
 
       const questions = parsed.questions.filter(q => q && typeof q.content === 'string');
       const latencyMs = Date.now() - startedAt;
-      console.log(`[ai:generate-questions] ok provider=${provider} count=${questions.length} latency=${latencyMs}ms`);
+      const quotaInfo = quotaCheck.source === 'free'
+        ? `used=${quotaCheck.used}/${quotaCheck.limit}`
+        : quotaCheck.source;
+      console.log(`[ai:generate-questions] ok provider=${provider} count=${questions.length} latency=${latencyMs}ms quota=${quotaInfo}`);
 
       return res.json({
         questions,
@@ -4503,6 +4601,12 @@ if (USE_NODEJS_QUESTIONS) {
         model,
         usage,
         latencyMs,
+        quota: {
+          used: quotaCheck.used,
+          limit: quotaCheck.limit === Infinity ? null : quotaCheck.limit,
+          remaining: quotaCheck.remaining === Infinity ? null : quotaCheck.remaining,
+          source: quotaCheck.source,  // 'admin' | 'paid' | 'free'
+        },
       });
     } catch (err) {
       const status = err && err.status ? err.status : 500;
@@ -4510,6 +4614,53 @@ if (USE_NODEJS_QUESTIONS) {
       return res.status(status >= 400 && status < 600 ? status : 500).json({
         error: 'ai_error',
         message: err.message || 'Lỗi gọi AI sinh câu hỏi',
+      });
+    }
+  });
+
+  // GET /api/ai/generate-questions/quota — FE check quota trước khi gen
+  // để hiển thị "Còn N/20 lượt hôm nay" trong UI
+  app.get('/api/ai/generate-questions/quota', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized' });
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { return res.status(401).json({ error: 'invalid_token' }); }
+
+    try {
+      // Admin
+      if (decoded.role === 'ADMIN') {
+        return res.json({ used: 0, limit: null, remaining: null, source: 'admin', unlimited: true });
+      }
+      // Paid plan
+      const userKey = decoded.sub || decoded.userId || decoded.email;
+      const entitlements = require('./lib/entitlements.cjs');
+      const hasPaid = await entitlements.hasFeature(userKey, 'quiz_generate').catch(() => false);
+      if (hasPaid) {
+        return res.json({ used: 0, limit: null, remaining: null, source: 'paid', unlimited: true });
+      }
+      // Free — query AiQuotaLog
+      await _ensureAiQuotaTable();
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT count FROM "AiQuotaLog"
+         WHERE user_id = $1 AND feature = 'ai_question_gen' AND day = CURRENT_DATE`,
+        [userKey]).catch(() => ({ rows: [] }));
+      const used = rows[0]?.count || 0;
+      const tomorrow = new Date(); tomorrow.setHours(24, 0, 0, 0);
+      return res.json({
+        used,
+        limit: AI_GEN_QUOTA_DAILY,
+        remaining: Math.max(0, AI_GEN_QUOTA_DAILY - used),
+        source: 'free',
+        unlimited: false,
+        resetAt: tomorrow.toISOString(),
+      });
+    } catch (e) {
+      return res.json({
+        used: 0, limit: AI_GEN_QUOTA_DAILY,
+        remaining: AI_GEN_QUOTA_DAILY, source: 'free', unlimited: false,
+        error: e.message,
       });
     }
   });
