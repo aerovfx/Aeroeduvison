@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ALL_SIMS } from './r3f'
 import {
   ArrowLeft, Box, Atom, Beaker, Orbit, Waves, Zap,
@@ -624,7 +624,10 @@ function UserSandboxEditor({
 // ─────────────────────────────────────────────
 export default function AuraPage() {
   const navigate = useNavigate()
-  const [activeSim, setActiveSim] = useState<string | null>(null)
+  const { simId } = useParams<{ simId: string }>()
+  // User: "thêm route cho các giả lập trong /dashboard/aura"
+  // → Sync activeSim ↔ URL param: /dashboard/aura/:simId
+  const [activeSim, setActiveSim] = useState<string | null>(simId ?? null)
   const [userSandboxes, setUserSandboxes] = useState<UserSandbox[]>([])
   const [editingUserSandbox, setEditingUserSandbox] = useState<UserSandbox | null>(null)
   const [saved, setSaved] = useState(false)
@@ -632,6 +635,27 @@ export default function AuraPage() {
   useEffect(() => {
     setUserSandboxes(loadUserSandboxes())
   }, [])
+
+  // Sync URL → state (khi user vào /dashboard/aura/:simId hoặc back/forward)
+  useEffect(() => {
+    setActiveSim(simId ?? null)
+    // Khi simId thay đổi và là user sandbox → tự load
+    if (simId && simId.startsWith('user-')) {
+      const userSb = loadUserSandboxes().find((s) => s.id === simId)
+      if (userSb) setEditingUserSandbox({ ...userSb, files: userSb.files.map((f) => ({ ...f })) })
+    } else {
+      setEditingUserSandbox(null)
+    }
+  }, [simId])
+
+  // Wrap setActiveSim to also navigate URL (single source of truth = URL)
+  const goSim = useCallback((id: string | null) => {
+    if (id) {
+      navigate(`/dashboard/aura/${id}`)
+    } else {
+      navigate('/dashboard/aura')
+    }
+  }, [navigate])
 
   // User: "có nút back để dễ dàng trở lại giao diện chính thức khi đang ở trong các mô phỏng"
   // ESC để thoát mô phỏng nhanh (rất hữu ích khi sim đang fullscreen pointer-locked)
@@ -642,7 +666,7 @@ export default function AuraPage() {
         // Nếu sim đang pointer-locked (vd FPV drone) thì ESC sẽ unlock trước
         // Pressing ESC again sẽ trigger handler này → thoát về catalog
         if (!document.pointerLockElement) {
-          setActiveSim(null)
+          goSim(null)
           setEditingUserSandbox(null)
         }
       }
@@ -664,13 +688,13 @@ export default function AuraPage() {
     setUserSandboxes(updated)
     saveUserSandboxes(updated)
     setEditingUserSandbox(newSandbox)
-    setActiveSim(id)
-  }, [userSandboxes])
+    goSim(id)
+  }, [userSandboxes, goSim])
 
   const openUserSandbox = useCallback((sandbox: UserSandbox) => {
     setEditingUserSandbox({ ...sandbox, files: sandbox.files.map(f => ({ ...f })) })
-    setActiveSim(sandbox.id)
-  }, [])
+    goSim(sandbox.id)
+  }, [goSim])
 
   const handleSave = useCallback(() => {
     if (!editingUserSandbox) return
@@ -690,9 +714,9 @@ export default function AuraPage() {
   }, [userSandboxes])
 
   const handleBack = useCallback(() => {
-    setActiveSim(null)
+    goSim(null)
     setEditingUserSandbox(null)
-  }, [])
+  }, [goSim])
 
   // ── USER SANDBOX EDITING VIEW ──
   if (editingUserSandbox && activeSim?.startsWith('user-')) {
@@ -718,7 +742,7 @@ export default function AuraPage() {
           {/* Top bar — prominent navigation */}
           <div className="px-4 py-2.5 border-b border-white/10 shrink-0 flex items-center gap-2 bg-[#0a0a0f]/95 backdrop-blur-md sticky top-0 z-20">
             <button
-              onClick={() => setActiveSim(null)}
+              onClick={() => goSim(null)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 transition-all"
               title="Quay lại danh sách mô phỏng (ESC)"
             >
@@ -754,7 +778,7 @@ export default function AuraPage() {
 
           {/* Floating exit button — ALWAYS visible on bottom-left, ngay cả khi sim fullscreen */}
           <button
-            onClick={() => setActiveSim(null)}
+            onClick={() => goSim(null)}
             className="fixed bottom-4 left-4 z-50 group flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-white bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400/60 transition-all shadow-lg hover:shadow-cyan-500/20"
             title="Thoát mô phỏng (ESC)"
             style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
@@ -832,7 +856,7 @@ export default function AuraPage() {
           <span>★</span> Featured Sandbox
         </h2>
         <button
-          onClick={() => setActiveSim('fpv-drone-vr')}
+          onClick={() => goSim('fpv-drone-vr')}
           className="group w-full text-left rounded-2xl overflow-hidden relative transition-all duration-300 hover:scale-[1.005]"
           style={{
             background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 50%, rgba(6,182,212,0.18) 100%)',
@@ -964,7 +988,7 @@ export default function AuraPage() {
             return (
               <button
                 key={sim.id}
-                onClick={() => setActiveSim(sim.id)}
+                onClick={() => goSim(sim.id)}
                 className="group text-left p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300"
               >
                 <div className="flex items-start justify-between mb-3">

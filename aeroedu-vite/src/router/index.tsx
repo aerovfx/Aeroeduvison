@@ -382,6 +382,7 @@ export function AppRouter() {
             {/* Dashboard pages chưa port → PageFallback */}
             <Route path="/dashboard/ai-content-generator" element={<PageFallback />} />
             <Route path="/dashboard/aura"                  element={<AuraPage />} />
+            <Route path="/dashboard/aura/:simId"           element={<AuraPage />} />
             <Route path="/dashboard/change-password"       element={<PageFallback />} />
             <Route path="/dashboard/competition"           element={<PageFallback />} />
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
