@@ -10261,14 +10261,169 @@ app.get('/api/teacher/exams', async (req, res) => {
   try {
     const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
-    const where = _examListWhere(req.query.scope || 'mine');
-    const { rows } = await pool.query(
-      `SELECT *, (teacher_id = ANY($1::text[])) AS is_owner FROM "Exam"
-       WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [myIds]);
-    const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
-    return res.json({ exams, total: exams.length });
+    // scope = 'mine' | 'public' | 'all' (default 'mine' để compat)
+    // 'all' = đề của tôi + đề public từ GV khác (cộng đồng)
+    const scope = String(req.query.scope || 'mine');
+    const where = _examListWhere(scope);
+    // Enrich với teacher info + community stats (attempts + avg score từ PracticeExam)
+    const { rows } = await pool.query(`
+      SELECT e.*,
+             (e.teacher_id = ANY($1::text[])) AS is_owner,
+             u.name AS author_name, u.email AS author_email, u.image AS author_image,
+             COALESCE(ps.attempts, 0)::int AS attempts,
+             COALESCE(ps.unique_students, 0)::int AS unique_students,
+             COALESCE(ps.avg_score, 0)::int AS avg_score
+      FROM "Exam" e
+      LEFT JOIN "User" u ON u.id = COALESCE(e.teacher_id, e."userId"::text)
+      LEFT JOIN (
+        SELECT exam_id, COUNT(*) AS attempts,
+               COUNT(DISTINCT "studentId") AS unique_students,
+               ROUND(AVG(NULLIF(percentage, 0))) AS avg_score
+        FROM (
+          SELECT pe.*,
+                 COALESCE((pe.questions->0->>'exam_id')::text,
+                          pe.subject || ':' || pe.grade) AS exam_id
+          FROM "PracticeExam" pe WHERE pe.completed
+        ) sub
+        GROUP BY exam_id
+      ) ps ON ps.exam_id = e.id
+      WHERE ${where}
+      ORDER BY e.created_at DESC LIMIT 500`, [myIds]).catch(async (err) => {
+        // Fallback nếu PracticeExam có shape khác → query không enrich
+        console.warn('[teacher-exams:list] enriched query failed:', err.message.slice(0, 100));
+        return pool.query(`
+          SELECT e.*,
+                 (e.teacher_id = ANY($1::text[])) AS is_owner,
+                 u.name AS author_name, u.email AS author_email, u.image AS author_image,
+                 0 AS attempts, 0 AS unique_students, 0 AS avg_score
+          FROM "Exam" e
+          LEFT JOIN "User" u ON u.id = COALESCE(e.teacher_id, e."userId"::text)
+          WHERE ${where}
+          ORDER BY e.created_at DESC LIMIT 500`, [myIds]);
+      });
+    const exams = rows.map(r => ({
+      ...r,
+      visibility: r.visibility || 'private',
+      isOwner: !!r.is_owner,
+      authorName: r.author_name || 'Chưa rõ',
+      authorEmail: r.author_email || null,
+      authorImage: r.author_image || null,
+      attempts: Number(r.attempts) || 0,
+      uniqueStudents: Number(r.unique_students) || 0,
+      avgScore: Number(r.avg_score) || 0,
+    }));
+    return res.json({ exams, total: exams.length, scope });
   } catch (e) { console.error('[teacher-exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
 });
+
+// ── /api/exams/community-stats — bảng vinh danh ──
+// Top đề được làm nhiều nhất + Top GV có đề được đánh giá cao
+;(() => {
+  app.get('/api/exams/community-stats', async (req, res) => {
+    // Public endpoint — bất kỳ ai cũng xem được (không leak điểm cá nhân)
+    try {
+      const pool = _getPool();
+      const limit = Math.max(5, Math.min(50, parseInt(String(req.query.limit || '10'), 10) || 10));
+
+      const [mostAttemptedR, topTeachersR, summaryR] = await Promise.all([
+        // TOP đề được làm nhiều nhất — JOIN Exam + PracticeExam.subject (proxy)
+        // PracticeExam không có exam_id column, dùng subject+grade làm proxy
+        // Đổi qua: aggregate PracticeExam.subject + grade rồi match với Exam có
+        // cùng subject. Fallback subject-only match nếu không có grade.
+        pool.query(`
+          WITH practice_agg AS (
+            SELECT subject, grade,
+                   COUNT(*)::int AS attempts,
+                   COUNT(DISTINCT "studentId")::int AS unique_students,
+                   ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
+            FROM "PracticeExam" WHERE completed
+            GROUP BY subject, grade
+          )
+          SELECT e.id, e.title, e.subject, e.grade,
+                 jsonb_array_length(COALESCE(e.question_ids, '[]'::jsonb)) AS question_count,
+                 pa.attempts, pa.unique_students, pa.avg_score,
+                 u.id AS teacher_id, u.name AS teacher_name, u.image AS teacher_image
+          FROM "Exam" e
+          LEFT JOIN practice_agg pa ON pa.subject = e.subject AND COALESCE(pa.grade, '') = COALESCE(e.grade, '')
+          LEFT JOIN "User" u ON u.id = COALESCE(e.teacher_id, e."userId"::text)
+          WHERE pa.attempts > 0
+          ORDER BY pa.attempts DESC LIMIT $1`, [limit])
+          .catch(() => ({ rows: [] })),
+
+        // TOP GV — sum attempts + avg score cho TẤT CẢ đề của GV
+        pool.query(`
+          WITH practice_subjects AS (
+            SELECT subject, grade,
+                   COUNT(*)::int AS attempts,
+                   ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
+            FROM "PracticeExam" WHERE completed
+            GROUP BY subject, grade
+          ),
+          teacher_stats AS (
+            SELECT COALESCE(e.teacher_id, e."userId"::text) AS tid,
+                   COUNT(DISTINCT e.id)::int AS exam_count,
+                   SUM(COALESCE(ps.attempts, 0))::int AS total_attempts,
+                   ROUND(AVG(NULLIF(ps.avg_score, 0)))::int AS avg_score
+            FROM "Exam" e
+            LEFT JOIN practice_subjects ps
+              ON ps.subject = e.subject AND COALESCE(ps.grade, '') = COALESCE(e.grade, '')
+            GROUP BY COALESCE(e.teacher_id, e."userId"::text)
+          )
+          SELECT u.id, u.name, u.email, u.image,
+                 ts.exam_count, ts.total_attempts, ts.avg_score
+          FROM teacher_stats ts
+          JOIN "User" u ON u.id = ts.tid
+          WHERE ts.total_attempts > 0
+          ORDER BY ts.total_attempts DESC, ts.avg_score DESC NULLS LAST
+          LIMIT $1`, [limit]).catch(() => ({ rows: [] })),
+
+        // Summary
+        pool.query(`
+          SELECT
+            (SELECT COUNT(*) FROM "Exam")::int AS total_exams,
+            (SELECT COUNT(*) FROM "Exam" WHERE visibility = 'public')::int AS public_exams,
+            (SELECT COUNT(DISTINCT COALESCE(teacher_id, "userId"::text)) FROM "Exam")::int AS contributing_teachers,
+            (SELECT COUNT(*) FROM "PracticeExam" WHERE completed)::int AS total_attempts,
+            (SELECT COUNT(DISTINCT "studentId") FROM "PracticeExam" WHERE completed)::int AS active_students,
+            (SELECT ROUND(AVG(NULLIF(percentage, 0)))::int FROM "PracticeExam" WHERE completed) AS avg_score
+        `).catch(() => ({ rows: [{ total_exams: 0, public_exams: 0, contributing_teachers: 0,
+                                     total_attempts: 0, active_students: 0, avg_score: 0 }] })),
+      ]);
+
+      return res.json({
+        mostAttempted: mostAttemptedR.rows.map(r => ({
+          id: r.id,
+          title: r.title,
+          subject: r.subject,
+          grade: r.grade,
+          questionCount: Number(r.question_count) || 0,
+          attempts: Number(r.attempts) || 0,
+          uniqueStudents: Number(r.unique_students) || 0,
+          avgScore: Number(r.avg_score) || 0,
+          teacher: r.teacher_id ? {
+            id: r.teacher_id,
+            name: r.teacher_name || 'Chưa rõ',
+            image: r.teacher_image || null,
+          } : null,
+        })),
+        topTeachers: topTeachersR.rows.map(r => ({
+          id: r.id,
+          name: r.name || 'Chưa rõ',
+          email: r.email,
+          image: r.image,
+          examCount: Number(r.exam_count) || 0,
+          totalAttempts: Number(r.total_attempts) || 0,
+          avgScore: Number(r.avg_score) || 0,
+        })),
+        summary: summaryR.rows[0] || {},
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error('[exams:community-stats]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+})();
 
 app.post('/api/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
