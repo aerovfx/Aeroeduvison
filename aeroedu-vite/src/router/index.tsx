@@ -99,6 +99,7 @@ const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
 // PythonLabsPage removed — flattened all sims into /dashboard/labtwin (LabsIndex)
 const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
 const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
+const CircularSHM        = lazy(() => import('@/pages/labs/CircularSHM'))
 const VideoTrackingLab   = lazy(() => import('@/pages/labs/VideoTracking'))
 const GeometryUnfoldLab  = lazy(() => import('@/pages/labs/GeometryUnfold'))
 const PixelOfficeRPGLab  = lazy(() => import('@/pages/labs/PixelOfficeRPG'))
@@ -408,6 +409,7 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs"                         element={<Navigate to="/dashboard/labtwin" replace />} />
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
             <Route path="/dashboard/labtwin/labs/fourier-epicycles"       element={<FourierEpicycles />} />
+            <Route path="/dashboard/labtwin/labs/circular-shm"            element={<CircularSHM />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />

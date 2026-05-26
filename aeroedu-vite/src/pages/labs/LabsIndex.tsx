@@ -177,6 +177,7 @@ const POPULAR_LABS: PopularLab[] = [
   // ── Toán & Trực quan (3) ──
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/labs/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
   { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/labs/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
+  { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/labs/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
   { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
   { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/labs/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
 
