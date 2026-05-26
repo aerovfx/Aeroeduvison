@@ -4285,6 +4285,101 @@ app.get('/api/teachers/all', async (req, res) => {
     } catch (e) { console.error('[stem-projects:patch]', e.message); return res.status(500).json({ error: e.message }); }
   });
 
+  // GET /api/teacher/stem-projects/:id/members-raw — diagnostic
+  // Trả TẤT CẢ rows trong StemProjectMember cho project — bất kể status.
+  // Cho phép GV xem rows có user_linked=false (User row bị xoá / id mismatch).
+  // User: "HS Aerovfx đã tham gia bằng QR nhưng giao diện GV chưa hiển thị"
+  app.get('/api/teacher/stem-projects/:id/members-raw', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.id, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV chủ dự án mới xem được' });
+      }
+      const { rows } = await pool.query(`
+        SELECT m.id, m.project_id, m.student_id, m.role, m.status, m.joined_at,
+               m.joined_via_token,
+               u.name, u.email, u.image, u.role AS user_role,
+               (u.id IS NOT NULL) AS user_linked
+        FROM "StemProjectMember" m
+        LEFT JOIN "User" u ON u.id = m.student_id
+        WHERE m.project_id = $1
+        ORDER BY m.joined_at DESC
+      `, [req.params.id]);
+      return res.json({
+        items: rows,
+        total: rows.length,
+        active: rows.filter(r => r.status === 'active').length,
+        linked: rows.filter(r => r.user_linked).length,
+      });
+    } catch (e) {
+      console.error('[stem:members-raw]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/teacher/stem-projects/:id/members/:memberId/reactivate
+  // GV bấm "Kích hoạt lại" cho member bị status=inactive/null
+  app.post('/api/teacher/stem-projects/:id/members/:memberId/reactivate', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.id, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV chủ dự án mới làm được' });
+      }
+      const { rowCount } = await pool.query(
+        `UPDATE "StemProjectMember" SET status = 'active'
+         WHERE id = $1 AND project_id = $2`,
+        [req.params.memberId, req.params.id]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy member' });
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error('[stem:reactivate]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/teacher/stem-projects/:id/members/manual
+  // GV add member thủ công bằng email HS (cho trường hợp QR không hoạt động)
+  app.post('/api/teacher/stem-projects/:id/members/manual', async (req, res) => {
+    const decoded = stemAuth(req, res); if (!decoded) return;
+    try {
+      await _ensureStemTables();
+      const pool = _getPool();
+      const myIds = stemMyIds(decoded);
+      if (!await _verifyTeacherOwnsProject(pool, req.params.id, myIds)) {
+        return res.status(403).json({ error: 'Chỉ GV chủ dự án mới thêm member' });
+      }
+      const email = String((req.body || {}).email || '').trim().toLowerCase();
+      if (!email) return res.status(400).json({ error: 'Cần email HS' });
+      const { rows: users } = await pool.query(
+        `SELECT id, name, email, image FROM "User" WHERE lower(email) = $1 LIMIT 1`,
+        [email]
+      );
+      if (!users.length) return res.status(404).json({ error: `Không tìm thấy HS có email "${email}"` });
+      const student = users[0];
+      const { randomUUID } = require('crypto');
+      const r = await pool.query(`
+        INSERT INTO "StemProjectMember"(id, project_id, student_id, status, joined_via_token)
+        VALUES ($1, $2, $3, 'active', 'manual')
+        ON CONFLICT (project_id, student_id) DO UPDATE SET status = 'active'
+        RETURNING *, (xmax = 0) AS is_new
+      `, [randomUUID(), req.params.id, student.id]);
+      return res.json({
+        ok: true, member: r.rows[0],
+        student: { id: student.id, name: student.name, email: student.email, image: student.image },
+        message: r.rows[0].is_new ? `Đã thêm ${student.name || email} vào dự án` : `${student.name || email} đã là member — re-activated`,
+      });
+    } catch (e) {
+      console.error('[stem:add-manual]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // DELETE /api/teacher/stem-projects/:id
   app.delete('/api/teacher/stem-projects/:id', async (req, res) => {
     const decoded = stemAuth(req, res); if (!decoded) return;
@@ -4388,9 +4483,21 @@ app.get('/api/teachers/all', async (req, res) => {
     } catch (e) { console.error('[stem:invite-info]', e.message); return res.status(500).json({ valid: false, error: e.message }); }
   });
 
-  // POST /api/stem/invite/:token/join — HS join dự án qua link
+  // POST /api/stem/invite/:token/join — HS join dự án qua link/QR
+  // User: "Học sinh Aerovfx đã tham gia bằng QR code nhưng trong giao diện
+  //        stem giáo viên chưa hiện thị"
+  // FIX:
+  //   - decoded.sub có thể null → dùng fallback userId/id/email
+  //   - ON CONFLICT DO UPDATE status='active' để re-active row cũ nếu có
+  //   - Log chi tiết để debug
   app.post('/api/stem/invite/:token/join', async (req, res) => {
     const decoded = stemAuth(req, res); if (!decoded) return;
+    // Robust student id resolution — JWT có thể có sub HOẶC userId HOẶC id
+    const studentId = decoded.sub || decoded.userId || decoded.id || decoded.email;
+    if (!studentId) {
+      console.error('[stem:join] decoded thiếu identifier:', JSON.stringify(decoded).slice(0, 200));
+      return res.status(400).json({ error: 'Không xác định được tài khoản — thử logout/login lại' });
+    }
     try {
       await _ensureStemTables();
       const pool = _getPool();
@@ -4406,28 +4513,38 @@ app.get('/api/teachers/all', async (req, res) => {
 
       const { randomUUID } = require('crypto');
       const memberId = randomUUID();
-      // Insert ON CONFLICT DO NOTHING — không tăng used_count nếu HS đã join trước đó
-      const { rowCount } = await pool.query(`
-        INSERT INTO "StemProjectMember"(id, project_id, student_id, joined_via_token)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (project_id, student_id) DO NOTHING
-      `, [memberId, inv.project_id, decoded.sub, req.params.token]);
+      // ON CONFLICT DO UPDATE SET status='active' — đảm bảo nếu HS từng join
+      // rồi quit (status='inactive'), khi join lại sẽ re-activate.
+      // Trả về cả id để check rowCount + xMODE để biết là insert mới hay re-activate.
+      const r = await pool.query(`
+        INSERT INTO "StemProjectMember"(id, project_id, student_id, joined_via_token, status)
+        VALUES ($1, $2, $3, $4, 'active')
+        ON CONFLICT (project_id, student_id) DO UPDATE
+          SET status = 'active',
+              joined_via_token = COALESCE("StemProjectMember".joined_via_token, EXCLUDED.joined_via_token)
+        RETURNING id, status, joined_at, (xmax = 0) AS is_new
+      `, [memberId, inv.project_id, studentId, req.params.token]);
+      const memberRow = r.rows[0];
+      const isNew = memberRow && memberRow.is_new;
 
-      // Tăng used_count chỉ khi HS mới join
-      if (rowCount) {
+      // Tăng used_count chỉ khi HS mới join lần đầu
+      if (isNew) {
         await pool.query(
           `UPDATE "StemProjectInvite" SET used_count = used_count + 1 WHERE token = $1`,
           [req.params.token]
         );
       }
 
+      console.log(`[stem:join] student=${studentId.slice(0,12)} project=${inv.project_id.slice(0,8)} ${isNew ? 'NEW' : 'EXIST'}`);
+
       return res.json({
         ok: true, projectId: inv.project_id,
-        alreadyMember: rowCount === 0,
-        message: rowCount ? 'Đã tham gia dự án thành công' : 'Bạn đã là thành viên của dự án này',
+        memberId: memberRow ? memberRow.id : null,
+        alreadyMember: !isNew,
+        message: isNew ? 'Đã tham gia dự án thành công' : 'Bạn đã là thành viên — đã kích hoạt lại nếu cần',
       });
     } catch (e) {
-      console.error('[stem:invite-join]', e.message);
+      console.error('[stem:invite-join]', e.message, 'studentId=', studentId);
       return res.status(500).json({ error: e.message });
     }
   });
@@ -4802,11 +4919,20 @@ app.get('/api/teachers/all', async (req, res) => {
 
       const [project, members, tasks, logs, feedbacks, milestones] = await Promise.all([
         pool.query(`SELECT * FROM "StemProject" WHERE id = $1`, [req.params.id]),
+        // FIX 2026-05-26: Bỏ filter status='active' → hiện cả members có status null
+        // hoặc khác (vd join từ legacy bị mất default). User báo HS join QR nhưng
+        // không thấy → có thể do status NULL. Vẫn LEFT JOIN User để có name/image
+        // (nếu User row đã bị xoá hoặc student_id không khớp → fallback display).
         pool.query(`
-          SELECT m.*, u.name, u.email, u.image
+          SELECT m.*,
+                 COALESCE(u.name, 'HS ' || SUBSTRING(m.student_id, 1, 8)) AS name,
+                 u.email,
+                 u.image,
+                 (u.id IS NOT NULL) AS user_linked
           FROM "StemProjectMember" m
           LEFT JOIN "User" u ON u.id = m.student_id
-          WHERE m.project_id = $1 AND m.status = 'active'
+          WHERE m.project_id = $1
+            AND (m.status IS NULL OR m.status <> 'banned')
           ORDER BY m.joined_at DESC
         `, [req.params.id]),
         pool.query(`SELECT * FROM "StemTask" WHERE project_id = $1

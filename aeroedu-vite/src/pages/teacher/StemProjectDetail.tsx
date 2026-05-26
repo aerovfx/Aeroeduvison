@@ -26,7 +26,7 @@ interface Project {
   category: string; status: string; subject: string | null; grade: string | null;
   difficulty: string; created_at: string;
 }
-interface Member { id: string; student_id: string; name: string | null; email: string | null; image: string | null; joined_at: string }
+interface Member { id: string; student_id: string; name: string | null; email: string | null; image: string | null; joined_at: string; status?: string | null; user_linked?: boolean }
 interface Task {
   id: string; title: string; description: string | null;
   assigned_to: string[]; status: string; priority: string;
@@ -168,7 +168,8 @@ export default function StemProjectDetail() {
         {/* ── TAB CONTENT ── */}
         {tab === 'overview' && (
           <OverviewTab members={members} logs={logs.slice(0, 5)} feedbacks={feedbacks.slice(0, 5)}
-            milestones={milestones} isOwner={isOwner} />
+            milestones={milestones} isOwner={isOwner}
+            projectId={id || ''} onReload={reload} />
         )}
         {tab === 'tasks' && (
           <TasksTab tasks={tasks} members={members} isOwner={isOwner}
@@ -298,33 +299,129 @@ function Stat({ label, value, sub, icon: Icon, color }: {
 // ─────────────────────────────────────────────────────────────
 // Tabs
 // ─────────────────────────────────────────────────────────────
-function OverviewTab({ members, logs, feedbacks, milestones }: {
-  members: Member[]; logs: Log[]; feedbacks: Feedback[]; milestones: Milestone[]; isOwner: boolean
+function OverviewTab({ members, logs, feedbacks, milestones, isOwner, projectId, onReload }: {
+  members: Member[]; logs: Log[]; feedbacks: Feedback[]; milestones: Milestone[]; isOwner: boolean;
+  projectId: string; onReload: () => void;
 }) {
+  const [showAddManual, setShowAddManual] = useState(false)
+  const [manualEmail, setManualEmail] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const addManual = async () => {
+    if (!manualEmail.trim() || adding) return
+    setAdding(true)
+    try {
+      const { data } = await api.post<{ ok: boolean; message: string }>(
+        `/teacher/stem-projects/${projectId}/members/manual`,
+        { email: manualEmail.trim() }
+      )
+      toast.success(data.message)
+      setManualEmail('')
+      setShowAddManual(false)
+      onReload()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Không thêm được HS')
+    } finally {
+      setAdding(false)
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="rounded-2xl bg-card border border-border p-5">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Thành viên ({members.length})</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            Thành viên ({members.length})
+          </h3>
+          {isOwner && (
+            <button
+              onClick={() => setShowAddManual(!showAddManual)}
+              className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
+              title="Thêm HS thủ công bằng email (cho trường hợp QR/link không hoạt động)"
+            >
+              + Thêm HS bằng email
+            </button>
+          )}
+        </div>
+
+        {/* Manual add form */}
+        {showAddManual && (
+          <div className="mb-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-2">
+            <p className="text-[10px] text-emerald-300/80 font-bold uppercase tracking-wider">
+              📧 Add HS có sẵn tài khoản bằng email
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={manualEmail}
+                onChange={e => setManualEmail(e.target.value)}
+                placeholder="aerovfx@example.com"
+                className="flex-1 px-2 py-1.5 rounded bg-background border border-border text-sm"
+                onKeyDown={e => { if (e.key === 'Enter') addManual() }}
+              />
+              <button
+                onClick={addManual}
+                disabled={adding || !manualEmail.trim()}
+                className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"
+              >
+                {adding ? 'Đang thêm…' : 'Thêm'}
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Email phải khớp với tài khoản HS đã đăng ký inphysic.com
+            </p>
+          </div>
+        )}
+
         {members.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">Chưa có HS tham gia. Dùng nút "Mời HS" ở danh sách dự án.</p>
+          <div className="text-center py-6">
+            <p className="text-xs text-muted-foreground italic mb-2">Chưa có HS tham gia.</p>
+            <p className="text-[10px] text-muted-foreground">
+              HS có thể tham gia qua QR/link mời ở danh sách dự án,
+              hoặc bấm "Thêm HS bằng email" phía trên.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2 max-h-72 overflow-y-auto">
-            {members.map(m => (
-              <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                {m.image
-                  ? <img src={m.image} className="w-8 h-8 rounded-full object-cover" />
-                  : <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
-                      {(m.name || 'H')[0].toUpperCase()}
-                    </div>}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">{m.name || '(chưa đặt tên)'}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{m.email}</p>
+            {members.map(m => {
+              const isLinked = m.user_linked !== false  // default true if undefined
+              const isActive = !m.status || m.status === 'active'
+              return (
+                <div key={m.id}
+                  className={`flex items-center gap-3 p-2 rounded-lg ${
+                    isLinked && isActive ? 'bg-muted/30' : 'bg-amber-500/10 border border-amber-500/30'
+                  }`}>
+                  {m.image
+                    ? <img src={m.image} className="w-8 h-8 rounded-full object-cover" />
+                    : <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                        isLinked ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                      }`}>
+                        {(m.name || 'H')[0].toUpperCase()}
+                      </div>}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate flex items-center gap-1.5">
+                      {m.name || `HS ${m.student_id.slice(0, 8)}`}
+                      {!isLinked && (
+                        <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/30 text-amber-200" title="User row không tồn tại trong DB">
+                          ⚠ Không tìm thấy User
+                        </span>
+                      )}
+                      {!isActive && (
+                        <span className="text-[8px] px-1 py-0.5 rounded bg-rose-500/30 text-rose-200">
+                          {m.status}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {m.email || `id: ${m.student_id.slice(0, 16)}...`}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(m.joined_at).toLocaleDateString('vi-VN')}
+                  </span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(m.joined_at).toLocaleDateString('vi-VN')}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
