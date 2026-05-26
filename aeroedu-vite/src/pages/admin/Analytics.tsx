@@ -37,12 +37,24 @@ interface RouteRow {
   lastView: string
 }
 
+interface ActiveUser {
+  userId: string
+  userName: string | null
+  userImage: string | null
+  userRole: string | null
+  userEmail: string | null
+  currentPath: string
+  lastSeen: string
+  secondsAgo: number
+}
+
 interface RealtimeData {
   activeNow: number               // last 5 min (backward compat)
   activeLast30s?: number          // truly realtime
   activeLast1min?: number
   activeLast5min?: number
   activeUsers5min?: number        // logged-in only
+  activeUsers?: ActiveUser[]      // danh sách user đang online — name + path + thời gian
   recent: { path: string; userRole: string | null; userName?: string | null; userImage?: string | null; createdAt: string }[]
   byPath?: { path: string; viewers: number; lastView: string }[]
   timestamp?: string
@@ -851,6 +863,64 @@ export default function AdminAnalytics() {
                     <span className="ml-1.5 font-bold text-emerald-300">{p.viewers}</span>
                   </a>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* 👥 Logged-in users đang online — TÊN CỤ THỂ */}
+          {realtime.activeUsers && realtime.activeUsers.length > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-emerald-500/20">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/80 mb-2">
+                👥 {realtime.activeUsers.length} người dùng đã đăng nhập đang online:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                {realtime.activeUsers.map(u => {
+                  const fresh = u.secondsAgo <= 60
+                  const ringClass = fresh
+                    ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-emerald-900'
+                    : 'ring-1 ring-white/10'
+                  const dot = fresh ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'
+                  const ago = u.secondsAgo < 60 ? `${u.secondsAgo}s` : `${Math.floor(u.secondsAgo / 60)}p`
+                  return (
+                    <div
+                      key={u.userId}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] transition"
+                      title={`${u.userName || u.userEmail || u.userId} · ${u.currentPath} · ${ago} trước`}
+                    >
+                      <div className="relative shrink-0">
+                        {u.userImage ? (
+                          <img
+                            src={u.userImage}
+                            alt=""
+                            className={`w-7 h-7 rounded-full object-cover ${ringClass}`}
+                          />
+                        ) : (
+                          <div className={`w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-[11px] font-bold text-white ${ringClass}`}>
+                            {(u.userName || u.userEmail || '?')[0]?.toUpperCase()}
+                          </div>
+                        )}
+                        <span className={`absolute -bottom-0 -right-0 w-2.5 h-2.5 rounded-full border border-emerald-900 ${dot}`}></span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-white truncate">
+                          {u.userName || u.userEmail?.split('@')[0] || 'Vô danh'}
+                          {u.userRole === 'ADMIN' && (
+                            <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500/20 text-rose-300">ADMIN</span>
+                          )}
+                          {u.userRole === 'TEACHER' && (
+                            <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-bold bg-purple-500/20 text-purple-300">GV</span>
+                          )}
+                          {u.userRole === 'STUDENT' && (
+                            <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-bold bg-blue-500/20 text-blue-300">HS</span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-white/50 truncate font-mono">
+                          {u.currentPath} · {ago}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

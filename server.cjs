@@ -10913,6 +10913,57 @@ app.post('/api/analytics/pageview', async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════════
+// POST /api/analytics/heartbeat — track "alive" của user khi tab open
+// User: "hiện nay có 2 tài khoản đang login là vietchung và admin nhưng
+//        trong trang phân tích của admin không hiển thị được thông số đó"
+//
+// VẤN ĐỀ: PageView ghi 1 lần khi navigate route → nếu user mở tab + để yên
+// (không bấm gì) thì sau 5 phút sẽ rớt khỏi cửa sổ realtime → analytics
+// hiện 0 dù user đang online.
+//
+// FIX: FE gửi heartbeat mỗi 30s khi tab visible. BE upsert PageView row
+// đặc biệt với path='__heartbeat__'. Realtime endpoint:
+//   - INCLUDE __heartbeat__ trong active count → biết user còn online
+//   - EXCLUDE __heartbeat__ khỏi byPath/recent → không spam UI
+//
+// Dùng PageView (không tạo bảng mới) để tận dụng index/RBAC sẵn có.
+// Insert thường thay vì UPSERT để giữ history các tab khác nhau.
+// ════════════════════════════════════════════════════════════════════
+app.post('/api/analytics/heartbeat', async (req, res) => {
+  res.status(204).end(); // fire-and-forget
+  try {
+    const b = req.body || {};
+    const sessionId = b.sessionId ? String(b.sessionId).slice(0, 60) : null;
+    const path = b.path ? String(b.path).slice(0, 500) : '/';
+
+    let userId = null;
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
+    }
+
+    // Bỏ qua heartbeat anonymous không có session → noise
+    if (!userId && !sessionId) return;
+
+    const ua = String(req.headers['user-agent'] || '').slice(0, 500);
+    const parsed = _parseUA(ua);
+    const ipHash = _hashIp(_clientIp(req));
+
+    const pool = _getPool();
+    await pool.query(
+      `INSERT INTO "PageView"(
+         path, session_id, user_id, view_ms, referrer,
+         user_agent, device_type, os, browser, ip_hash
+       ) VALUES ($1,$2,$3,$4,$5, $6,$7,$8,$9,$10)`,
+      ['__heartbeat__', sessionId, userId, null, path,
+       ua || null, parsed.device, parsed.os, parsed.browser, ipHash]
+    );
+  } catch (e) {
+    if (Math.random() < 0.01) console.warn('[heartbeat]', e.message);
+  }
+});
+
 // ── Stub handlers cho Rust microservices offline ──────────
 // (aero-backend, teacher-service, reco-service đều ECONNREFUSED)
 // Trả empty payload thay vì 503 → UI hiện empty state, không lỗi đỏ.
@@ -14447,7 +14498,7 @@ app.get('/api/admin/analytics/realtime', async (req, res) => {
     //   - 3 cửa sổ: 30s (realtime), 1m, 5m
     //   - "recent" filter last 30 phút + enrich user name/image
     //   - "byPath" group page đang được xem nhiều nhất
-    const [activeStats, recent, byPath] = await Promise.all([
+    const [activeStats, recent, byPath, activeUsersList] = await Promise.all([
       // Multi-window active count, distinct user-or-session
       pool.query(`
         WITH norm AS (
@@ -14465,24 +14516,65 @@ app.get('/api/admin/analytics/realtime', async (req, res) => {
       `).catch(() => ({ rows: [{ last30s: 0, last1m: 0, last5m: 0, users5m: 0 }] })),
 
       // Recent activity feed — last 30 min, enrich user info
+      // Exclude __heartbeat__ — chỉ là ping nền, không phải hành động thật
       pool.query(`
         SELECT pv.path, pv.created_at AS "createdAt",
                u.role AS "userRole", u.name AS "userName", u.image AS "userImage"
         FROM "PageView" pv
         LEFT JOIN "User" u ON u.id = pv.user_id
         WHERE pv.created_at >= NOW() - INTERVAL '30 minute'
+          AND pv.path <> '__heartbeat__'
         ORDER BY pv.created_at DESC LIMIT 20
       `).catch(() => ({ rows: [] })),
 
       // Pages being viewed right now (last 5min) — top 10
+      // Heartbeat path là background ping, không hiện trong "đang được xem"
       pool.query(`
         SELECT pv.path,
                COUNT(DISTINCT COALESCE(pv.user_id, pv.session_id, pv.ip_hash))::int AS viewers,
                MAX(pv.created_at) AS "lastView"
         FROM "PageView" pv
         WHERE pv.created_at >= NOW() - INTERVAL '5 minute'
+          AND pv.path <> '__heartbeat__'
         GROUP BY pv.path
         ORDER BY viewers DESC, "lastView" DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
+
+      // Logged-in users đang online (last 5 min) — danh sách user_id + name
+      // User: muốn biết CỤ THỂ "vietchung" và "admin" đang online (không chỉ count)
+      // Group by user_id để 1 user mở nhiều tab vẫn chỉ hiện 1 lần.
+      // Trang đang xem = path gần nhất KHÔNG phải heartbeat.
+      pool.query(`
+        WITH user_latest AS (
+          SELECT pv.user_id,
+                 MAX(pv.created_at) AS last_seen
+          FROM "PageView" pv
+          WHERE pv.created_at >= NOW() - INTERVAL '5 minute'
+            AND pv.user_id IS NOT NULL
+          GROUP BY pv.user_id
+        ),
+        user_path AS (
+          SELECT DISTINCT ON (pv.user_id)
+                 pv.user_id, pv.path
+          FROM "PageView" pv
+          WHERE pv.created_at >= NOW() - INTERVAL '5 minute'
+            AND pv.user_id IS NOT NULL
+            AND pv.path <> '__heartbeat__'
+          ORDER BY pv.user_id, pv.created_at DESC
+        )
+        SELECT ul.user_id     AS "userId",
+               u.name         AS "userName",
+               u.image        AS "userImage",
+               u.role         AS "userRole",
+               u.email        AS "userEmail",
+               COALESCE(up.path, '/') AS "currentPath",
+               ul.last_seen   AS "lastSeen",
+               EXTRACT(EPOCH FROM (NOW() - ul.last_seen))::int AS "secondsAgo"
+        FROM user_latest ul
+        LEFT JOIN "User" u ON u.id = ul.user_id
+        LEFT JOIN user_path up ON up.user_id = ul.user_id
+        ORDER BY ul.last_seen DESC
+        LIMIT 50
       `).catch(() => ({ rows: [] })),
     ]);
 
@@ -14493,13 +14585,14 @@ app.get('/api/admin/analytics/realtime', async (req, res) => {
       activeLast1min: s.last1m || 0,
       activeLast5min: s.last5m || 0,
       activeUsers5min: s.users5m || 0,    // logged-in only
+      activeUsers: activeUsersList.rows,  // [{ userId, userName, currentPath, secondsAgo, ... }]
       recent: recent.rows,
       byPath: byPath.rows,                // top pages being viewed
       timestamp: new Date().toISOString(),
     });
   } catch (e) {
     console.error('[admin:realtime]', e.message);
-    return res.json({ activeNow: 0, recent: [], byPath: [] });
+    return res.json({ activeNow: 0, activeUsers: [], recent: [], byPath: [] });
   }
 });
 

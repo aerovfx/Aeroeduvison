@@ -142,4 +142,56 @@ export function usePageTracking() {
     })
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
+
+  // ── Heartbeat: ping mỗi 30s khi tab visible ─────────────────────
+  // User: "có 2 tài khoản đang login là vietchung và admin nhưng trong
+  // trang phân tích của admin không hiển thị được thông số đó"
+  //
+  // VẤN ĐỀ: PageView chỉ ghi khi navigate. User để tab idle 5 phút sẽ
+  // rớt khỏi cửa sổ realtime → admin thấy 0 dù user vẫn online.
+  //
+  // FIX: ping POST /api/analytics/heartbeat mỗi 30s (chỉ khi tab visible
+  // + đã login). BE insert PageView path='__heartbeat__' (loại khỏi byPath/
+  // recent, chỉ tính vào active count).
+  useEffect(() => {
+    let timerId: number | null = null
+
+    const ping = () => {
+      // Chỉ ping khi tab visible
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const token = sessionStorage.getItem('aeroedu_access_token')
+      // Chỉ ping cho user đã login (anonymous đã có PageView khi navigate)
+      if (!token) return
+      try {
+        fetch('/api/analytics/heartbeat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            sessionId: getSessionId(),
+            path: location.pathname + location.search,
+          }),
+          keepalive: true,
+          credentials: 'include',
+        }).catch(() => { /* silent — analytics không fail UX */ })
+      } catch { /* never throw */ }
+    }
+
+    // Ping ngay khi mount + sau đó mỗi 30s
+    ping()
+    timerId = window.setInterval(ping, 30_000)
+
+    // Ping khi tab visible trở lại (user switch tab về)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVis)
+
+    return () => {
+      if (timerId != null) window.clearInterval(timerId)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [location.pathname, location.search])
 }
