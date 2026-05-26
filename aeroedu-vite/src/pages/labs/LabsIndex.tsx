@@ -172,6 +172,7 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Con lắc đơn',        emoji: '⚖️', path: '/dashboard/labtwin/simple-pendulum',    desc: 'Chu kỳ T = 2π√(l/g)',          accent: 'emerald',  group: 'physics' },
   { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
   { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
+  { name: 'Giao thoa Young',    emoji: '💡', path: '/dashboard/labtwin/young-double-slit',  desc: 'Ánh sáng đơn sắc qua 2 khe hẹp', accent: 'fuchsia',  group: 'physics' },
 
   // ── Toán & Trực quan (3) ──
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },

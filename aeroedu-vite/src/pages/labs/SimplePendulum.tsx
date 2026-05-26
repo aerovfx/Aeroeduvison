@@ -49,9 +49,11 @@ function draw(
 ) {
   ctx.clearRect(0, 0, W, H)
 
-  const pivotX = W * 0.38
-  const pivotY = H * 0.12
-  const rodLen = Math.min(H * 0.55, params.length * 160)
+  const pivotX = W * 0.36
+  // Pivot near top to give max vertical space for rod
+  const pivotY = H * 0.08
+  // Longer rod: scale by length factor 240 (was 160) + use up to 78% of H
+  const rodLen = Math.min(H * 0.78, params.length * 240)
   const bobX = pivotX + rodLen * Math.sin(theta)
   const bobY = pivotY + rodLen * Math.cos(theta)
   const bobR = 18
@@ -89,20 +91,42 @@ function draw(
   ctx.lineTo(bobX, bobY)
   ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 3; ctx.stroke()
 
-  // ── Angle arc ──
-  if (Math.abs(theta) > 0.05) {
-    ctx.beginPath()
-    ctx.arc(pivotX, pivotY, 40, Math.PI / 2 - 0.05, Math.PI / 2 + theta, theta < 0)
-    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2; ctx.stroke()
-    ctx.fillStyle = '#fbbf24'; ctx.font = '11px monospace'
-    ctx.fillText(`θ=${(theta * 180 / Math.PI).toFixed(1)}°`, pivotX + 44, pivotY + 14)
-  }
-
-  // ── Vertical reference ──
+  // ── Vertical reference (vẽ TRƯỚC angle arc để arc nằm trên) ──
   ctx.setLineDash([4, 4])
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1
+  ctx.strokeStyle = 'rgba(148,163,184,0.4)'; ctx.lineWidth = 1.5
   ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(pivotX, pivotY + rodLen + 10); ctx.stroke()
   ctx.setLineDash([])
+
+  // ── Angle arc FIX ──
+  // Canvas Y-down: rod's screen angle from positive x = atan2(cosθ, sinθ) = π/2 - θ
+  // Vertical down = π/2. Arc từ rod hiện tại (π/2 - θ) đến vertical (π/2).
+  // - θ > 0 (right): rod angle < π/2, vẽ ngược chiều kim đồng hồ (counterclockwise=true)
+  // - θ < 0 (left):  rod angle > π/2, vẽ thuận kim đồng hồ (counterclockwise=false)
+  if (Math.abs(theta) > 0.02) {
+    const arcR = Math.min(50, rodLen * 0.22)
+    ctx.beginPath()
+    ctx.arc(pivotX, pivotY, arcR, Math.PI / 2 - theta, Math.PI / 2, theta > 0)
+    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5; ctx.stroke()
+
+    // Fill arc area lightly to show angle region
+    ctx.beginPath()
+    ctx.moveTo(pivotX, pivotY)
+    ctx.arc(pivotX, pivotY, arcR, Math.PI / 2 - theta, Math.PI / 2, theta > 0)
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(251,191,36,0.12)'
+    ctx.fill()
+
+    // Label θ — đặt giữa cung
+    const labelAngle = Math.PI / 2 - theta / 2
+    const labelR = arcR + 14
+    const lx = pivotX + labelR * Math.cos(labelAngle)
+    const ly = pivotY + labelR * Math.sin(labelAngle)
+    ctx.fillStyle = '#fbbf24'
+    ctx.font = 'bold 13px monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`θ=${(theta * 180 / Math.PI).toFixed(1)}°`, lx, ly)
+  }
 
   // ── Bob ──
   const bobGrd = ctx.createRadialGradient(bobX - 5, bobY - 5, 2, bobX, bobY, bobR)
@@ -205,9 +229,9 @@ export default function SimplePendulumLab() {
       if (runRef.current) {
         const next = rk4(s, p, 0.016)
         Object.assign(s, next)
-        const pivotX = canvas.width * 0.38
-        const pivotY = canvas.height * 0.12
-        const rodLen = Math.min(canvas.height * 0.55, p.length * 160)
+        const pivotX = canvas.width * 0.36
+        const pivotY = canvas.height * 0.08
+        const rodLen = Math.min(canvas.height * 0.78, p.length * 240)
         trailRef.current.push({ x: pivotX + rodLen * Math.sin(s.theta), y: pivotY + rodLen * Math.cos(s.theta) })
         if (trailRef.current.length > 80) trailRef.current.shift()
         thetaHistRef.current.push(s.theta)

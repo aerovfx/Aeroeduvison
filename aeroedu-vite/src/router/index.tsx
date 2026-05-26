@@ -130,6 +130,7 @@ const MomentumCollision  = lazy(() => import('@/pages/labs/MomentumCollision'))
 const ProjectileMotion   = lazy(() => import('@/pages/labs/ProjectileMotion'))
 const CircularMotion     = lazy(() => import('@/pages/labs/CircularMotion'))
 const RotationalDynamics = lazy(() => import('@/pages/labs/RotationalDynamics'))
+const YoungDoubleSlit    = lazy(() => import('@/pages/labs/YoungDoubleSlit'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -464,6 +465,10 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/projectile-motion"       element={<ProjectileMotion />} />
             <Route path="/dashboard/labtwin/circular-motion"         element={<CircularMotion />} />
             <Route path="/dashboard/labtwin/rotational-dynamics"     element={<RotationalDynamics />} />
+            <Route path="/dashboard/labtwin/young-double-slit"       element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/young"                   element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/double-slit"             element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/light-interference"      element={<YoungDoubleSlit />} />
             <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
             {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
             <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />

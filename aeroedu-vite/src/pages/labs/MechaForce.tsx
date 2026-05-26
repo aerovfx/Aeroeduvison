@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Pause, RotateCcw, ChevronLeft, Settings, Zap } from 'lucide-react'
+import { Play, Pause, RotateCcw, ChevronLeft, Settings, Zap, Activity } from 'lucide-react'
 
 interface Params {
   mass: number       // kg
@@ -24,12 +24,22 @@ interface DynState {
 
 const G = 9.81
 
+// History sample for multi-graph analysis
+interface HistorySample {
+  t: number
+  x: number
+  v: number
+  a: number
+  fNet: number
+  friction: number
+}
+
 function draw(
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
   state: DynState,
   params: Params,
-  vHistory: number[],
+  _vHistory: number[],
 ) {
   ctx.clearRect(0, 0, W, H)
   ctx.fillStyle = 'hsl(260,25%,9%)'; ctx.fillRect(0, 0, W, H)
@@ -149,62 +159,110 @@ function draw(
   ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left'
   ctx.fillText(isMoving ? '⚡ Chuyển động (kinetic)' : '🔒 Đứng yên (static)', statusX + 10, statusY + 20)
 
-  // ── v-t graph ──
-  const gX = W * 0.57; const gY = H * 0.06; const gW = W * 0.38; const gH = H * 0.52
-  ctx.fillStyle = 'rgba(17,24,39,0.8)'
-  ctx.beginPath(); ctx.roundRect(gX, gY, gW, gH, 8); ctx.fill()
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1; ctx.stroke()
-  ctx.fillStyle = '#9ca3af'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText('Vận tốc v(t)', gX + 8, gY + 18)
+  // (đồ thị đã chuyển ra component MultiGraph React/SVG bên ngoài canvas)
+  void N
+  void isMoving
+  void fApplied
+  void fKinetic
+  void fMax_s
+}
 
-  const innerY = gY + 30; const innerH = gH - 38; const N2 = vHistory.length
-  const maxV = Math.max(Math.abs(state.v) * 1.5, 2)
-  const midG = innerY + innerH / 2
+// ─── Multi-graph component: 4 đồ thị phân tích chuyển động/lực ───
+// User: "biểu diễn thêm nhiều loại đồ thị khác cho chuyển động ... phân tích chi tiết"
+function MultiGraph({ history }: { history: HistorySample[] }) {
+  if (history.length < 2) {
+    return (
+      <div className="rounded-2xl bg-[hsl(260,25%,11%)] border border-purple-500/20 p-8 text-center text-white/40 text-sm italic">
+        Chưa có dữ liệu — bấm "Chạy" để bắt đầu mô phỏng
+      </div>
+    )
+  }
+  const SUB_W = 360, SUB_H = 180, P = 36
+  const ts = history.map((h) => h.t)
+  const tMin = ts[0], tMax = ts[ts.length - 1]
+  const tRange = Math.max(tMax - tMin, 0.001)
+  const xScale = (t: number) => P + ((t - tMin) / tRange) * (SUB_W - 2 * P)
 
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(gX + 4, midG); ctx.lineTo(gX + gW - 4, midG); ctx.stroke()
-  ctx.fillStyle = '#4b5563'; ctx.font = '9px monospace'
-  ctx.fillText(`+${maxV.toFixed(1)}`, gX + 5, innerY + 10)
-  ctx.fillText('0', gX + 5, midG + 4)
-
-  if (N2 > 1) {
-    ctx.beginPath(); ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2
-    vHistory.forEach((v, i) => {
-      const px = gX + 4 + (i / Math.max(N2 - 1, 1)) * (gW - 8)
-      const py = midG - (v / maxV) * (innerH / 2 - 4)
-      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
-    })
-    ctx.stroke()
-    // Current dot
-    const dotX = gX + gW - 8
-    const dotY = midG - (state.v / maxV) * (innerH / 2 - 4)
-    ctx.fillStyle = '#a78bfa'; ctx.beginPath(); ctx.arc(dotX, dotY, 4, 0, Math.PI * 2); ctx.fill()
+  const renderChart = (
+    title: string,
+    color: string,
+    accessor: (h: HistorySample) => number,
+    unit: string,
+    centerZero = true,
+  ) => {
+    const values = history.map(accessor)
+    const absMax = Math.max(...values.map(Math.abs), 0.1)
+    const yMax = absMax * 1.15
+    const yScale = centerZero
+      ? (v: number) => SUB_H / 2 - (v / yMax) * (SUB_H - 2 * P) / 2
+      : (v: number) => SUB_H - P - ((v + yMax) / (2 * yMax)) * (SUB_H - 2 * P)
+    const path = history.map((h, i) => `${i === 0 ? 'M' : 'L'} ${xScale(h.t)},${yScale(accessor(h))}`).join(' ')
+    const zeroY = centerZero ? SUB_H / 2 : yScale(0)
+    const last = history[history.length - 1]
+    return (
+      <div className="bg-[hsl(260,25%,11%)] rounded-xl border border-white/[0.08] p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-bold text-white/80 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+            {title}
+          </h4>
+          <span className="text-[11px] font-mono" style={{ color }}>
+            {accessor(last).toFixed(2)} {unit}
+          </span>
+        </div>
+        <svg viewBox={`0 0 ${SUB_W} ${SUB_H}`} className="w-full h-auto">
+          {/* Grid */}
+          {[0, 0.5, 1].map((t) => (
+            <line key={t}
+              x1={P} y1={P + (SUB_H - 2 * P) * t}
+              x2={SUB_W - P} y2={P + (SUB_H - 2 * P) * t}
+              stroke="rgba(148,163,184,0.08)" strokeWidth="0.5" />
+          ))}
+          {/* Zero line */}
+          <line x1={P} y1={zeroY} x2={SUB_W - P} y2={zeroY}
+            stroke="rgba(148,163,184,0.25)" strokeWidth="1" strokeDasharray="3 3" />
+          {/* Y-axis labels */}
+          <text x={P - 4} y={P + 8} fontSize="9" fill="rgba(148,163,184,0.55)" textAnchor="end" fontFamily="monospace">
+            +{absMax.toFixed(2)}
+          </text>
+          <text x={P - 4} y={zeroY + 3} fontSize="9" fill="rgba(148,163,184,0.55)" textAnchor="end" fontFamily="monospace">
+            0
+          </text>
+          {centerZero && (
+            <text x={P - 4} y={SUB_H - P + 8} fontSize="9" fill="rgba(148,163,184,0.55)" textAnchor="end" fontFamily="monospace">
+              -{absMax.toFixed(2)}
+            </text>
+          )}
+          {/* X-axis labels (time) */}
+          <text x={P} y={SUB_H - 6} fontSize="9" fill="rgba(148,163,184,0.5)" fontFamily="monospace">
+            {tMin.toFixed(1)}s
+          </text>
+          <text x={SUB_W - P} y={SUB_H - 6} fontSize="9" fill="rgba(148,163,184,0.5)" textAnchor="end" fontFamily="monospace">
+            {tMax.toFixed(1)}s
+          </text>
+          {/* Curve */}
+          <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+          {/* Current dot */}
+          <circle cx={xScale(last.t)} cy={yScale(accessor(last))} r="3" fill={color} />
+        </svg>
+      </div>
+    )
   }
 
-  // ── Readouts ──
-  const rX = gX; const rY = gY + gH + 8
-  ctx.fillStyle = 'rgba(17,24,39,0.8)'
-  ctx.beginPath(); ctx.roundRect(rX, rY, gW, 80, 8); ctx.fill()
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1; ctx.stroke()
-
-  const fNet = isMoving ? fApplied - fKinetic : 0
-  const a    = fNet / params.mass
-  const rows = [
-    { label: 'v', val: `${state.v.toFixed(3)} m/s`, color: '#a78bfa' },
-    { label: 'a', val: `${a.toFixed(3)} m/s²`,      color: '#fbbf24' },
-    { label: 'F_net', val: `${fNet.toFixed(2)} N`,   color: '#4ade80' },
-    { label: 'x', val: `${state.x.toFixed(3)} m`,    color: '#67e8f9' },
-    { label: 'f_s_max', val: `${fMax_s.toFixed(2)} N`, color: '#f87171' },
-    { label: 'N', val: `${N.toFixed(2)} N`,           color: '#fde68a' },
-  ]
-  rows.forEach((r, i) => {
-    const col = i % 2; const row = Math.floor(i / 2)
-    const tx = rX + 8 + col * (gW / 2); const ty = rY + 16 + row * 20
-    ctx.fillStyle = r.color; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'left'
-    ctx.fillText(`${r.label}: `, tx, ty)
-    ctx.fillStyle = '#e5e7eb'; ctx.font = '11px monospace'
-    ctx.fillText(r.val, tx + 55, ty)
-  })
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <Activity className="w-4 h-4 text-purple-400" />
+        <h3 className="font-bold text-purple-300 text-sm">Phân tích chuyển động — 4 đồ thị</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {renderChart('Vị trí x(t)',         '#67e8f9', (h) => h.x,        'm',   false)}
+        {renderChart('Vận tốc v(t)',         '#a78bfa', (h) => h.v,        'm/s', true)}
+        {renderChart('Gia tốc a(t)',         '#fbbf24', (h) => h.a,        'm/s²', true)}
+        {renderChart('Lực tổng F_net(t)',    '#4ade80', (h) => h.fNet,     'N',   true)}
+      </div>
+    </div>
+  )
 }
 
 export default function MechaForceLab() {
@@ -216,13 +274,17 @@ export default function MechaForceLab() {
   const animRef   = useRef<number>(0)
   const stateRef  = useRef<DynState>({ x: 0.05, v: 0, t: 0, phase: 'static' })
   const vHistRef  = useRef<number[]>([])
+  const fullHistRef = useRef<HistorySample[]>([])
+  const [, forceRerender] = useState(0)
   const runRef    = useRef(true)
   const paramsRef = useRef(params)
   paramsRef.current = params
 
   const reset = useCallback(() => {
     stateRef.current = { x: 0.05, v: 0, t: 0, phase: 'static' }
-    vHistRef.current = []; setSimTime(0)
+    vHistRef.current = []
+    fullHistRef.current = []
+    setSimTime(0)
   }, [])
 
   useEffect(() => { runRef.current = running }, [running])
@@ -243,15 +305,22 @@ export default function MechaForceLab() {
 
       if (runRef.current) {
         const dt = 0.016
+        let friction_signed = 0
+        let fNet = 0
+        let aVal = 0
         if (s.phase === 'static') {
           const netForce = p.force - gravity_comp
           if (Math.abs(netForce) > fMax_s) s.phase = 'kinetic'
+          // Khi tĩnh, ma sát = lực đẩy (cân bằng)
+          friction_signed = Math.min(Math.abs(netForce), fMax_s) * Math.sign(netForce)
+          fNet = 0
+          aVal = 0
         }
         if (s.phase === 'kinetic') {
-          const friction = s.v >= 0 ? fKin : -fKin
-          const fNet = p.force - gravity_comp - friction
-          const a = fNet / p.mass
-          s.v += a * dt
+          friction_signed = s.v >= 0 ? fKin : -fKin
+          fNet = p.force - gravity_comp - friction_signed
+          aVal = fNet / p.mass
+          s.v += aVal * dt
           s.x += s.v * dt
           if (s.x < 0.05) { s.x = 0.05; s.v = Math.max(0, s.v); s.phase = 'static' }
           if (s.x > 2.5)  { s.x = 0.05; s.v = 0; s.phase = 'static' }
@@ -259,6 +328,16 @@ export default function MechaForceLab() {
         s.t += dt
         vHistRef.current.push(s.v)
         if (vHistRef.current.length > MAX) vHistRef.current.shift()
+        // Record full history every ~50ms (3 frames @ 60fps) → ~6s cho 200 mẫu
+        if (fullHistRef.current.length === 0 ||
+            s.t - fullHistRef.current[fullHistRef.current.length - 1].t >= 0.05) {
+          fullHistRef.current.push({
+            t: s.t, x: s.x, v: s.v, a: aVal, fNet, friction: friction_signed,
+          })
+          if (fullHistRef.current.length > 240) fullHistRef.current.shift()
+          // Trigger React re-render every ~50ms for graph update
+          forceRerender((n) => (n + 1) & 0xFFFF)
+        }
         setSimTime(s.t)
       }
       draw(ctx, canvas.width, canvas.height, s, p, vHistRef.current)
@@ -287,18 +366,22 @@ export default function MechaForceLab() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3 bg-[hsl(260,25%,11%)] rounded-2xl border border-purple-500/20 overflow-hidden">
-            <canvas ref={canvasRef} width={780} height={500} className="w-full" style={{ background: 'hsl(260,25%,9%)' }} />
-            <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5">
-              <button onClick={() => setRunning(r => !r)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-semibold transition-colors">
-                {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {running ? 'Dừng' : 'Chạy'}
-              </button>
-              <button onClick={reset} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm transition-colors">
-                <RotateCcw className="h-4 w-4" /> Reset
-              </button>
-              <div className="ml-auto text-sm font-mono text-white/60">t = {simTime.toFixed(2)}s</div>
+          <div className="lg:col-span-3 space-y-3">
+            <div className="bg-[hsl(260,25%,11%)] rounded-2xl border border-purple-500/20 overflow-hidden">
+              <canvas ref={canvasRef} width={780} height={400} className="w-full" style={{ background: 'hsl(260,25%,9%)' }} />
+              <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5">
+                <button onClick={() => setRunning(r => !r)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-semibold transition-colors">
+                  {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {running ? 'Dừng' : 'Chạy'}
+                </button>
+                <button onClick={reset} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm transition-colors">
+                  <RotateCcw className="h-4 w-4" /> Reset
+                </button>
+                <div className="ml-auto text-sm font-mono text-white/60">t = {simTime.toFixed(2)}s</div>
+              </div>
             </div>
+            {/* MultiGraph: x-t, v-t, a-t, F-t */}
+            <MultiGraph history={fullHistRef.current} />
           </div>
 
           <div className="space-y-4">

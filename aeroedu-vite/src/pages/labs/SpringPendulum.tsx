@@ -23,45 +23,49 @@ interface SimState {
   running: boolean
 }
 
-// ─── Canvas renderer ──────────────────────────────────────────────────────────
-
-function drawFrame(
+// ─── Spring viz canvas (LEFT, square) ────────────────────────────
+// User: "đồ thị và con lắc có kích thước hợp lí"
+// Tách spring + chart → 2 element riêng để có không gian rộng rãi
+function drawSpring(
   ctx: CanvasRenderingContext2D,
   W: number,
   H: number,
   x: number,
   params: PhysicsParams,
-  history: { x: number; ke: number; pe: number }[],
 ) {
   ctx.clearRect(0, 0, W, H)
+  ctx.fillStyle = 'hsl(260,25%,9%)'
+  ctx.fillRect(0, 0, W, H)
 
-  const midX = W * 0.38
-  const midY = H * 0.40
-  const scale = (H * 0.28) / Math.max(params.amplitude, 0.01)
-  const springTop = H * 0.05
-  const blockSize = 36
+  const midX = W * 0.5
+  const midY = H * 0.50
+  // Scale dùng max(amplitude+10%) để spring không bao giờ "out of bound"
+  const scale = (H * 0.38) / Math.max(params.amplitude * 1.1, 0.05)
+  const springTop = H * 0.08
+  const blockSize = 56  // Bigger block — easier to see mass
 
   // ── Ceiling ──
-  ctx.fillStyle = '#4b5563'
-  ctx.fillRect(midX - 40, springTop - 8, 80, 8)
+  ctx.fillStyle = '#475569'
+  ctx.fillRect(midX - 60, springTop - 12, 120, 12)
   // Ceiling hatching
-  ctx.strokeStyle = '#6b7280'
-  ctx.lineWidth = 1
-  for (let i = -4; i <= 4; i++) {
+  ctx.strokeStyle = '#64748b'
+  ctx.lineWidth = 1.5
+  for (let i = -5; i <= 5; i++) {
     ctx.beginPath()
-    ctx.moveTo(midX + i * 12 - 36, springTop - 8)
-    ctx.lineTo(midX + i * 12 - 20, springTop - 20)
+    ctx.moveTo(midX + i * 14 - 56, springTop - 12)
+    ctx.lineTo(midX + i * 14 - 36, springTop - 30)
     ctx.stroke()
   }
 
   // ── Spring ──
   const blockY = midY + x * scale
-  const springLen = blockY - springTop
-  const coils = 12
-  const coilW = 16
+  const springLen = Math.max(blockY - springTop, 30)
+  const coils = 14
+  const coilW = 22  // wider coil for visibility
   ctx.beginPath()
-  ctx.strokeStyle = '#8b5cf6'
-  ctx.lineWidth = 2.5
+  ctx.strokeStyle = '#a78bfa'
+  ctx.lineWidth = 3.5
+  ctx.lineCap = 'round'
   ctx.moveTo(midX, springTop)
   for (let i = 0; i <= coils * 4; i++) {
     const t = i / (coils * 4)
@@ -71,144 +75,119 @@ function drawFrame(
   }
   ctx.lineTo(midX, blockY)
   ctx.stroke()
+  ctx.lineCap = 'butt'
 
   // ── Equilibrium line ──
-  ctx.setLineDash([5, 5])
-  ctx.strokeStyle = '#4b5563'
-  ctx.lineWidth = 1
+  ctx.setLineDash([6, 6])
+  ctx.strokeStyle = '#64748b'
+  ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.moveTo(midX - 60, midY)
-  ctx.lineTo(midX + 80, midY)
+  ctx.moveTo(midX - 90, midY)
+  ctx.lineTo(midX + 110, midY)
   ctx.stroke()
   ctx.setLineDash([])
-  ctx.fillStyle = '#6b7280'
-  ctx.font = '11px monospace'
-  ctx.fillText('x = 0', midX + 65, midY + 4)
+  ctx.fillStyle = '#94a3b8'
+  ctx.font = 'bold 13px monospace'
+  ctx.fillText('x = 0', midX + 95, midY + 5)
 
-  // ── Displacement arrow ──
+  // ── Displacement vector ──
   if (Math.abs(x) > 0.005) {
-    ctx.strokeStyle = x > 0 ? '#f97316' : '#22d3ee'
-    ctx.fillStyle   = x > 0 ? '#f97316' : '#22d3ee'
-    ctx.lineWidth = 1.5
+    const arrowColor = x > 0 ? '#f97316' : '#22d3ee'
+    ctx.strokeStyle = arrowColor
+    ctx.fillStyle = arrowColor
+    ctx.lineWidth = 2.5
+    const arrowX = midX + blockSize / 2 + 28
     ctx.beginPath()
-    ctx.moveTo(midX + 55, midY)
-    ctx.lineTo(midX + 55, blockY)
+    ctx.moveTo(arrowX, midY)
+    ctx.lineTo(arrowX, blockY)
     ctx.stroke()
-    const arrowY = blockY + (x > 0 ? -6 : 6)
+    const arrowYTip = blockY
+    const arrowYBase = blockY + (x > 0 ? -10 : 10)
     ctx.beginPath()
-    ctx.moveTo(midX + 55, blockY)
-    ctx.lineTo(midX + 50, arrowY)
-    ctx.lineTo(midX + 60, arrowY)
+    ctx.moveTo(arrowX, arrowYTip)
+    ctx.lineTo(arrowX - 6, arrowYBase)
+    ctx.lineTo(arrowX + 6, arrowYBase)
     ctx.closePath()
     ctx.fill()
-    ctx.font = '11px monospace'
-    ctx.fillText(`x=${x >= 0 ? '+' : ''}${x.toFixed(3)}m`, midX + 62, (midY + blockY) / 2 + 4)
+    ctx.font = 'bold 14px monospace'
+    ctx.fillText(`x=${x >= 0 ? '+' : ''}${x.toFixed(3)}m`, arrowX + 10, (midY + blockY) / 2 + 4)
   }
 
-  // ── Block (mass) ──
+  // ── Block (mass) — bigger, more visible ──
   const grd = ctx.createLinearGradient(midX - blockSize / 2, blockY - blockSize / 2, midX + blockSize / 2, blockY + blockSize / 2)
-  grd.addColorStop(0, '#7c3aed')
-  grd.addColorStop(1, '#4c1d95')
+  grd.addColorStop(0, '#a855f7')
+  grd.addColorStop(1, '#6d28d9')
   ctx.fillStyle = grd
   ctx.beginPath()
-  ctx.roundRect(midX - blockSize / 2, blockY - blockSize / 2, blockSize, blockSize, 6)
+  ctx.roundRect(midX - blockSize / 2, blockY - blockSize / 2, blockSize, blockSize, 8)
   ctx.fill()
-  ctx.strokeStyle = '#a78bfa'
-  ctx.lineWidth = 2
+  ctx.strokeStyle = '#c4b5fd'
+  ctx.lineWidth = 2.5
   ctx.stroke()
-  ctx.fillStyle = '#e9d5ff'
-  ctx.font = 'bold 12px sans-serif'
+  // Glow shadow effect via second draw
+  ctx.shadowColor = 'rgba(168,139,250,0.4)'
+  ctx.shadowBlur = 12
+  ctx.fillStyle = '#f3e8ff'
+  ctx.font = 'bold 16px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(`${params.mass}kg`, midX, blockY + 4)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`${params.mass}kg`, midX, blockY)
+  ctx.shadowBlur = 0
   ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+}
 
-  // ── Energy graph (right side) ──
-  const gX = W * 0.57
-  const gY = H * 0.08
-  const gW = W * 0.38
-  const gH = H * 0.60
+// ─── Energy chart (React SVG component) ──────────────────────────
+function EnergyChart({ history, maxE }: {
+  history: Array<{ x: number; ke: number; pe: number }>
+  maxE: number
+}) {
+  const W = 500, H = 280, P = 36
   const N = history.length
+  const yScale = (v: number) => H - P - (v / Math.max(maxE * 1.05, 0.001)) * (H - 2 * P)
+  const xScale = (i: number) => P + (i / Math.max(N - 1, 1)) * (W - 2 * P)
 
-  ctx.fillStyle = 'rgba(17,24,39,0.7)'
-  ctx.beginPath()
-  ctx.roundRect(gX, gY, gW, gH, 8)
-  ctx.fill()
-  ctx.strokeStyle = '#374151'
-  ctx.lineWidth = 1
-  ctx.stroke()
+  const kePath = history.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)},${yScale(p.ke)}`).join(' ')
+  const pePath = history.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)},${yScale(p.pe)}`).join(' ')
+  const totalY = yScale(maxE)
 
-  ctx.fillStyle = '#9ca3af'
-  ctx.font = '12px sans-serif'
-  ctx.fillText('Năng lượng theo thời gian', gX + 8, gY + 18)
-  ctx.font = '10px monospace'
-  ctx.fillStyle = '#8b5cf6'; ctx.fillRect(gX + 8, gY + 28, 12, 3); ctx.fillStyle = '#d1d5db'; ctx.fillText('KE (động năng)', gX + 24, gY + 33)
-  ctx.fillStyle = '#f97316'; ctx.fillRect(gX + 8, gY + 40, 12, 3); ctx.fillStyle = '#d1d5db'; ctx.fillText('PE (thế năng)', gX + 24, gY + 45)
-  ctx.fillStyle = '#22c55e'; ctx.fillRect(gX + 8, gY + 52, 12, 3); ctx.fillStyle = '#d1d5db'; ctx.fillText('Tổng E', gX + 24, gY + 57)
-
-  const maxE = 0.5 * params.springK * params.amplitude ** 2
-  const innerY = gY + 70; const innerH = gH - 80
-
-  // Axes
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(gX + 4, innerY); ctx.lineTo(gX + gW - 4, innerY); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(gX + 4, innerY); ctx.lineTo(gX + 4, innerY - innerH + 4); ctx.stroke()
-
-  const toGY = (v: number) => innerY - (v / (maxE * 1.1)) * (innerH - 8)
-  const toGX = (i: number) => gX + 4 + (i / Math.max(N - 1, 1)) * (gW - 8)
-
-  if (N > 1) {
-    ;[
-      { key: 'ke' as const, color: '#8b5cf6' },
-      { key: 'pe' as const, color: '#f97316' },
-    ].forEach(({ key, color }) => {
-      ctx.beginPath()
-      ctx.strokeStyle = color; ctx.lineWidth = 2
-      history.forEach((p, i) => {
-        const px = toGX(i); const py = toGY(p[key])
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
-      })
-      ctx.stroke()
-    })
-    // Total energy line
-    const totalE = maxE
-    const ey = toGY(totalE)
-    ctx.setLineDash([4, 4]); ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(gX + 4, ey); ctx.lineTo(gX + gW - 4, ey); ctx.stroke()
-    ctx.setLineDash([])
-  }
-
-  // ── Phase indicator dots ──
-  const last = history[history.length - 1]
-  if (last && N > 1) {
-    const dotX = toGX(N - 1)
-    ctx.fillStyle = '#8b5cf6'; ctx.beginPath(); ctx.arc(dotX, toGY(last.ke), 4, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(dotX, toGY(last.pe), 4, 0, Math.PI * 2); ctx.fill()
-  }
-
-  // ── Live readouts ──
-  const rx = gX
-  const ry = gY + gH + 10
-  ctx.fillStyle = 'rgba(17,24,39,0.7)'
-  ctx.beginPath(); ctx.roundRect(rx, ry, gW, 58, 8); ctx.fill()
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1; ctx.stroke()
-
-  const ke = last?.ke ?? 0
-  const pe = last?.pe ?? 0
-  const total = ke + pe
-  const readouts = [
-    { label: 'KE', value: `${ke.toFixed(4)} J`, color: '#a78bfa' },
-    { label: 'PE', value: `${pe.toFixed(4)} J`, color: '#fb923c' },
-    { label: 'E tot', value: `${total.toFixed(4)} J`, color: '#4ade80' },
-    { label: 'x', value: `${x.toFixed(4)} m`, color: '#67e8f9' },
-  ]
-  readouts.forEach((r, i) => {
-    const col = i < 2 ? 0 : 1
-    const row = i % 2
-    const tx = rx + 10 + col * (gW / 2)
-    const ty = ry + 18 + row * 18
-    ctx.fillStyle = r.color; ctx.font = 'bold 11px monospace'; ctx.fillText(`${r.label}: `, tx, ty)
-    ctx.fillStyle = '#e5e7eb'; ctx.font = '11px monospace'; ctx.fillText(r.value, tx + 40, ty)
-  })
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+      {/* BG */}
+      <rect x="0" y="0" width={W} height={H} fill="rgba(15,23,42,0.6)" rx="8" />
+      {/* Grid */}
+      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+        <line key={t} x1={P} y1={P + (H - 2 * P) * t} x2={W - P} y2={P + (H - 2 * P) * t}
+          stroke="rgba(148,163,184,0.1)" strokeWidth="0.5" />
+      ))}
+      {/* Y-axis labels */}
+      {[1, 0.5, 0].map((t) => (
+        <text key={t} x={P - 6} y={P + (1 - t) * (H - 2 * P) + 4} fontSize="10" fill="rgba(148,163,184,0.6)" textAnchor="end" fontFamily="monospace">
+          {(maxE * t).toFixed(3)} J
+        </text>
+      ))}
+      {/* Total E line (constant if no damping) */}
+      <line x1={P} y1={totalY} x2={W - P} y2={totalY}
+        stroke="#22c55e" strokeWidth="1.5" strokeDasharray="6 4" />
+      {/* KE */}
+      {N > 1 && <path d={kePath} fill="none" stroke="#a78bfa" strokeWidth="2.2" />}
+      {/* PE */}
+      {N > 1 && <path d={pePath} fill="none" stroke="#f97316" strokeWidth="2.2" />}
+      {/* Title */}
+      <text x={P} y={20} fontSize="13" fontWeight="bold" fill="#cbd5e1" fontFamily="sans-serif">
+        Năng lượng theo thời gian
+      </text>
+      {/* Legend */}
+      <g transform={`translate(${W - 200}, 12)`}>
+        <line x1="0" y1="6" x2="14" y2="6" stroke="#a78bfa" strokeWidth="2.5" />
+        <text x="18" y="9" fontSize="10" fill="#cbd5e1">KE</text>
+        <line x1="40" y1="6" x2="54" y2="6" stroke="#f97316" strokeWidth="2.5" />
+        <text x="58" y="9" fontSize="10" fill="#cbd5e1">PE</text>
+        <line x1="80" y1="6" x2="94" y2="6" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4 3" />
+        <text x="98" y="9" fontSize="10" fill="#cbd5e1">E tổng</text>
+      </g>
+    </svg>
+  )
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -275,7 +254,7 @@ export default function SpringPendulumLab() {
 
       const W = canvas.width
       const H = canvas.height
-      drawFrame(ctx, W, H, s.x, p, historyRef.current)
+      drawSpring(ctx, W, H, s.x, p)
     }
 
     animRef.current = requestAnimationFrame(loop)
@@ -305,19 +284,19 @@ export default function SpringPendulumLab() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-          {/* Canvas */}
-          <div className="lg:col-span-3 bg-[hsl(260,25%,11%)] rounded-2xl border border-purple-500/20 overflow-hidden">
+          {/* Spring viz (LEFT — vuông, không chiếm chỗ chart) */}
+          <div className="lg:col-span-2 bg-[hsl(260,25%,11%)] rounded-2xl border border-purple-500/20 overflow-hidden flex flex-col">
             <canvas
               ref={canvasRef}
-              width={780}
-              height={460}
+              width={440}
+              height={520}
               className="w-full"
-              style={{ background: 'hsl(260,25%,9%)' }}
+              style={{ background: 'hsl(260,25%,9%)', aspectRatio: '440/520' }}
             />
             {/* Controls bar */}
-            <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5">
+            <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5 flex-wrap">
               <button
                 onClick={() => setRunning(r => !r)}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold text-sm transition-colors"
@@ -331,11 +310,41 @@ export default function SpringPendulumLab() {
               >
                 <RotateCcw className="h-4 w-4" /> Reset
               </button>
-              <div className="ml-auto flex gap-4 text-sm font-mono text-white/60">
-                <span>t = {simTime.toFixed(2)}s</span>
-                <span>T = {T}s</span>
-                <span>ω = {ω.toFixed(2)} rad/s</span>
+              <div className="ml-auto flex gap-3 text-xs font-mono text-white/60">
+                <span>t={simTime.toFixed(1)}s</span>
+                <span>T={T}s</span>
               </div>
+            </div>
+          </div>
+
+          {/* Energy chart (CENTER — SVG riêng, kích thước hợp lí) */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="bg-[hsl(260,25%,11%)] rounded-2xl border border-purple-500/20 p-4">
+              <EnergyChart
+                history={historyRef.current}
+                maxE={0.5 * params.springK * params.amplitude ** 2}
+              />
+            </div>
+            {/* Live readouts grid */}
+            <div className="grid grid-cols-2 gap-2">
+              {(() => {
+                const last = historyRef.current[historyRef.current.length - 1]
+                const ke = last?.ke ?? 0
+                const pe = last?.pe ?? 0
+                const total = ke + pe
+                const xVal = last?.x ?? params.amplitude
+                return ([
+                  { label: 'KE', value: `${ke.toFixed(4)} J`,    color: 'text-purple-300', bg: 'bg-purple-500/[0.08]' },
+                  { label: 'PE', value: `${pe.toFixed(4)} J`,    color: 'text-orange-300', bg: 'bg-orange-500/[0.08]' },
+                  { label: 'E tổng',  value: `${total.toFixed(4)} J`, color: 'text-emerald-300', bg: 'bg-emerald-500/[0.08]' },
+                  { label: 'x',  value: `${xVal.toFixed(4)} m`,  color: 'text-cyan-300', bg: 'bg-cyan-500/[0.08]' },
+                ] as const).map((r) => (
+                  <div key={r.label} className={`rounded-lg ${r.bg} border border-white/[0.06] p-3`}>
+                    <div className="text-[10px] uppercase tracking-wide text-white/45 font-bold">{r.label}</div>
+                    <div className={`text-base font-bold font-mono mt-1 ${r.color}`}>{r.value}</div>
+                  </div>
+                ))
+              })()}
             </div>
           </div>
 
