@@ -99,6 +99,7 @@ const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
 const PythonLabsPage     = lazy(() => import('@/pages/labs/PythonLabs'))
 const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
 const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
+const VideoTrackingLab   = lazy(() => import('@/pages/labs/VideoTracking'))
 const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
 const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
@@ -441,7 +442,7 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs-simple"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/ml-training"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/simulations-simple" element={<PageFallback />} />
-            <Route path="/dashboard/labtwin/video-tracking" element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/video-tracking" element={<VideoTrackingLab />} />
 
             {/* ── COURSES ───────────────────────────────────── */}
             <Route path="/courses/:courseId"                              element={<CourseViewPage />} />
