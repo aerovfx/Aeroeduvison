@@ -1870,6 +1870,87 @@ function AnalogCircuitBuilderInner(
                 </g>
               )}
 
+              {/* ── READING LABELS — render BEFORE wires để dây luôn nằm trên
+                   User: "fix lỗi mạch điện các dây nối không hiển thị"
+                   Order: labels (background) → wires → components → terminals
+                   → dây không bao giờ bị che bởi label rectangle */}
+              {simResult?.ok && simResult.current != null && components.map(c => {
+                const g = GEOM[c.type]
+                const I = simResult.current ?? 0
+                const ledState = simResult.ledStates[c.id] ?? 'off'
+                let primary = ''
+                let secondary = ''
+                let labelColor = '#22d3ee'
+                if (c.type === 'resistor' && c.value) {
+                  const Vdrop = I * c.value
+                  primary = `U = ${Vdrop.toFixed(2)} V`
+                  secondary = `I = ${(I * 1000).toFixed(1)} mA · R = ${c.value}Ω`
+                  labelColor = '#fbbf24'
+                } else if (c.type === 'ammeter') {
+                  const meter = simResult.meterReadings?.[c.id] ?? I
+                  primary = `${(meter * 1000).toFixed(1)} mA`
+                  secondary = `${meter.toFixed(4)} A`
+                  labelColor = '#34d399'
+                } else if (c.type === 'voltmeter') {
+                  const V = simResult.meterReadings?.[c.id] ?? 0
+                  primary = `${V.toFixed(2)} V`
+                  secondary = 'Vôn kế'
+                  labelColor = '#a78bfa'
+                } else if (c.type === 'battery_9v' || c.type === 'battery_aa' || c.type === 'emf_cell') {
+                  const emf = c.value ?? 9
+                  primary = `ξ = ${emf} V`
+                  secondary = `I = ${(I * 1000).toFixed(1)} mA`
+                  labelColor = '#f97316'
+                } else if (c.type.startsWith('led_')) {
+                  primary = ledState === 'on' ? `${(I * 1000).toFixed(1)} mA · ON` : ledState === 'burnt' ? '🔥 CHÁY!' : 'OFF'
+                  secondary = ledState === 'burnt' ? 'I > 30 mA' : ledState === 'on' ? 'Sáng' : 'Quá thấp'
+                  labelColor = ledState === 'burnt' ? '#ef4444' : ledState === 'on' ? '#fbbf24' : '#71717a'
+                } else if (c.type === 'switch') {
+                  primary = c.on ? 'ĐÓNG' : 'MỞ'
+                  secondary = c.on ? 'Cho dòng đi qua' : 'Hở mạch'
+                  labelColor = c.on ? '#34d399' : '#ef4444'
+                }
+                if (!primary) return null
+                const labelX = c.x + g.w / 2
+                const labelY = c.y + g.h + 4
+                return (
+                  <g key={`lbl-${c.id}`} style={{ pointerEvents: 'none' }}>
+                    {/* Translucent rect — dây hoặc waypoint sau này render LÊN TRÊN */}
+                    <rect
+                      x={labelX - 50}
+                      y={labelY}
+                      width={100}
+                      height={secondary ? 26 : 14}
+                      rx={3}
+                      fill="rgba(0,0,0,0.65)"
+                      stroke={labelColor}
+                      strokeWidth={0.6}
+                    />
+                    <text
+                      x={labelX}
+                      y={labelY + 10}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontWeight="bold"
+                      fontFamily="ui-monospace, monospace"
+                      fill={labelColor}>
+                      {primary}
+                    </text>
+                    {secondary && (
+                      <text
+                        x={labelX}
+                        y={labelY + 21}
+                        textAnchor="middle"
+                        fontSize={7}
+                        fontFamily="ui-monospace, monospace"
+                        fill="rgba(255,255,255,0.75)">
+                        {secondary}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+
               {/* Wires — Manhattan routing với waypoints draggable */}
               {wires.map(w => {
                 const fromComp = components.find(c => c.id === w.fromId)
@@ -2002,80 +2083,7 @@ function AnalogCircuitBuilderInner(
 
                     {/* Inline reading label cho TẤT CẢ component khi simulating
                         User: "thêm các chỉ số của điện trở, ampe kế..." */}
-                    {simResult?.ok && simResult.current != null && (() => {
-                      const I = simResult.current ?? 0
-                      let primary = ''
-                      let secondary = ''
-                      let labelColor = '#22d3ee'
-                      if (c.type === 'resistor' && c.value) {
-                        const Vdrop = I * c.value
-                        primary = `U = ${Vdrop.toFixed(2)} V`
-                        secondary = `I = ${(I * 1000).toFixed(1)} mA · R = ${c.value}Ω`
-                        labelColor = '#fbbf24'
-                      } else if (c.type === 'ammeter') {
-                        const meter = simResult.meterReadings?.[c.id] ?? I
-                        primary = `${(meter * 1000).toFixed(1)} mA`
-                        secondary = `${meter.toFixed(4)} A`
-                        labelColor = '#34d399'
-                      } else if (c.type === 'voltmeter') {
-                        const V = simResult.meterReadings?.[c.id] ?? 0
-                        primary = `${V.toFixed(2)} V`
-                        secondary = 'Vôn kế'
-                        labelColor = '#a78bfa'
-                      } else if (c.type === 'battery_9v' || c.type === 'battery_aa' || c.type === 'emf_cell') {
-                        const emf = c.value ?? 9
-                        primary = `ξ = ${emf} V`
-                        secondary = `I = ${(I * 1000).toFixed(1)} mA`
-                        labelColor = '#f97316'
-                      } else if (c.type.startsWith('led_')) {
-                        primary = ledState === 'on' ? `${(I * 1000).toFixed(1)} mA · ON` : ledState === 'burnt' ? '🔥 CHÁY!' : 'OFF'
-                        secondary = ledState === 'burnt' ? 'I > 30 mA' : ledState === 'on' ? 'Sáng' : 'Quá thấp'
-                        labelColor = ledState === 'burnt' ? '#ef4444' : ledState === 'on' ? '#fbbf24' : '#71717a'
-                      } else if (c.type === 'switch') {
-                        primary = c.on ? 'ĐÓNG' : 'MỞ'
-                        secondary = c.on ? 'Cho dòng đi qua' : 'Hở mạch'
-                        labelColor = c.on ? '#34d399' : '#ef4444'
-                      }
-                      if (!primary) return null
-                      const labelX = c.x + g.w / 2
-                      const labelY = c.y + g.h + 8
-                      return (
-                        <g style={{ pointerEvents: 'none' }}>
-                          <rect
-                            x={labelX - 50}
-                            y={labelY}
-                            width={100}
-                            height={secondary ? 26 : 14}
-                            rx={3}
-                            fill="rgba(0,0,0,0.75)"
-                            stroke={labelColor}
-                            strokeWidth={0.6}
-                            opacity={0.95}
-                          />
-                          <text
-                            x={labelX}
-                            y={labelY + 10}
-                            textAnchor="middle"
-                            fontSize={9}
-                            fontWeight="bold"
-                            fontFamily="ui-monospace, monospace"
-                            fill={labelColor}>
-                            {primary}
-                          </text>
-                          {secondary && (
-                            <text
-                              x={labelX}
-                              y={labelY + 21}
-                              textAnchor="middle"
-                              fontSize={7}
-                              fontFamily="ui-monospace, monospace"
-                              fill="rgba(255,255,255,0.6)">
-                              {secondary}
-                            </text>
-                          )}
-                        </g>
-                      )
-                    })()}
+                    {/* Reading labels moved to separate pass below — tránh che dây nối */}
 
                     {/* Terminals (in absolute coords so they're not rotated visually) */}
                     {['a', 'b'].map(term => {
