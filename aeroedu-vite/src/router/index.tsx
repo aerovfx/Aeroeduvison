@@ -138,6 +138,7 @@ const DensityBuoyancy    = lazy(() => import('@/pages/labs/DensityBuoyancy'))
 const ScratchKids        = lazy(() => import('@/pages/labs/ScratchKids'))
 const CFDFlow            = lazy(() => import('@/pages/labs/CFDFlow'))
 const StandingWaves      = lazy(() => import('@/pages/labs/StandingWaves'))
+const StemDIYLibrary     = lazy(() => import('@/pages/labs/StemDIYLibrary'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -497,6 +498,10 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/standing-waves"          element={<StandingWaves />} />
             <Route path="/dashboard/labtwin/standing-wave"           element={<StandingWaves />} />
             <Route path="/dashboard/labtwin/harmonics"               element={<StandingWaves />} />
+            <Route path="/dashboard/labtwin/stem-diy"                element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/diy"                     element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/diy-library"             element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/tutorials"               element={<StemDIYLibrary />} />
             <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
             {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
             <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />

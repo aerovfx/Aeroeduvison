@@ -179,6 +179,7 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Scratch Kids',      emoji: '🐱', path: '/dashboard/labtwin/scratch-kids',       desc: 'Lập trình kéo thả · vẽ · phát nhạc', accent: 'amber', group: 'ai' },
   { name: 'CFD Dòng chảy',     emoji: '🌀', path: '/dashboard/labtwin/cfd-flow',           desc: 'Lattice Boltzmann · Karman vortex', accent: 'cyan', group: 'physics' },
   { name: 'Sóng dừng',         emoji: '〰️', path: '/dashboard/labtwin/standing-waves',     desc: 'Hài âm n · Nốt + Bụng', accent: 'amber', group: 'physics' },
+  { name: 'Thư viện DIY STEM', emoji: '📚', path: '/dashboard/labtwin/stem-diy',           desc: '16 dự án tự làm theo bước', accent: 'emerald', group: 'physics' },
 
   // ── Toán & Trực quan (3) ──
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
