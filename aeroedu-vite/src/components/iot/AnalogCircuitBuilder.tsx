@@ -14,7 +14,7 @@
  */
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 import {
-  Zap, Plus, Trash2, Save, Play, RotateCw, MousePointer,
+  Zap, Plus, Trash2, Save, Play, Pause, RotateCw, MousePointer,
   Cable, FolderOpen, BookOpen, AlertTriangle, CheckCircle2,
   XCircle, Lightbulb, ChevronDown,
   FlaskConical, LineChart,
@@ -1211,6 +1211,15 @@ function AnalogCircuitBuilderInner(
   const [wireStart, setWireStart]   = useState<{ componentId: string; terminal: 'a' | 'b' } | null>(null)
   const [mode, setMode]             = useState<Mode>('select')
   const [simResult, setSimResult]   = useState<SimResult | null>(null)
+  // User: "nút tắt mở giả lập cần hoạt động tốt hơn"
+  // Continuous simulation toggle — khi ON, tự re-simulate mỗi khi mạch đổi
+  const [simRunning, setSimRunning] = useState<boolean>(() => {
+    try { return localStorage.getItem('analogCircuit:simRunning') !== 'false' }
+    catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('analogCircuit:simRunning', String(simRunning)) } catch { /* ignore */ }
+  }, [simRunning])
   const [showTemplates, setShowTemplates] = useState(false)
   const [showSavedDialog, setShowSavedDialog] = useState(false)
   const [savedList, setSavedList]   = useState<SavedCircuit[]>([])
@@ -1501,6 +1510,19 @@ function AnalogCircuitBuilderInner(
     setSimResult(r)
   }
 
+  // Auto re-simulate khi simRunning + mạch thay đổi (debounce 80ms)
+  // → User vừa nối dây hoặc đổi giá trị, kết quả tự cập nhật ngay
+  useEffect(() => {
+    if (!simRunning) return
+    const tid = setTimeout(() => {
+      if (components.length > 0) {
+        const r = simulate(components, wires)
+        setSimResult(r)
+      }
+    }, 80)
+    return () => clearTimeout(tid)
+  }, [components, wires, simRunning])
+
   // ─── Clear all ───────────────────────────────────────────────────
 
   const clearAll = () => {
@@ -1668,12 +1690,32 @@ function AnalogCircuitBuilderInner(
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button
-            onClick={runSim}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:scale-[1.02] transition-transform shadow shadow-emerald-500/30"
-          >
-            <Play className="w-3.5 h-3.5" /> Mô phỏng
-          </button>
+          {/* Sim toggle + manual run — user yêu cầu "nút tắt mở giả lập tốt hơn" */}
+          <div className="inline-flex items-center gap-1">
+            <button
+              onClick={() => {
+                setSimRunning(r => !r)
+                if (!simRunning) runSim()
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-transform hover:scale-[1.02] shadow ${
+                simRunning
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-emerald-500/30'
+                  : 'bg-zinc-700 text-zinc-300 border border-zinc-600'
+              }`}
+              title={simRunning ? 'Đang chạy — bấm để TẮT giả lập' : 'Đang tắt — bấm để BẬT'}>
+              {simRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {simRunning ? 'Đang chạy' : 'Bật giả lập'}
+              {simRunning && (
+                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse" />
+              )}
+            </button>
+            <button
+              onClick={runSim}
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-emerald-200 hover:bg-zinc-700 border border-border transition"
+              title="Chạy lại 1 lần (manual refresh)">
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1939,6 +1981,83 @@ function AnalogCircuitBuilderInner(
                         reading={simResult?.meterReadings?.[c.id]}
                       />
                     </g>
+
+                    {/* Inline reading label cho TẤT CẢ component khi simulating
+                        User: "thêm các chỉ số của điện trở, ampe kế..." */}
+                    {simResult?.ok && simResult.current != null && (() => {
+                      const I = simResult.current ?? 0
+                      let primary = ''
+                      let secondary = ''
+                      let labelColor = '#22d3ee'
+                      if (c.type === 'resistor' && c.value) {
+                        const Vdrop = I * c.value
+                        primary = `U = ${Vdrop.toFixed(2)} V`
+                        secondary = `I = ${(I * 1000).toFixed(1)} mA · R = ${c.value}Ω`
+                        labelColor = '#fbbf24'
+                      } else if (c.type === 'ammeter') {
+                        const meter = simResult.meterReadings?.[c.id] ?? I
+                        primary = `${(meter * 1000).toFixed(1)} mA`
+                        secondary = `${meter.toFixed(4)} A`
+                        labelColor = '#34d399'
+                      } else if (c.type === 'voltmeter') {
+                        const V = simResult.meterReadings?.[c.id] ?? 0
+                        primary = `${V.toFixed(2)} V`
+                        secondary = 'Vôn kế'
+                        labelColor = '#a78bfa'
+                      } else if (c.type === 'battery_9v' || c.type === 'battery_aa' || c.type === 'emf_cell') {
+                        const emf = c.value ?? 9
+                        primary = `ξ = ${emf} V`
+                        secondary = `I = ${(I * 1000).toFixed(1)} mA`
+                        labelColor = '#f97316'
+                      } else if (c.type.startsWith('led_')) {
+                        primary = ledState === 'on' ? `${(I * 1000).toFixed(1)} mA · ON` : ledState === 'burnt' ? '🔥 CHÁY!' : 'OFF'
+                        secondary = ledState === 'burnt' ? 'I > 30 mA' : ledState === 'on' ? 'Sáng' : 'Quá thấp'
+                        labelColor = ledState === 'burnt' ? '#ef4444' : ledState === 'on' ? '#fbbf24' : '#71717a'
+                      } else if (c.type === 'switch') {
+                        primary = c.on ? 'ĐÓNG' : 'MỞ'
+                        secondary = c.on ? 'Cho dòng đi qua' : 'Hở mạch'
+                        labelColor = c.on ? '#34d399' : '#ef4444'
+                      }
+                      if (!primary) return null
+                      const labelX = c.x + g.w / 2
+                      const labelY = c.y + g.h + 8
+                      return (
+                        <g style={{ pointerEvents: 'none' }}>
+                          <rect
+                            x={labelX - 50}
+                            y={labelY}
+                            width={100}
+                            height={secondary ? 26 : 14}
+                            rx={3}
+                            fill="rgba(0,0,0,0.75)"
+                            stroke={labelColor}
+                            strokeWidth={0.6}
+                            opacity={0.95}
+                          />
+                          <text
+                            x={labelX}
+                            y={labelY + 10}
+                            textAnchor="middle"
+                            fontSize={9}
+                            fontWeight="bold"
+                            fontFamily="ui-monospace, monospace"
+                            fill={labelColor}>
+                            {primary}
+                          </text>
+                          {secondary && (
+                            <text
+                              x={labelX}
+                              y={labelY + 21}
+                              textAnchor="middle"
+                              fontSize={7}
+                              fontFamily="ui-monospace, monospace"
+                              fill="rgba(255,255,255,0.6)">
+                              {secondary}
+                            </text>
+                          )}
+                        </g>
+                      )
+                    })()}
 
                     {/* Terminals (in absolute coords so they're not rotated visually) */}
                     {['a', 'b'].map(term => {
