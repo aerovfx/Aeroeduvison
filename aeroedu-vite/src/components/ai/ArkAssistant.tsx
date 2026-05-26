@@ -18,7 +18,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, Loader2, Bot, User, Sparkles, Trash2 } from 'lucide-react'
-import { api } from '@/services/api'
+import { api, tokenStore } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'react-hot-toast'
 
@@ -104,7 +104,7 @@ export default function ArkAssistant() {
       ]
 
       const baseURL = '/api'
-      const token = localStorage.getItem('aero:access_token') || ''
+      const token = tokenStore.getAccessToken() || ''
       const resp = await fetch(`${baseURL}/ark-bot/chat`, {
         method: 'POST',
         headers: {
@@ -114,13 +114,18 @@ export default function ArkAssistant() {
         body: JSON.stringify({
           messages: conversationMessages,
           stream: true,
+          role: user?.role || 'STUDENT',
         }),
         signal: abortRef.current.signal,
       })
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }))
-        throw new Error(err.error || `HTTP ${resp.status}`)
+        // Special handling for 429 quota exceeded
+        if (resp.status === 429) {
+          throw new Error(err.message || 'Đã hết quota AI hôm nay — Đăng ký Pro để dùng không giới hạn')
+        }
+        throw new Error(err.message || err.error || `HTTP ${resp.status}`)
       }
 
       if (!resp.body) throw new Error('No response body')

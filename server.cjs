@@ -5338,6 +5338,186 @@ if (USE_NODEJS_QUESTIONS) {
       return res.status(500).json({ error: e.message });
     }
   });
+
+  // ══════════════════════════════════════════════════════════════
+  // POST /api/ark-bot/chat — Trợ lý floating chatbot SSE streaming
+  // User: "trợ lý chưa hoạt động Trợ lý AeroEdu — Ark Bot · Giáo viên"
+  //
+  // Fix: BE chưa có endpoint → catch-all proxy → 503.
+  // Implementation: DeepSeek streaming SSE → forward chunks tới client.
+  // Same quota 20/day shared với mọi AI services + role-aware system prompt.
+  // ══════════════════════════════════════════════════════════════
+  function buildArkBotSystemPrompt(role) {
+    const base = [
+      'Bạn là Trợ lý AeroEdu — chatbot thông minh trên nền tảng inphysic.com.',
+      'Trả lời ngắn gọn, thân thiện, dùng tiếng Việt. Dùng emoji vừa phải.',
+      'Khi đề xuất action, gợi ý URL relative (vd "/teacher/exams", "/dashboard/graph-lab").',
+    ];
+    if (role === 'TEACHER') {
+      return base.concat([
+        '',
+        'Vai trò người dùng: GIÁO VIÊN.',
+        'Bạn có thể giúp:',
+        '• Tư vấn phương pháp giảng dạy (active learning, blended, flipped classroom)',
+        '• Soạn giáo án (gợi ý mở /teacher/lesson-plans)',
+        '• Tạo đề thi (gợi ý /teacher/question-bank hoặc /teacher/latex-documents)',
+        '• Phân tích kết quả HS (gợi ý /teacher/analytics, /teacher/gradebook)',
+        '• Quản lý lớp (/teacher/classes, /teacher/student-requests)',
+        '• Dự án STEM (/teacher/stem-projects)',
+        '• Knowledge Graph chuyên môn (/teacher/knowledge-graph)',
+        '',
+        'Trả lời theo chuẩn TT 32/2018 GDPT (Vật lí, Hoá học...) và TT 22/2021 đánh giá.',
+      ]).join('\n');
+    }
+    if (role === 'ADMIN') {
+      return base.concat([
+        '',
+        'Vai trò người dùng: QUẢN TRỊ.',
+        'Bạn có thể giúp:',
+        '• Quản lý user (/admin/users, /admin/teachers, /admin/students)',
+        '• Phân tích hệ thống (/admin/analytics, /admin/insights)',
+        '• Vận hành (/admin/operations, /admin/audit-log)',
+        '• Camera + IoT (/admin/camera-management, /admin/iot-management)',
+      ]).join('\n');
+    }
+    // STUDENT default
+    return base.concat([
+      '',
+      'Vai trò người dùng: HỌC SINH.',
+      'Bạn có thể giúp:',
+      '• Giải bài tập + giải thích bước-bước (LaTeX cho công thức)',
+      '• Gợi ý lộ trình học (/student/dashboard, /student/exam-prep)',
+      '• Tư vấn nghề nghiệp (/student/career)',
+      '• Khoá học (/student/my-courses)',
+      '• Chuẩn bị thi (/student/exam-prep, /student/exam-modes)',
+    ]).join('\n');
+  }
+
+  app.post('/api/ark-bot/chat', async (req, res) => {
+    try {
+      // Auth
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized', message: 'Đăng nhập trước' });
+      let decoded;
+      try { decoded = _akVerify(auth.slice(7)); }
+      catch { return res.status(401).json({ error: 'invalid_token', message: 'Token không hợp lệ' }); }
+
+      // Quota check (shared 20/day với mọi AI services)
+      const quotaCheck = await _checkAiQuestionGenQuota(decoded);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          error: 'quota_exceeded',
+          message: `Đã dùng hết ${quotaCheck.limit} lượt AI miễn phí hôm nay. Đăng ký Pro để dùng không giới hạn.`,
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          retryAt: quotaCheck.retryAt,
+          upgradeUrl: '/payment?plan=pro&feature=ai_tutor',
+        });
+      }
+
+      const b = req.body || {};
+      const messages = Array.isArray(b.messages) ? b.messages : [];
+      const role = b.role || decoded.role || 'STUDENT';
+      const wantStream = b.stream !== false;  // default stream
+
+      if (messages.length === 0) {
+        return res.status(400).json({ error: 'no_messages', message: 'Cần ít nhất 1 message' });
+      }
+
+      const system = buildArkBotSystemPrompt(role);
+      const allMessages = [
+        { role: 'system', content: system },
+        ...messages.slice(-10).filter(m => m && m.role && m.content),
+      ];
+
+      if (!process.env.DEEPSEEK_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+        return res.status(503).json({
+          error: 'ai_not_configured',
+          message: 'AI chưa cấu hình. Liên hệ admin.',
+        });
+      }
+
+      // Streaming via DeepSeek (OpenAI-compatible SSE)
+      if (wantStream && process.env.DEEPSEEK_API_KEY) {
+        try {
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+              messages: allMessages,
+              stream: true,
+              temperature: 0.7,
+              max_tokens: 1500,
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 200)}`);
+          }
+          // Forward SSE stream tới client
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
+          // Pipe DeepSeek stream → client
+          dsResp.body.on('data', chunk => res.write(chunk));
+          dsResp.body.on('end', () => res.end());
+          dsResp.body.on('error', err => {
+            console.error('[ark-bot] stream error:', err.message);
+            try { res.end(); } catch {}
+          });
+          return;
+        } catch (e) {
+          console.warn('[ark-bot] DeepSeek stream failed, fallback non-stream Claude:', e.message.slice(0, 100));
+          // Fall through to Claude non-stream
+        }
+      }
+
+      // Non-streaming Claude fallback
+      if (process.env.ANTHROPIC_API_KEY) {
+        try {
+          const client = getAnthropic();
+          const completion = await client.messages.create({
+            model: AI_TUTOR_MODEL,
+            max_tokens: 1500,
+            system,
+            messages: allMessages.filter(m => m.role !== 'system').map(m => ({
+              role: m.role === 'assistant' ? 'assistant' : 'user',
+              content: m.content,
+            })),
+          });
+          let reply = '';
+          if (Array.isArray(completion.content)) {
+            for (const block of completion.content) {
+              if (block && block.type === 'text') reply += block.text;
+            }
+          }
+          // Return as fake-SSE chunk để client tương thích
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.write(`data: ${JSON.stringify({
+            choices: [{ delta: { content: reply } }],
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        } catch (e) {
+          console.error('[ark-bot] Claude fallback failed:', e.message);
+        }
+      }
+
+      return res.status(503).json({
+        error: 'all_providers_failed',
+        message: 'AI provider không phản hồi. Thử lại sau ít phút.',
+      });
+    } catch (err) {
+      console.error('[ark-bot]', err.message);
+      return res.status(500).json({ error: 'internal_error', message: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
