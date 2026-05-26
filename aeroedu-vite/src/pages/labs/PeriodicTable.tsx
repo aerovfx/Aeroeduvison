@@ -315,8 +315,39 @@ function ElementCard({ el, onClick, selected }: { el: Element; onClick: () => vo
 }
 
 // ── Detail Card — "Things We Take" museum-frame style ───────────────
+// ── Subatomic particle constants ─────────────────────────────────
+// Khối lượng tính bằng đơn vị nguyên tử u (1 u = 1.66054 × 10⁻²⁷ kg)
+// Điện tích tính bằng e (1 e = 1.602 × 10⁻¹⁹ C)
+const PARTICLE_INFO = {
+  proton:   { symbol: 'p⁺',  name: 'Proton',   charge: '+1 e',  chargeC: '+1.602 × 10⁻¹⁹ C', mass: '1.007276 u', massKg: '1.6726 × 10⁻²⁷ kg', spin: '1/2', color: '#ef4444', loc: 'Hạt nhân' },
+  neutron:  { symbol: 'n⁰',  name: 'Neutron',  charge: '0',     chargeC: 'Trung hòa',         mass: '1.008665 u', massKg: '1.6749 × 10⁻²⁷ kg', spin: '1/2', color: '#94a3b8', loc: 'Hạt nhân' },
+  electron: { symbol: 'e⁻',  name: 'Electron', charge: '−1 e',  chargeC: '−1.602 × 10⁻¹⁹ C', mass: '0.000549 u', massKg: '9.109 × 10⁻³¹ kg',  spin: '1/2', color: '#22d3ee', loc: 'Vỏ nguyên tử' },
+} as const
+
+// Shell labels theo n (principal quantum number) — chuẩn Bohr/Schrödinger
+const SHELL_LABELS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
+const SHELL_MAX_ELECTRONS = [2, 8, 18, 32, 50, 72, 98]  // 2n²
+// Binding energy approximation (eV) — gần đúng theo công thức hydrogen
+// E_n = −13.6 × Z² / n²  (Z là điện tích hạt nhân hiệu dụng, rough)
+function approxBindingEnergy(Z: number, n: number): string {
+  const Zeff = Math.max(1, Z - (n - 1) * 2)  // rough screening
+  const E = -13.6 * (Zeff * Zeff) / (n * n)
+  return E < -1000 ? `${(E / 1000).toFixed(1)} keV` : `${E.toFixed(0)} eV`
+}
+
 function DetailCard({ element }: { element: Element }) {
   const meta = CATEGORY_META[element.category]
+  // Tính số neutron: A - Z (A = mass round, Z = atomic number)
+  const neutronCount = Math.max(0, Math.round(element.mass) - element.z)
+  const totalProtons = element.z
+  const totalElectrons = element.shells.reduce((s, n) => s + n, 0)
+  // Total mass (atomic) — chỉ là approximation theo Z, N, e
+  const totalMassU = (
+    totalProtons * 1.007276 +
+    neutronCount * 1.008665 +
+    totalElectrons * 0.000549
+  ).toFixed(3)
+  const netCharge = totalProtons - totalElectrons
 
   return (
     <div
@@ -425,31 +456,148 @@ function DetailCard({ element }: { element: Element }) {
         <p className="text-xs text-white/80 leading-relaxed">{element.uses}</p>
       </div>
 
-      {/* Shell breakdown viz — Bohr style minimal */}
+      {/* ── HẠT HẠ NGUYÊN TỬ — Proton · Neutron · Electron ── */}
       <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-3">
-          Electron Distribution
+          Hạt hạ nguyên tử · Subatomic particles
         </div>
-        <div className="flex items-end gap-1.5 h-12">
-          {element.shells.map((count, i) => {
-            const maxCount = Math.max(...element.shells)
-            const heightPercent = (count / maxCount) * 100
+
+        {/* 3 cards p / n / e */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {([
+            { key: 'proton',   count: totalProtons,    accent: 'rose' },
+            { key: 'neutron',  count: neutronCount,    accent: 'slate' },
+            { key: 'electron', count: totalElectrons,  accent: 'cyan' },
+          ] as const).map(({ key, count, accent }) => {
+            const p = PARTICLE_INFO[key]
             return (
-              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
-                <div className="text-[9px] font-bold tabular-nums text-white/80">{count}</div>
-                <div
-                  className="w-full rounded-sm transition-all"
-                  style={{
-                    height: `${heightPercent}%`,
-                    background: `linear-gradient(180deg, ${meta.color}, ${meta.color}40)`,
-                    boxShadow: `0 0 8px ${meta.glow}40`,
-                  }}
-                />
-                <div className="text-[8px] uppercase text-white/40 tracking-wider">K{i + 1}</div>
+              <div key={key}
+                className="rounded-md p-2 md:p-2.5 text-center"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${p.color}40`,
+                  boxShadow: `0 0 12px ${p.color}10`,
+                }}>
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <span className="text-base font-black tabular-nums"
+                    style={{ color: p.color, textShadow: `0 0 8px ${p.color}60` }}>
+                    {p.symbol}
+                  </span>
+                  <span className="text-base font-black tabular-nums text-white">×{count}</span>
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-white/50 font-bold">{p.name}</div>
+                <div className="mt-1.5 text-[9px] text-white/40 leading-tight">
+                  {p.loc}
+                </div>
               </div>
             )
           })}
         </div>
+
+        {/* Per-particle properties */}
+        <div className="space-y-1 text-[10px]">
+          <div className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 pb-1 border-b border-white/10 text-white/40 uppercase tracking-wider">
+            <span>Hạt</span>
+            <span className="text-right">Điện tích</span>
+            <span className="text-right">Khối lượng</span>
+            <span className="text-right">Spin</span>
+          </div>
+          {(['proton', 'neutron', 'electron'] as const).map(key => {
+            const p = PARTICLE_INFO[key]
+            return (
+              <div key={key} className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 items-center py-1">
+                <span className="flex items-center gap-1">
+                  <span className="font-bold" style={{ color: p.color }}>{p.symbol}</span>
+                  <span className="text-white/60">{p.name}</span>
+                </span>
+                <span className="text-right text-white/80 font-mono">{p.charge}</span>
+                <span className="text-right text-white/80 font-mono">{p.mass}</span>
+                <span className="text-right text-white/80 font-mono">{p.spin}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Total summary */}
+        <div className="mt-3 p-2 rounded-md flex items-center justify-between text-[11px]"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-white/40">Khối lượng nguyên tử lý thuyết</div>
+            <div className="font-mono font-bold text-white">≈ {totalMassU} u</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] uppercase tracking-wider text-white/40">Điện tích tổng</div>
+            <div className="font-mono font-bold"
+              style={{ color: netCharge === 0 ? '#22c55e' : netCharge > 0 ? '#ef4444' : '#22d3ee' }}>
+              {netCharge === 0 ? '0 (trung hòa)' : netCharge > 0 ? `+${netCharge}` : `${netCharge}`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MỨC NĂNG LƯỢNG · Energy Levels (Bohr) ── */}
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-3">
+          Mức năng lượng · Energy levels
+        </div>
+
+        {/* Table với shell info */}
+        <div className="space-y-1">
+          <div className="grid grid-cols-[30px_50px_50px_1fr_1fr] gap-2 pb-1 border-b border-white/10 text-[9px] uppercase tracking-wider text-white/40">
+            <span>Lớp</span>
+            <span className="text-center">n</span>
+            <span className="text-center">e⁻</span>
+            <span className="text-right">Tối đa 2n²</span>
+            <span className="text-right">E (xấp xỉ)</span>
+          </div>
+          {element.shells.map((count, i) => {
+            const n = i + 1
+            const label = SHELL_LABELS[i] || `n${n}`
+            const max = SHELL_MAX_ELECTRONS[i] || (2 * n * n)
+            const energy = approxBindingEnergy(element.z, n)
+            const fillPercent = (count / max) * 100
+            return (
+              <div key={i} className="grid grid-cols-[30px_50px_50px_1fr_1fr] gap-2 items-center py-1.5">
+                <span className="font-black text-sm" style={{ color: meta.color }}>{label}</span>
+                <span className="text-center text-white/70 font-mono">{n}</span>
+                <span className="text-center text-white font-mono font-bold">{count}</span>
+                <span className="text-right">
+                  <span className="text-white/50 text-[10px]">/ {max}</span>
+                </span>
+                <span className="text-right text-white/80 font-mono text-[10px]">{energy}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Visualisation bars */}
+        <div className="mt-3 flex items-end gap-1.5 h-12">
+          {element.shells.map((count, i) => {
+            const max = SHELL_MAX_ELECTRONS[i] || 2 * (i + 1) * (i + 1)
+            const heightPercent = (count / max) * 100
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
+                <div className="text-[9px] font-bold tabular-nums text-white/80">{count}/{max}</div>
+                <div
+                  className="w-full rounded-sm transition-all relative"
+                  style={{
+                    height: `${Math.max(heightPercent, 8)}%`,
+                    background: `linear-gradient(180deg, ${meta.color}, ${meta.color}40)`,
+                    boxShadow: `0 0 8px ${meta.glow}40`,
+                  }}
+                />
+                <div className="text-[10px] uppercase font-black tracking-wider" style={{ color: meta.color }}>
+                  {SHELL_LABELS[i] || `n${i + 1}`}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Formula hint */}
+        <p className="mt-3 text-[9px] text-white/30 italic leading-relaxed">
+          E<sub>n</sub> ≈ −13.6 × Z<sub>eff</sub>² / n² eV (xấp xỉ Bohr · Z<sub>eff</sub> trừ ảnh hưởng chắn)
+        </p>
       </div>
     </div>
   )
