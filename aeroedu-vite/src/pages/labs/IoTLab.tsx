@@ -8,8 +8,8 @@
  *   - Simulator giả lập (LED blink, PWM, traffic light…)
  *   - Serial monitor giả lập (ghi output theo timeline)
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, Play, Pause, RotateCcw, Cpu, Zap, Copy, Check,
   CircuitBoard, Radio, Activity, Download, BookOpen,
@@ -1288,9 +1288,29 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 
 export default function IoTLab() {
   usePageTitle('IoT Lab — Mạch điện & Arduino')
+  const navigate = useNavigate()
+  const { sketchId } = useParams<{ sketchId: string }>()
+  // Validate sketchId — fallback CIRCUITS[0] nếu không tồn tại
+  const initialId = (sketchId && CIRCUITS.some((c) => c.id === sketchId))
+    ? sketchId
+    : CIRCUITS[0].id
   const [mode, setMode] = useState<'arduino' | 'analog' | 'semi' | 'custom'>('arduino')
   const [analogTab, setAnalogTab] = useState<'builder' | 'presets' | 'assembly'>('assembly')
-  const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)
+  const [activeId, setActiveId] = useState<string>(initialId)
+
+  // Sync URL → state khi user dùng back/forward hoặc paste link
+  useEffect(() => {
+    if (sketchId && CIRCUITS.some((c) => c.id === sketchId)) {
+      setActiveId(sketchId)
+      setMode('arduino')  // auto-switch sang Arduino mode khi URL có sketchId
+    }
+  }, [sketchId])
+
+  // Wrap setActiveId → cũng update URL (single source of truth)
+  const goToSketch = useCallback((id: string) => {
+    setActiveId(id)
+    navigate(`/dashboard/iot-lab/sketch/${id}`)
+  }, [navigate])
   const [running, setRunning] = useState(true)
   const [tMs, setTMs] = useState(0)
   const [filterBoard, setFilterBoard] = useState<'all' | Board>('all')
@@ -1602,7 +1622,7 @@ export default function IoTLab() {
                 return (
                   <button
                     key={c.id}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => goToSketch(c.id)}
                     className={`w-full text-left rounded-lg px-3 py-2 transition border ${
                       isActive
                         ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-100'

@@ -388,6 +388,9 @@ export function AppRouter() {
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
             <Route path="/dashboard/iot-lab"                       element={<IoTLab />} />
+            {/* User: "thêm các routes cho các thí nghiệm trong /dashboard/iot-lab" */}
+            <Route path="/dashboard/iot-lab/sketch/:sketchId"      element={<IoTLab />} />
+            <Route path="/dashboard/iot-lab/arduino/:sketchId"     element={<IoTLab />} />
             <Route path="/dashboard/iot-lab/emulator"              element={<ArduinoEmulator />} />
             {/* ── Deep-link routes cho assignment "lắp ráp / nghiên cứu mạch" ── */}
             <Route path="/dashboard/iot-lab/circuit-builder"       element={<CircuitBuilder />} />
