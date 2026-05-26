@@ -160,6 +160,7 @@ const TranscriptRecordingPage = lazy(() => import('@/pages/teacher/TranscriptRec
 const CreateModulePage      = lazy(() => import('@/pages/teacher/CreateModule'))
 const LaTeXEditorPage       = lazy(() => import('@/pages/teacher/LaTeXEditor'))
 const TeacherMyCoursesPage  = lazy(() => import('@/pages/teacher/MyCourses'))
+const TeacherWayArena       = lazy(() => import('@/pages/teacher/WayArena'))
 const TeacherCourseEditorPage = lazy(() => import('@/pages/teacher/CourseEditor'))
 const TeacherCourseVideosPage = lazy(() => import('@/pages/teacher/CourseVideos'))
 const TeacherCourseAssetsPage = lazy(() => import('@/pages/teacher/CourseAssets'))
@@ -204,6 +205,7 @@ const StudentCareerPage               = lazy(() => import('@/pages/student/Caree
 const StudentExamPrepPage             = lazy(() => import('@/pages/student/ExamPrep'))
 const StudentExamsPage                = lazy(() => import('@/pages/student/Exams'))
 const StudentSelfStudyPage            = lazy(() => import('@/pages/student/SelfStudy'))
+const StudentKidsProgressPage         = lazy(() => import('@/pages/student/KidsProgress'))
 const ForYouPage                      = lazy(() => import('@/pages/student/ForYou'))
 const StudentDailyPage                = lazy(() => import('@/pages/student/Daily'))
 const CareerGamesPage                 = lazy(() => import('@/pages/student/CareerGames'))
@@ -499,6 +501,7 @@ export function AppRouter() {
               <Route path="/student/exam/:examId"             element={<ExamModesPage />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
               <Route path="/student/self-study"               element={<StudentSelfStudyPage />} />
+              <Route path="/student/kids-progress"            element={<StudentKidsProgressPage />} />
               <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/daily"                    element={<StudentDailyPage />} />
               <Route path="/student/games"                    element={<CareerGamesPage />} />
@@ -519,6 +522,8 @@ export function AppRouter() {
               <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
               <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />
               <Route path="/teacher/my-courses"             element={<TeacherMyCoursesPage />} />
+              <Route path="/teacher/way-arena"              element={<TeacherWayArena />} />
+              <Route path="/teacher/way-arena/:code"        element={<TeacherWayArena />} />
               <Route path="/teacher/course/create"          element={<TeacherCourseEditorPage />} />
               <Route path="/teacher/course/:courseId/edit"  element={<TeacherCourseEditorPage />} />
               <Route path="/teacher/course/:courseId/videos" element={<TeacherCourseVideosPage />} />
