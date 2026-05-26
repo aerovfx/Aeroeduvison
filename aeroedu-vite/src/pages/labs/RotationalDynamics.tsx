@@ -123,19 +123,24 @@ export default function RotationalDynamics() {
       const rad = (thetaRef.current * Math.PI) / 180
       const sinT = Math.sin(rad)
       const cosT = Math.cos(rad)
-      const inclineStartX = 60
-      const inclineStartY = CANVAS_H - 50
-      const inclineEndX = inclineStartX + INCLINE_LEN * PX_PER_M * cosT
-      const inclineEndY = inclineStartY - INCLINE_LEN * PX_PER_M * sinT
+
+      // FIX 2026-05-27: User "Lăn thì phải từ trên dốc lăn xuống. Hãy đổi
+      // vị trí điểm đầu và điểm cuối cho đúng"
+      // → BOTTOM-LEFT là điểm đến (finish), TOP-RIGHT là điểm xuất phát (s=0)
+      // Slope hypotenuse: top-right ↘ bottom-left
+      const bottomLeftX = 60                                                    // điểm thấp nhất (finish)
+      const bottomLeftY = CANVAS_H - 50
+      const topRightX = bottomLeftX + INCLINE_LEN * PX_PER_M * cosT             // điểm cao nhất (start)
+      const topRightY = bottomLeftY - INCLINE_LEN * PX_PER_M * sinT
 
       // Ground
       ctx.fillStyle = '#334155'
-      ctx.fillRect(0, inclineStartY, CANVAS_W, CANVAS_H - inclineStartY)
-      // Incline
+      ctx.fillRect(0, bottomLeftY, CANVAS_W, CANVAS_H - bottomLeftY)
+      // Incline triangle: bottom-left → top-right (hypotenuse) → bottom-right (vertical) → close
       ctx.beginPath()
-      ctx.moveTo(inclineStartX, inclineStartY)
-      ctx.lineTo(inclineEndX, inclineEndY)
-      ctx.lineTo(inclineEndX, inclineStartY)
+      ctx.moveTo(bottomLeftX, bottomLeftY)
+      ctx.lineTo(topRightX, topRightY)
+      ctx.lineTo(topRightX, bottomLeftY)
       ctx.closePath()
       ctx.fillStyle = '#475569'
       ctx.fill()
@@ -143,21 +148,22 @@ export default function RotationalDynamics() {
       ctx.lineWidth = 2
       ctx.stroke()
 
-      // Angle indicator
+      // Angle indicator (tại điểm chân dốc — bottom-left)
       ctx.strokeStyle = 'rgba(251,191,36,0.6)'
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.arc(inclineStartX, inclineStartY, 28, -rad, 0)
+      ctx.arc(bottomLeftX, bottomLeftY, 28, -rad, 0)
       ctx.stroke()
       ctx.fillStyle = '#fbbf24'
       ctx.font = 'bold 11px sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(`${thetaRef.current.toFixed(0)}°`, inclineStartX + 38, inclineStartY - 8)
+      ctx.fillText(`${thetaRef.current.toFixed(0)}°`, bottomLeftX + 38, bottomLeftY - 8)
 
-      // Distance markers
+      // Distance markers: s=0 ở ĐỈNH (top-right), s=INCLINE_LEN ở ĐÁY (bottom-left)
+      // Vector từ top-right → bottom-left: (-cosT, +sinT) (đi xuống-trái)
       for (let s = 0; s <= INCLINE_LEN; s += 2) {
-        const px = inclineStartX + s * PX_PER_M * cosT
-        const py = inclineStartY - s * PX_PER_M * sinT
+        const px = topRightX - s * PX_PER_M * cosT
+        const py = topRightY + s * PX_PER_M * sinT
         ctx.fillStyle = 'rgba(148,163,184,0.5)'
         ctx.font = '9px monospace'
         ctx.textAlign = 'center'
@@ -169,25 +175,44 @@ export default function RotationalDynamics() {
         ctx.stroke()
       }
 
-      // Finish line
-      const finishX = inclineEndX
-      const finishY = inclineEndY
+      // 🏃 Điểm XUẤT PHÁT (top-right) — flag đỏ "START"
+      ctx.fillStyle = '#ef4444'
+      ctx.shadowColor = '#ef4444'
+      ctx.shadowBlur = 8
+      ctx.beginPath()
+      ctx.arc(topRightX, topRightY - 12, 6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.shadowBlur = 0
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 9px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('START', topRightX, topRightY - 26)
+
+      // 🏁 Điểm ĐÍCH (bottom-left) — finish line xanh lá
       ctx.strokeStyle = '#10b981'
       ctx.lineWidth = 3
       ctx.beginPath()
-      ctx.moveTo(finishX - 4 * sinT, finishY - 4 * cosT - 20)
-      ctx.lineTo(finishX - 4 * sinT - 14 * sinT, finishY - 4 * cosT - 20 - 14 * cosT)
+      ctx.moveTo(bottomLeftX, bottomLeftY)
+      ctx.lineTo(bottomLeftX, bottomLeftY - 24)
       ctx.stroke()
+      // Checkered pattern flag
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#10b981' : '#fff'
+        ctx.fillRect(bottomLeftX, bottomLeftY - 24 + i * 6, 14, 6)
+        ctx.fillStyle = i % 2 === 0 ? '#fff' : '#10b981'
+        ctx.fillRect(bottomLeftX + 14, bottomLeftY - 24 + i * 6, 14, 6)
+      }
       ctx.fillStyle = '#10b981'
       ctx.font = 'bold 10px sans-serif'
-      ctx.fillText('🏁', finishX - 4 * sinT - 7 * sinT, finishY - 4 * cosT - 22)
+      ctx.fillText('🏁 FINISH', bottomLeftX + 14, bottomLeftY - 32)
 
-      // Objects rolling
+      // Objects rolling — xuất phát top-right (s=0), kết thúc bottom-left (s=INCLINE_LEN)
+      // px = topRightX - s·cosT (đi sang trái), py = topRightY + s·sinT (đi xuống)
       const radiusPx = r * PX_PER_M
       objsRef.current.forEach((o, idx) => {
         const meta = SHAPES[o.shape]
-        const px = inclineStartX + o.s * PX_PER_M * cosT - sinT * (radiusPx + 6) * (idx % 2 === 0 ? 1 : 0.5)
-        const py = inclineStartY - o.s * PX_PER_M * sinT - cosT * (radiusPx + 6) * (idx % 2 === 0 ? 1 : 0.5)
+        const px = topRightX - o.s * PX_PER_M * cosT - sinT * (radiusPx + 6) * (idx % 2 === 0 ? 1 : 0.5)
+        const py = topRightY + o.s * PX_PER_M * sinT - cosT * (radiusPx + 6) * (idx % 2 === 0 ? 1 : 0.5)
         // Shadow
         ctx.shadowColor = meta.color
         ctx.shadowBlur = 12
@@ -195,7 +220,9 @@ export default function RotationalDynamics() {
         ctx.beginPath(); ctx.arc(px, py, radiusPx, 0, Math.PI * 2); ctx.fill()
         ctx.shadowBlur = 0
         // Spoke indicator for rotation visualization
-        const rotationAngle = o.s / r  // rad (rolling without slipping)
+        // Rolling left + down → wheel rotates clockwise in screen coords
+        // (top of ball moves left = ngược chiều +x). Negate angle vì canvas Y-down.
+        const rotationAngle = -o.s / r  // rad (rolling without slipping, downhill direction)
         ctx.strokeStyle = '#fff'
         ctx.lineWidth = 2
         ctx.beginPath()
