@@ -261,8 +261,9 @@ function usesVarY(n: Node): boolean {
 
 function compileFunction(src: string): { ok: true; eval: (x: number) => number } | { ok: false; err: string } {
   try {
-    // Normalize: strip leading "y =" or "f(x) ="
-    let s = src.trim()
+    // Normalize Unicode math symbols (cho user dùng được ký tự từ bàn phím khoa học)
+    let s = normalizeMathSrc(src.trim())
+    // Strip leading "y =" or "f(x) ="
     s = s.replace(/^\s*y\s*=\s*/i, '').replace(/^\s*f\s*\(\s*x\s*\)\s*=\s*/i, '')
     if (!s) return { ok: false, err: 'Biểu thức rỗng' }
     const node = parse(s)
@@ -280,12 +281,25 @@ function compileFunction(src: string): { ok: true; eval: (x: number) => number }
 // ─────────────────────────────────────────────────────────────
 // Inequality parser & compiler
 // Hỗ trợ: 3x < 2, y > x^2, x^2 + y^2 <= 4, y < sin(x), etc.
+// Cũng nhận dạng Unicode từ bàn phím khoa học: ≤ ≥ (U+2264, U+2265)
 // Output diff(x,y) = lhs(x,y) - rhs(x,y) → so sánh với 0 theo op.
 // ─────────────────────────────────────────────────────────────
 
 type IneqOp = '<' | '<=' | '>' | '>='
 
+// Normalize Unicode math symbols → ASCII trước khi parse.
+// User: "Ký tự không hợp lệ: '≤'" — bàn phím khoa học gửi U+2264.
+function normalizeMathSrc(src: string): string {
+  return src
+    .replace(/≤/g, '<=')        // U+2264 less-than or equal
+    .replace(/≥/g, '>=')        // U+2265 greater-than or equal
+    .replace(/⩽/g, '<=')        // U+2A7D variants
+    .replace(/⩾/g, '>=')        // U+2A7E variants
+    .replace(/≠/g, '!=')        // U+2260 not equal (chưa hỗ trợ nhưng map an toàn)
+}
+
 // Detect operator vị trí đầu tiên (longest-match: '<=' trước '<')
+// Source đã được normalizeMathSrc → chỉ cần check ASCII variants.
 function findIneqOp(src: string): { op: IneqOp; pos: number } | null {
   const candidates: { op: IneqOp; len: number }[] = [
     { op: '<=', len: 2 }, { op: '>=', len: 2 },
@@ -310,7 +324,8 @@ type CompiledInequality = {
 function compileInequality(src: string):
   { ok: true; ineq: CompiledInequality } | { ok: false; err: string } {
   try {
-    let s = src.trim()
+    // Normalize Unicode (≤ → <=, ≥ → >=) trước khi tìm operator
+    let s = normalizeMathSrc(src.trim())
     // Strip leading "y =" hoặc "f(x) =" (không áp dụng — vì có thể nhầm với <=)
     const found = findIneqOp(s)
     if (!found) return { ok: false, err: 'Không tìm thấy toán tử bất đẳng thức' }
@@ -337,10 +352,10 @@ function compileInequality(src: string):
   }
 }
 
-// Detect bất phương trình (chứa <, <=, >, >= — nhưng không phải <= được fence
-// trong dấu ngoặc, etc.). Simple check: chỉ cần substring exist.
+// Detect bất phương trình — chấp nhận cả ASCII (<, >, <=, >=) và Unicode
+// (≤ U+2264, ≥ U+2265, ⩽ U+2A7D, ⩾ U+2A7E) từ bàn phím khoa học.
 function isInequalitySrc(src: string): boolean {
-  return /<=?|>=?/.test(src)
+  return /<=?|>=?|[≤≥⩽⩾]/.test(src)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -361,6 +376,16 @@ const COLORS = [
 ]
 
 const PRESETS: { label: string; src: string }[] = [
+  // ── Bất phương trình ĐẶC TRƯNG — demo dùng ký tự ≤ ≥ Unicode ──
+  // (Test parser nhận diện ký tự từ bàn phím khoa học)
+  { label: '2x + y ≤ 2', src: '2x + y ≤ 2' },            // nửa mặt phẳng tuyến tính
+  { label: 'x² + y² ≤ 9', src: 'x^2 + y^2 ≤ 9' },        // hình tròn đặc
+  // ── Các bất phương trình khác ──
+  { label: '3x < 2', src: '3x < 2' },
+  { label: 'y < x²', src: 'y < x^2' },
+  { label: 'y ≥ |x|', src: 'y ≥ abs(x)' },
+  { label: 'y > sin(x)', src: 'y > sin(x)' },
+  // ── Hàm số y = f(x) ──
   { label: 'x²', src: 'x^2' },
   { label: 'x³', src: 'x^3' },
   { label: 'sin(x)', src: 'sin(x)' },
@@ -373,12 +398,6 @@ const PRESETS: { label: string; src: string }[] = [
   { label: '1/x', src: '1/x' },
   { label: 'x²−4', src: 'x^2 - 4' },
   { label: 'sin(x)·eˣ', src: 'sin(x) * exp(-x^2/4)' },
-  // ── Inequalities (bất phương trình) ──
-  { label: '3x < 2', src: '3x < 2' },
-  { label: 'y < x²', src: 'y < x^2' },
-  { label: 'y ≥ |x|', src: 'y >= abs(x)' },
-  { label: 'x² + y² < 4', src: 'x^2 + y^2 < 4' },
-  { label: 'y > sin(x)', src: 'y > sin(x)' },
 ]
 
 // ─────────────────────────────────────────────────────────────
@@ -917,9 +936,12 @@ let nextId = 1
 const mkId = () => `fn-${nextId++}`
 
 export default function GraphLab() {
+  // Demo mặc định: 1 hàm số + 2 bất phương trình đặc trưng dùng Unicode ≤
+  // Cover 3 dạng: y = f(x), tuyến tính nửa mặt phẳng, hình tròn đặc.
   const [rows, setRows] = useState<EquationRow[]>([
-    { id: mkId(), src: 'x^2', color: COLORS[0], visible: true },
-    { id: mkId(), src: 'sin(x)', color: COLORS[1], visible: true },
+    { id: mkId(), src: 'x^2',          color: COLORS[0], visible: true },
+    { id: mkId(), src: '2x + y ≤ 2',   color: COLORS[3], visible: true },  // pink
+    { id: mkId(), src: 'x^2 + y^2 ≤ 9', color: COLORS[7], visible: true }, // red
   ])
   const [activeId, setActiveId] = useState<string>(rows[0]?.id ?? '')
   const [kbMode, setKbMode] = useState<KbMode>('fx')
