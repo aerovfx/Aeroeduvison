@@ -21,8 +21,12 @@
 - Last deployed commit: `8e89d69` (revision pixiai-00579-rul, 2026-05-26 — HOTFIX STEM member: HS join QR hiện thị + add thủ công + diagnostic, 100% traffic)
 - Last deployed commit: `e91b324` (2026-05-26 — đang deploy batch 6: Self-Study Duolingo K-9 + WayArena + KidsProgress + Particle info + LabTwin reorg + Student STEM)
 - Last deployed commit: `94b4646` (revision pixiai-00584-kib, 2026-05-26 — batch 8: MechaForce + AirflowCFD Kármán + R3F Geometry + Circular↔SHM, 100% traffic)
-- Last deployed commit: `5b66c17` (HOTFIX 2026-05-26 — exam author JOIN User + claim-orphan endpoint + prominent save circuit button)
+- Last deployed commit: `5b66c17` (revision pixiai-00585-zux, HOTFIX 2026-05-26 — exam author JOIN User + claim-orphan endpoint + prominent save circuit button)
+- Last deployed commit: `a210ac8` (HOTFIX 2026-05-26 — sync teacher_id ↔ userId cả 2 cột + auto-backfill mỗi server boot)
 - Commits since last deploy: `0/5`
+- Prev: `1259d28` — Fix dây nối không hiện: render reading labels BEFORE wires (background layer) thay vì TRONG component map → wires luôn nằm trên labels
+- Prev: `e5c44c6` — Cleanup: gitignore .claude/worktrees + remove accidentally-committed submodule
+- Prev: `81a38ee` — Bỏ /labs/ segment: 27 routes /dashboard/labtwin/labs/<slug> → /dashboard/labtwin/<slug> + LegacyLabSlugRedirect backward-compat + sed sweep all FE links
 - Prev: `86e2a2f` — Analog Circuit Builder: nút bật/tắt giả lập continuous + chỉ số chi tiết per-component (R/A/V/Battery/LED/Switch labels)
 - Prev: `4512cd0` — Bỏ /labtwin/labs catalog route (Navigate redirect) + R3F 3D GeometryUnfold (4 components Cube/Cuboid/Cylinder/Pyramid unfold animate + SpinningGroup + OrbitControls centered)
 - Prev: `d1eb4a3` — AirflowCFD physics upgrade (Kármán vortex St=0.2 + potential flow doublet + Kutta-Joukowski airfoil + 1400 particles + StreamlinesWithTime wake oscillation)
