@@ -163,7 +163,7 @@ const teacherSections: RouteSection[] = [
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
-      { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/teacher/knowledge-graph' },
+      { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
     ],
   },
   {
