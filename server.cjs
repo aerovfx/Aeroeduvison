@@ -2416,6 +2416,336 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ════════════════════════════════════════════════════════════════════
+// AI WEEKLY EXAM GENERATION — Tạo tự động đề trắc nghiệm theo phòng + tuần
+// User: "AI tạo tự động đề thi trắc nghiệm từ các câu hỏi trong ngân hàng
+//        theo đúng chủ đề và nội dung tương đương phòng thi theo mỗi tuần.
+//        Ngoài các đề thi do giáo viên tạo ra."
+//
+// Mỗi public phòng thi → mỗi tuần ISO (W22-2026 vd) → 1 đề AI tự động:
+//   - Subject + grade detect từ room.name/description + linked Exam
+//   - Sample 30 MCQ từ "Question" WHERE subject+grade match + visibility public
+//   - Difficulty profile theo category (tn/hsg/practice/...):
+//       tn:       60% TH, 30% VD, 10% VDC
+//       hsg:      20% TH, 40% VD, 40% VDC
+//       olympic:  10% TH, 30% VD, 60% VDC
+//       midterm:  40% NB, 40% TH, 20% VD
+//       final:    30% NB, 40% TH, 25% VD, 5% VDC
+//       practice: 50% NB, 40% TH, 10% VD
+//   - Tạo Exam record ai_generated=true, week_tag='W22-2026', room_id=...
+//
+// Trigger:
+//   1. Manual: POST /api/teacher/exam-rooms/:roomId/ai-generate-weekly
+//   2. Admin batch: POST /api/admin/exam-rooms/ai-generate-all-weekly
+//   3. Auto: setInterval mỗi 1h → check rooms thiếu đề AI tuần này → tạo
+// ════════════════════════════════════════════════════════════════════
+;(() => {
+  // ISO week tag — W22-2026 ngắn gọn
+  function _isoWeekTag(date = new Date()) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `W${String(weekNo).padStart(2, '0')}-${d.getUTCFullYear()}`;
+  }
+
+  // Detect subject Vietnamese từ text → chuẩn hoá
+  function _detectSubject(text) {
+    const s = (text || '').toLowerCase();
+    if (/(vật lí|vật lý|vatli|vat ly|physics)/.test(s)) return 'Vật lí';
+    if (/(toán|toan|math)/.test(s)) return 'Toán';
+    if (/(hóa|hoa hoc|chemistry)/.test(s)) return 'Hóa học';
+    if (/(sinh học|sinh hoc|biology)/.test(s)) return 'Sinh học';
+    if (/(văn|ngữ văn|literature)/.test(s)) return 'Ngữ văn';
+    if (/(tiếng anh|english|anh văn)/.test(s)) return 'Tiếng Anh';
+    if (/(lịch sử|lich su|history)/.test(s)) return 'Lịch sử';
+    if (/(địa lí|địa lý|dia ly|geography)/.test(s)) return 'Địa lí';
+    if (/(gdcd|công dân|kinh tế pháp luật|ktpl)/.test(s)) return 'GDKT&PL';
+    if (/(tin học|tin hoc|informatics|computer)/.test(s)) return 'Tin học';
+    if (/(công nghệ|cong nghe|technology)/.test(s)) return 'Công nghệ';
+    return null;
+  }
+
+  function _detectGrade(text) {
+    const t = String(text || '');
+    const m = t.match(/(?:lớp|khối|k)\s*(\d{1,2})/i);
+    if (m) return m[1];
+    const m2 = t.match(/\b(10|11|12|9|8|7|6)\b/);
+    if (m2) return m2[1];
+    return null;
+  }
+
+  function _detectCategory(text) {
+    const s = (text || '').toLowerCase();
+    if (/(tốt nghiệp|thpt qg|thptqg|tnthpt|tn thpt|tuyển sinh đại học)/.test(s)) return 'tn';
+    if (/(học sinh giỏi|hsg|giỏi quốc gia|giỏi cấp tỉnh)/.test(s)) return 'hsg';
+    if (/(olympic|trại hè|trại đông|đề chọn đội tuyển)/.test(s)) return 'olympic';
+    if (/(giữa kỳ|giữa kì|giua ky|midterm)/.test(s)) return 'midterm';
+    if (/(cuối kỳ|cuối kì|cuoi ky|final|hết môn)/.test(s)) return 'final';
+    if (/(luyện tập|on tap|practice)/.test(s)) return 'practice';
+    return 'other';
+  }
+
+  // Difficulty profile per category — số câu mỗi mức trên 30 câu
+  const DIFF_PROFILES = {
+    tn:       { NB: 0,  TH: 18, VD: 9, VDC: 3 },
+    hsg:      { NB: 0,  TH: 6,  VD: 12, VDC: 12 },
+    olympic:  { NB: 0,  TH: 3,  VD: 9,  VDC: 18 },
+    midterm:  { NB: 12, TH: 12, VD: 6,  VDC: 0 },
+    final:    { NB: 9,  TH: 12, VD: 8,  VDC: 1 },
+    practice: { NB: 15, TH: 12, VD: 3,  VDC: 0 },
+    other:    { NB: 10, TH: 12, VD: 6,  VDC: 2 },
+  };
+
+  // Sample N questions ngẫu nhiên từ array (Fisher-Yates partial)
+  function _sample(arr, n) {
+    const a = arr.slice();
+    const out = [];
+    n = Math.min(n, a.length);
+    for (let i = 0; i < n; i++) {
+      const j = i + Math.floor(Math.random() * (a.length - i));
+      [a[i], a[j]] = [a[j], a[i]];
+      out.push(a[i]);
+    }
+    return out;
+  }
+
+  // Core: tạo 1 đề AI cho 1 phòng. Trả về { exam, created: boolean, reason? }
+  async function _generateWeeklyExamForRoom(pool, room, weekTag) {
+    // 1. Đã có exam tuần này? Skip để idempotent.
+    const existing = await pool.query(
+      `SELECT id, title, total_points, duration_min, question_ids
+       FROM "Exam"
+       WHERE room_id = $1 AND week_tag = $2 AND ai_generated = true
+       LIMIT 1`,
+      [room.id, weekTag]
+    ).catch(() => ({ rows: [] }));
+    if (existing.rows.length) {
+      return { exam: existing.rows[0], created: false, reason: 'already_exists' };
+    }
+
+    // 2. Detect subject + grade + category — ưu tiên Exam đã link, fallback regex
+    let subject = null, grade = null;
+    if (room.exam_id) {
+      const er = await pool.query(
+        `SELECT subject, grade FROM "Exam" WHERE id = $1`, [room.exam_id]
+      ).catch(() => ({ rows: [] }));
+      if (er.rows[0]) { subject = er.rows[0].subject; grade = er.rows[0].grade; }
+    }
+    const text = `${room.name || ''} ${room.description || ''}`;
+    if (!subject) subject = _detectSubject(text);
+    if (!grade)   grade   = _detectGrade(text);
+    const category = _detectCategory(text);
+
+    if (!subject || !grade) {
+      return { exam: null, created: false, reason: 'cannot_detect_subject_or_grade' };
+    }
+
+    // 3. Query Question Bank — MCQ + match subject/grade
+    // Match cả 2 chính tả "Vật lí" / "Vật lý" + grade variations
+    const subjectPatterns = subject === 'Vật lí' ? ['Vật lí', 'Vật lý', 'Physics']
+                          : subject === 'Hóa học' ? ['Hóa học', 'Hoá học', 'Chemistry']
+                          : [subject];
+    const gradePatterns = [grade, `Lớp ${grade}`, `Khối ${grade}`, `K${grade}`];
+
+    const { rows: qs } = await pool.query(`
+      SELECT id, difficulty
+      FROM "Question"
+      WHERE type IN ('multiple_choice', 'mcq', 'tracnghiem')
+        AND lower(subject) = ANY($1::text[])
+        AND (grade = ANY($2::text[]) OR grade ~ $3)
+        AND content IS NOT NULL AND content <> ''
+        AND options IS NOT NULL AND jsonb_array_length(options) >= 2
+      LIMIT 500
+    `, [
+      subjectPatterns.map(s => s.toLowerCase()),
+      gradePatterns,
+      `^(${gradePatterns.join('|')})$`,
+    ]).catch(e => { console.error('[ai-exam:query]', e.message); return { rows: [] }; });
+
+    if (!qs.length) {
+      return { exam: null, created: false, reason: `no_questions_for_${subject}_${grade}` };
+    }
+
+    // 4. Sample theo difficulty profile
+    const profile = DIFF_PROFILES[category] || DIFF_PROFILES.other;
+    const byDiff = { NB: [], TH: [], VD: [], VDC: [] };
+    for (const q of qs) {
+      const d = String(q.difficulty || 'TH').toUpperCase();
+      if (byDiff[d]) byDiff[d].push(q.id);
+      else byDiff.TH.push(q.id);
+    }
+    const picked = [];
+    for (const [level, count] of Object.entries(profile)) {
+      picked.push(..._sample(byDiff[level] || [], count));
+    }
+    // Fallback nếu profile không đủ → bổ sung từ pool còn lại
+    if (picked.length < 30) {
+      const remaining = qs.filter(q => !picked.includes(q.id)).map(q => q.id);
+      picked.push(..._sample(remaining, 30 - picked.length));
+    }
+    if (picked.length < 10) {
+      return { exam: null, created: false, reason: `insufficient_questions_${picked.length}` };
+    }
+
+    // 5. Create Exam record — teacher_id = room owner (legal owner)
+    const { randomUUID } = require('crypto');
+    const examId = randomUUID();
+    const examTitle = `🤖 AI · ${subject} ${grade} · Tuần ${weekTag.replace(/^W/, '')}`;
+    const examDesc = `Đề trắc nghiệm AI tự động tạo từ ngân hàng câu hỏi · ${picked.length} câu · ${weekTag}`;
+    const duration = category === 'tn' ? 50 : category === 'hsg' ? 90 : category === 'olympic' ? 120 : 45;
+    const metadata = {
+      sourceQuestionsCount: qs.length,
+      pickedCount: picked.length,
+      category,
+      generatedAt: new Date().toISOString(),
+      profile,
+    };
+
+    await pool.query(`
+      INSERT INTO "Exam"(
+        id, teacher_id, title, description, subject, grade,
+        duration_min, total_points, question_ids, settings,
+        status, visibility, ai_generated, week_tag, room_id, ai_metadata
+      ) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9::jsonb,$10::jsonb, $11,$12,true,$13,$14,$15::jsonb)
+    `, [
+      examId, room.teacher_id, examTitle, examDesc, subject, grade,
+      duration, picked.length, JSON.stringify(picked), JSON.stringify({ shuffle: true, showResult: true }),
+      'published', 'public',
+      weekTag, room.id, JSON.stringify(metadata),
+    ]);
+
+    return {
+      exam: { id: examId, title: examTitle, total_points: picked.length, duration_min: duration, question_ids: picked },
+      created: true,
+      subject, grade, category, weekTag,
+    };
+  }
+
+  // Expose helpers
+  global.__aiExamGen = { _generateWeeklyExamForRoom, _isoWeekTag };
+
+  // ── Endpoint 1: GV trigger manual cho 1 phòng ──
+  app.post('/api/teacher/exam-rooms/:roomId/ai-generate-weekly', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+    const userId = decoded.userId || decoded.id || decoded.sub;
+
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, teacher_id, exam_id, name, description, is_public
+         FROM "OnlineExamRoom" WHERE id = $1`, [req.params.roomId]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Phòng không tồn tại' });
+      const room = rows[0];
+      if (room.teacher_id !== userId && decoded.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Chỉ chủ phòng hoặc admin được tạo đề AI' });
+      }
+      const weekTag = (req.body && req.body.weekTag) || _isoWeekTag();
+      const result = await _generateWeeklyExamForRoom(pool, room, weekTag);
+      if (!result.created && result.reason !== 'already_exists') {
+        return res.status(400).json({ error: `Không tạo được đề: ${result.reason}`, ...result });
+      }
+      return res.json({ ok: true, ...result });
+    } catch (e) {
+      console.error('[ai-exam:gen-room]', e.message);
+      return res.status(500).json({ error: 'Lỗi tạo đề AI: ' + e.message });
+    }
+  });
+
+  // ── Endpoint 2: Admin batch tạo cho tất cả public rooms ──
+  app.post('/api/admin/exam-rooms/ai-generate-all-weekly', async (req, res) => {
+    if (!(await _requireAdmin(req, res))) return;
+    try {
+      const pool = _getPool();
+      const weekTag = (req.body && req.body.weekTag) || _isoWeekTag();
+      const { rows: rooms } = await pool.query(
+        `SELECT id, teacher_id, exam_id, name, description, is_public
+         FROM "OnlineExamRoom"
+         WHERE is_public = true AND status != 'archived'
+         ORDER BY created_at DESC LIMIT 200`
+      );
+      const results = { weekTag, processed: rooms.length, created: 0, skipped: 0, errors: [] };
+      for (const room of rooms) {
+        try {
+          const r = await _generateWeeklyExamForRoom(pool, room, weekTag);
+          if (r.created) results.created++;
+          else results.skipped++;
+        } catch (e) {
+          results.errors.push({ roomId: room.id, error: e.message.slice(0, 100) });
+        }
+      }
+      return res.json(results);
+    } catch (e) {
+      console.error('[ai-exam:gen-all]', e.message);
+      return res.status(500).json({ error: 'Lỗi batch generate: ' + e.message });
+    }
+  });
+
+  // ── Endpoint 3: List AI exams của 1 phòng (cho FE hiển thị) ──
+  app.get('/api/teacher/exam-rooms/:roomId/ai-exams', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized', items: [] });
+    try { _akVerify(auth.slice(7)); }
+    catch { return res.status(401).json({ error: 'Token không hợp lệ', items: [] }); }
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT id, title, description, subject, grade, duration_min, total_points,
+               status, week_tag, ai_metadata, created_at,
+               COALESCE(jsonb_array_length(question_ids), 0)::int AS qcount
+        FROM "Exam"
+        WHERE room_id = $1 AND ai_generated = true
+        ORDER BY created_at DESC LIMIT 20
+      `, [req.params.roomId]).catch(() => ({ rows: [] }));
+      return res.json({ items: rows, count: rows.length });
+    } catch (e) {
+      console.error('[ai-exam:list]', e.message);
+      return res.json({ items: [], count: 0 });
+    }
+  });
+
+  // ── Background scheduler — chạy mỗi 1h check rooms thiếu đề AI tuần này ──
+  // Chỉ kick off sau khi server boot 60s (tránh race với migration)
+  async function _weeklyTick() {
+    try {
+      const pool = _getPool();
+      const weekTag = _isoWeekTag();
+      const { rows: rooms } = await pool.query(`
+        SELECT r.id, r.teacher_id, r.exam_id, r.name, r.description, r.is_public
+        FROM "OnlineExamRoom" r
+        WHERE r.is_public = true AND r.status != 'archived'
+          AND NOT EXISTS (
+            SELECT 1 FROM "Exam" e
+            WHERE e.room_id = r.id AND e.week_tag = $1 AND e.ai_generated = true
+          )
+        ORDER BY r.created_at DESC LIMIT 100
+      `, [weekTag]).catch(() => ({ rows: [] }));
+      if (!rooms.length) return;
+      let created = 0;
+      for (const room of rooms) {
+        try {
+          const r = await _generateWeeklyExamForRoom(pool, room, weekTag);
+          if (r.created) created++;
+        } catch (e) { /* per-room error → continue */ }
+      }
+      if (created > 0) console.log(`[ai-exam:tick] tạo ${created}/${rooms.length} đề tuần ${weekTag}`);
+    } catch (e) {
+      console.error('[ai-exam:tick]', e.message);
+    }
+  }
+
+  setTimeout(() => {
+    _weeklyTick().catch(() => {});
+    setInterval(() => { _weeklyTick().catch(() => {}); }, 60 * 60 * 1000); // mỗi 1h
+  }, 60_000);
+})();
+
 // ── Teacher-Student Link (kết nối GV-HS) — TRƯỚC proxy teacher-service ──
 ;(() => {
   async function _ensureTSLTable() {
@@ -11889,7 +12219,16 @@ async function _ensureExamTables() {
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
     ['visibility', "VARCHAR(20) DEFAULT 'private'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    // ── AI auto-generation columns ──
+    // User: "AI tạo tự động đề thi trắc nghiệm từ ngân hàng đề theo chủ đề
+    // tương đương phòng thi mỗi tuần. Ngoài các đề do GV tạo ra."
+    ['ai_generated',   "BOOLEAN DEFAULT false"],
+    ['week_tag',       "VARCHAR(10)"],      // vd: 'W22-2026' = ISO week
+    ['room_id',        "VARCHAR(36)"],      // link to OnlineExamRoom (cho AI exams)
+    ['ai_metadata',    "JSONB DEFAULT '{}'::jsonb"],  // sourceQuestionsCount, generatedAt, ...
   ]);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_room_week ON "Exam"(room_id, week_tag) WHERE ai_generated = true`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_ai_recent ON "Exam"(ai_generated, created_at DESC) WHERE ai_generated = true`).catch(() => {});
   await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId','examType','duration','totalScore','totalQuestions','passingScore','shuffle','sourceType','userId']);
   // BACKFILL: legacy GV data sang teacher_id
   await _backfillSnakeFromCamel('Exam', [

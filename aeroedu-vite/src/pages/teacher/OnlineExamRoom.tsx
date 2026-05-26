@@ -7,7 +7,7 @@ import {
   Loader2, FileText, Timer, Globe, Lock, LogIn,
   BookOpen, CheckCircle2, AlertTriangle, CalendarClock,
   Zap, ChevronDown, ChevronUp, CalendarPlus, Pencil, Save, X,
-  Trophy, Medal, Crown, RotateCcw,
+  Trophy, Medal, Crown, RotateCcw, Sparkles,
 } from "lucide-react"
 import toast from "react-hot-toast"
 
@@ -1584,12 +1584,215 @@ export default function OnlineExamRoomPage() {
               </div>
             )}
 
+            {/* ── AI Weekly Exams — đề trắc nghiệm tự sinh theo tuần ── */}
+            {selected && <AiWeeklyExamsPanel room={selected} />}
+
             {/* ── Per-room Leaderboard (vinh danh top thí sinh trong phòng) ── */}
             {selected && <RoomLeaderboard roomId={selected.id} roomName={selected.name} />}
 
           </div>{/* /right col */}
         </div>{/* /grid */}
       </div>{/* /main */}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// AiWeeklyExamsPanel — đề trắc nghiệm AI tự sinh theo tuần cho phòng thi
+// User: "AI tạo tự động đề thi trắc nghiệm từ các câu hỏi trong ngân hàng
+// theo đúng chủ đề và nội dung tương đương phòng thi theo mỗi tuần.
+// Ngoài các đề thi do giáo viên tạo ra."
+//
+// BE auto-generate mỗi 1h (setInterval), nhưng GV có thể bấm "Tạo ngay"
+// để force generate đề cho tuần hiện tại nếu chưa có.
+// ──────────────────────────────────────────────────────────────────
+interface AiExamItem {
+  id: string
+  title: string
+  description: string
+  subject: string
+  grade: string
+  duration_min: number
+  total_points: number
+  status: string
+  week_tag: string
+  qcount: number
+  created_at: string
+  ai_metadata?: {
+    category?: string
+    sourceQuestionsCount?: number
+    profile?: Record<string, number>
+  }
+}
+
+function AiWeeklyExamsPanel({ room }: { room: ExamRoom }) {
+  const [items, setItems] = useState<AiExamItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<{ items: AiExamItem[] }>(`/teacher/exam-rooms/${room.id}/ai-exams`)
+      .then(r => setItems(r.data.items || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [room.id, refreshKey])
+
+  const handleGenerate = async () => {
+    if (generating) return
+    setGenerating(true)
+    try {
+      const { data } = await api.post<{ ok: boolean; created?: boolean; reason?: string; subject?: string; grade?: string; weekTag?: string }>(
+        `/teacher/exam-rooms/${room.id}/ai-generate-weekly`
+      )
+      if (data.created) {
+        toast.success(`✅ Đã tạo đề AI cho ${data.subject} ${data.grade} · ${data.weekTag}`)
+      } else if (data.reason === 'already_exists') {
+        toast(`Đề AI tuần này đã có sẵn — hiển thị ở dưới`, { icon: 'ℹ️' })
+      } else {
+        toast.error(`Không tạo được đề: ${data.reason}`)
+      }
+      setRefreshKey(k => k + 1)
+    } catch (e) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (e as { message?: string })?.message || 'Lỗi'
+      toast.error(`Lỗi tạo đề AI: ${msg}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Auto-fetch thường xuyên hơn nếu chưa có đề tuần này (BE đang generate background)
+  const thisWeekItem = items.find(it => {
+    const now = new Date()
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    const weekNo = Math.ceil((((+d - +yearStart) / 86400000) + 1) / 7)
+    const thisTag = `W${String(weekNo).padStart(2, '0')}-${d.getUTCFullYear()}`
+    return it.week_tag === thisTag
+  })
+
+  return (
+    <div className="rounded-xl p-5 space-y-3"
+      style={{ background: D.card, border: '1px solid rgba(168,85,247,0.4)', borderRadius: 12 }}>
+      <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: '#c084fc' }} />
+          <span className="font-bold text-sm" style={{ color: D.text }}>Đề AI tuần này</span>
+          {items.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc' }}>
+              {items.length} đề
+            </span>
+          )}
+          {thisWeekItem && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>
+              ✓ Có tuần này
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleGenerate() }}
+            disabled={generating}
+            className="px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 disabled:opacity-50"
+            style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)' }}
+            title="Tạo đề AI cho tuần hiện tại"
+          >
+            {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {generating ? 'Đang tạo…' : 'Tạo ngay'}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1) }}
+            className="p-1 rounded hover:bg-white/5"
+            title="Refresh"
+          >
+            <RotateCcw className="w-3 h-3" style={{ color: D.muted }} />
+          </button>
+          {collapsed
+            ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} />
+            : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {!collapsed && (
+        <>
+          <p className="text-[11px]" style={{ color: D.muted2 }}>
+            AI tự sinh đề trắc nghiệm từ Ngân hàng câu hỏi mỗi tuần — theo chủ đề + khối lớp tương đương phòng thi.
+            Đây là đề BỔ SUNG, không thay thế đề do giáo viên tạo.
+          </p>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#c084fc' }} />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-6 px-2 rounded-lg"
+              style={{ background: 'rgba(168,85,247,0.05)', border: '1px dashed rgba(168,85,247,0.3)' }}>
+              <Sparkles className="w-8 h-8 mx-auto mb-2" style={{ color: 'rgba(168,85,247,0.4)' }} />
+              <p className="text-xs font-bold" style={{ color: D.text }}>
+                Chưa có đề AI cho phòng này
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: D.muted2 }}>
+                AI sẽ tự tạo trong vòng 1 giờ — hoặc bấm "Tạo ngay" để có ngay
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {items.map(it => {
+                const isThisWeek = thisWeekItem?.id === it.id
+                return (
+                  <div key={it.id}
+                    className="rounded-lg p-2.5 flex items-start gap-2"
+                    style={{
+                      background: isThisWeek ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${isThisWeek ? 'rgba(168,85,247,0.35)' : D.border}`,
+                    }}>
+                    <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#c084fc' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-bold text-xs truncate" style={{ color: D.text }}>
+                          {it.title}
+                        </p>
+                        {isThisWeek && (
+                          <span className="px-1 py-0.5 rounded text-[8px] font-bold"
+                            style={{ background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>
+                            TUẦN NÀY
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px]" style={{ color: D.muted }}>
+                        <span>📝 {it.qcount} câu</span>
+                        <span>⏱ {it.duration_min}p</span>
+                        <span className="font-mono">{it.week_tag}</span>
+                        {it.ai_metadata?.category && (
+                          <span className="px-1 rounded" style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc' }}>
+                            {it.ai_metadata.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <a
+                      href={`/teacher/exams/${it.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2 py-1 rounded text-[10px] font-bold hover:opacity-80"
+                      style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc' }}
+                    >
+                      Xem
+                    </a>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
