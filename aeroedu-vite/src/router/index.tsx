@@ -139,6 +139,9 @@ const ScratchKids        = lazy(() => import('@/pages/labs/ScratchKids'))
 const CFDFlow            = lazy(() => import('@/pages/labs/CFDFlow'))
 const StandingWaves      = lazy(() => import('@/pages/labs/StandingWaves'))
 const StemDIYLibrary     = lazy(() => import('@/pages/labs/StemDIYLibrary'))
+const BioGrowth          = lazy(() => import('@/pages/labs/BioGrowth'))
+const ThermalGas         = lazy(() => import('@/pages/labs/ThermalGas'))
+const WfcBuilder         = lazy(() => import('@/pages/labs/WfcBuilder'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -502,6 +505,19 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/diy"                     element={<StemDIYLibrary />} />
             <Route path="/dashboard/labtwin/diy-library"             element={<StemDIYLibrary />} />
             <Route path="/dashboard/labtwin/tutorials"               element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/biogrowth"               element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/bio-growth"              element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/population"              element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/thermal-gas"             element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/gas-laws"                element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/thermodynamics"          element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/ideal-gas"               element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/wfc-builder"             element={<WfcBuilder />} />
+            <Route path="/dashboard/labtwin/wfc"                     element={<WfcBuilder />} />
+            <Route path="/dashboard/labtwin/wave-function-collapse"  element={<WfcBuilder />} />
+            {/* Wokwi sim → redirect đến Arduino emulator hiện có */}
+            <Route path="/dashboard/labtwin/wokwi-sim"               element={<Navigate to="/dashboard/iot-lab/emulator" replace />} />
+            <Route path="/dashboard/labtwin/wokwi"                   element={<Navigate to="/dashboard/iot-lab/emulator" replace />} />
             <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
             {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
             <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />
