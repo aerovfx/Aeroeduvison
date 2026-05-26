@@ -392,9 +392,9 @@ export default function LabsIndexPage() {
               </div>
             </div>
 
-            {/* Category cards grid */}
+            {/* Category cards grid — auto-rows-fr để mọi card cùng chiều cao */}
             <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-fr">
                 {PYTHON_CATEGORIES.map((cat) => {
                   const emoji = CATEGORY_ICON[cat.category] ?? '🔬'
                   const gradient = CATEGORY_GRADIENT[cat.category] ?? DEFAULT_GRADIENT
@@ -404,19 +404,19 @@ export default function LabsIndexPage() {
                     <Link
                       key={cat.category}
                       to={`/dashboard/labtwin/labs?category=${encodeURIComponent(cat.category)}`}
-                      className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${gradient} border-2 ${border} overflow-hidden relative rounded-2xl block`}
+                      className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${gradient} border-2 ${border} overflow-hidden relative rounded-2xl flex flex-col h-full`}
                     >
                       {/* Decorative circles */}
                       <div className="absolute top-0 right-0 w-20 h-20 bg-white/[0.04] rounded-full -mr-10 -mt-10" />
                       <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.04] rounded-full -ml-8 -mb-8" />
 
-                      <div className="p-5 relative z-10">
+                      <div className="p-5 relative z-10 flex flex-col flex-1">
                         <div className="text-center mb-4">
                           <div className="text-6xl mb-3 group-hover:scale-125 transition-transform inline-block">
                             {emoji}
                           </div>
                           <h3 className="font-bold text-xl text-white/90 mb-2">{cat.category}</h3>
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-2 flex-wrap">
                             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.1] text-white/70 border border-white/10">
                               {cat.count} labs
                             </span>
@@ -427,8 +427,8 @@ export default function LabsIndexPage() {
                           </div>
                         </div>
 
-                        {/* Preview of first 2 sims */}
-                        <div className="space-y-2 mb-4">
+                        {/* Preview of first 2 sims — flex-1 để chiếm space, CTA push xuống đáy */}
+                        <div className="space-y-2 mb-4 flex-1">
                           {cat.preview.map((sim, i) => (
                             <div
                               key={i}
@@ -452,7 +452,7 @@ export default function LabsIndexPage() {
                           )}
                         </div>
 
-                        <div className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 group-hover:from-indigo-500 group-hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                        <div className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 group-hover:from-indigo-500 group-hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-auto">
                           Khám phá {cat.category}
                           <ArrowRight className="h-4 w-4" />
                         </div>
@@ -506,13 +506,13 @@ export default function LabsIndexPage() {
               </div>
             </div>
 
-            {/* Tool cards */}
+            {/* Tool cards — auto-rows-fr + h-full flex flex-col chuẩn hoá chiều cao */}
             <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
                 {/* Graph — featured */}
                 <Link
                   to="/dashboard/labtwin/labs/graph-lab"
-                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   <div className="absolute inset-0 opacity-[0.12] pointer-events-none">
                     <svg viewBox="0 0 200 120" preserveAspectRatio="none" className="w-full h-full">
@@ -545,7 +545,7 @@ export default function LabsIndexPage() {
                     </svg>
                   </div>
 
-                  <div className="relative z-10 p-5">
+                  <div className="relative z-10 p-5 flex flex-col flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-cyan-500/20 ring-1 ring-cyan-400/40 group-hover:scale-110 transition-transform">
                         <FunctionSquare className="h-7 w-7 text-cyan-300" />
@@ -565,18 +565,18 @@ export default function LabsIndexPage() {
                       Máy tính đồ thị kiểu GeoGebra — nhập phương trình, vẽ trực quan, kéo &amp; zoom, bàn phím toán học tích hợp.
                     </p>
 
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-4 flex-1">
                       {['Đại số', 'Hàm số', 'Lượng giác', 'Mũ & log'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-800 dark:text-cyan-100/80 border border-cyan-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-800 dark:text-cyan-100/80 border border-cyan-400/20 self-start"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
 
-                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 group-hover:from-cyan-400 group-hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 group-hover:from-cyan-400 group-hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-auto">
                       Mở Graph
                       <ArrowRight className="h-4 w-4" />
                     </div>
@@ -586,7 +586,7 @@ export default function LabsIndexPage() {
                 {/* AirflowCFD — featured (R3F airflow simulator) */}
                 <Link
                   to="/dashboard/labtwin/labs/airflow-cfd"
-                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   {/* Decorative streamlines */}
                   <div className="absolute inset-0 opacity-[0.18] pointer-events-none">
@@ -611,7 +611,7 @@ export default function LabsIndexPage() {
                     </svg>
                   </div>
 
-                  <div className="relative z-10 p-5">
+                  <div className="relative z-10 p-5 flex flex-col flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-fuchsia-500/20 ring-1 ring-fuchsia-400/40 group-hover:scale-110 transition-transform">
                         <Wind className="h-7 w-7 text-fuchsia-300" />
@@ -631,26 +631,26 @@ export default function LabsIndexPage() {
                       Mô phỏng dòng không khí qua 5 vật thể 3D — cánh máy bay, hình cầu, trụ, thân xe, rotor bơm. Có streamlines, áp suất bề mặt, đồ thị hội tụ.
                     </p>
 
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-4 flex-1">
                       {['Reynolds', 'CL/CD', 'AoA', 'Streamlines'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-800 dark:text-fuchsia-100/80 border border-fuchsia-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-800 dark:text-fuchsia-100/80 border border-fuchsia-400/20 self-start"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
 
-                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 group-hover:from-fuchsia-400 group-hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 group-hover:from-fuchsia-400 group-hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-auto">
                       Mở AirflowCFD
                       <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
                 </Link>
 
-                <div className="relative rounded-2xl border-2 border-dashed border-border/60 bg-slate-900/40 overflow-hidden opacity-70">
-                  <div className="p-5 flex flex-col h-full">
+                <div className="relative rounded-2xl border-2 border-dashed border-border/60 bg-slate-900/40 overflow-hidden opacity-70 flex flex-col h-full">
+                  <div className="p-5 flex flex-col h-full flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-secondary ring-1 ring-slate-700">
                         <Wrench className="h-7 w-7 text-slate-500" />
@@ -701,10 +701,10 @@ export default function LabsIndexPage() {
             </div>
           </div>
 
-          {/* ── Achievements + Goals ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* ── Achievements + Goals — auto-rows-fr cho cùng chiều cao ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 auto-rows-fr">
             {/* Achievements */}
-            <div className="bg-gradient-to-br from-amber-500/10 to-amber-400/5 border-2 border-amber-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-br from-amber-500/10 to-amber-400/5 border-2 border-amber-500/20 rounded-2xl overflow-hidden flex flex-col">
               <div className="px-6 py-4 border-b border-amber-500/10">
                 <h3 className="flex items-center gap-2 text-amber-200 font-bold text-lg">
                   <Award className="h-6 w-6 text-amber-400" />
@@ -731,7 +731,7 @@ export default function LabsIndexPage() {
             </div>
 
             {/* Weekly goals */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-blue-400/5 border-2 border-blue-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-500/10 to-blue-400/5 border-2 border-blue-500/20 rounded-2xl overflow-hidden flex flex-col">
               <div className="px-6 py-4 border-b border-blue-500/10">
                 <h3 className="flex items-center gap-2 text-blue-200 font-bold text-lg">
                   <TrendingUp className="h-6 w-6 text-blue-400" />
@@ -796,7 +796,7 @@ export default function LabsIndexPage() {
             </div>
 
             <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
                 {POPULAR_LABS.map((lab) => {
                   const url = `${origin}${lab.path}`
                   const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(url)}`
@@ -804,17 +804,17 @@ export default function LabsIndexPage() {
                   return (
                     <div
                       key={lab.path}
-                      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] transition-all p-4 flex flex-col items-center text-center"
+                      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] transition-all p-4 flex flex-col items-center text-center h-full"
                     >
                       <div className="p-2 bg-white rounded-xl mb-3 shadow-[0_0_24px_rgba(99,102,241,0.18)]">
                         <img src={qrImg} alt={`QR ${lab.name}`} className="w-28 h-28 object-contain" loading="lazy" />
                       </div>
                       <div className="text-2xl mb-1">{lab.emoji}</div>
                       <h4 className="text-sm font-bold text-white/90 mb-0.5 line-clamp-1">{lab.name}</h4>
-                      <p className="text-[11px] text-white/45 leading-snug mb-3 line-clamp-2 min-h-[28px]">
+                      <p className="text-[11px] text-white/45 leading-snug mb-3 line-clamp-2 min-h-[28px] flex-1">
                         {lab.desc}
                       </p>
-                      <div className="flex items-center gap-1.5 w-full">
+                      <div className="flex items-center gap-1.5 w-full mt-auto">
                         <Link
                           to={lab.path}
                           className="flex-1 text-center text-[11px] font-semibold px-2 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-400/30 text-indigo-200 hover:bg-indigo-500/25 transition-all"
