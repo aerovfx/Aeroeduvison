@@ -23,6 +23,7 @@ import CompetencyPicker, { type CompetencyTarget } from '@/components/learning-p
 import CompetencyCoverage from '@/components/learning-path/CompetencyCoverage'
 import RubricEditor, { defaultEvaluation, type ModuleEvaluation } from '@/components/learning-path/RubricEditor'
 import KgPathSuggester, { type KgSuggestedModule } from '@/components/learning-path/KgPathSuggester'
+import KgPathSketch, { type SketchModuleOut } from '@/components/learning-path/KgPathSketch'
 import { MODULE_TYPE_TO_PILLARS, getPillar, COMPETENCY_LEVELS } from '@/lib/competency-framework'
 
 const CreateModuleModal = lazy(() => import('@/components/learning-path/CreateModuleModal'))
@@ -287,6 +288,10 @@ export default function LearningPathBuilder() {
   const [customModules, setCustomModules] = useState<Module[]>([])
   const [activeModuleIdForRubric, setActiveModuleIdForRubric] = useState<string | null>(null)
 
+  // KG method tabs (Suggester vs Sketch) + Sketch modal
+  const [kgMethod, setKgMethod] = useState<'suggest' | 'sketch'>('suggest')
+  const [sketchOpen, setSketchOpen] = useState(false)
+
   const handleCreateModule = (m: Module) => {
     const enriched = applyDefaultsToModule(m)
     setCustomModules(prev => [enriched, ...prev])
@@ -319,6 +324,26 @@ export default function LearningPathBuilder() {
     const converted = mods.map(kgSuggestedToModule)
     setSelectedModules(prev => [...prev, ...converted])
     toast.success(`Đã thêm ${converted.length} module từ KG`)
+  }
+
+  // Method 2: từ Sketch canvas → modules (already topologically sorted)
+  const handleSketchSave = (mods: SketchModuleOut[]) => {
+    if (mods.length === 0) return
+    const converted = mods.map((m): Module => applyDefaultsToModule({
+      id: m.id,
+      type: m.type,
+      title: m.title,
+      subject: m.subject || pathSubject,
+      difficulty: m.difficulty,
+      duration: m.duration,
+      xpTarget: m.xpTarget,
+      description: m.description,
+      tags: m.tags,
+      kgNodeId: m.kgNodeId,
+      kgNodeType: m.kgNodeType,
+    }))
+    setSelectedModules(prev => [...prev, ...converted])
+    toast.success(`Đã chuyển ${converted.length} node thành module (topological order)`)
   }
 
   /* Track which KG nodes are already in path (để tránh thêm trùng) */
@@ -700,27 +725,73 @@ export default function LearningPathBuilder() {
             </Card>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="lpb-sidebar">
-              {/* ── 🧠 KG-based auto-suggest (Phase 1+4+6 from KG service) ──
-                  User: "thuật toán gợi ý tự động tìm các node có mối quan hệ
-                   với nhau và gợi ý xây dựng lộ trình học tập theo gợi ý từ
-                   các node trong KG" */}
+              {/* ── 🧠 2 METHODS từ KG: Suggester + Sketch ──
+                  User: "xây dựng lộ trình học dựa vào 2 phương pháp:
+                   1. Node KG gợi ý mở rộng từ khoá có quan hệ
+                   2. Bảng kéo thả node + nối các node tạo lộ trình
+                   Sau đó GV điền nội dung cụ thể" */}
               <Card style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.08), rgba(99,102,241,0.04))', border: '1px solid rgba(168,139,250,0.25)' }}>
                 <h3 style={{
-                  fontSize: 13, fontWeight: 800, color: D.text, margin: '0 0 4px',
+                  fontSize: 13, fontWeight: 800, color: D.text, margin: '0 0 8px',
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}>
                   <Brain size={14} style={{ color: '#a78bfa' }} />
-                  Gợi ý từ Knowledge Graph
+                  Xây lộ trình từ Knowledge Graph
                 </h3>
-                <p style={{ fontSize: 10.5, color: D.muted, margin: '0 0 10px', lineHeight: 1.4 }}>
-                  Thuật toán tự tìm node liên quan + dựng lộ trình từ KG
-                </p>
-                <KgPathSuggester
-                  pathSubject={pathSubject}
-                  onAdd={handleKgAddOne}
-                  onAddMany={handleKgAddMany}
-                  existingKgNodeIds={existingKgNodeIds}
-                />
+                {/* 2-tab sub-toggle */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 8, padding: 2,
+                  background: 'rgba(255,255,255,0.04)', borderRadius: 8 }}>
+                  <button onClick={() => setKgMethod('suggest')}
+                    style={{
+                      flex: 1, padding: '5px 8px', borderRadius: 6, cursor: 'pointer',
+                      background: kgMethod === 'suggest' ? 'rgba(168,139,250,0.25)' : 'transparent',
+                      border: kgMethod === 'suggest' ? '1px solid #a78bfa' : '1px solid transparent',
+                      color: kgMethod === 'suggest' ? '#a78bfa' : 'rgba(255,255,255,0.55)',
+                      fontWeight: 700, fontSize: 10.5,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    }}>
+                    🔍 Cách 1: Gợi ý
+                  </button>
+                  <button onClick={() => setKgMethod('sketch')}
+                    style={{
+                      flex: 1, padding: '5px 8px', borderRadius: 6, cursor: 'pointer',
+                      background: kgMethod === 'sketch' ? 'rgba(34,211,238,0.2)' : 'transparent',
+                      border: kgMethod === 'sketch' ? '1px solid #22d3ee' : '1px solid transparent',
+                      color: kgMethod === 'sketch' ? '#22d3ee' : 'rgba(255,255,255,0.55)',
+                      fontWeight: 700, fontSize: 10.5,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    }}>
+                    🎨 Cách 2: Bảng vẽ
+                  </button>
+                </div>
+                {kgMethod === 'suggest' ? (
+                  <>
+                    <p style={{ fontSize: 10.5, color: D.muted, margin: '0 0 10px', lineHeight: 1.4 }}>
+                      Thuật toán tự tìm node liên quan từ keyword
+                    </p>
+                    <KgPathSuggester
+                      pathSubject={pathSubject}
+                      onAdd={handleKgAddOne}
+                      onAddMany={handleKgAddMany}
+                      existingKgNodeIds={existingKgNodeIds}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 10.5, color: D.muted, margin: '0 0 8px', lineHeight: 1.4 }}>
+                      Mở bảng vẽ riêng — kéo thả node + nối edge → điền nội dung
+                    </p>
+                    <button onClick={() => setSketchOpen(true)}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: 'linear-gradient(135deg, #22d3ee, #0891b2)',
+                        border: 'none', color: '#fff', fontWeight: 700, fontSize: 12,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}>
+                      🎨 Mở bảng vẽ lộ trình
+                    </button>
+                  </>
+                )}
               </Card>
 
               <Card>
@@ -1058,6 +1129,44 @@ export default function LearningPathBuilder() {
           />
         )}
       </Suspense>
+
+      {/* 🎨 KG Sketch fullscreen modal — Method 2 (drag-drop canvas) */}
+      {sketchOpen && (
+        <div onClick={() => setSketchOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(5,3,12,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+            backdropFilter: 'blur(8px)',
+          }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#0a0612', border: '1px solid rgba(168,139,250,0.3)', borderRadius: 14,
+              padding: 18, maxWidth: 1280, width: '100%', maxHeight: '95vh', overflowY: 'auto',
+              boxShadow: '0 30px 80px rgba(0,0,0,0.8), 0 0 80px rgba(168,139,250,0.15)',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🎨 Bảng vẽ lộ trình từ KG
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'rgba(255,255,255,0.55)' }}>
+                  Kéo node KG vào bảng · Nối với "+" để tạo edge · Click node để điền nội dung
+                </p>
+              </div>
+              <button onClick={() => setSketchOpen(false)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: '6px 10px', borderRadius: 6,
+                  fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                Đóng (giữ lại sketch)
+              </button>
+            </div>
+            <KgPathSketch
+              pathSubject={pathSubject}
+              onSave={(mods) => { handleSketchSave(mods); setSketchOpen(false) }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Existing paths dialog */}
       {pathsListOpen && (
