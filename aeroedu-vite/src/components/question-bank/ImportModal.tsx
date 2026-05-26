@@ -1,10 +1,11 @@
 import { useState, useRef } from "react"
 import {
   Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Trash2, Download,
-  ClipboardPaste, Code2, Eraser,
+  ClipboardPaste, Code2, Eraser, Sparkles, Send, Bot,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import * as XLSX from "xlsx"
+import { api } from "@/services/api"
 
 // ── Template generators ──────────────────────────────────────
 // Mẫu mở rộng 2026-05-19: bao quát 3 loại câu chính + LaTeX inline,
@@ -666,6 +667,56 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [pasteParsing, setPasteParsing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // AI chat generator state
+  const [aiTopic, setAiTopic] = useState("")
+  const [aiCount, setAiCount] = useState(5)
+  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed')
+  const [aiTypes, setAiTypes] = useState<string[]>(['MCQ'])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiLastResult, setAiLastResult] = useState<{ count: number; provider: string } | null>(null)
+
+  const handleAiGenerate = async () => {
+    const topic = aiTopic.trim()
+    if (!topic || topic.length < 3) {
+      setAiError('Vui lòng nhập chủ đề ít nhất 3 ký tự')
+      return
+    }
+    setAiLoading(true)
+    setAiError(null)
+    setAiLastResult(null)
+    try {
+      const { data } = await api.post<{
+        questions: any[]; json: string; count: number; provider: string; model: string;
+      }>('/ai/generate-questions', {
+        topic,
+        count: aiCount,
+        subject,           // dùng subject của modal
+        grade,             // dùng grade của modal
+        difficulty: aiDifficulty === 'mixed' ? undefined : aiDifficulty,
+        types: aiTypes.length > 0 ? aiTypes : undefined,
+      })
+      if (!data?.json || !data.count) {
+        throw new Error('AI trả về 0 câu hỏi — thử lại với chủ đề rõ ràng hơn')
+      }
+      // Fill textarea JSON + clear paste error
+      setPastedJson(data.json)
+      setPasteError(null)
+      setAiLastResult({ count: data.count, provider: data.provider })
+      toast.success(`AI sinh ${data.count} câu hỏi (${data.provider}). Bấm "Phân tích JSON" để xem trước.`)
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Lỗi gọi AI'
+      setAiError(msg)
+      toast.error(msg)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const toggleAiType = (t: string) => {
+    setAiTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -979,12 +1030,146 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                 )}
               </div>
 
+              {/* ── AI Chat — Tạo câu hỏi tự động bằng AI ── */}
+              <div className="relative">
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex-1 h-px bg-[#2a2b3d]" />
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">hoặc — sinh tự động bằng AI</span>
+                  <div className="flex-1 h-px bg-[#2a2b3d]" />
+                </div>
+
+                <div className="rounded-xl p-4 space-y-3 border"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.08))',
+                    borderColor: 'rgba(139,92,246,0.3)',
+                  }}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg,#8b5cf6,#ec4899)' }}>
+                        <Bot className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-200">AI Tạo câu hỏi tự động</p>
+                        <p className="text-[10px] text-slate-400">Mô tả chủ đề → AI sinh JSON → 1 click import</p>
+                      </div>
+                    </div>
+                    {aiLastResult && (
+                      <span className="text-[10px] px-2 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
+                        ✓ Đã sinh {aiLastResult.count} câu ({aiLastResult.provider})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Topic input */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 mb-1.5 block">
+                      Chủ đề / yêu cầu cụ thể
+                    </label>
+                    <textarea
+                      value={aiTopic}
+                      onChange={e => setAiTopic(e.target.value)}
+                      placeholder="VD: Định luật bảo toàn năng lượng — bài tập áp dụng vào con lắc đơn và chuyển động tròn đều..."
+                      rows={2}
+                      className="w-full bg-[#06070f] border border-[#1e2033] rounded-lg p-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-purple-500/60 resize-y leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Config row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 mb-1 block uppercase tracking-wide">Số câu</label>
+                      <select
+                        value={aiCount}
+                        onChange={e => setAiCount(Number(e.target.value))}
+                        className="w-full bg-[#06070f] border border-[#1e2033] rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60"
+                      >
+                        {[3, 5, 10, 15, 20].map(n => <option key={n} value={n}>{n} câu</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 mb-1 block uppercase tracking-wide">Độ khó</label>
+                      <select
+                        value={aiDifficulty}
+                        onChange={e => setAiDifficulty(e.target.value as any)}
+                        className="w-full bg-[#06070f] border border-[#1e2033] rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60"
+                      >
+                        <option value="mixed">Đa dạng</option>
+                        <option value="easy">Dễ</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="hard">Khó</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-semibold text-slate-400 mb-1 block uppercase tracking-wide">Loại câu (chọn nhiều)</label>
+                      <div className="flex gap-1 flex-wrap">
+                        {([
+                          { id: 'MCQ', label: 'MCQ' },
+                          { id: 'MULTIPLE_TF', label: 'Đúng/Sai' },
+                          { id: 'SHORT_ANSWER', label: 'Trả lời ngắn' },
+                          { id: 'ESSAY', label: 'Tự luận' },
+                        ]).map(({ id, label }) => {
+                          const active = aiTypes.includes(id)
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => toggleAiType(id)}
+                              className={`px-2 py-1 rounded text-[10px] font-bold transition-colors border ${
+                                active
+                                  ? 'bg-purple-500/30 border-purple-400 text-purple-200'
+                                  : 'bg-[#06070f] border-[#1e2033] text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Error */}
+                  {aiError && (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-950/30 border border-rose-700/40 text-xs text-rose-300">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>{aiError}</span>
+                    </div>
+                  )}
+
+                  {/* Action: generate + tip */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      JSON sinh ra tự động fill xuống ô bên dưới — Bấm <strong className="text-purple-300">"Phân tích JSON"</strong> để import
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAiGenerate}
+                      disabled={aiLoading || !aiTopic.trim()}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: aiLoading || !aiTopic.trim()
+                          ? '#6b7280'
+                          : 'linear-gradient(135deg,#8b5cf6,#ec4899)',
+                        boxShadow: aiLoading || !aiTopic.trim() ? 'none' : '0 4px 12px rgba(139,92,246,0.4)',
+                      }}
+                    >
+                      {aiLoading
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> AI đang sinh câu hỏi...</>
+                        : <><Send className="w-3.5 h-3.5" /> Sinh câu hỏi bằng AI</>
+                      }
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* ── Dán JSON trực tiếp (alternative to file upload) ── */}
               <div className="relative">
                 {/* "Hoặc" divider */}
                 <div className="flex items-center gap-3 my-2">
                   <div className="flex-1 h-px bg-[#2a2b3d]" />
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">hoặc</span>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">hoặc — dán JSON sẵn có</span>
                   <div className="flex-1 h-px bg-[#2a2b3d]" />
                 </div>
 

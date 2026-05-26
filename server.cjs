@@ -4304,6 +4304,215 @@ if (USE_NODEJS_QUESTIONS) {
   // Conversation history — not persisted yet. Return [] so the frontend
   // sidebar renders cleanly. (Persistence can be added later via Prisma.)
   app.get('/api/ai-tutor/conversations', (_req, res) => res.json([]));
+
+  // ══════════════════════════════════════════════════════════════
+  // POST /api/ai/generate-questions
+  // Sinh câu hỏi JSON từ topic do GV mô tả — dùng cho Question Bank import.
+  //
+  // Body:
+  //   topic: string (chủ đề/yêu cầu — bắt buộc)
+  //   count: number (mặc định 5, max 20)
+  //   subject?: 'Vật lí' | 'Toán' | 'Hoá học' | ...
+  //   grade?: '10' | '11' | '12'
+  //   difficulty?: 'easy' | 'medium' | 'hard'
+  //   types?: ['MCQ', 'MULTIPLE_TF', 'SHORT_ANSWER', 'TRUE_FALSE', 'ESSAY']
+  //
+  // Response:
+  //   { questions: [...], json: stringified, provider, model, usage }
+  //
+  // System prompt force JSON output theo schema ImportModal expect.
+  // ══════════════════════════════════════════════════════════════
+  function buildQuestionGenPrompt() {
+    return [
+      'Bạn là chuyên gia ra đề trắc nghiệm cho học sinh THPT Việt Nam.',
+      'Nhiệm vụ: Sinh các câu hỏi theo định dạng JSON CHÍNH XÁC để import vào Ngân hàng câu hỏi.',
+      '',
+      'CẤU TRÚC JSON BẮT BUỘC (output PHẢI là JSON object, không thêm text giải thích bên ngoài):',
+      '```',
+      '{',
+      '  "questions": [',
+      '    {',
+      '      "questionType": "MCQ" | "MULTIPLE_TF" | "SHORT_ANSWER" | "TRUE_FALSE" | "ESSAY",',
+      '      "content": "Nội dung câu hỏi (hỗ trợ LaTeX inline $x^2$ hoặc block $$\\\\int...$$)",',
+      '      "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],  // chỉ cho MCQ và MULTIPLE_TF',
+      '      "correctAnswer": "A" | "B" | "C" | "D"  // cho MCQ',
+      '                     | "Đúng,Sai,Đúng,Sai"   // cho MULTIPLE_TF (4 mệnh đề)',
+      '                     | "1414"                  // cho SHORT_ANSWER (4 ký tự số, đề THPT QG)',
+      '                     | "đáp án mẫu..."         // cho ESSAY',
+      '      "subject": "Vật lí" | "Toán" | "Hoá học" | ...,',
+      '      "grade": "10" | "11" | "12",',
+      '      "difficulty": "easy" | "medium" | "hard",',
+      '      "topic": "Chủ đề ngắn gọn",',
+      '      "explanation": "Lời giải / giải thích chi tiết"',
+      '    }',
+      '  ]',
+      '}',
+      '```',
+      '',
+      'QUY TẮC:',
+      '1. JSON output PHẢI parse được — KHÔNG dùng markdown ```json fence trong response.',
+      '2. Subject dùng chuẩn TT 32/2018 GDPT: "Vật lí" (không "Vật lý"), "Hoá học" (không "Hóa học").',
+      '3. Câu MCQ: đúng 4 options A-D, correctAnswer là 1 ký tự A/B/C/D.',
+      '4. Câu MULTIPLE_TF (Đúng/Sai 4 mệnh đề chuẩn THPT 2025): 4 options là 4 mệnh đề,',
+      '   correctAnswer = "Đúng,Sai,Đúng,Sai" (cách nhau dấu phẩy, mỗi vị trí ứng 1 mệnh đề).',
+      '5. Câu SHORT_ANSWER (trả lời ngắn chuẩn THPT QG): correctAnswer là chuỗi 4 ký tự số.',
+      '6. LaTeX: bọc trong $...$ (inline) hoặc $$...$$ (block) — escape backslash: \\\\frac, \\\\sqrt.',
+      '7. Difficulty cân bằng: 30% easy + 50% medium + 20% hard (trừ khi user yêu cầu khác).',
+      '8. Câu hỏi phải đúng kiến thức chuẩn SGK, không bịa.',
+      '9. explanation chi tiết để GV hiểu cách giải.',
+      '10. Tránh trùng câu hỏi — mỗi câu test 1 khái niệm khác.',
+    ].join('\n');
+  }
+
+  function buildQuestionGenUserMsg(topic, opts) {
+    const count = Math.max(1, Math.min(20, Number(opts.count) || 5));
+    const subject = opts.subject ? `Môn: ${opts.subject}` : '';
+    const grade = opts.grade ? `Lớp: ${opts.grade}` : '';
+    const difficulty = opts.difficulty ? `Độ khó: ${opts.difficulty}` : '';
+    const types = Array.isArray(opts.types) && opts.types.length > 0
+      ? `Loại câu: ${opts.types.join(', ')}` : '';
+    return [
+      `Hãy sinh ${count} câu hỏi với yêu cầu:`,
+      `Chủ đề: ${topic}`,
+      subject, grade, difficulty, types,
+      '',
+      'Trả về JSON OBJECT theo schema { "questions": [...] } — KHÔNG kèm markdown fence hay text giải thích bên ngoài JSON.',
+    ].filter(Boolean).join('\n');
+  }
+
+  // Extract JSON từ response (AI đôi khi vẫn kèm fence dù bị cấm)
+  function extractJson(text) {
+    if (!text) return null;
+    let s = String(text).trim();
+    // Remove markdown fence nếu có
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+    // Find first { và last } cho safety
+    const firstBrace = s.indexOf('{');
+    const lastBrace = s.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      s = s.slice(firstBrace, lastBrace + 1);
+    }
+    try { return JSON.parse(s); } catch { return null; }
+  }
+
+  app.post('/api/ai/generate-questions', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
+    const startedAt = Date.now();
+    try {
+      const body = req.body || {};
+      const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
+      if (!topic || topic.length < 3) {
+        return res.status(400).json({ error: 'topic_required', message: 'Vui lòng nhập chủ đề (tối thiểu 3 ký tự)' });
+      }
+      const opts = {
+        count: body.count,
+        subject: body.subject,
+        grade: body.grade,
+        difficulty: body.difficulty,
+        types: body.types,
+      };
+
+      const system = buildQuestionGenPrompt();
+      const userMsg = buildQuestionGenUserMsg(topic, opts);
+      const maxTokens = parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4000', 10);
+
+      // Provider routing — same pattern như ai-tutor
+      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+      const useDeepseek = (prefProvider === 'deepseek' && process.env.DEEPSEEK_API_KEY) ||
+                          (!process.env.ANTHROPIC_API_KEY && process.env.DEEPSEEK_API_KEY);
+
+      let rawText = '';
+      let provider = '';
+      let model = '';
+      let usage = null;
+
+      if (useDeepseek) {
+        const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+        const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: dsModel,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: userMsg },
+            ],
+            max_tokens: maxTokens,
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          }),
+        });
+        if (!dsResp.ok) {
+          const errText = await dsResp.text().catch(() => '');
+          throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 300)}`);
+        }
+        const dsJson = await dsResp.json();
+        rawText = dsJson.choices?.[0]?.message?.content || '';
+        provider = 'deepseek';
+        model = dsModel;
+        usage = dsJson.usage || null;
+      } else {
+        // Anthropic Claude
+        let client;
+        try { client = getAnthropic(); }
+        catch (err) {
+          return res.status(503).json({
+            error: 'ai_unavailable',
+            message: 'AI chưa cấu hình (ANTHROPIC_API_KEY hoặc DEEPSEEK_API_KEY).',
+          });
+        }
+        const completion = await client.messages.create({
+          model: AI_TUTOR_MODEL,
+          max_tokens: maxTokens,
+          system,
+          messages: [{ role: 'user', content: userMsg }],
+        });
+        if (Array.isArray(completion.content)) {
+          for (const block of completion.content) {
+            if (block && block.type === 'text' && typeof block.text === 'string') {
+              rawText += block.text;
+            }
+          }
+        }
+        provider = 'anthropic';
+        model = completion.model || AI_TUTOR_MODEL;
+        usage = completion.usage || null;
+      }
+
+      const parsed = extractJson(rawText);
+      if (!parsed || !Array.isArray(parsed.questions)) {
+        console.warn('[ai:generate-questions] parse failed, raw=', rawText.slice(0, 300));
+        return res.status(500).json({
+          error: 'parse_failed',
+          message: 'AI trả về dữ liệu không đúng format JSON. Thử lại với chủ đề rõ ràng hơn.',
+          raw: rawText.slice(0, 1000),
+        });
+      }
+
+      const questions = parsed.questions.filter(q => q && typeof q.content === 'string');
+      const latencyMs = Date.now() - startedAt;
+      console.log(`[ai:generate-questions] ok provider=${provider} count=${questions.length} latency=${latencyMs}ms`);
+
+      return res.json({
+        questions,
+        json: JSON.stringify({ questions }, null, 2),
+        count: questions.length,
+        provider,
+        model,
+        usage,
+        latencyMs,
+      });
+    } catch (err) {
+      const status = err && err.status ? err.status : 500;
+      console.error(`[ai:generate-questions] ❌ ${status} ${err.message}`);
+      return res.status(status >= 400 && status < 600 ? status : 500).json({
+        error: 'ai_error',
+        message: err.message || 'Lỗi gọi AI sinh câu hỏi',
+      });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
