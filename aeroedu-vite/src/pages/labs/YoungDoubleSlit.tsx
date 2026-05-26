@@ -161,26 +161,73 @@ export default function YoungDoubleSlit() {
       ctx.textAlign = 'left'
       ctx.fillText(`a = ${slitMm}mm`, SLIT_X + 28, (slit1Y + slit2Y) / 2 + 4)
 
-      // Wavefronts (concentric arcs from 2 slits)
+      // ── Wavefronts (concentric arcs from 2 slits) ──
+      // User: "mặt sóng cần làm rộng hơn và di chuyển đập vào màn hứng"
+      // → Tăng arc opening (rộng hơn), không fade theo distance (đập tới màn),
+      //   tăng số fronts + lineWidth + spawn nhiều fronts trong vòng đời.
+      const waveHits: Array<{ y: number; intensity: number }> = []
       if (showWavefronts) {
         const baseColor = wavelengthToRGB(lambdaNm)
-        const numFronts = 10
-        ctx.lineWidth = 1.2
+        const numFronts = 24                    // was 10 → nhiều hơn 2.4×
+        const ARC_HALF = Math.PI * 0.48         // was π/2.2 (~82°) → ~86° mỗi bên, gần 180° total
+        const MAX_R = PROP_DISTANCE_PX + 40     // cho phép vượt qua màn 1 chút để "đập"
+        ctx.lineWidth = 2                       // was 1.2 → đậm hơn
+        ctx.lineCap = 'round'
+
         for (let i = 0; i < numFronts; i++) {
-          const offset = (t * 100 + i * wavelengthPx) % wavelengthPx
-          const r = wavelengthPx * (i - numFronts / 2) + offset + wavelengthPx * 8
-          if (r < 0 || r > PROP_DISTANCE_PX + 20) continue
+          // Mỗi front cách nhau wavelengthPx*2 → thoáng hơn, thấy rõ hình sin
+          const spawnSpacing = wavelengthPx * 2.2
+          const offset = (t * 110 + i * spawnSpacing) % (numFronts * spawnSpacing)
+          const r = offset
+          if (r < 5 || r > MAX_R) continue
+
           for (const cy of [slit1Y, slit2Y]) {
-            // Compute valid angle range (only forward propagation)
+            // Alpha không fade theo distance — wavefront giữ visible tới màn
+            // Chỉ fade khi vượt qua màn ("đập" rồi tan biến)
+            const distToScreen = PROP_DISTANCE_PX - r
+            let alpha: number
+            if (distToScreen > 0) {
+              // Đang propagate — alpha tăng nhẹ khi gần màn (gợi cảm giác tiến tới)
+              alpha = 0.45 + (1 - distToScreen / PROP_DISTANCE_PX) * 0.2
+            } else {
+              // Đã vượt qua màn — fade nhanh
+              alpha = Math.max(0, 0.65 - (-distToScreen) / 30)
+            }
             ctx.strokeStyle = baseColor
-            ctx.globalAlpha = Math.max(0, 1 - r / PROP_DISTANCE_PX) * 0.35
+            ctx.globalAlpha = alpha
             ctx.beginPath()
-            // Arc opening to the right
-            ctx.arc(SLIT_X, cy, r, -Math.PI / 2.2, Math.PI / 2.2)
+            ctx.arc(SLIT_X, cy, r, -ARC_HALF, ARC_HALF)
             ctx.stroke()
+
+            // Glow effect — thêm 1 stroke mờ rộng hơn tạo cảm giác mặt sóng có khối
+            if (alpha > 0.3) {
+              ctx.globalAlpha = alpha * 0.25
+              ctx.lineWidth = 5
+              ctx.beginPath()
+              ctx.arc(SLIT_X, cy, r, -ARC_HALF, ARC_HALF)
+              ctx.stroke()
+              ctx.lineWidth = 2
+            }
+
+            // ✨ Detect wave hit screen: r ∈ [PROP_DISTANCE_PX-3, PROP_DISTANCE_PX+3]
+            // Tính điểm intersect với màn → hiển thị flash tại điểm đó
+            if (Math.abs(distToScreen) < 4) {
+              // Y point on screen where arc intersects (only points within arc angle)
+              // For each visible angle ±ARC_HALF, the arc point hits screen if
+              // x = SLIT_X + r·cos(θ) = SCREEN_X → cos(θ) = (SCREEN_X − SLIT_X) / r
+              const cosTheta = PROP_DISTANCE_PX / r
+              if (cosTheta <= 1 && cosTheta >= Math.cos(ARC_HALF)) {
+                const theta = Math.acos(cosTheta)
+                const hitY1 = cy - r * Math.sin(theta)  // top hit
+                const hitY2 = cy + r * Math.sin(theta)  // bottom hit
+                waveHits.push({ y: hitY1, intensity: 1 - Math.abs(distToScreen) / 4 })
+                waveHits.push({ y: hitY2, intensity: 1 - Math.abs(distToScreen) / 4 })
+              }
+            }
           }
         }
         ctx.globalAlpha = 1
+        ctx.lineCap = 'butt'
       }
 
       // Screen
@@ -188,6 +235,23 @@ export default function YoungDoubleSlit() {
       ctx.fillRect(SCREEN_X, 0, 6, CANVAS_H)
       ctx.strokeStyle = '#475569'
       ctx.strokeRect(SCREEN_X, 0, 6, CANVAS_H)
+
+      // ✨ Wave hit flashes — chấm sáng tại điểm sóng vừa "đập" vào màn
+      if (showWavefronts && waveHits.length > 0) {
+        const flashColor = wavelengthToRGB(lambdaNm)
+        for (const hit of waveHits) {
+          if (hit.y < 0 || hit.y > CANVAS_H) continue
+          ctx.shadowColor = flashColor
+          ctx.shadowBlur = 14
+          ctx.fillStyle = flashColor
+          ctx.globalAlpha = hit.intensity * 0.9
+          ctx.beginPath()
+          ctx.arc(SCREEN_X + 3, hit.y, 5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.shadowBlur = 0
+        ctx.globalAlpha = 1
+      }
 
       // Draw fringe pattern directly on screen surface (right edge)
       // Intensity I(y) = 4·I₀·cos²(π·a·sin θ / λ)
