@@ -18,6 +18,7 @@ import {
   ArrowLeft, Zap, Users, ClipboardList, Activity, MessageSquare,
   Target, Plus, Loader2, Calendar, Clock, CheckCircle2, Circle,
   AlertCircle, Star, Trash2, Edit3, Send, X, Award, TrendingUp,
+  Kanban, ChevronLeft, ChevronRight, Flame, Timer,
 } from 'lucide-react'
 import { api } from '@/services/api'
 
@@ -57,7 +58,7 @@ interface Dashboard {
   feedbacks: Feedback[]; milestones: Milestone[]; stats: Stats; isOwner: boolean;
 }
 
-type Tab = 'overview' | 'tasks' | 'logs' | 'feedback' | 'milestones'
+type Tab = 'overview' | 'scrum' | 'tasks' | 'logs' | 'feedback' | 'milestones'
 
 export default function StemProjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -146,6 +147,7 @@ export default function StemProjectDetail() {
         <div className="flex gap-1 mb-4 border-b border-border overflow-x-auto">
           {([
             { key: 'overview' as const, label: 'Tổng quan', icon: TrendingUp },
+            { key: 'scrum' as const, label: 'Scrum Board', icon: Kanban },
             { key: 'tasks' as const, label: `Nhiệm vụ (${tasks.length})`, icon: ClipboardList },
             { key: 'logs' as const, label: `Tiến trình (${logs.length})`, icon: Activity },
             { key: 'feedback' as const, label: `Feedback (${feedbacks.length})`, icon: MessageSquare },
@@ -170,6 +172,17 @@ export default function StemProjectDetail() {
           <OverviewTab members={members} logs={logs.slice(0, 5)} feedbacks={feedbacks.slice(0, 5)}
             milestones={milestones} isOwner={isOwner}
             projectId={id || ''} onReload={reload} />
+        )}
+        {tab === 'scrum' && (
+          <ScrumTab
+            tasks={tasks} members={members} milestones={milestones} project={project}
+            isOwner={isOwner}
+            onMoveTask={async (taskId, newStatus) => {
+              try { await api.patch(`/teacher/stem-projects/${id}/tasks/${taskId}`, { status: newStatus }); reload() }
+              catch (e: any) { toast.error(e?.response?.data?.error || 'Lỗi') }
+            }}
+            onCreate={() => setTaskModal(true)}
+          />
         )}
         {tab === 'tasks' && (
           <TasksTab tasks={tasks} members={members} isOwner={isOwner}
@@ -567,6 +580,366 @@ function TasksTab({ tasks, members, isOwner, onCreate, onUpdate, onDelete, onFee
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// ScrumTab — Agile Scrum board cho STEM project
+//
+// User: "đưa quản lí dự án chuẩn agile scrum cho Stem giáo viên"
+//
+// Components:
+//   - Sprint header: tên + dates + progress + days remaining
+//   - Kanban 4 cột: Backlog · To Do · In Progress · Done
+//   - Sprint stats: velocity, story points, burndown chart
+//   - Daily standup quick log
+//
+// Status mapping:
+//   Backlog       — chưa có due_date hoặc cách >14 ngày
+//   To Do (pending) — pending + due_date trong sprint
+//   In Progress   — in-progress
+//   Done          — completed
+//
+// Sprint duration: 14 ngày (Scrum standard)
+// Story points = task.points (đã có trong schema)
+// ──────────────────────────────────────────────────────────────────
+
+type ScrumColumn = 'backlog' | 'todo' | 'in-progress' | 'done'
+
+interface ScrumTabProps {
+  tasks: Task[]
+  members: Member[]
+  milestones: Milestone[]
+  project: Project
+  isOwner: boolean
+  onMoveTask: (taskId: string, newStatus: string) => Promise<void>
+  onCreate: () => void
+}
+
+function ScrumTab({ tasks, members, milestones, isOwner, onMoveTask, onCreate }: ScrumTabProps) {
+  // ── Sprint calculation ──
+  // Mỗi sprint = 14 ngày. Sprint 1 bắt đầu từ phase 1 milestone hoặc project created_at.
+  const SPRINT_DAYS = 14
+  const projectStart = milestones[0]?.due_date
+    ? new Date(milestones[0].due_date).getTime() - (14 * 86400000)
+    : Date.now() - (30 * 86400000)  // fallback: 30 ngày trước
+
+  const daysSinceStart = Math.floor((Date.now() - projectStart) / 86400000)
+  const currentSprintNum = Math.max(1, Math.floor(daysSinceStart / SPRINT_DAYS) + 1)
+  const [viewSprintNum, setViewSprintNum] = useState(currentSprintNum)
+
+  const sprintStart = new Date(projectStart + (viewSprintNum - 1) * SPRINT_DAYS * 86400000)
+  const sprintEnd = new Date(sprintStart.getTime() + SPRINT_DAYS * 86400000)
+  const daysRemaining = Math.max(0, Math.ceil((sprintEnd.getTime() - Date.now()) / 86400000))
+  const sprintProgress = Math.min(100, Math.max(0,
+    ((Date.now() - sprintStart.getTime()) / (SPRINT_DAYS * 86400000)) * 100
+  ))
+  const isCurrentSprint = viewSprintNum === currentSprintNum
+
+  // ── Map tasks vào columns ──
+  const columns: Record<ScrumColumn, Task[]> = { backlog: [], todo: [], 'in-progress': [], done: [] }
+  for (const t of tasks) {
+    if (t.status === 'completed') {
+      columns.done.push(t)
+    } else if (t.status === 'in-progress') {
+      columns['in-progress'].push(t)
+    } else if (t.due_date) {
+      const dueT = new Date(t.due_date).getTime()
+      if (dueT >= sprintStart.getTime() && dueT <= sprintEnd.getTime()) {
+        columns.todo.push(t)
+      } else {
+        columns.backlog.push(t)
+      }
+    } else {
+      columns.backlog.push(t)
+    }
+  }
+
+  // ── Sprint stats ──
+  const sprintTasks = [...columns.todo, ...columns['in-progress'], ...columns.done]
+  const totalPoints = sprintTasks.reduce((s, t) => s + (t.points || 1), 0)
+  const completedPoints = columns.done.reduce((s, t) => s + (t.points || 1), 0)
+  const velocityPercent = totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0
+
+  // ── Burndown calculation ──
+  // Ideal: linear from totalPoints → 0 over SPRINT_DAYS
+  // Actual: at each day, remaining = totalPoints - sum(completed tasks completed_at <= day)
+  const burndownData: { day: number; ideal: number; actual: number | null }[] = []
+  for (let d = 0; d <= SPRINT_DAYS; d++) {
+    const ideal = totalPoints - (totalPoints * d / SPRINT_DAYS)
+    const dayT = sprintStart.getTime() + d * 86400000
+    let actual: number | null = totalPoints
+    if (dayT > Date.now()) actual = null  // future
+    else {
+      const doneByThen = sprintTasks
+        .filter(t => t.completed_at && new Date(t.completed_at).getTime() <= dayT)
+        .reduce((s, t) => s + (t.points || 1), 0)
+      actual = totalPoints - doneByThen
+    }
+    burndownData.push({ day: d, ideal, actual })
+  }
+
+  // ── Drag-drop column move ──
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const handleDragStart = (taskId: string) => setDraggedId(taskId)
+  const handleDrop = async (col: ScrumColumn) => {
+    if (!draggedId) return
+    const statusMap: Record<ScrumColumn, string> = {
+      backlog: 'pending', todo: 'pending', 'in-progress': 'in-progress', done: 'completed',
+    }
+    await onMoveTask(draggedId, statusMap[col])
+    setDraggedId(null)
+  }
+
+  // ── Column meta ──
+  const COL_META: Record<ScrumColumn, { label: string; color: string; bg: string; icon: any }> = {
+    backlog:       { label: 'Backlog',       color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', icon: Circle },
+    todo:          { label: 'To Do',         color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: Circle },
+    'in-progress': { label: 'In Progress',   color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  icon: Activity },
+    done:          { label: 'Done',          color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: CheckCircle2 },
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ── Sprint header ── */}
+      <div className="rounded-2xl bg-gradient-to-br from-amber-500/10 via-rose-500/5 to-purple-500/10 border border-amber-500/20 p-5">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setViewSprintNum(n => Math.max(1, n - 1))}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-30"
+              disabled={viewSprintNum <= 1}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Flame className="w-5 h-5 text-amber-500" />
+                Sprint {viewSprintNum}
+                {isCurrentSprint && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    HIỆN TẠI
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {sprintStart.toLocaleDateString('vi-VN')} → {sprintEnd.toLocaleDateString('vi-VN')}
+              </p>
+            </div>
+            <button onClick={() => setViewSprintNum(n => n + 1)}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isCurrentSprint && (
+              <div className="px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5" />
+                Còn {daysRemaining} ngày
+              </div>
+            )}
+            {isOwner && (
+              <button onClick={onCreate}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Thêm task
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sprint progress bar */}
+        <div className="h-2 rounded-full bg-white/5 overflow-hidden mb-3">
+          <div className="h-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all"
+            style={{ width: `${sprintProgress}%` }} />
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div className="rounded-lg bg-white/5 p-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Points</div>
+            <div className="text-xl font-bold text-amber-300">{totalPoints}</div>
+          </div>
+          <div className="rounded-lg bg-white/5 p-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Completed</div>
+            <div className="text-xl font-bold text-emerald-300">{completedPoints}</div>
+          </div>
+          <div className="rounded-lg bg-white/5 p-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Velocity</div>
+            <div className="text-xl font-bold text-cyan-300">{velocityPercent}%</div>
+          </div>
+          <div className="rounded-lg bg-white/5 p-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Tasks</div>
+            <div className="text-xl font-bold text-purple-300">{sprintTasks.length}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Kanban board ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        {(['backlog', 'todo', 'in-progress', 'done'] as ScrumColumn[]).map(col => {
+          const meta = COL_META[col]
+          const colTasks = columns[col]
+          return (
+            <div key={col}
+              className="rounded-xl p-3 min-h-[200px]"
+              style={{ background: meta.bg, border: `1px solid ${meta.color}30` }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(col)}>
+              <div className="flex items-center justify-between mb-3 pb-2 border-b" style={{ borderColor: `${meta.color}20` }}>
+                <div className="flex items-center gap-1.5">
+                  <meta.icon className="w-4 h-4" style={{ color: meta.color }} />
+                  <span className="text-sm font-bold uppercase tracking-wider" style={{ color: meta.color }}>
+                    {meta.label}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-muted-foreground">
+                    {colTasks.length}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {colTasks.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground italic text-center py-4">Trống</p>
+                ) : (
+                  colTasks.map(t => {
+                    const assignedMembers = members.filter(m => t.assigned_to?.includes(m.student_id))
+                    return (
+                      <div key={t.id}
+                        draggable={isOwner}
+                        onDragStart={() => handleDragStart(t.id)}
+                        className={`rounded-lg bg-card border border-border p-2.5 cursor-${isOwner ? 'grab' : 'default'} active:cursor-grabbing hover:shadow-md transition-shadow ${draggedId === t.id ? 'opacity-50' : ''}`}>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <p className="text-xs font-bold leading-tight flex-1">{t.title}</p>
+                          <span className="text-[9px] px-1 py-0.5 rounded font-bold flex-shrink-0"
+                            style={{
+                              background: t.priority === 'high' ? 'rgba(239,68,68,0.2)' : t.priority === 'medium' ? 'rgba(251,191,36,0.2)' : 'rgba(148,163,184,0.2)',
+                              color: t.priority === 'high' ? '#fca5a5' : t.priority === 'medium' ? '#fcd34d' : '#cbd5e1',
+                            }}>
+                            {t.priority?.toUpperCase()}
+                          </span>
+                        </div>
+                        {t.description && (
+                          <p className="text-[10px] text-muted-foreground line-clamp-2 mb-1.5">{t.description}</p>
+                        )}
+                        <div className="flex items-center justify-between gap-2 text-[10px]">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-3 h-3" style={{ color: meta.color }} />
+                            <span className="font-bold tabular-nums" style={{ color: meta.color }}>{t.points || 1} SP</span>
+                          </div>
+                          {t.due_date && (
+                            <span className="text-muted-foreground flex items-center gap-0.5">
+                              <Calendar className="w-2.5 h-2.5" />
+                              {new Date(t.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                          {assignedMembers.length > 0 && (
+                            <div className="flex -space-x-1">
+                              {assignedMembers.slice(0, 3).map(m => (
+                                <div key={m.id}
+                                  className="w-4 h-4 rounded-full bg-emerald-500/30 border border-card text-[8px] flex items-center justify-center font-bold text-emerald-200"
+                                  title={m.name || ''}>
+                                  {(m.name || '?')[0].toUpperCase()}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Burndown chart ── */}
+      <div className="rounded-2xl bg-card border border-border p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-amber-500" />
+            Burndown Chart · Sprint {viewSprintNum}
+          </h3>
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-0.5 border-t-2 border-dashed border-cyan-500" />
+              Lý tưởng
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-0.5 bg-amber-500" />
+              Thực tế
+            </span>
+          </div>
+        </div>
+
+        <svg viewBox="0 0 600 200" className="w-full h-40" preserveAspectRatio="none">
+          {/* Grid */}
+          {[0, 0.25, 0.5, 0.75, 1].map(p => (
+            <line key={p} x1="40" y1={20 + p * 160} x2="590" y2={20 + p * 160}
+              stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+          ))}
+          {/* Y axis labels */}
+          {[0, 0.25, 0.5, 0.75, 1].map(p => (
+            <text key={p} x="35" y={20 + p * 160 + 4} fill="rgba(255,255,255,0.4)"
+              fontSize="10" textAnchor="end">
+              {Math.round(totalPoints * (1 - p))}
+            </text>
+          ))}
+          {/* X axis labels */}
+          {[0, 7, 14].map(d => (
+            <text key={d} x={40 + (d / SPRINT_DAYS) * 550} y="195"
+              fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle">
+              D{d}
+            </text>
+          ))}
+          {/* Ideal line */}
+          {totalPoints > 0 && (
+            <polyline
+              points={burndownData.map(p => `${40 + (p.day / SPRINT_DAYS) * 550},${20 + (1 - p.ideal / totalPoints) * 160}`).join(' ')}
+              fill="none" stroke="#22d3ee" strokeWidth="1.5" strokeDasharray="4,4"
+            />
+          )}
+          {/* Actual line */}
+          {totalPoints > 0 && (
+            <polyline
+              points={burndownData
+                .filter(p => p.actual !== null)
+                .map(p => `${40 + (p.day / SPRINT_DAYS) * 550},${20 + (1 - (p.actual as number) / totalPoints) * 160}`)
+                .join(' ')}
+              fill="none" stroke="#fbbf24" strokeWidth="2.5"
+              style={{ filter: 'drop-shadow(0 0 4px rgba(251,191,36,0.5))' }}
+            />
+          )}
+          {/* Today marker */}
+          {isCurrentSprint && (
+            <line
+              x1={40 + (daysSinceStart % SPRINT_DAYS / SPRINT_DAYS) * 550}
+              y1="20"
+              x2={40 + (daysSinceStart % SPRINT_DAYS / SPRINT_DAYS) * 550}
+              y2="180"
+              stroke="#ef4444" strokeWidth="1" strokeDasharray="2,2"
+            />
+          )}
+        </svg>
+
+        <p className="mt-2 text-[10px] text-muted-foreground italic">
+          💡 Đường thực tế nằm dưới đường lý tưởng = sprint đang trễ.
+          Nằm trên = đang đi nhanh hơn kế hoạch.
+        </p>
+      </div>
+
+      {/* ── Daily standup hint ── */}
+      <div className="rounded-2xl bg-emerald-500/5 border border-emerald-500/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-emerald-400 text-base">☕</span>
+          <h4 className="text-sm font-bold text-emerald-300">Daily Standup · 15 phút mỗi sáng</h4>
+        </div>
+        <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
+          <li>HS ghi log "Hôm qua làm gì" trong tab <strong className="text-foreground">Tiến trình</strong></li>
+          <li>"Hôm nay làm gì" — chọn task từ cột <strong className="text-foreground">To Do</strong> kéo sang <strong className="text-foreground">In Progress</strong></li>
+          <li>"Có vướng mắc gì" — ghi vào log + GV feedback ở tab <strong className="text-foreground">Feedback</strong></li>
+        </ul>
+      </div>
     </div>
   )
 }
