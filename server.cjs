@@ -2469,22 +2469,32 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 
   // POST /api/online-exam-room/join — HS/GV join bằng accessCode hoặc roomId
+  // FIX 2026-05-26: trả về examId để FE navigate đúng /student/exam/:examId
+  // Trước đó chỉ trả roomId → FE navigate /student/exam/{roomId} → 404 "Không tìm thấy đề"
   app.post('/api/online-exam-room/join', async (req, res) => {
     const decoded = roomAuth(req, res); if (!decoded) return;
     try {
       const { accessCode, roomId } = req.body || {};
       const pool = _getPool();
       let row;
+      // SELECT cả 2 column case (exam_id snake + examId camel legacy)
+      const SEL = `SELECT id, COALESCE(exam_id, "examId"::text) AS exam_id, name FROM "OnlineExamRoom"`;
       if (roomId) {
-        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE id = $1`, [roomId]);
+        const r = await pool.query(`${SEL} WHERE id = $1`, [roomId]);
         row = r.rows[0];
       } else if (accessCode) {
-        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE access_code = $1`,
+        const r = await pool.query(`${SEL} WHERE access_code = $1`,
           [String(accessCode).toUpperCase()]);
         row = r.rows[0];
       }
       if (!row) return res.status(404).json({ error: 'Mã phòng không hợp lệ' });
-      return res.json({ ok: true, roomId: row.id });
+      if (!row.exam_id) {
+        return res.status(409).json({
+          error: 'Phòng thi chưa gắn đề (giáo viên cần chọn đề cho phòng)',
+          roomId: row.id,
+        });
+      }
+      return res.json({ ok: true, roomId: row.id, examId: row.exam_id, roomName: row.name });
     } catch (e) { console.error('[room:join]', e.message); return res.status(500).json({ error: 'Lỗi join phòng' }); }
   });
 })();
@@ -13776,6 +13786,7 @@ app.get('/api/student/exam-rooms/leaderboard', async (req, res) => {
 });
 
 // POST /api/student/exam-rooms/:id/join — HS join phòng thi
+// FIX 2026-05-26: trả thêm examId để FE navigate đúng /student/exam/:examId
 app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
@@ -13786,6 +13797,7 @@ app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
     const { accessCode } = req.body || {};
     const { rows } = await pool.query(
       `SELECT id, access_code, is_public, max_students,
+              COALESCE(exam_id, "examId"::text) AS exam_id,
               (SELECT COUNT(*) FROM "RoomParticipant" WHERE room_id = $1) AS current_count
        FROM "OnlineExamRoom" WHERE id = $1`, [req.params.id]
     );
@@ -13797,13 +13809,19 @@ app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
     if (room.max_students && Number(room.current_count) >= room.max_students) {
       return res.status(409).json({ error: 'Phòng đã đầy' });
     }
+    if (!room.exam_id) {
+      return res.status(409).json({
+        error: 'Phòng thi chưa gắn đề (giáo viên cần chọn đề cho phòng)',
+        roomId: req.params.id,
+      });
+    }
     const { randomUUID } = require('crypto');
     await pool.query(`
       INSERT INTO "RoomParticipant"(id, room_id, user_id, joined_at)
       VALUES ($1, $2, $3, NOW())
       ON CONFLICT (room_id, user_id) DO NOTHING
     `, [randomUUID(), req.params.id, userId]);
-    return res.json({ ok: true, roomId: req.params.id });
+    return res.json({ ok: true, roomId: req.params.id, examId: room.exam_id });
   } catch (e) { console.error('[student:room:join]', e.message); return res.status(500).json({ error: e.message }); }
 });
 
