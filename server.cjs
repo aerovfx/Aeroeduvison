@@ -10276,17 +10276,21 @@ app.get('/api/teacher/exams', async (req, res) => {
       FROM "Exam" e
       LEFT JOIN "User" u ON u.id = COALESCE(e.teacher_id, e."userId"::text)
       LEFT JOIN (
-        SELECT exam_id, COUNT(*) AS attempts,
-               COUNT(DISTINCT "studentId") AS unique_students,
-               ROUND(AVG(NULLIF(percentage, 0))) AS avg_score
-        FROM (
-          SELECT pe.*,
-                 COALESCE((pe.questions->0->>'exam_id')::text,
-                          pe.subject || ':' || pe.grade) AS exam_id
-          FROM "PracticeExam" pe WHERE pe.completed
-        ) sub
-        GROUP BY exam_id
-      ) ps ON ps.exam_id = e.id
+        -- Normalize PracticeExam subject + grade để match Exam đa biến thể
+        -- (Vật lí ↔ Vật lý, "Lớp 11" ↔ "11", NULL grade ↔ any)
+        SELECT
+          LOWER(REGEXP_REPLACE(COALESCE(subject, ''), '[íìỉĩịýỳỷỹỵ]', 'i', 'g')) AS subj_norm,
+          REGEXP_REPLACE(COALESCE(grade, ''), '[^0-9]', '', 'g') AS grade_norm,
+          COUNT(*)::int AS attempts,
+          COUNT(DISTINCT "studentId")::int AS unique_students,
+          ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
+        FROM "PracticeExam" WHERE completed
+        GROUP BY 1, 2
+      ) ps
+        ON ps.subj_norm = LOWER(REGEXP_REPLACE(COALESCE(e.subject, ''), '[íìỉĩịýỳỷỹỵ]', 'i', 'g'))
+       AND (ps.grade_norm = REGEXP_REPLACE(COALESCE(e.grade, ''), '[^0-9]', '', 'g')
+            OR ps.grade_norm = ''
+            OR REGEXP_REPLACE(COALESCE(e.grade, ''), '[^0-9]', '', 'g') = '')
       WHERE ${where}
       ORDER BY e.created_at DESC LIMIT 500`, [myIds]).catch(async (err) => {
         // Fallback nếu PracticeExam có shape khác → query không enrich
@@ -10325,49 +10329,83 @@ app.get('/api/teacher/exams', async (req, res) => {
       const pool = _getPool();
       const limit = Math.max(5, Math.min(50, parseInt(String(req.query.limit || '10'), 10) || 10));
 
+      // ── HELPER SQL: normalize subject + grade ──
+      // Vấn đề: Exam.subject="Vật lí" vs PracticeExam.subject="Vật lý" (lệch dấu)
+      //          Exam.grade=NULL vs PracticeExam.grade="11" (NULL mismatch)
+      // → Match thất bại → mostAttempted/topTeachers rỗng dù có 117 lượt thi.
+      //
+      // Solution: normalize cả 2 bên:
+      //   subj_norm = LOWER + thay "í/ý/ỳ/ỷ/ỹ/ỵ" → "i" (đồng nhất "lý" ↔ "lí")
+      //   grade_norm = chỉ giữ digits ("Lớp 11" → "11", "11" → "11", NULL → "")
+      // Match grade nới: nếu 1 bên = '' → wildcard match (proxy "tất cả lớp").
+      const NORM_SUBJ = (col) => `LOWER(REGEXP_REPLACE(COALESCE(${col}, ''), '[íìỉĩịýỳỷỹỵ]', 'i', 'g'))`;
+      const NORM_GRADE = (col) => `REGEXP_REPLACE(COALESCE(${col}, ''), '[^0-9]', '', 'g')`;
+
       const [mostAttemptedR, topTeachersR, summaryR] = await Promise.all([
-        // TOP đề được làm nhiều nhất — JOIN Exam + PracticeExam.subject (proxy)
-        // PracticeExam không có exam_id column, dùng subject+grade làm proxy
-        // Đổi qua: aggregate PracticeExam.subject + grade rồi match với Exam có
-        // cùng subject. Fallback subject-only match nếu không có grade.
+        // TOP đề được làm nhiều nhất — JOIN Exam + PracticeExam qua normalized subject+grade
+        // Nhiều đề cùng (subject, grade) → cùng share attempts count (đại diện "đề hot subject").
         pool.query(`
           WITH practice_agg AS (
-            SELECT subject, grade,
-                   COUNT(*)::int AS attempts,
-                   COUNT(DISTINCT "studentId")::int AS unique_students,
-                   ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
+            SELECT
+              ${NORM_SUBJ('subject')} AS subj_norm,
+              ${NORM_GRADE('grade')} AS grade_norm,
+              MAX(subject) AS subject_display,
+              MAX(grade) AS grade_display,
+              COUNT(*)::int AS attempts,
+              COUNT(DISTINCT "studentId")::int AS unique_students,
+              ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
             FROM "PracticeExam" WHERE completed
-            GROUP BY subject, grade
+            GROUP BY 1, 2
+          ),
+          exam_norm AS (
+            SELECT e.*,
+                   ${NORM_SUBJ('e.subject')} AS subj_norm,
+                   ${NORM_GRADE('e.grade')} AS grade_norm
+            FROM "Exam" e
           )
-          SELECT e.id, e.title, e.subject, e.grade,
-                 jsonb_array_length(COALESCE(e.question_ids, '[]'::jsonb)) AS question_count,
+          SELECT en.id, en.title, en.subject, en.grade,
+                 jsonb_array_length(COALESCE(en.question_ids, '[]'::jsonb)) AS question_count,
                  pa.attempts, pa.unique_students, pa.avg_score,
                  u.id AS teacher_id, u.name AS teacher_name, u.image AS teacher_image
-          FROM "Exam" e
-          LEFT JOIN practice_agg pa ON pa.subject = e.subject AND COALESCE(pa.grade, '') = COALESCE(e.grade, '')
-          LEFT JOIN "User" u ON u.id = COALESCE(e.teacher_id, e."userId"::text)
+          FROM exam_norm en
+          JOIN practice_agg pa
+            ON pa.subj_norm = en.subj_norm
+           AND (pa.grade_norm = en.grade_norm OR pa.grade_norm = '' OR en.grade_norm = '')
+          LEFT JOIN "User" u ON u.id = COALESCE(en.teacher_id, en."userId"::text)
           WHERE pa.attempts > 0
-          ORDER BY pa.attempts DESC LIMIT $1`, [limit])
-          .catch(() => ({ rows: [] })),
+          ORDER BY pa.attempts DESC, pa.avg_score DESC NULLS LAST
+          LIMIT $1`, [limit])
+          .catch(err => { console.warn('[mostAttempted] query failed:', err.message.slice(0, 200)); return { rows: [] }; }),
 
-        // TOP GV — sum attempts + avg score cho TẤT CẢ đề của GV
+        // TOP GV — sum attempts qua TẤT CẢ đề của GV (normalized match)
         pool.query(`
-          WITH practice_subjects AS (
-            SELECT subject, grade,
-                   COUNT(*)::int AS attempts,
-                   ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
+          WITH practice_agg AS (
+            SELECT
+              ${NORM_SUBJ('subject')} AS subj_norm,
+              ${NORM_GRADE('grade')} AS grade_norm,
+              COUNT(*)::int AS attempts,
+              ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_score
             FROM "PracticeExam" WHERE completed
-            GROUP BY subject, grade
+            GROUP BY 1, 2
+          ),
+          exam_norm AS (
+            SELECT e.id,
+                   COALESCE(e.teacher_id, e."userId"::text) AS tid,
+                   ${NORM_SUBJ('e.subject')} AS subj_norm,
+                   ${NORM_GRADE('e.grade')} AS grade_norm
+            FROM "Exam" e
+            WHERE COALESCE(e.teacher_id, e."userId"::text) IS NOT NULL
           ),
           teacher_stats AS (
-            SELECT COALESCE(e.teacher_id, e."userId"::text) AS tid,
-                   COUNT(DISTINCT e.id)::int AS exam_count,
-                   SUM(COALESCE(ps.attempts, 0))::int AS total_attempts,
-                   ROUND(AVG(NULLIF(ps.avg_score, 0)))::int AS avg_score
-            FROM "Exam" e
-            LEFT JOIN practice_subjects ps
-              ON ps.subject = e.subject AND COALESCE(ps.grade, '') = COALESCE(e.grade, '')
-            GROUP BY COALESCE(e.teacher_id, e."userId"::text)
+            SELECT en.tid,
+                   COUNT(DISTINCT en.id)::int AS exam_count,
+                   SUM(COALESCE(pa.attempts, 0))::int AS total_attempts,
+                   ROUND(AVG(NULLIF(pa.avg_score, 0)))::int AS avg_score
+            FROM exam_norm en
+            LEFT JOIN practice_agg pa
+              ON pa.subj_norm = en.subj_norm
+             AND (pa.grade_norm = en.grade_norm OR pa.grade_norm = '' OR en.grade_norm = '')
+            GROUP BY en.tid
           )
           SELECT u.id, u.name, u.email, u.image,
                  ts.exam_count, ts.total_attempts, ts.avg_score
@@ -10375,7 +10413,8 @@ app.get('/api/teacher/exams', async (req, res) => {
           JOIN "User" u ON u.id = ts.tid
           WHERE ts.total_attempts > 0
           ORDER BY ts.total_attempts DESC, ts.avg_score DESC NULLS LAST
-          LIMIT $1`, [limit]).catch(() => ({ rows: [] })),
+          LIMIT $1`, [limit])
+          .catch(err => { console.warn('[topTeachers] query failed:', err.message.slice(0, 200)); return { rows: [] }; }),
 
         // Summary
         pool.query(`
