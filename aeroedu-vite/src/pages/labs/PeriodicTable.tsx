@@ -15,7 +15,7 @@
  */
 import { useState, useMemo, useRef, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stars, MeshTransmissionMaterial, Environment } from '@react-three/drei'
+import { OrbitControls, Stars } from '@react-three/drei'
 import { ChevronLeft, Atom } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import * as THREE from 'three'
@@ -103,6 +103,21 @@ const ELEMENTS: Element[] = [
 ]
 
 // ── 3D Atom Components ──────────────────────────────────────
+// ── OPTIMIZED 3D Components (Solar System sim pattern) ─────────────
+// User: "Aura giả lập thái dương hệ chạy rất mượt. Có thể vận dụng giải pháp đó"
+// CHANGES từ phiên bản v1 (lag) sang v2 (smooth):
+//   - BỎ MeshTransmissionMaterial (4 render passes/frame → 1)
+//   - BỎ Environment "night" preset (HDR 1MB+ IBL → no IBL)
+//   - BỎ acrylic GlassCube (geometry box transparent expensive)
+//   - BỎ reflective floor metal 0.95 (extra shader cost)
+//   - BỎ pointLight TỪNG ELECTRON (Uranium = 92 lights → GPU chết!)
+//     → 1 nucleus pointLight + 1 ambient là đủ
+//   - REDUCE Stars 4000 → 1500 count
+//   - REDUCE shell line segments 96 → 64
+//   - REDUCE sphereGeometry segments 16 → 12 cho electrons
+//   - DPR clamp [1, 1.5] thay vì [1, 2]
+//   - emissive intensity giữ glow look mà không cần pointLight thật
+
 function Nucleus({ size, color }: { size: number; color: string }) {
   const ref = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
@@ -113,15 +128,17 @@ function Nucleus({ size, color }: { size: number; color: string }) {
   })
   return (
     <mesh ref={ref}>
-      <sphereGeometry args={[size, 48, 48]} />
+      <sphereGeometry args={[size, 32, 32]} />
       <meshStandardMaterial
         color={color}
         emissive={color}
-        emissiveIntensity={1.5}
-        roughness={0.2}
-        metalness={0.6}
+        emissiveIntensity={2}
+        roughness={0.3}
+        metalness={0.4}
+        toneMapped={false}
       />
-      <pointLight color={color} intensity={4} distance={10} />
+      {/* 1 light ở nucleus — đủ illuminate cả scene */}
+      <pointLight color={color} intensity={2.5} distance={12} decay={1.5} />
     </mesh>
   )
 }
@@ -140,9 +157,10 @@ function ElectronShell({
     }
   })
 
+  // Pre-compute orbit ring geometry once per radius
   const orbitCurve = useMemo(() => {
     const points: THREE.Vector3[] = []
-    const segments = 96
+    const segments = 64  // giảm từ 96
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2
       points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius))
@@ -150,51 +168,35 @@ function ElectronShell({
     return new THREE.BufferGeometry().setFromPoints(points)
   }, [radius])
 
+  // Pre-compute electron positions once
+  const positions = useMemo(() => {
+    const arr: [number, number, number][] = []
+    for (let i = 0; i < electronCount; i++) {
+      const angle = (i / electronCount) * Math.PI * 2
+      arr.push([Math.cos(angle) * radius, 0, Math.sin(angle) * radius])
+    }
+    return arr
+  }, [radius, electronCount])
+
   return (
     <group ref={groupRef} rotation={[tilt, 0, tilt * 0.5]}>
       <line>
         <primitive object={orbitCurve} attach="geometry" />
-        <lineBasicMaterial color={color} transparent opacity={0.35} />
+        <lineBasicMaterial color={color} transparent opacity={0.4} />
       </line>
-      {Array.from({ length: electronCount }).map((_, i) => {
-        const angle = (i / electronCount) * Math.PI * 2
-        const x = Math.cos(angle) * radius
-        const z = Math.sin(angle) * radius
-        return (
-          <mesh key={i} position={[x, 0, z]}>
-            <sphereGeometry args={[0.085, 16, 16]} />
-            <meshStandardMaterial
-              color={color}
-              emissive={color}
-              emissiveIntensity={3}
-              toneMapped={false}
-            />
-            <pointLight color={color} intensity={0.5} distance={2} />
-          </mesh>
-        )
-      })}
+      {positions.map((pos, i) => (
+        <mesh key={i} position={pos}>
+          <sphereGeometry args={[0.085, 12, 12]} />
+          {/* emissive + toneMapped:false → glow look mà KHÔNG cần pointLight */}
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </group>
-  )
-}
-
-// Acrylic cube container — like museum specimen blocks (ref image 1, 2)
-function GlassCube({ size = 7 }: { size?: number }) {
-  return (
-    <mesh>
-      <boxGeometry args={[size, size, size]} />
-      <MeshTransmissionMaterial
-        thickness={0.5}
-        roughness={0.05}
-        transmission={1}
-        ior={1.5}
-        chromaticAberration={0.04}
-        backside
-        backsideThickness={0.3}
-        samples={4}
-        resolution={256}
-        anisotropy={0.3}
-      />
-    </mesh>
   )
 }
 
@@ -202,52 +204,41 @@ function AtomScene({ element }: { element: Element }) {
   const meta = CATEGORY_META[element.category]
   const nucleusSize = useMemo(() => 0.4 + Math.min(element.z / 100, 0.8), [element.z])
 
+  // Memoize shell configs để khi camera xoay không rebuild
+  const shells = useMemo(() =>
+    element.shells.map((electronCount, shellIdx) => ({
+      key: `${element.symbol}-${shellIdx}`,
+      electronCount,
+      radius: 1.5 + shellIdx * 0.95,
+      tilt: (shellIdx * Math.PI) / element.shells.length * 1.2 + shellIdx * 0.3,
+      speed: 1.6 / (shellIdx + 1),
+    })),
+    [element]
+  )
+
   return (
     <>
-      {/* Studio-grade 3-point lighting like museum display */}
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[5, 8, 5]} intensity={0.8} color="#ffffff" />
-      <directionalLight position={[-5, 3, -5]} intensity={0.3} color={meta.glow} />
-      <pointLight position={[0, -3, 3]} intensity={0.4} color="#ffffff" />
+      {/* Lighting tối giản — Solar System sim pattern */}
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[5, 8, 5]} intensity={0.6} color="#ffffff" />
 
-      {/* Far starfield (deep space backdrop) */}
-      <Stars radius={80} depth={80} count={4000} factor={3} fade speed={0.5} />
+      {/* Starfield — count giảm 4000 → 1500 cho mượt */}
+      <Stars radius={80} depth={50} count={1500} factor={3} fade speed={0.5} />
 
-      {/* Atom centred — nucleus + orbits */}
+      {/* Nucleus (chứa pointLight chính) */}
       <Nucleus size={nucleusSize} color={meta.glow} />
-      {element.shells.map((electronCount, shellIdx) => {
-        const radius = 1.5 + shellIdx * 0.95
-        const tilt = (shellIdx * Math.PI) / element.shells.length * 1.2 + shellIdx * 0.3
-        const speed = 1.6 / (shellIdx + 1)
-        return (
-          <ElectronShell
-            key={shellIdx}
-            radius={radius}
-            electronCount={electronCount}
-            tilt={tilt}
-            speed={speed}
-            color={meta.glow}
-          />
-        )
-      })}
 
-      {/* Reflective floor — gives the museum-display feel */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4.5, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial
-          color="#0a0a0a"
-          metalness={0.95}
-          roughness={0.25}
+      {/* Electron shells */}
+      {shells.map(s => (
+        <ElectronShell
+          key={s.key}
+          radius={s.radius}
+          electronCount={s.electronCount}
+          tilt={s.tilt}
+          speed={s.speed}
+          color={meta.glow}
         />
-      </mesh>
-
-      {/* Subtle environment for transmission material */}
-      <Suspense fallback={null}>
-        <Environment preset="night" />
-      </Suspense>
-
-      {/* Acrylic cube containing the atom */}
-      <GlassCube size={7} />
+      ))}
     </>
   )
 }
@@ -590,15 +581,16 @@ export default function PeriodicTable() {
             }>
               <Canvas
                 camera={{ position: [0, 2, 10], fov: 50 }}
-                gl={{ antialias: true, alpha: false }}
+                gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
                 style={{ background: '#000' }}
-                dpr={[1, 2]}
+                dpr={[1, 1.5]}
               >
                 <color attach="background" args={['#000000']} />
-                <fog attach="fog" args={['#000000', 12, 30]} />
                 <AtomScene element={selected} />
                 <OrbitControls
                   enablePan={false}
+                  enableDamping
+                  dampingFactor={0.1}
                   minDistance={4}
                   maxDistance={22}
                   autoRotate
