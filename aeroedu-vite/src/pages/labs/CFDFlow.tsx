@@ -288,6 +288,18 @@ function pressureColor(rho: number): [number, number, number] {
 type ColorMode = 'speed' | 'vorticity' | 'pressure'
 type DrawMode = 'add' | 'erase'
 
+// Dye particle for ink/smoke injection visualization
+// Reference: "engineering CFD video" — colored streaks following flow
+interface DyeParticle {
+  x: number       // lattice coords
+  y: number
+  age: number     // frames since spawn (for fade-out)
+  hue: number     // 0-360 HSL hue (rainbow injection)
+  prevX: number   // for trail line segment
+  prevY: number
+  alive: boolean
+}
+
 export default function CFDFlow() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stateRef = useRef<LBMState | null>(null)
@@ -306,8 +318,14 @@ export default function CFDFlow() {
   const [brushSize, setBrushSize] = useState(4)
   const [step, setStep] = useState(0)
   const [showStreamlines, setShowStreamlines] = useState(false)
+  const [showDye, setShowDye] = useState(true)        // dye particles ribbons
+  const [showVectors, setShowVectors] = useState(false) // velocity vector field
+  const [dyeIntensity, setDyeIntensity] = useState(0.4) // background dim factor
+  const [numStreams, setNumStreams] = useState(8)     // số luồng dye spawn
   const [fps, setFps] = useState(60)
   const stepCounterRef = useRef(0)
+  const dyeRef = useRef<DyeParticle[]>([])
+  const dyeHueRef = useRef(0)  // cycling hue for rainbow injection
 
   runningRef.current = running
   inflowURef.current = inflowU
@@ -345,6 +363,65 @@ export default function CFDFlow() {
           for (let k = 0; k < STEPS_PER_FRAME; k++) {
             stepLBM(s, omegaRef.current, inflowURef.current)
             stepCounterRef.current += 1
+          }
+
+          // ─── Dye particle injection + advection ───
+          // User: "engineering CFD video" — colored ink streams following flow
+          if (showDye) {
+            // Spawn new particles from inlet (left edge) — multiple streams
+            for (let stream = 0; stream < numStreams; stream++) {
+              const yPos = (NY * (stream + 0.5)) / numStreams
+              dyeRef.current.push({
+                x: 1.5, y: yPos,
+                prevX: 1.5, prevY: yPos,
+                age: 0,
+                hue: (dyeHueRef.current + stream * 40) % 360,
+                alive: true,
+              })
+            }
+            dyeHueRef.current = (dyeHueRef.current + 4) % 360
+
+            // Advect existing particles
+            const particles = dyeRef.current
+            for (let i = 0; i < particles.length; i++) {
+              const p = particles[i]
+              if (!p.alive) continue
+              p.prevX = p.x
+              p.prevY = p.y
+              const ix = Math.floor(p.x)
+              const iy = Math.floor(p.y)
+              if (ix < 0 || ix >= NX - 1 || iy < 0 || iy >= NY - 1 || s.solid[idx(ix, iy)]) {
+                p.alive = false
+                continue
+              }
+              // Bilinear interpolation of velocity for smooth advection
+              const fx = p.x - ix, fy = p.y - iy
+              const i00 = idx(ix, iy)
+              const i10 = idx(ix + 1, iy)
+              const i01 = idx(ix, iy + 1)
+              const i11 = idx(ix + 1, iy + 1)
+              const ux = s.ux[i00] * (1 - fx) * (1 - fy)
+                       + s.ux[i10] * fx * (1 - fy)
+                       + s.ux[i01] * (1 - fx) * fy
+                       + s.ux[i11] * fx * fy
+              const uy = s.uy[i00] * (1 - fx) * (1 - fy)
+                       + s.uy[i10] * fx * (1 - fy)
+                       + s.uy[i01] * (1 - fx) * fy
+                       + s.uy[i11] * fx * fy
+              // Scale by display speed (lattice unit → grid cells per frame)
+              const SPEED_SCALE = 5.0
+              p.x += ux * SPEED_SCALE
+              p.y += uy * SPEED_SCALE
+              p.age += 1
+              // Kill old or out-of-bounds
+              if (p.x > NX - 1 || p.x < 0 || p.y < 0 || p.y > NY - 1 || p.age > 600) {
+                p.alive = false
+              }
+            }
+            // Compact: drop dead particles when array too large
+            if (particles.length > 6000) {
+              dyeRef.current = particles.filter((p) => p.alive)
+            }
           }
         }
 
@@ -384,11 +461,86 @@ export default function CFDFlow() {
         }
         const offCtx = offCanvas.getContext('2d')!
         offCtx.putImageData(img, 0, 0)
-        // Draw scaled up to display canvas
+        // Draw scaled up to display canvas — dim if dye visible để dye nổi bật
         const ctx = canvas.getContext('2d')!
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
-        ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height)
+        // Khi showDye: vẽ field mờ hơn để particle ribbons nổi bật như video CFD eng
+        if (showDye) {
+          ctx.fillStyle = '#020410'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.globalAlpha = dyeIntensity
+          ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height)
+          ctx.globalAlpha = 1
+        } else {
+          ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height)
+        }
+
+        // ─── Dye particle ribbons (drawn AFTER background field) ───
+        if (showDye) {
+          const scaleX = canvas.width / NX
+          const scaleY = canvas.height / NY
+          const particles = dyeRef.current
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i]
+            if (!p.alive) continue
+            const alpha = Math.max(0, 1 - p.age / 600) * 0.85
+            const hue = p.hue
+            ctx.strokeStyle = `hsla(${hue}, 100%, 65%, ${alpha})`
+            ctx.lineWidth = 2.2
+            // Glow effect for first few segments
+            if (p.age < 60) {
+              ctx.shadowColor = `hsl(${hue}, 100%, 70%)`
+              ctx.shadowBlur = 6
+            } else {
+              ctx.shadowBlur = 0
+            }
+            ctx.beginPath()
+            ctx.moveTo(p.prevX * scaleX, p.prevY * scaleY)
+            ctx.lineTo(p.x * scaleX, p.y * scaleY)
+            ctx.stroke()
+          }
+          ctx.shadowBlur = 0
+          ctx.lineCap = 'butt'
+          ctx.lineJoin = 'miter'
+        }
+
+        // ─── Velocity vectors field (optional) ───
+        if (showVectors) {
+          const scaleX = canvas.width / NX
+          const scaleY = canvas.height / NY
+          const STEP_X = 12, STEP_Y = 8
+          ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+          ctx.fillStyle = 'rgba(255,255,255,0.55)'
+          ctx.lineWidth = 1
+          for (let y = STEP_Y; y < NY; y += STEP_Y) {
+            for (let x = STEP_X; x < NX; x += STEP_X) {
+              if (s.solid[idx(x, y)]) continue
+              const ux = s.ux[idx(x, y)]
+              const uy = s.uy[idx(x, y)]
+              const mag = Math.sqrt(ux * ux + uy * uy)
+              if (mag < 0.01) continue
+              const dx = (ux / mag) * Math.min(mag * 60, 12)
+              const dy = (uy / mag) * Math.min(mag * 60, 12)
+              const px = x * scaleX
+              const py = y * scaleY
+              ctx.beginPath()
+              ctx.moveTo(px, py)
+              ctx.lineTo(px + dx, py + dy)
+              ctx.stroke()
+              // Tiny arrowhead
+              const ang = Math.atan2(dy, dx)
+              ctx.beginPath()
+              ctx.moveTo(px + dx, py + dy)
+              ctx.lineTo(px + dx - 3 * Math.cos(ang - 0.5), py + dy - 3 * Math.sin(ang - 0.5))
+              ctx.lineTo(px + dx - 3 * Math.cos(ang + 0.5), py + dy - 3 * Math.sin(ang + 0.5))
+              ctx.closePath()
+              ctx.fill()
+            }
+          }
+        }
 
         // Draw streamlines (optional overlay)
         if (showStreamlines) {
@@ -431,7 +583,7 @@ export default function CFDFlow() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [showStreamlines])
+  }, [showStreamlines, showDye, showVectors, dyeIntensity, numStreams])
 
   // Mouse drawing on canvas
   const drawingRef = useRef(false)
@@ -533,12 +685,39 @@ export default function CFDFlow() {
                   </button>
                 ))}
               </div>
-              <label className="mt-3 flex items-center gap-2 text-xs cursor-pointer">
-                <input type="checkbox" checked={showStreamlines}
-                  onChange={(e) => setShowStreamlines(e.target.checked)}
-                  className="accent-cyan-500" />
-                <span className="text-white/70">Vẽ streamlines</span>
-              </label>
+              <div className="mt-3 space-y-1.5">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={showDye}
+                    onChange={(e) => setShowDye(e.target.checked)}
+                    className="accent-pink-500" />
+                  <span className="text-white/80 font-semibold">🌈 Bơm dye (rainbow ribbons)</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={showVectors}
+                    onChange={(e) => setShowVectors(e.target.checked)}
+                    className="accent-cyan-500" />
+                  <span className="text-white/70">Vector field</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={showStreamlines}
+                    onChange={(e) => setShowStreamlines(e.target.checked)}
+                    className="accent-cyan-500" />
+                  <span className="text-white/70">Streamlines</span>
+                </label>
+              </div>
+              {showDye && (
+                <div className="mt-3 pt-3 border-t border-white/[0.08] space-y-2">
+                  <Slider label="Số luồng dye" value={numStreams} min={2} max={20} step={1}
+                    suffix="" onChange={(v) => setNumStreams(Math.round(v))} />
+                  <Slider label="Độ mờ background" value={dyeIntensity} min={0.05} max={1} step={0.05}
+                    suffix="" onChange={setDyeIntensity} />
+                  <button
+                    onClick={() => { dyeRef.current = [] }}
+                    className="w-full px-2 py-1.5 rounded text-[11px] bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-rose-200 font-bold">
+                    Xoá hết particle dye
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Flow params */}
