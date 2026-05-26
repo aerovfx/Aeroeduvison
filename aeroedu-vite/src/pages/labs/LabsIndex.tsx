@@ -178,6 +178,7 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
   { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
   { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
+  { name: 'Tròn 3D + Helix',   emoji: '🌀', path: '/dashboard/labtwin/circular-motion-3d', desc: 'Helix 3D + chiếu lên XY/XZ/YZ', accent: 'cyan',     group: 'physics' },
   { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
   { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
 

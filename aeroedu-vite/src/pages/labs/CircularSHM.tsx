@@ -23,23 +23,30 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 // ── Projection types ─────────────────────────────────────────────
-type Projection = 'cos' | 'sin' | 'both'
+// User: "tạo 2 hình chiếu lên Ox và Oy" + reference GIF phasor + wave với
+// I=cos, Q=sin, I+Q sum, phase indicator theo độ (0°→720°)
+type Projection = 'cos' | 'sin' | 'both' | 'sum'
 
 const PROJECTION_META: Record<Projection, { label: string; formula: string; color: string }> = {
   cos: {
-    label: 'Trục x (cos)',
-    color: '#06b6d4',
-    formula: 'x(t) = A\\cos(\\omega t + \\varphi)',
+    label: 'Ox: I = cos',
+    color: '#3b82f6',
+    formula: 'I(\\theta) = A\\cos(\\theta + \\varphi)',
   },
   sin: {
-    label: 'Trục y (sin)',
-    color: '#f59e0b',
-    formula: 'y(t) = A\\sin(\\omega t + \\varphi)',
+    label: 'Oy: Q = sin',
+    color: '#ef4444',
+    formula: 'Q(\\theta) = A\\sin(\\theta + \\varphi)',
   },
   both: {
-    label: 'Cả 2 trục',
+    label: 'I + Q (2 trục)',
     color: '#a855f7',
-    formula: '\\vec{r}(t) = A(\\cos(\\omega t + \\varphi),\\, \\sin(\\omega t + \\varphi))',
+    formula: 'I = A\\cos(\\theta),\\quad Q = A\\sin(\\theta)',
+  },
+  sum: {
+    label: 'I + Q (tổng)',
+    color: '#22c55e',
+    formula: 'I + Q = A[\\cos(\\theta) + \\sin(\\theta)] = A\\sqrt{2}\\cos(\\theta - \\tfrac{\\pi}{4})',
   },
 }
 
@@ -311,21 +318,33 @@ export default function CircularSHM() {
       ctx.lineTo(waveStartX, waveCenterY + A + 20)
       ctx.stroke()
 
-      // Time labels on x axis (T/4, T/2, ...)
-      const T = (2 * Math.PI) / omegaUI  // period
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      // ── X-axis trong ĐỘ (0° → 720°) — reference GIF style ──
+      // Mỗi pixel ngang = 720° / waveWidth
+      const DEG_TOTAL = 720
+      const pxPerDeg = waveWidth / DEG_TOTAL
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'
       ctx.font = '11px ui-monospace, monospace'
-      for (let k = 1; k * (T / 4) * PIX_PER_SEC < waveWidth; k++) {
-        const px = waveStartX + k * (T / 4) * PIX_PER_SEC
-        if (px > W - 30) break
+      // Major ticks every 180° (0, 180, 360, 540, 720)
+      for (let deg = 0; deg <= DEG_TOTAL; deg += 180) {
+        const px = waveStartX + deg * pxPerDeg
         ctx.beginPath()
-        ctx.moveTo(px, waveCenterY - 4)
-        ctx.lineTo(px, waveCenterY + 4)
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+        ctx.moveTo(px, waveCenterY - 5)
+        ctx.lineTo(px, waveCenterY + 5)
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+        ctx.lineWidth = 1.5
         ctx.stroke()
-        if (k % 2 === 0) {
-          ctx.fillText(`${k / 4}T`, px - 8, waveCenterY + 16)
-        }
+        ctx.textAlign = 'center'
+        ctx.fillText(`${deg}°`, px, waveCenterY + 18)
+      }
+      // Minor ticks every 90°
+      for (let deg = 90; deg < DEG_TOTAL; deg += 180) {
+        const px = waveStartX + deg * pxPerDeg
+        ctx.beginPath()
+        ctx.moveTo(px, waveCenterY - 3)
+        ctx.lineTo(px, waveCenterY + 3)
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+        ctx.lineWidth = 1
+        ctx.stroke()
       }
 
       // Amplitude markers ±A
@@ -336,60 +355,157 @@ export default function CircularSHM() {
       ctx.moveTo(waveStartX, waveCenterY + A); ctx.lineTo(W - 10, waveCenterY + A)
       ctx.stroke()
       ctx.setLineDash([])
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      ctx.fillText('+A', waveStartX - 22, waveCenterY - A + 4)
-      ctx.fillText('-A', waveStartX - 22, waveCenterY + A + 4)
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'
+      ctx.textAlign = 'right'
+      ctx.fillText('+A', waveStartX - 6, waveCenterY - A + 4)
+      ctx.fillText('-A', waveStartX - 6, waveCenterY + A + 4)
+      ctx.fillText('0',  waveStartX - 6, waveCenterY + 4)
+      ctx.textAlign = 'left'
 
-      // ── Draw wave (cos / sin / both) ──
-      function drawTrail(arr: number[], color: string) {
-        if (arr.length < 2) return
+      // ── Y-axis label "Amplitude" ──
+      ctx.save()
+      ctx.translate(waveStartX - 32, waveCenterY)
+      ctx.rotate(-Math.PI / 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'
+      ctx.font = '11px ui-monospace, monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('Amplitude', 0, 0)
+      ctx.restore()
+      // X-axis label
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'
+      ctx.font = '11px ui-monospace, monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('Phase (degree)', waveStartX + waveWidth / 2, waveCenterY + 34)
+
+      // ── Draw waves PARAMETRIC từ 0° → 720° ──
+      // Vẽ statically dựa trên phase, không phải scroll trail
+      function drawWave(amp: number, color: string, phaseFn: (deg: number) => number, lineWidth = 2.5) {
         ctx!.beginPath()
-        for (let i = 0; i < arr.length; i++) {
-          const px = waveStartX + i * (1 / PIX_PER_SEC) * PIX_PER_SEC / speed * (60 / 60) * (1000 / 1000)
-          // Simpler: px = waveStartX + i * (speed/60) * PIX_PER_SEC ... use approx
-          const pxSimple = waveStartX + i * 1.0  // 1 px per frame
-          const val = -arr[i]  // canvas Y inverted
-          if (pxSimple > W - 10) break
-          if (i === 0) ctx!.moveTo(pxSimple, waveCenterY + val)
-          else ctx!.lineTo(pxSimple, waveCenterY + val)
+        for (let d = 0; d <= DEG_TOTAL; d += 1) {
+          const px = waveStartX + d * pxPerDeg
+          const val = phaseFn(d) * amp
+          const py = waveCenterY - val
+          if (d === 0) ctx!.moveTo(px, py)
+          else ctx!.lineTo(px, py)
         }
         ctx!.strokeStyle = color
-        ctx!.shadowColor = color
-        ctx!.shadowBlur = 8
-        ctx!.lineWidth = 2.5
+        ctx!.lineWidth = lineWidth
         ctx!.stroke()
-        ctx!.shadowBlur = 0
       }
-      if (projection === 'cos' || projection === 'both') {
-        drawTrail(trailRef.current, '#06b6d4')
+      const phaseRad = phase  // initial phase from slider
+
+      // I = cos (xanh dương, mảnh)
+      if (projection === 'cos' || projection === 'both' || projection === 'sum') {
+        drawWave(A, projection === 'cos' ? '#3b82f6' : 'rgba(59,130,246,0.55)',
+          (d) => Math.cos(d * Math.PI / 180 + phaseRad),
+          projection === 'cos' ? 2.5 : 1.5)
       }
-      if (projection === 'sin' || projection === 'both') {
-        drawTrail(trailYRef.current, '#f59e0b')
+      // Q = sin (đỏ, mảnh)
+      if (projection === 'sin' || projection === 'both' || projection === 'sum') {
+        drawWave(A, projection === 'sin' ? '#ef4444' : 'rgba(239,68,68,0.55)',
+          (d) => Math.sin(d * Math.PI / 180 + phaseRad),
+          projection === 'sin' ? 2.5 : 1.5)
+      }
+      // I+Q sum (xanh lá, đậm) chỉ ở mode 'sum'
+      if (projection === 'sum') {
+        ctx.shadowColor = '#22c55e'; ctx.shadowBlur = 6
+        drawWave(A, '#22c55e',
+          (d) => Math.cos(d * Math.PI / 180 + phaseRad) + Math.sin(d * Math.PI / 180 + phaseRad),
+          3)
+        ctx.shadowBlur = 0
       }
 
-      // Current value dot on wave
-      if (projection === 'cos' || projection === 'both') {
-        const px = waveStartX + 1
-        const py = waveCenterY - Math.cos(angle) * A
+      // ── Phase indicator line: vertical drop từ current angle ──
+      // Reference GIF: vertical arrow shown at current phase showing the value
+      // Calculate current phase mod 720
+      const currentPhaseDeg = ((angle * 180 / Math.PI) % DEG_TOTAL + DEG_TOTAL) % DEG_TOTAL
+      const phasePx = waveStartX + currentPhaseDeg * pxPerDeg
+      const projColor = projection === 'cos' ? '#3b82f6'
+                     : projection === 'sin' ? '#ef4444'
+                     : projection === 'sum' ? '#22c55e' : '#a855f7'
+      const projValue = projection === 'cos' ? Math.cos(angle)
+                      : projection === 'sin' ? Math.sin(angle)
+                      : projection === 'sum' ? (Math.cos(angle) + Math.sin(angle)) / Math.sqrt(2)
+                      : Math.cos(angle)
+      // Vertical phase line
+      ctx.beginPath()
+      ctx.moveTo(phasePx, waveCenterY)
+      ctx.lineTo(phasePx, waveCenterY - projValue * A)
+      ctx.strokeStyle = projColor
+      ctx.lineWidth = 1.8
+      ctx.stroke()
+      // Arrow head pointing to the dot
+      const arrowDir = projValue >= 0 ? -1 : 1
+      ctx.beginPath()
+      ctx.moveTo(phasePx, waveCenterY - projValue * A)
+      ctx.lineTo(phasePx - 4, waveCenterY - projValue * A + arrowDir * 8)
+      ctx.lineTo(phasePx + 4, waveCenterY - projValue * A + arrowDir * 8)
+      ctx.closePath()
+      ctx.fillStyle = projColor
+      ctx.fill()
+      // Current value dot
+      ctx.beginPath()
+      ctx.arc(phasePx, waveCenterY - projValue * A, 5, 0, Math.PI * 2)
+      ctx.fillStyle = projColor
+      ctx.shadowColor = projColor
+      ctx.shadowBlur = 10
+      ctx.fill()
+      ctx.shadowBlur = 0
+      // Phase label "phase = X°"
+      ctx.fillStyle = 'rgba(255,255,255,0.65)'
+      ctx.font = 'bold 11px ui-monospace, monospace'
+      ctx.textAlign = 'left'
+      const labelX = Math.min(phasePx + 8, W - 90)
+      ctx.fillText(`θ = ${currentPhaseDeg.toFixed(0)}°`, labelX, waveCenterY - A - 8)
+
+      // ── For 'both' mode: also draw secondary phase dot ──
+      if (projection === 'both') {
+        // Cos dot (blue)
         ctx.beginPath()
-        ctx.arc(px, py, 5, 0, Math.PI * 2)
-        ctx.fillStyle = '#06b6d4'
-        ctx.shadowColor = '#06b6d4'
+        ctx.arc(phasePx, waveCenterY - Math.cos(angle) * A, 5, 0, Math.PI * 2)
+        ctx.fillStyle = '#3b82f6'
+        ctx.shadowColor = '#3b82f6'
+        ctx.shadowBlur = 10
+        ctx.fill()
+        // Sin dot (red)
+        ctx.beginPath()
+        ctx.arc(phasePx, waveCenterY - Math.sin(angle) * A, 5, 0, Math.PI * 2)
+        ctx.fillStyle = '#ef4444'
+        ctx.shadowColor = '#ef4444'
         ctx.shadowBlur = 10
         ctx.fill()
         ctx.shadowBlur = 0
       }
-      if (projection === 'sin' || projection === 'both') {
-        const px = waveStartX + 1
-        const py = waveCenterY - Math.sin(angle) * A
-        ctx.beginPath()
-        ctx.arc(px, py, 5, 0, Math.PI * 2)
-        ctx.fillStyle = '#f59e0b'
-        ctx.shadowColor = '#f59e0b'
-        ctx.shadowBlur = 10
-        ctx.fill()
-        ctx.shadowBlur = 0
+
+      // ── Legend top-left of wave ──
+      const legendX = waveStartX + 10
+      const legendY = waveCenterY - A - 30
+      ctx.fillStyle = 'rgba(10,10,20,0.7)'
+      ctx.fillRect(legendX, legendY - 14, 220, 22)
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+      ctx.strokeRect(legendX, legendY - 14, 220, 22)
+      // I marker
+      ctx.strokeStyle = projection === 'cos' || projection === 'both' || projection === 'sum' ? '#3b82f6' : 'rgba(59,130,246,0.3)'
+      ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(legendX + 6, legendY); ctx.lineTo(legendX + 22, legendY); ctx.stroke()
+      ctx.fillStyle = '#cbd5e1'
+      ctx.font = '11px ui-monospace, monospace'
+      ctx.textAlign = 'left'
+      ctx.fillText('I', legendX + 28, legendY + 4)
+      // Q marker
+      ctx.strokeStyle = projection === 'sin' || projection === 'both' || projection === 'sum' ? '#ef4444' : 'rgba(239,68,68,0.3)'
+      ctx.beginPath(); ctx.moveTo(legendX + 50, legendY); ctx.lineTo(legendX + 66, legendY); ctx.stroke()
+      ctx.fillText('Q', legendX + 72, legendY + 4)
+      // I+Q marker (sum mode)
+      if (projection === 'sum') {
+        ctx.strokeStyle = '#22c55e'
+        ctx.lineWidth = 3
+        ctx.beginPath(); ctx.moveTo(legendX + 94, legendY); ctx.lineTo(legendX + 110, legendY); ctx.stroke()
+        ctx.fillText('I + Q', legendX + 116, legendY + 4)
       }
+      // Suppress unused warning for trail arrays
+      void MAX_TRAIL
+      void PIX_PER_SEC
 
       // Labels for circular motion side
       ctx.fillStyle = 'rgba(255,255,255,0.5)'
