@@ -18,7 +18,7 @@ import {
   ArrowLeft, Zap, Users, ClipboardList, Activity, MessageSquare,
   Target, Plus, Loader2, Calendar, Clock, CheckCircle2, Circle,
   AlertCircle, Star, Trash2, Edit3, Send, X, Award, TrendingUp,
-  Kanban, ChevronLeft, ChevronRight, Flame, Timer,
+  Kanban, ChevronLeft, ChevronRight, Flame, Timer, GripVertical, RotateCcw,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import {
@@ -74,6 +74,46 @@ export default function StemProjectDetail() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('overview')
+
+  // ── Tab order — drag-and-drop reorderable (persist per project) ──
+  // User: "các tab có thể kéo thả, di chuyển vào các vị trí mới"
+  const DEFAULT_TAB_ORDER: Tab[] = ['overview', 'scrum', 'tasks', 'logs', 'feedback', 'milestones']
+  const TAB_ORDER_KEY = `stem-tab-order-${id || 'default'}`
+
+  const [tabOrder, setTabOrder] = useState<Tab[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_TAB_ORDER
+    try {
+      const raw = localStorage.getItem(TAB_ORDER_KEY)
+      if (!raw) return DEFAULT_TAB_ORDER
+      const parsed = JSON.parse(raw) as Tab[]
+      // Validate: must contain all 6 tabs
+      const isValid = Array.isArray(parsed)
+        && parsed.length === DEFAULT_TAB_ORDER.length
+        && DEFAULT_TAB_ORDER.every((t) => parsed.includes(t))
+      return isValid ? parsed : DEFAULT_TAB_ORDER
+    } catch { return DEFAULT_TAB_ORDER }
+  })
+
+  // Persist on change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(tabOrder)) } catch { /* quota */ }
+  }, [tabOrder, TAB_ORDER_KEY])
+
+  const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
+  const [dragOverTab, setDragOverTab] = useState<Tab | null>(null)
+
+  const moveTabBefore = (source: Tab, target: Tab) => {
+    if (source === target) return
+    setTabOrder((prev) => {
+      const next = prev.filter((t) => t !== source)
+      const idx = next.indexOf(target)
+      if (idx < 0) return prev
+      next.splice(idx, 0, source)
+      return next
+    })
+  }
+  const resetTabOrder = () => setTabOrder(DEFAULT_TAB_ORDER)
   const [taskModal, setTaskModal] = useState(false)
   const [milestoneModal, setMilestoneModal] = useState<Milestone | null | 'new'>(null)
   const [logModal, setLogModal] = useState(false)
@@ -151,28 +191,75 @@ export default function StemProjectDetail() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-4 border-b border-border overflow-x-auto">
-          {([
-            { key: 'overview' as const, label: 'Tổng quan', icon: TrendingUp },
-            { key: 'scrum' as const, label: 'Scrum Board', icon: Kanban },
-            { key: 'tasks' as const, label: `Nhiệm vụ (${tasks.length})`, icon: ClipboardList },
-            { key: 'logs' as const, label: `Tiến trình (${logs.length})`, icon: Activity },
-            { key: 'feedback' as const, label: `Feedback (${feedbacks.length})`, icon: MessageSquare },
-            { key: 'milestones' as const, label: `Phase (${milestones.length})`, icon: Target },
-          ]).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                tab === key
-                  ? 'border-amber-500 text-amber-400'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Icon className="w-4 h-4" /> {label}
-            </button>
-          ))}
+        {/* Tabs — drag-and-drop reorderable */}
+        <div className="flex items-center gap-2 mb-4 border-b border-border">
+          <div className="flex gap-1 flex-1 overflow-x-auto">
+            {(() => {
+              const tabMeta: Record<Tab, { label: string; icon: typeof TrendingUp }> = {
+                overview:   { label: 'Tổng quan',                            icon: TrendingUp },
+                scrum:      { label: 'Scrum Board',                          icon: Kanban },
+                tasks:      { label: `Nhiệm vụ (${tasks.length})`,           icon: ClipboardList },
+                logs:       { label: `Tiến trình (${logs.length})`,          icon: Activity },
+                feedback:   { label: `Feedback (${feedbacks.length})`,       icon: MessageSquare },
+                milestones: { label: `Phase (${milestones.length})`,         icon: Target },
+              }
+              return tabOrder.map((key) => {
+                const { label, icon: Icon } = tabMeta[key]
+                const isActive = tab === key
+                const isDragged = draggedTab === key
+                const isDragOver = dragOverTab === key && draggedTab !== key
+                return (
+                  <div
+                    key={key}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedTab(key)
+                      e.dataTransfer.effectAllowed = 'move'
+                      try { e.dataTransfer.setData('text/plain', key) } catch { /* some browsers */ }
+                    }}
+                    onDragEnd={() => { setDraggedTab(null); setDragOverTab(null) }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      if (draggedTab && draggedTab !== key) setDragOverTab(key)
+                    }}
+                    onDragLeave={() => setDragOverTab((cur) => cur === key ? null : cur)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (draggedTab && draggedTab !== key) moveTabBefore(draggedTab, key)
+                      setDraggedTab(null); setDragOverTab(null)
+                    }}
+                    className={`relative group flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px transition whitespace-nowrap cursor-grab active:cursor-grabbing select-none ${
+                      isActive
+                        ? 'border-amber-500 text-amber-400'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    } ${isDragged ? 'opacity-30' : ''} ${
+                      isDragOver ? 'bg-amber-500/10 border-l-2 border-l-amber-500 rounded-tl-md' : ''
+                    }`}
+                    title="Kéo để sắp xếp tab"
+                  >
+                    {/* Grip handle — visible on hover */}
+                    <GripVertical className="w-3 h-3 text-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <button
+                      type="button"
+                      onClick={() => setTab(key)}
+                      className="flex items-center gap-2"
+                    >
+                      <Icon className="w-4 h-4" /> {label}
+                    </button>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+          {/* Reset order */}
+          <button
+            onClick={resetTabOrder}
+            title="Khôi phục thứ tự tab mặc định"
+            className="shrink-0 p-1.5 rounded-md hover:bg-muted/40 text-muted-foreground hover:text-foreground transition opacity-60 hover:opacity-100"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* ── TAB CONTENT ── */}
