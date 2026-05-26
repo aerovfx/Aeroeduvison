@@ -9,7 +9,6 @@ import {
   TrendingUp, Award, Zap, ArrowLeft,
   FunctionSquare, Wrench, Wind, QrCode,
 } from 'lucide-react'
-import { QuickScanQr } from '@/components/common/QuickScanQr'
 import { SIMULATIONS, type Simulation } from './PythonLabs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -289,197 +288,219 @@ export default function LabsIndexPage() {
             ))}
           </div>
 
-          {/* ── 🚀 TẤT CẢ THÍ NGHIỆM — flat grid, không cần drill category ──
-              User: "tất cả đưa ra ngoài route labtwin"
-              Hiển thị thẳng 15 lab popular ngay trên /dashboard/labtwin
-              để HS không phải bấm vào category mới thấy lab. */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
-                  <Sparkles className="h-7 w-7 text-purple-500" />
-                  Tất cả thí nghiệm
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Bấm vào để vào thẳng — không cần drill qua category
-                </p>
-              </div>
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
-                {POPULAR_LABS.length} labs
-              </span>
-            </div>
+          {/* ── 🚀 TẤT CẢ THÍ NGHIỆM — GỘP 3 section thành 1 ──
+              User: "gộp Python Simulations & Labs 32 thí nghiệm... và Quét QR... vào Tất cả thí nghiệm"
+              Cấu trúc mới:
+              1. Header với QR card compact ở góc phải
+              2. Phổ biến: 15 POPULAR_LABS flat grid (icon + name + desc)
+              3. Theo chủ đề: 32 SIMULATIONS grouped by category
+              4. Bottom CTA */}
+          <div className="mb-8 rounded-2xl border-2 border-purple-500/25 bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 dark:from-[hsl(280,45%,9%)] dark:via-[hsl(310,40%,10%)] dark:to-[hsl(20,40%,10%)] overflow-hidden relative">
+            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.05] select-none pointer-events-none leading-none">🧪</div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 auto-rows-fr">
-              {POPULAR_LABS.map(lab => {
-                const accentColors: Record<string, string> = {
-                  rose:    'from-rose-500/15 to-pink-500/10 border-rose-300/40 dark:border-rose-500/30 hover:border-rose-500',
-                  indigo:  'from-indigo-500/15 to-blue-500/10 border-indigo-300/40 dark:border-indigo-500/30 hover:border-indigo-500',
-                  emerald: 'from-emerald-500/15 to-teal-500/10 border-emerald-300/40 dark:border-emerald-500/30 hover:border-emerald-500',
-                  cyan:    'from-cyan-500/15 to-sky-500/10 border-cyan-300/40 dark:border-cyan-500/30 hover:border-cyan-500',
-                  amber:   'from-amber-500/15 to-orange-500/10 border-amber-300/40 dark:border-amber-500/30 hover:border-amber-500',
-                  fuchsia: 'from-fuchsia-500/15 to-purple-500/10 border-fuchsia-300/40 dark:border-fuchsia-500/30 hover:border-fuchsia-500',
-                }
-                const groupLabel: Record<string, string> = {
-                  physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
-                  electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
-                }
-                return (
-                  <Link
-                    key={lab.path}
-                    to={lab.path}
-                    className={`group relative rounded-2xl border-2 bg-gradient-to-br ${accentColors[lab.accent]} p-4 flex flex-col items-center text-center transition-all hover:scale-[1.04] hover:shadow-xl h-full`}
-                  >
-                    <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
-                      {groupLabel[lab.group]}
-                    </span>
-                    <div className="text-4xl md:text-5xl mb-2 group-hover:scale-125 transition-transform">
-                      {lab.emoji}
-                    </div>
-                    <h3 className="font-bold text-sm md:text-base text-foreground mb-1 leading-tight">
-                      {lab.name}
-                    </h3>
-                    <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2 mt-auto pt-2">
-                      {lab.desc}
-                    </p>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ── QR truy cập nhanh — học sinh quét là vào thẳng LabTwin ── */}
-          <div className="mb-8">
-            <QuickScanQr
-              targetUrl={labsCatalogUrl}
-              accent="indigo"
-              title="Quét QR để mở LabTwin trên điện thoại"
-              description={`Học sinh chỉ cần mở camera, quét mã là vào thẳng danh mục ${PYTHON_TOTAL} thí nghiệm Python — không cần đăng nhập, không cần gõ link.`}
-              downloadName="labtwin-qr.png"
-            />
-          </div>
-
-          {/* ── Python Simulations — All Categories ──
-              2026-05-20: light mode dùng gradient nhạt indigo→purple→pink,
-              dark mode giữ cosmic deep HSL như cũ. */}
-          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-[hsl(245,50%,10%)] dark:via-[hsl(270,45%,9%)] dark:to-[hsl(290,45%,10%)] overflow-hidden relative">
-            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.06] select-none pointer-events-none leading-none">🐍</div>
-
-            {/* Header */}
-            <div className="relative z-10 px-6 pt-6 pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h2 className="text-3xl font-bold text-indigo-100 flex items-center gap-2">
-                    <Sparkles className="h-8 w-8 text-yellow-400" />
-                    Python Simulations &amp; Labs
+            {/* Header — title + QR compact card */}
+            <div className="relative z-10 px-6 pt-6 pb-3">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
+                    <Sparkles className="h-7 w-7 text-purple-500" />
+                    Tất cả thí nghiệm
                   </h2>
-                  <p className="text-lg mt-2 text-indigo-300/70">
-                    {PYTHON_TOTAL} thí nghiệm được code bằng Python thật! Mỗi danh mục có nhiều labs cool! 🎨
+                  <p className="text-sm text-muted-foreground mt-1.5">
+                    {POPULAR_LABS.length} lab phổ biến + {SIMULATIONS.length} thí nghiệm Python theo chủ đề — bấm là vào thẳng
                   </p>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
+                      ⭐ {POPULAR_LABS.length} phổ biến
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30">
+                      🐍 {SIMULATIONS.length} Python labs
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-pink-100 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-500/30">
+                      {PYTHON_CATEGORIES.length} chủ đề
+                    </span>
+                  </div>
                 </div>
-                <Link
-                  to="/dashboard/labtwin"
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  Xem tất cả
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
+
+                {/* QR card compact — góc phải header */}
+                <div className="shrink-0 rounded-xl border-2 border-indigo-300/50 dark:border-indigo-500/30 bg-white dark:bg-indigo-950/40 p-3 flex items-center gap-3 max-w-xs">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encodeURIComponent(labsCatalogUrl)}`}
+                    alt="QR LabTwin"
+                    className="w-20 h-20 object-contain rounded-md"
+                    loading="lazy"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                      <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Quét QR</span>
+                    </div>
+                    <p className="text-[10.5px] text-muted-foreground leading-snug mb-1.5 line-clamp-2">
+                      Mở LabTwin trên điện thoại — không cần đăng nhập
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadQrImage(
+                          `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(labsCatalogUrl)}`,
+                          'labtwin-qr.png',
+                        )
+                      }
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-500/30 transition-all"
+                    >
+                      Tải PNG
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* ── FLAT ALL-LABS view — nhóm theo category nhưng hiển thị HẾT ──
-                User: "đưa tất cả lab từ Python Simulations & Labs ra ngoài"
-                Thay vì 9 category cards drill → /labs?category=X,
-                giờ render NGAY 32 labs grouped by category headers. */}
-            <div className="relative z-10 px-6 py-4 space-y-6">
-              {(() => {
-                // Group SIMULATIONS by category
-                const grouped: Record<string, Simulation[]> = {}
-                for (const s of SIMULATIONS) {
-                  if (!grouped[s.category]) grouped[s.category] = []
-                  grouped[s.category].push(s)
-                }
-                // Preserve original order from PYTHON_CATEGORIES
-                const catOrder = PYTHON_CATEGORIES.map(c => c.category)
-                const extraCats = Object.keys(grouped).filter(c => !catOrder.includes(c))
-                const orderedCats = [...catOrder, ...extraCats].filter(c => grouped[c]?.length > 0)
-
-                return orderedCats.map(catName => {
-                  const emoji = CATEGORY_ICON[catName] ?? '🔬'
-                  const gradient = CATEGORY_GRADIENT[catName] ?? DEFAULT_GRADIENT
-                  const border = CATEGORY_BORDER[catName] ?? 'border-white/10'
-                  const labs = grouped[catName]
+            {/* ── ⭐ Phổ biến — 15 POPULAR_LABS flat grid ── */}
+            <div className="relative z-10 px-6 py-3">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">⭐</span>
+                <h3 className="font-bold text-lg text-foreground">Phổ biến nhất</h3>
+                <span className="text-xs text-muted-foreground">— mỗi lab có UI riêng, vào thẳng</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 auto-rows-fr">
+                {POPULAR_LABS.map(lab => {
+                  const accentColors: Record<string, string> = {
+                    rose:    'from-rose-500/15 to-pink-500/10 border-rose-300/40 dark:border-rose-500/30 hover:border-rose-500',
+                    indigo:  'from-indigo-500/15 to-blue-500/10 border-indigo-300/40 dark:border-indigo-500/30 hover:border-indigo-500',
+                    emerald: 'from-emerald-500/15 to-teal-500/10 border-emerald-300/40 dark:border-emerald-500/30 hover:border-emerald-500',
+                    cyan:    'from-cyan-500/15 to-sky-500/10 border-cyan-300/40 dark:border-cyan-500/30 hover:border-cyan-500',
+                    amber:   'from-amber-500/15 to-orange-500/10 border-amber-300/40 dark:border-amber-500/30 hover:border-amber-500',
+                    fuchsia: 'from-fuchsia-500/15 to-purple-500/10 border-fuchsia-300/40 dark:border-fuchsia-500/30 hover:border-fuchsia-500',
+                  }
+                  const groupLabel: Record<string, string> = {
+                    physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
+                    electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
+                  }
                   return (
-                    <div key={catName}
-                      className={`rounded-2xl border-2 ${border} bg-gradient-to-br ${gradient} p-5`}>
-                      {/* Category header */}
-                      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{emoji}</span>
-                          <div>
-                            <h3 className="font-bold text-lg text-white/95">{catName}</h3>
-                            <p className="text-xs text-white/50">{labs.length} thí nghiệm</p>
-                          </div>
-                        </div>
-                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/25 text-yellow-300">
-                          <Star className="h-3 w-3" />
-                          {labs.reduce((s, l) => s + l.xp, 0)} XP
-                        </span>
+                    <Link
+                      key={lab.path}
+                      to={lab.path}
+                      className={`group relative rounded-2xl border-2 bg-gradient-to-br ${accentColors[lab.accent]} p-4 flex flex-col items-center text-center transition-all hover:scale-[1.04] hover:shadow-xl h-full`}
+                    >
+                      <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
+                        {groupLabel[lab.group]}
+                      </span>
+                      <div className="text-4xl md:text-5xl mb-2 group-hover:scale-125 transition-transform">
+                        {lab.emoji}
                       </div>
-
-                      {/* All labs in this category — flat grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                        {labs.map(lab => {
-                          const href = lab.internal_link ?? `/dashboard/labtwin/${lab.id}`
-                          const diffColor = lab.difficulty === 'Dễ' ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
-                                          : lab.difficulty === 'Trung bình' ? 'text-amber-300 bg-amber-500/15 border-amber-500/30'
-                                          : 'text-rose-300 bg-rose-500/15 border-rose-500/30'
-                          return (
-                            <Link key={lab.id} to={href}
-                              className="rounded-xl bg-black/30 hover:bg-black/40 border border-white/10 hover:border-white/30 p-3 transition-all hover:scale-[1.02] group flex flex-col">
-                              <div className="flex items-start justify-between gap-2 mb-1.5">
-                                <h4 className="font-bold text-sm text-white leading-snug line-clamp-2 group-hover:text-yellow-300">
-                                  {lab.name}
-                                </h4>
-                              </div>
-                              <p className="text-[11px] text-white/50 leading-relaxed line-clamp-2 mb-2 flex-1">
-                                {lab.description}
-                              </p>
-                              <div className="flex items-center gap-1.5 flex-wrap text-[10px] mt-auto">
-                                <span className={`px-1.5 py-0.5 rounded font-bold border ${diffColor}`}>
-                                  {lab.difficulty}
-                                </span>
-                                <span className="flex items-center gap-1 text-white/40">
-                                  <Clock className="h-2.5 w-2.5" />
-                                  {lab.duration}
-                                </span>
-                                <span className="ml-auto text-yellow-300 font-bold">
-                                  +{lab.xp} XP
-                                </span>
-                              </div>
-                            </Link>
-                          )
-                        })}
-                      </div>
-                    </div>
+                      <h3 className="font-bold text-sm md:text-base text-foreground mb-1 leading-tight">
+                        {lab.name}
+                      </h3>
+                      <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2 mt-auto pt-2">
+                        {lab.desc}
+                      </p>
+                    </Link>
                   )
-                })
-              })()}
+                })}
+              </div>
+            </div>
 
-              {/* Bottom CTA */}
-              <div className="p-4 bg-white/[0.04] rounded-xl border-2 border-indigo-500/15">
+            {/* ── 🐍 Theo chủ đề — 32 SIMULATIONS grouped ── */}
+            <div className="relative z-10 px-6 py-3">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🐍</span>
+                <h3 className="font-bold text-lg text-foreground">Theo chủ đề — Python Simulations</h3>
+                <span className="text-xs text-muted-foreground">— {PYTHON_TOTAL} thí nghiệm code bằng Python thật</span>
+              </div>
+              <div className="space-y-5">
+                {(() => {
+                  // Group SIMULATIONS by category
+                  const grouped: Record<string, Simulation[]> = {}
+                  for (const s of SIMULATIONS) {
+                    if (!grouped[s.category]) grouped[s.category] = []
+                    grouped[s.category].push(s)
+                  }
+                  const catOrder = PYTHON_CATEGORIES.map(c => c.category)
+                  const extraCats = Object.keys(grouped).filter(c => !catOrder.includes(c))
+                  const orderedCats = [...catOrder, ...extraCats].filter(c => grouped[c]?.length > 0)
+
+                  return orderedCats.map(catName => {
+                    const emoji = CATEGORY_ICON[catName] ?? '🔬'
+                    const gradient = CATEGORY_GRADIENT[catName] ?? DEFAULT_GRADIENT
+                    const border = CATEGORY_BORDER[catName] ?? 'border-white/10'
+                    const labs = grouped[catName]
+                    return (
+                      <div key={catName}
+                        className={`rounded-2xl border-2 ${border} bg-gradient-to-br ${gradient} p-5`}>
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">{emoji}</span>
+                            <div>
+                              <h4 className="font-bold text-lg text-foreground">{catName}</h4>
+                              <p className="text-xs text-muted-foreground">{labs.length} thí nghiệm</p>
+                            </div>
+                          </div>
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/25 text-yellow-700 dark:text-yellow-300">
+                            <Star className="h-3 w-3" />
+                            {labs.reduce((s, l) => s + l.xp, 0)} XP
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                          {labs.map(lab => {
+                            const href = lab.internal_link ?? `/dashboard/labtwin/${lab.id}`
+                            const diffColor = lab.difficulty === 'Dễ' ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+                                            : lab.difficulty === 'Trung bình' ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15 border-amber-500/30'
+                                            : 'text-rose-700 dark:text-rose-300 bg-rose-500/15 border-rose-500/30'
+                            return (
+                              <Link key={lab.id} to={href}
+                                className="rounded-xl bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/40 border border-border/60 hover:border-foreground/30 p-3 transition-all hover:scale-[1.02] group flex flex-col">
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <h5 className="font-bold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-purple-600 dark:group-hover:text-yellow-300">
+                                    {lab.name}
+                                  </h5>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-2 flex-1">
+                                  {lab.description}
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap text-[10px] mt-auto">
+                                  <span className={`px-1.5 py-0.5 rounded font-bold border ${diffColor}`}>
+                                    {lab.difficulty}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {lab.duration}
+                                  </span>
+                                  <span className="ml-auto text-yellow-600 dark:text-yellow-300 font-bold">
+                                    +{lab.xp} XP
+                                  </span>
+                                </div>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {/* Bottom CTA inside merged section */}
+            <div className="relative z-10 px-6 pb-6 pt-2">
+              <div className="p-4 bg-white/60 dark:bg-white/[0.04] rounded-xl border-2 border-purple-300/40 dark:border-purple-500/15">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div className="text-3xl">🎯</div>
                     <div>
-                      <h4 className="font-bold text-indigo-200">Hiển thị đầy đủ {SIMULATIONS.length} labs</h4>
-                      <p className="text-sm text-indigo-300/60">
-                        Tất cả labs đã được trải phẳng theo nhóm · không cần drill nữa
+                      <h4 className="font-bold text-foreground">
+                        Hiển thị đầy đủ {POPULAR_LABS.length + SIMULATIONS.length} thí nghiệm
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Đã gộp: ⭐ phổ biến + 🐍 Python labs + 📱 QR vào 1 chỗ — không cần drill
                       </p>
                     </div>
                   </div>
-                  <Link to="/dashboard/labtwin"
-                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all">
-                    Tìm kiếm & filter
+                  <Link
+                    to="/dashboard/labtwin"
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-white/[0.06] text-purple-700 dark:text-indigo-300 hover:bg-purple-200 dark:hover:bg-indigo-500/20 border-2 border-purple-300 dark:border-indigo-500/20 rounded-xl font-semibold transition-all"
+                  >
+                    Tìm kiếm &amp; filter
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
