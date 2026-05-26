@@ -649,12 +649,17 @@ function makeProxy(target, label, pathFilter) {
       status:         row.status,
       matrixId:       row.matrixId || null,
       userId:         row.userId,
+      // Author info từ JOIN User
+      authorName:     row.author_name || row.authorName || null,
+      authorImage:    row.author_image || row.authorImage || null,
+      authorEmail:    row.author_email || row.authorEmail || null,
       createdAt:      row.createdAt,
       updatedAt:      row.updatedAt,
     };
   }
 
   // ── GET /api/teacher/exams ─────────────────────────────────
+  // User: "Tác giả: Chưa rõ" — fix bằng LEFT JOIN User để lấy name/image
   app.get('/api/teacher/exams', async (req, res) => {
     try {
       const userId = getExamUserId(req);
@@ -662,7 +667,14 @@ function makeProxy(target, label, pathFilter) {
 
       const pool = getEPool();
       const { rows } = await pool.query(
-        `SELECT * FROM "Exam" WHERE "userId" = $1 ORDER BY "createdAt" DESC`,
+        `SELECT e.*,
+                COALESCE(u.name, u.email)   AS author_name,
+                u.image                     AS author_image,
+                u.email                     AS author_email
+         FROM "Exam" e
+         LEFT JOIN "User" u ON u.id = e."userId"
+         WHERE e."userId" = $1
+         ORDER BY e."createdAt" DESC`,
         [userId]
       );
 
@@ -670,6 +682,48 @@ function makeProxy(target, label, pathFilter) {
       return res.json({ exams: rows.map(mapExam) });
     } catch (err) {
       console.error('[teacher:exams] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/admin/exams/claim-orphan-by-email ─────────────────────
+  // User: "Gán cho tài khoản giáo viên VietChung email teacher@example.com"
+  // Tìm tất cả Exam có userId NULL/không match User → gán cho GV chỉ định
+  app.post('/api/admin/exams/claim-orphan-by-email', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const pool = getEPool();
+      const email = String((req.body && req.body.email) || 'teacher@example.com').toLowerCase();
+
+      // Find teacher
+      const { rows: us } = await pool.query(
+        `SELECT id, name, email FROM "User" WHERE lower(email) = $1 LIMIT 1`,
+        [email]
+      );
+      if (!us.length) {
+        return res.status(404).json({ error: `Không tìm thấy GV với email ${email}` });
+      }
+      const teacher = us[0];
+
+      // Update orphan exams (userId NULL OR userId không tồn tại trong User)
+      const { rowCount } = await pool.query(
+        `UPDATE "Exam"
+         SET "userId" = $1, "updatedAt" = NOW()
+         WHERE "userId" IS NULL
+            OR "userId" = ''
+            OR NOT EXISTS (SELECT 1 FROM "User" u WHERE u.id = "Exam"."userId")`,
+        [teacher.id]
+      );
+
+      return res.json({
+        ok: true,
+        teacher: { id: teacher.id, name: teacher.name, email: teacher.email },
+        updated: rowCount,
+        message: `Đã gán ${rowCount} đề thi orphan cho ${teacher.name} (${email})`,
+      });
+    } catch (err) {
+      console.error('[admin:exams:claim-orphan]', err.message);
       return res.status(500).json({ error: err.message });
     }
   });

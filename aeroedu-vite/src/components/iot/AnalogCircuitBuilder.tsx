@@ -1715,6 +1715,24 @@ function AnalogCircuitBuilderInner(
               title="Chạy lại 1 lần (manual refresh)">
               <RotateCw className="w-3.5 h-3.5" />
             </button>
+            {/* User: "sau khi ghép thủ công xong thì có nút lưu thành 1 mạch cụ thể"
+                Prominent save button — hiện khi đã có components, nổi bật ở top bar */}
+            {components.length > 0 && (
+              <button
+                onClick={saveCircuit}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:scale-[1.02] transition-transform shadow shadow-amber-500/30"
+                title="Lưu mạch hiện tại với tên để tái sử dụng">
+                <Save className="w-3.5 h-3.5" /> Lưu thành mạch
+              </button>
+            )}
+            {components.length > 0 && savedList.length > 0 && (
+              <button
+                onClick={() => setShowSavedDialog(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 text-amber-300 hover:bg-zinc-700 border border-amber-500/30 transition"
+                title={`${savedList.length} mạch đã lưu — click để mở`}>
+                <FolderOpen className="w-3.5 h-3.5" /> {savedList.length}
+              </button>
+            )}
           </div>
         </div>
       </div>
