@@ -101,6 +101,7 @@ const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
 const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
 const VideoTrackingLab   = lazy(() => import('@/pages/labs/VideoTracking'))
 const GeometryUnfoldLab  = lazy(() => import('@/pages/labs/GeometryUnfold'))
+const PixelOfficeRPGLab  = lazy(() => import('@/pages/labs/PixelOfficeRPG'))
 const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
 const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
@@ -411,6 +412,7 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
             <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
             <Route path="/dashboard/labtwin/labs/geometry-unfold"         element={<GeometryUnfoldLab />} />
+            <Route path="/dashboard/labtwin/labs/pixel-office-rpg"        element={<PixelOfficeRPGLab />} />
             {/* ── GAME HUB — mọi game mount trực tiếp dưới /dashboard/games/* ── */}
             <Route path="/dashboard/games"                                element={<GamesIndexPage />} />
             <Route path="/dashboard/games/pixel-odyssey"                  element={<PixelOdyssey />} />

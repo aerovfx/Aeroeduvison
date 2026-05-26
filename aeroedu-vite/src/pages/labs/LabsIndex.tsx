@@ -180,6 +180,9 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
   { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/labs/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
 
+  // ── Game RPG (1) ──
+  { name: 'Pixel Office RPG',   emoji: '🎮', path: '/dashboard/labtwin/labs/pixel-office-rpg', desc: 'AI agent VS Code · top-down pixel + chat', accent: 'fuchsia', group: 'ai' },
+
   // ── Hoá & Quang (2) ──
   { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/labs/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
   { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/labs/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
