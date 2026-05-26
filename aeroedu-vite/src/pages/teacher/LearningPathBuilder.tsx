@@ -22,6 +22,7 @@ import { api } from '@/services/api'
 import CompetencyPicker, { type CompetencyTarget } from '@/components/learning-path/CompetencyPicker'
 import CompetencyCoverage from '@/components/learning-path/CompetencyCoverage'
 import RubricEditor, { defaultEvaluation, type ModuleEvaluation } from '@/components/learning-path/RubricEditor'
+import KgPathSuggester, { type KgSuggestedModule } from '@/components/learning-path/KgPathSuggester'
 import { MODULE_TYPE_TO_PILLARS, getPillar, COMPETENCY_LEVELS } from '@/lib/competency-framework'
 
 const CreateModuleModal = lazy(() => import('@/components/learning-path/CreateModuleModal'))
@@ -84,6 +85,9 @@ export interface Module {
   // V2: competency framework + rubric
   competencies?: CompetencyTarget[]
   evaluation?: ModuleEvaluation
+  // V3: KG source (track origin nếu module được sinh từ KG suggester)
+  kgNodeId?: string
+  kgNodeType?: string
 }
 
 export interface RosterStudent {
@@ -289,6 +293,40 @@ export default function LearningPathBuilder() {
     setSelectedModules(prev => [...prev, enriched])
   }
 
+  /* KG → Module helpers */
+  const kgSuggestedToModule = (kg: KgSuggestedModule): Module => applyDefaultsToModule({
+    id: kg.id,
+    type: kg.type,
+    title: kg.title,
+    subject: kg.subject || pathSubject,
+    difficulty: kg.difficulty,
+    duration: kg.duration,
+    xpTarget: kg.xpTarget,
+    description: kg.description,
+    tags: kg.tags,
+    kgNodeId: kg.kgNodeId,
+    kgNodeType: kg.kgNodeType,
+  })
+
+  const handleKgAddOne = (kg: KgSuggestedModule) => {
+    const m = kgSuggestedToModule(kg)
+    setSelectedModules(prev => [...prev, m])
+    toast.success(`Đã thêm "${m.title}" từ KG`)
+  }
+
+  const handleKgAddMany = (mods: KgSuggestedModule[]) => {
+    if (mods.length === 0) return
+    const converted = mods.map(kgSuggestedToModule)
+    setSelectedModules(prev => [...prev, ...converted])
+    toast.success(`Đã thêm ${converted.length} module từ KG`)
+  }
+
+  /* Track which KG nodes are already in path (để tránh thêm trùng) */
+  const existingKgNodeIds = useMemo(
+    () => selectedModules.map(m => m.kgNodeId).filter((x): x is string => !!x),
+    [selectedModules]
+  )
+
   // Load roster + paths
   useEffect(() => {
     (async () => {
@@ -455,7 +493,7 @@ export default function LearningPathBuilder() {
                 <p style={{ color: D.muted, fontSize: 12.5, margin: 0 }}>
                   {editingPathId
                     ? `Đang chỉnh sửa: "${pathName || '...'}" — sẽ ghi đè khi lưu`
-                    : 'Soạn lộ trình học gắn với khung năng lực Chương trình GDPT 2018 + STEM'}
+                    : 'Soạn lộ trình từ Knowledge Graph — gắn khung năng lực GDPT 2018 + STEM'}
                 </p>
               </div>
             </div>
@@ -620,6 +658,16 @@ export default function LearningPathBuilder() {
                             background: DIFF_COLORS[m.difficulty].bg, color: DIFF_COLORS[m.difficulty].text,
                             border: `1px solid ${DIFF_COLORS[m.difficulty].border}`,
                           }}>{DIFF_COLORS[m.difficulty].label}</span>
+                          {m.kgNodeId && (
+                            <span title={`Từ KG · ${m.kgNodeType || 'Node'}`} style={{
+                              fontSize: 10, padding: '1.5px 6px', borderRadius: 4,
+                              background: 'rgba(168,139,250,0.15)', color: '#a78bfa',
+                              border: '1px solid rgba(168,139,250,0.3)',
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                            }}>
+                              <Brain size={9} /> KG
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 11, color: D.muted, display: 'flex', gap: 12, marginBottom: 6 }}>
                           <span>⏱ {m.duration} phút</span>
@@ -652,9 +700,32 @@ export default function LearningPathBuilder() {
             </Card>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="lpb-sidebar">
+              {/* ── 🧠 KG-based auto-suggest (Phase 1+4+6 from KG service) ──
+                  User: "thuật toán gợi ý tự động tìm các node có mối quan hệ
+                   với nhau và gợi ý xây dựng lộ trình học tập theo gợi ý từ
+                   các node trong KG" */}
+              <Card style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.08), rgba(99,102,241,0.04))', border: '1px solid rgba(168,139,250,0.25)' }}>
+                <h3 style={{
+                  fontSize: 13, fontWeight: 800, color: D.text, margin: '0 0 4px',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <Brain size={14} style={{ color: '#a78bfa' }} />
+                  Gợi ý từ Knowledge Graph
+                </h3>
+                <p style={{ fontSize: 10.5, color: D.muted, margin: '0 0 10px', lineHeight: 1.4 }}>
+                  Thuật toán tự tìm node liên quan + dựng lộ trình từ KG
+                </p>
+                <KgPathSuggester
+                  pathSubject={pathSubject}
+                  onAdd={handleKgAddOne}
+                  onAddMany={handleKgAddMany}
+                  existingKgNodeIds={existingKgNodeIds}
+                />
+              </Card>
+
               <Card>
-                <h3 style={{ fontSize: 13, fontWeight: 800, color: D.text, margin: '0 0 12px' }}>📦 Modules gợi ý</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
+                <h3 style={{ fontSize: 13, fontWeight: 800, color: D.text, margin: '0 0 12px' }}>📦 Modules gợi ý (mẫu)</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
                   {[...customModules, ...AVAILABLE_MODULES].map(m => (
                     <button
                       key={m.id}
