@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { DocumentUploadModal } from "@/components/document-digitization/UploadModal"
+import { api } from "@/services/api"
 
 /* ── Dark palette ── */
 const D = {
@@ -98,14 +99,13 @@ export default function DocumentDigitizationPage() {
   const fetchDocuments = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (selectedStatus !== 'Tất cả') params.append('status', selectedStatus)
-      const res = await fetch(`/api/documents?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setDocuments(data.documents || [])
-    } catch {
-      toast.error('Không thể tải danh sách tài liệu')
+      const params = selectedStatus !== 'Tất cả' ? { status: selectedStatus } : {}
+      // Dùng axios api (auto-inject Bearer), không phải bare fetch()
+      const res = await api.get<{ documents: Document[] }>('/documents', { params })
+      setDocuments(res.data?.documents || [])
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || 'Không thể tải danh sách tài liệu'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -113,12 +113,11 @@ export default function DocumentDigitizationPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
+      await api.delete(`/documents/${id}`)
       toast.success('Đã xóa tài liệu')
       fetchDocuments()
-    } catch {
-      toast.error('Không thể xóa tài liệu')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Không thể xóa tài liệu')
     } finally {
       setDeleteTarget(null)
     }

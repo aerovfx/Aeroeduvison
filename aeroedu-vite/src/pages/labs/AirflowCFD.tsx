@@ -10,7 +10,7 @@
  * Triết lý render: xấp xỉ trực quan (không giải Navier–Stokes thật) —
  * đủ nhanh, chạy mượt trên GPU, và giữ các xu hướng vật lý đúng để dạy học.
  *
- * Route: /dashboard/labtwin/labs/airflow-cfd
+ * Route: /dashboard/labtwin/airflow-cfd
  */
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'

@@ -1416,6 +1416,28 @@ export default function IoTLab() {
           </Link>
         </div>
 
+        {/* ── Quick Access Cards — deep-link cho assignment "lắp ráp / nghiên cứu mạch" ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          {[
+            { to: '/dashboard/iot-lab/circuit-builder', icon: Wrench, color: 'from-amber-500 to-orange-600', label: 'Mạch Analog', desc: 'Battery, R, LED, tụ' },
+            { to: '/dashboard/iot-lab/circuit-presets', icon: BookOpen, color: 'from-emerald-500 to-teal-600', label: '8 Mạch mẫu', desc: 'Nối tiếp, song song, RC' },
+            { to: '/dashboard/iot-lab/semiconductor', icon: Sigma, color: 'from-purple-500 to-indigo-600', label: 'Bán dẫn', desc: 'Diode, NE555, Op-Amp' },
+            { to: '/dashboard/iot-lab/digital-logic', icon: Cpu, color: 'from-blue-500 to-cyan-600', label: 'Cổng Logic', desc: 'AND, OR, NOT, FF' },
+            { to: '/dashboard/iot-lab/custom-board', icon: CircuitBoard, color: 'from-pink-500 to-rose-600', label: 'Wokwi Custom', desc: 'Tự thiết kế mạch' },
+            { to: '/dashboard/iot-lab/emulator', icon: FileCode2, color: 'from-cyan-500 to-blue-600', label: 'Arduino Sim', desc: 'Chạy code .ino' },
+          ].map(({ to, icon: Icon, color, label, desc }) => (
+            <Link key={to} to={to}
+              className="group relative p-4 rounded-xl bg-card dark:bg-zinc-900/60 border border-border hover:border-cyan-500/40 hover:scale-[1.02] transition-all overflow-hidden">
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-br ${color} transition-opacity`} />
+              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-md`}>
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="font-bold text-sm text-foreground mb-0.5">{label}</h3>
+              <p className="text-[11px] text-zinc-500 leading-tight">{desc}</p>
+            </Link>
+          ))}
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2 mb-2">

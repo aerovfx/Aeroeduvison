@@ -1,7 +1,7 @@
 /**
  * PixelOfficeRPG — Game pixel art RPG VS Code-themed với AI agent chat
  *
- * Route: /dashboard/labtwin/labs/pixel-office-rpg
+ * Route: /dashboard/labtwin/pixel-office-rpg
  *
  * User: paste HTML reference complete với:
  *   - VS Code UI (tabs, sidebar icons, status bar đỏ)

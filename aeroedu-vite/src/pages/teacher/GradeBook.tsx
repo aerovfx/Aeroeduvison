@@ -419,14 +419,31 @@ export default function GradeBook() {
     }
     setLoading(true)
     try {
+      // BE trả ho_ten AS hoTen + ma_dinh_danh AS maDinhDanh (snake → camel).
+      // FE interface ClassStudent dùng name/mssv/dob/gender → MUST map.
+      type BEStudent = {
+        id: string; stt: number | null;
+        hoTen?: string; maDinhDanh?: string | null;
+        ngaySinh?: string | null; gioiTinh?: string | null;
+        // Legacy fallback (nếu BE đổi sau)
+        name?: string; mssv?: string | null; dob?: string | null; gender?: string | null;
+      }
       const res = await api.get<{
-        students: ClassStudent[]
+        students: BEStudent[]
         grades: Record<string, GradeRow>
       }>('/teacher/gradebook', { params: { classId, subject, semester } })
-      setStudents(res.data?.students || [])
+      const mapped: ClassStudent[] = (res.data?.students || []).map(s => ({
+        id: s.id,
+        stt: s.stt ?? null,
+        name: s.hoTen || s.name || `HS ${s.stt || '?'}`,
+        mssv: s.maDinhDanh ?? s.mssv ?? null,
+        dob:  s.ngaySinh   ?? s.dob   ?? null,
+        gender: s.gioiTinh ?? s.gender ?? null,
+      }))
+      setStudents(mapped)
       // Fill missing students with empty grade rows
       const gMap = { ...(res.data?.grades || {}) }
-      for (const s of res.data?.students || []) {
+      for (const s of mapped) {
         if (!gMap[s.id]) gMap[s.id] = emptyGrade()
         // Đảm bảo ddgtx có đủ NUM_TX cột
         while (gMap[s.id].ddgtx.length < NUM_TX) gMap[s.id].ddgtx.push(null)

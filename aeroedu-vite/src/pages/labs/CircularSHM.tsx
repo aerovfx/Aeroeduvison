@@ -2,7 +2,7 @@
  * CircularSHM — Mô phỏng sự tương tự giữa chuyển động tròn đều và
  * dao động điều hoà (SHM = hình chiếu của chuyển động tròn lên 1 trục).
  *
- * Route: /dashboard/labtwin/labs/circular-shm
+ * Route: /dashboard/labtwin/circular-shm
  *
  * User: "thêm giả lập mô phỏng sự tương tự giữa chuyển động tròn và
  * dao động điều hoà. Thiết kế giao diện tương tự fourier-epicycles"

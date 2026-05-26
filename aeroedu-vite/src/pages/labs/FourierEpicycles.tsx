@@ -1,7 +1,7 @@
 /**
  * FourierEpicycles — Phân tích chuỗi Fourier bằng các vòng quay epicycle
  *
- * Route: /dashboard/labtwin/labs/fourier-epicycles
+ * Route: /dashboard/labtwin/fourier-epicycles
  *
  * User ref: ảnh @fourier_borel · mathswithmuza — square wave Fourier series
  * công thức f(x) = (4/π) Σ (1/(2n-1)) sin((2n-1)x)

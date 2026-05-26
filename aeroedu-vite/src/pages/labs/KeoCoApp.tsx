@@ -1,6 +1,6 @@
 /**
  * Kéo Co Kiến Thức — Teacher Control Panel
- *   /dashboard/labtwin/labs/keo-co-app
+ *   /dashboard/labtwin/keo-co-app
  *
  * Two tabs:
  *   1) "Lớp học"  (Classroom)  — create session → QR → live tug-of-war

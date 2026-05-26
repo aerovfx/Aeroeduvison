@@ -375,10 +375,29 @@ export default function StudentExamsPage() {
       return r.data || { rooms: [], count: 0 }
     },
     staleTime: 30_000,
-    // Auto-poll every 45s — phòng thi LIVE cần realtime đủ tốt mà không
-    // gọi backend quá nhiều. React Query tự pause khi tab off-focus.
     refetchInterval: 45_000,
     refetchIntervalInBackground: false,
+    retry: false,
+  })
+
+  // Global leaderboard 30 ngày — top HS theo avg score PracticeExam
+  interface GlobalLeader {
+    rank: number
+    userId: string
+    name: string
+    avatar: string | null
+    avgScore: number
+    bestScore: number
+    examCount: number
+    isMe: boolean
+  }
+  const { data: lbData } = useQuery<{ leaderboard: GlobalLeader[]; myEntry: GlobalLeader | null }>({
+    queryKey: ['exam-rooms-global-leaderboard'],
+    queryFn: async () => {
+      const r = await api.get('/student/exam-rooms/leaderboard?days=30')
+      return r.data || { leaderboard: [], myEntry: null }
+    },
+    staleTime: 5 * 60_000,
     retry: false,
   })
 
@@ -498,6 +517,53 @@ export default function StudentExamsPage() {
             <span style={{ fontSize: 14, color: '#6ee7b7', fontWeight: 600 }}>
               {active.length} phòng thi đang mở — vào ngay để không bỏ lỡ!
             </span>
+          </div>
+        )}
+
+        {/* ── Global leaderboard banner (TOP 10 HS 30 ngày qua PracticeExam) ── */}
+        {(lbData?.leaderboard?.length ?? 0) > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(251,191,36,0.08) 0%, rgba(245,101,101,0.05) 100%)',
+            border: '1px solid rgba(251,191,36,0.25)',
+            borderRadius: 14, padding: 16, marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Trophy style={{ width: 16, height: 16, color: '#fbbf24' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: D.text }}>
+                  Top HS Phòng Thi · 30 ngày qua
+                </span>
+              </div>
+              {lbData?.myEntry && !lbData.leaderboard.some(e => e.isMe) && (
+                <div style={{
+                  padding: '4px 10px', borderRadius: 8,
+                  background: 'rgba(251,191,36,0.18)', border: '1px solid rgba(251,191,36,0.4)',
+                  fontSize: 11, fontWeight: 700, color: '#fbbf24',
+                }}>
+                  Bạn xếp #{lbData.myEntry.rank} · {lbData.myEntry.avgScore.toFixed(1)}đ
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {(lbData?.leaderboard ?? []).slice(0, 10).map(e => (
+                <div key={e.userId} style={{
+                  flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px', borderRadius: 10, minWidth: 140,
+                  background: e.isMe ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.04)',
+                  border: e.isMe ? '1px solid rgba(251,191,36,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <RankMedal rank={e.rank} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: D.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {e.isMe ? '⭐ Bạn' : e.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: D.muted, marginTop: 2 }}>
+                      {e.avgScore.toFixed(1)}đ TB · {e.examCount} bài
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

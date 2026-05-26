@@ -1,7 +1,7 @@
 /**
  * GeometryUnfold — Khám phá hình học không gian: trải phẳng + công thức sống
  *
- * Route: /dashboard/labtwin/labs/geometry-unfold
+ * Route: /dashboard/labtwin/geometry-unfold
  *
  * User: paste tham khảo HTML mô phỏng dark sci-fi với 4 khối hình học
  * "Mô phỏng đúng các dạng hình học căn bản nhé"

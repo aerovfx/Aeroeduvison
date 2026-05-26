@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
+import VideoUploader from '@/components/teacher/VideoUploader'
 import {
   type Module, type ModuleType, type Difficulty,
   type QuizQuestion, type SurveyQuestion,
@@ -482,17 +483,41 @@ export default function CreateModuleModal({ open, onClose, onCreate, roster }: P
           {/* ─── Step 3: Type-specific ─── */}
           {step === 3 && (
             <div>
-              {/* VIDEO */}
+              {/* VIDEO — option 1: paste URL, option 2: upload file lên GCS */}
               {type === 'video' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Upload file → GCS bucket */}
                   <div>
-                    <label style={labelCls}>URL video *</label>
+                    <label style={labelCls}>📤 Upload file video lên GCS</label>
+                    <VideoUploader
+                      courseId="learning-path"
+                      mediaType="video"
+                      maxSizeMB={500}
+                      onComplete={(info) => {
+                        setVideoUrl(info.url)
+                        toast.success(`Video đã upload: ${info.filename}`)
+                      }}
+                    />
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    color: D.muted, fontSize: 11, fontWeight: 600,
+                  }}>
+                    <div style={{ flex: 1, height: 1, background: D.border2 }} />
+                    HOẶC
+                    <div style={{ flex: 1, height: 1, background: D.border2 }} />
+                  </div>
+
+                  {/* Paste URL có sẵn */}
+                  <div>
+                    <label style={labelCls}>🔗 URL video có sẵn</label>
                     <input
                       value={videoUrl}
                       onChange={e => setVideoUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=... hoặc https://vimeo.com/..."
                       style={inputCls}
-                      autoFocus
                     />
                     {videoUrl && (
                       <div style={{ color: '#a78bfa', fontSize: 11, marginTop: 6 }}>
@@ -500,13 +525,15 @@ export default function CreateModuleModal({ open, onClose, onCreate, roster }: P
                       </div>
                     )}
                   </div>
+
                   <div style={{
                     background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 8,
                     padding: 12, color: D.muted, fontSize: 12, lineHeight: 1.5,
                   }}>
                     <AlertCircle size={14} style={{ display: 'inline', marginRight: 6, color: '#a78bfa' }} />
-                    HS sẽ xem video embed trực tiếp trong module. Hỗ trợ:
-                    YouTube, Vimeo, file MP4, GCS bucket.
+                    Chọn 1 trong 2: <strong>Upload file</strong> (mp4/webm/mov, ≤500MB) hoặc
+                    <strong> paste URL</strong> (YouTube/Vimeo/MP4 link).
+                    File upload sẽ lưu trên GCS bucket riêng của bạn.
                   </div>
                 </div>
               )}

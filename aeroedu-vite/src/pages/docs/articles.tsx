@@ -1260,7 +1260,7 @@ Một vật dao động điều hoà với phương trình $x = 4\\cos(2\\pi t)$
       <>
         <P>
           Trang lab dành cho HS THPT học chương "Đại số Boole" + "Mạch số" (Tin học 11/12).
-          URL: <Code>/dashboard/labtwin/labs/digital-logic-lab</Code>.
+          URL: <Code>/dashboard/labtwin/digital-logic-lab</Code>.
         </P>
 
         <H2 id="dl-palette">10 linh kiện trong palette</H2>

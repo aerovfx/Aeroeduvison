@@ -325,7 +325,7 @@ function ResultView({ challenge, result }: { challenge: KcChallenge; result: KcC
         </div>
       </div>
 
-      <a href="/dashboard/labtwin/labs/keo-co-app"
+      <a href="/dashboard/labtwin/keo-co-app"
         className="block w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-xl py-3 text-center text-sm">
         Tạo thách đấu của bạn
       </a>

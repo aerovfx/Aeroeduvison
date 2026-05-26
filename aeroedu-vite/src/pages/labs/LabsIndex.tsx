@@ -168,36 +168,36 @@ interface PopularLab {
 // - Group field để có thể filter/section sau này
 const POPULAR_LABS: PopularLab[] = [
   // ── Vật lý cơ bản (5) ──
-  { name: 'Physics Motion',     emoji: '🎯', path: '/dashboard/labtwin/labs/physics-motion',     desc: 'Ném xiên · va chạm · gia tốc', accent: 'rose',     group: 'physics' },
-  { name: 'Con lắc lò xo',      emoji: '🌀', path: '/dashboard/labtwin/labs/spring-pendulum',    desc: 'Dao động điều hòa F = -kx',     accent: 'indigo',   group: 'physics' },
-  { name: 'Con lắc đơn',        emoji: '⚖️', path: '/dashboard/labtwin/labs/simple-pendulum',    desc: 'Chu kỳ T = 2π√(l/g)',          accent: 'emerald',  group: 'physics' },
-  { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/labs/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
-  { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/labs/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
+  { name: 'Physics Motion',     emoji: '🎯', path: '/dashboard/labtwin/physics-motion',     desc: 'Ném xiên · va chạm · gia tốc', accent: 'rose',     group: 'physics' },
+  { name: 'Con lắc lò xo',      emoji: '🌀', path: '/dashboard/labtwin/spring-pendulum',    desc: 'Dao động điều hòa F = -kx',     accent: 'indigo',   group: 'physics' },
+  { name: 'Con lắc đơn',        emoji: '⚖️', path: '/dashboard/labtwin/simple-pendulum',    desc: 'Chu kỳ T = 2π√(l/g)',          accent: 'emerald',  group: 'physics' },
+  { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
+  { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
 
   // ── Toán & Trực quan (3) ──
-  { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/labs/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
-  { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/labs/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
-  { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/labs/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
+  { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
+  { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
+  { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
   { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
-  { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/labs/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
+  { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
 
   // ── Game RPG (1) ──
-  { name: 'Pixel Office RPG',   emoji: '🎮', path: '/dashboard/labtwin/labs/pixel-office-rpg', desc: 'AI agent VS Code · top-down pixel + chat', accent: 'fuchsia', group: 'ai' },
+  { name: 'Pixel Office RPG',   emoji: '🎮', path: '/dashboard/labtwin/pixel-office-rpg', desc: 'AI agent VS Code · top-down pixel + chat', accent: 'fuchsia', group: 'ai' },
 
   // ── Hoá & Quang (2) ──
-  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/labs/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
-  { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/labs/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
+  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
+  { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
 
   // ── Điện tử & IoT (3) ──
-  { name: 'Circuit Simulator',  emoji: '🔌', path: '/dashboard/labtwin/labs/circuit-simulator',  desc: 'Mạch RLC · Ohm · Kirchhoff',   accent: 'indigo',   group: 'electronics' },
-  { name: 'Digital Logic Lab',  emoji: '⚙️', path: '/dashboard/labtwin/labs/digital-logic-lab',  desc: 'Cổng logic · bảng chân lý',    accent: 'cyan',     group: 'electronics' },
+  { name: 'Circuit Simulator',  emoji: '🔌', path: '/dashboard/labtwin/circuit-simulator',  desc: 'Mạch RLC · Ohm · Kirchhoff',   accent: 'indigo',   group: 'electronics' },
+  { name: 'Digital Logic Lab',  emoji: '⚙️', path: '/dashboard/labtwin/digital-logic-lab',  desc: 'Cổng logic · bảng chân lý',    accent: 'cyan',     group: 'electronics' },
   { name: 'Arduino Emulator',   emoji: '⚡', path: '/dashboard/iot-lab/emulator',                desc: 'Code C++ real-time browser',   accent: 'emerald',  group: 'electronics' },
 
   // ── AI & Vision (1 — IoT custom move to IoT lab page) ──
-  { name: 'Video Tracking',     emoji: '🎥', path: '/dashboard/labtwin/labs/video-tracking',     desc: 'Tracking quỹ đạo từ video · NCC', accent: 'fuchsia', group: 'ai' },
+  { name: 'Video Tracking',     emoji: '🎥', path: '/dashboard/labtwin/video-tracking',     desc: 'Tracking quỹ đạo từ video · NCC', accent: 'fuchsia', group: 'ai' },
 
   // ── Aero (1) ──
-  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/labs/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero' },
+  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero' },
 
   // 📌 Pixel Agents + Gesture Swarm đã chuyển sang Game Hub
   //    /dashboard/games/pixel-agents · /dashboard/games/gesture-swarm
@@ -429,7 +429,7 @@ export default function LabsIndexPage() {
                       {/* All labs in this category — flat grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
                         {labs.map(lab => {
-                          const href = lab.internal_link ?? `/dashboard/labtwin/labs/${lab.id}`
+                          const href = lab.internal_link ?? `/dashboard/labtwin/${lab.id}`
                           const diffColor = lab.difficulty === 'Dễ' ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
                                           : lab.difficulty === 'Trung bình' ? 'text-amber-300 bg-amber-500/15 border-amber-500/30'
                                           : 'text-rose-300 bg-rose-500/15 border-rose-500/30'
@@ -512,7 +512,7 @@ export default function LabsIndexPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
                 {/* Graph — featured */}
                 <Link
-                  to="/dashboard/labtwin/labs/graph-lab"
+                  to="/dashboard/labtwin/graph-lab"
                   className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   <div className="absolute inset-0 opacity-[0.12] pointer-events-none">
@@ -586,7 +586,7 @@ export default function LabsIndexPage() {
 
                 {/* AirflowCFD — featured (R3F airflow simulator) */}
                 <Link
-                  to="/dashboard/labtwin/labs/airflow-cfd"
+                  to="/dashboard/labtwin/airflow-cfd"
                   className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   {/* Decorative streamlines */}
@@ -692,7 +692,7 @@ export default function LabsIndexPage() {
                   </div>
                 </div>
                 <Link
-                  to="/dashboard/labtwin/labs/graph-lab"
+                  to="/dashboard/labtwin/graph-lab"
                   className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-cyan-300 hover:bg-cyan-500/20 border-2 border-cyan-500/20 rounded-xl font-semibold transition-all"
                 >
                   Thử ngay
