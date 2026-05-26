@@ -34,18 +34,30 @@ export default function ProjectileMotion() {
   const stateRef = useRef<State>({ t: 0, x: 0, y: 0, vx: 0, vy: 0 })
   const trailRef = useRef<Array<{ x: number; y: number }>>([])
   const runningRef = useRef(false)
+  // FIX 2026-05-27: dùng refs cho params để loop không bị restart mỗi khi
+  // slider đổi giá trị (lúc trước hitFeedback trong deps gây reset infinite)
+  const v0Ref = useRef(25)
+  const angleRef = useRef(45)
+  const gravityRef = useRef(9.8)
+  const dragRef = useRef(0)
+  const targetRef = useRef({ x: 40, h: 0 })
 
   const [v0, setV0] = useState(25)
   const [angle, setAngle] = useState(45)
   const [gravity, setGravity] = useState(9.8)
   const [drag, setDrag] = useState(0)
   const [running, setRunning] = useState(false)
-  const [target, setTarget] = useState({ x: 40, h: 0 })  // target at x=40m, height 0 (ground)
+  const [target, setTarget] = useState({ x: 40, h: 0 })
   const [hitFeedback, setHitFeedback] = useState<'hit' | 'miss' | null>(null)
 
   runningRef.current = running
+  v0Ref.current = v0
+  angleRef.current = angle
+  gravityRef.current = gravity
+  dragRef.current = drag
+  targetRef.current = target
 
-  // Compute theoretical R, H, T (no-drag)
+  // Compute theoretical R, H, T (no-drag) — for display only
   const rad = (angle * Math.PI) / 180
   const vx0 = v0 * Math.cos(rad)
   const vy0 = v0 * Math.sin(rad)
@@ -53,14 +65,35 @@ export default function ProjectileMotion() {
   const R = (v0 * v0 * Math.sin(2 * rad)) / gravity
   const Hmax = (vy0 * vy0) / (2 * gravity)
 
+  // Reset state với current params (đọc từ ref)
   const reset = () => {
     setRunning(false)
     setHitFeedback(null)
     trailRef.current = []
-    stateRef.current = { t: 0, x: 0, y: 0, vx: vx0, vy: vy0 }
+    const a = (angleRef.current * Math.PI) / 180
+    stateRef.current = {
+      t: 0, x: 0, y: 0,
+      vx: v0Ref.current * Math.cos(a),
+      vy: v0Ref.current * Math.sin(a),
+    }
   }
 
+  // FIX: khi đổi v0/angle/gravity → reset trajectory để dùng giá trị mới
   useEffect(() => { reset() /* eslint-disable-next-line */ }, [v0, angle, gravity])
+
+  // FIX 2026-05-27: khi bấm "Bắn!", tự reset state nếu lần bắn trước đã kết thúc
+  // (s.y ≤ 0 sau khi rơi xuống đất). Nếu không, ball sẽ "kẹt" không bắn lại được.
+  const startShot = () => {
+    const s = stateRef.current
+    // Nếu đã landed (y ≤ 0 và t > 0) hoặc state khởi tạo → reset trước
+    if (s.t > 0 && s.y <= 0) {
+      reset()
+      // Chờ 1 frame rồi mới set running để state apply
+      requestAnimationFrame(() => setRunning(true))
+    } else {
+      setRunning(!running)
+    }
+  }
 
   // Sim loop
   useEffect(() => {
@@ -75,12 +108,16 @@ export default function ProjectileMotion() {
       last = now
       const s = stateRef.current
 
-      if (runningRef.current && s.y >= 0) {
-        // Numerical integration with drag: a = -g·ĵ - k·|v|·v
+      // Dùng giá trị từ ref (không phải closure) — params mới apply ngay
+      const gravityNow = gravityRef.current
+      const dragNow = dragRef.current
+      const targetNow = targetRef.current
+
+      // Chỉ tích phân khi running VÀ ball đang ở trên đất (y > 0) HOẶC vừa khởi động (t = 0)
+      if (runningRef.current && (s.y > 0 || s.t === 0)) {
         const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy)
-        const ax = -drag * speed * s.vx
-        const ay = -gravity - drag * speed * s.vy
-        // RK4-ish: use mid-step for stability
+        const ax = -dragNow * speed * s.vx
+        const ay = -gravityNow - dragNow * speed * s.vy
         s.vx += ax * dt
         s.vy += ay * dt
         s.x += s.vx * dt
@@ -89,12 +126,11 @@ export default function ProjectileMotion() {
         trailRef.current.push({ x: s.x, y: s.y })
         if (trailRef.current.length > MAX_TRAIL) trailRef.current.shift()
 
-        // Hit detection — check if projectile passed target
-        if (s.y <= 0 && hitFeedback === null) {
-          const distToTarget = Math.abs(s.x - target.x)
-          if (distToTarget < 2) setHitFeedback('hit')
-          else setHitFeedback('miss')
-          // Stop
+        // Hit detection — khi ball CHẠM ĐẤT (y ≤ 0) và đã bay (t > 0)
+        if (s.y <= 0 && s.t > 0.1) {
+          s.y = 0  // clamp to ground
+          const distToTarget = Math.abs(s.x - targetNow.x)
+          setHitFeedback(distToTarget < 2 ? 'hit' : 'miss')
           runningRef.current = false
           setRunning(false)
         }
@@ -131,9 +167,9 @@ export default function ProjectileMotion() {
         ctx.beginPath(); ctx.moveTo(0, GROUND_Y - y); ctx.lineTo(CANVAS_W, GROUND_Y - y); ctx.stroke()
       }
 
-      // Target
-      const targetPxX = target.x * PX_PER_M
-      const targetPxY = GROUND_Y - target.h * PX_PER_M
+      // Target — đọc từ ref để slider update ngay
+      const targetPxX = targetRef.current.x * PX_PER_M
+      const targetPxY = GROUND_Y - targetRef.current.h * PX_PER_M
       ctx.fillStyle = hitFeedback === 'hit' ? '#10b981' : '#f59e0b'
       ctx.beginPath(); ctx.arc(targetPxX, targetPxY, 18, 0, Math.PI * 2); ctx.fill()
       ctx.fillStyle = '#0f172a'
@@ -146,17 +182,25 @@ export default function ProjectileMotion() {
       ctx.fillStyle = '#fff'
       ctx.font = 'bold 10px sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(`x=${target.x}m`, targetPxX, targetPxY - 25)
+      ctx.fillText(`x=${targetRef.current.x}m`, targetPxX, targetPxY - 25)
 
-      // Theoretical trajectory (dashed, no drag)
-      if (drag === 0) {
+      // Theoretical trajectory (dashed, no drag) — đọc params từ ref
+      const dragVal = dragRef.current
+      const gVal = gravityRef.current
+      const angVal = (angleRef.current * Math.PI) / 180
+      const v0Val = v0Ref.current
+      const vx0Val = v0Val * Math.cos(angVal)
+      const vy0Val = v0Val * Math.sin(angVal)
+      const TVal = (2 * vy0Val) / gVal
+
+      if (dragVal === 0) {
         ctx.strokeStyle = 'rgba(34,211,238,0.25)'
         ctx.lineWidth = 1
         ctx.setLineDash([4, 4])
         ctx.beginPath()
-        for (let t = 0; t <= T; t += 0.05) {
-          const tx = vx0 * t
-          const ty = vy0 * t - 0.5 * gravity * t * t
+        for (let t = 0; t <= TVal; t += 0.05) {
+          const tx = vx0Val * t
+          const ty = vy0Val * t - 0.5 * gVal * t * t
           if (ty < 0) break
           const px = tx * PX_PER_M
           const py = GROUND_Y - ty * PX_PER_M
@@ -206,14 +250,20 @@ export default function ProjectileMotion() {
       }
 
       // Launcher (cannon at origin)
+      // Launcher (cannon) — fully visible (x=4 thay vì -5)
       ctx.fillStyle = '#475569'
-      ctx.fillRect(-5, GROUND_Y - 8, 30, 8)
-      // Cannon barrel rotated
+      ctx.fillRect(4, GROUND_Y - 12, 36, 12)
+      // Cannon barrel rotated theo angVal (ref-based)
       ctx.save()
-      ctx.translate(10, GROUND_Y - 8)
-      ctx.rotate(-rad)
+      ctx.translate(22, GROUND_Y - 12)
+      ctx.rotate(-angVal)
       ctx.fillStyle = '#64748b'
-      ctx.fillRect(0, -4, 30, 8)
+      ctx.fillRect(0, -5, 36, 10)
+      // Barrel tip glow
+      ctx.fillStyle = '#fbbf24'
+      ctx.beginPath()
+      ctx.arc(36, 0, 3, 0, Math.PI * 2)
+      ctx.fill()
       ctx.restore()
 
       // Hit feedback
@@ -228,7 +278,9 @@ export default function ProjectileMotion() {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [vx0, vy0, gravity, drag, target.x, target.h, T, rad, hitFeedback])
+    // FIX: chỉ chạy 1 lần — params đọc từ ref, không cần re-run effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 text-white/90">
@@ -249,7 +301,7 @@ export default function ProjectileMotion() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setRunning(!running)}
+            <button onClick={startShot}
               className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm transition ${
                 running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'
               }`}>
