@@ -687,14 +687,16 @@ function makeProxy(target, label, pathFilter) {
   });
 
   // ── POST /api/admin/exams/claim-orphan-by-email ─────────────────────
-  // User: "Gán cho tài khoản giáo viên VietChung email teacher@example.com"
-  // Tìm tất cả Exam có userId NULL/không match User → gán cho GV chỉ định
+  // User: "Đã gán quyền vào các đề. Đề thi này không thuộc về bạn"
+  // FIX: Update CẢ HAI cột teacher_id (modern) + userId (legacy) — vì
+  // GET dùng cả 2 nhưng PATCH/UPDATE thường chỉ check teacher_id.
   app.post('/api/admin/exams/claim-orphan-by-email', async (req, res) => {
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
     try {
       const pool = getEPool();
       const email = String((req.body && req.body.email) || 'teacher@example.com').toLowerCase();
+      const claimAll = !!(req.body && req.body.claimAll);  // option: claim ALL exams (not just orphan)
 
       // Find teacher
       const { rows: us } = await pool.query(
@@ -706,13 +708,29 @@ function makeProxy(target, label, pathFilter) {
       }
       const teacher = us[0];
 
-      // Update orphan exams (userId NULL OR userId không tồn tại trong User)
+      // Try add teacher_id column nếu chưa có (lazy migrate)
+      await pool.query(`ALTER TABLE "Exam" ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(255)`).catch(() => {});
+
+      // Step 1: Backfill teacher_id từ userId existing (cho tất cả exams có userId)
+      await pool.query(`
+        UPDATE "Exam"
+        SET teacher_id = "userId"
+        WHERE (teacher_id IS NULL OR teacher_id = '')
+          AND "userId" IS NOT NULL AND "userId" <> ''
+      `).catch((e) => console.warn('[claim-orphan:backfill]', e.message));
+
+      // Step 2: Update orphan exams — set CẢ HAI columns
+      const whereClause = claimAll
+        ? `1=1`  // ALL exams
+        : `(("userId" IS NULL OR "userId" = '') AND (teacher_id IS NULL OR teacher_id = ''))
+           OR NOT EXISTS (SELECT 1 FROM "User" u WHERE u.id = "Exam"."userId" OR u.id = "Exam".teacher_id)`;
+
       const { rowCount } = await pool.query(
         `UPDATE "Exam"
-         SET "userId" = $1, "updatedAt" = NOW()
-         WHERE "userId" IS NULL
-            OR "userId" = ''
-            OR NOT EXISTS (SELECT 1 FROM "User" u WHERE u.id = "Exam"."userId")`,
+         SET "userId" = $1,
+             teacher_id = $1,
+             "updatedAt" = NOW()
+         WHERE ${whereClause}`,
         [teacher.id]
       );
 
@@ -720,7 +738,8 @@ function makeProxy(target, label, pathFilter) {
         ok: true,
         teacher: { id: teacher.id, name: teacher.name, email: teacher.email },
         updated: rowCount,
-        message: `Đã gán ${rowCount} đề thi orphan cho ${teacher.name} (${email})`,
+        claimAll,
+        message: `Đã gán ${rowCount} đề thi cho ${teacher.name} (${email}). Cả 2 cột teacher_id + userId đã sync.`,
       });
     } catch (err) {
       console.error('[admin:exams:claim-orphan]', err.message);
@@ -12723,6 +12742,25 @@ async function _ensureExamTables() {
     )
   `);
   await _dropLegacyNotNull('ExamQuestion', ['examId','questionId','order','points','createdAt','updatedAt']);
+
+  // ── Auto-sync teacher_id ↔ userId trên mỗi server boot ──
+  // User: "Đã gán quyền vào các đề. Đề thi này không thuộc về bạn" → fix
+  // GET dùng teacher_id OR userId, nhưng UPDATE/PATCH thường chỉ teacher_id
+  // → backfill teacher_id = userId nơi teacher_id NULL (lazy sync)
+  await pool.query(`
+    UPDATE "Exam"
+    SET teacher_id = "userId"
+    WHERE (teacher_id IS NULL OR teacher_id = '')
+      AND "userId" IS NOT NULL AND "userId" <> ''
+  `).catch(e => console.warn('[exams:sync teacher_id from userId]', e.message));
+
+  // Symmetric: backfill userId = teacher_id nơi userId NULL
+  await pool.query(`
+    UPDATE "Exam"
+    SET "userId" = teacher_id
+    WHERE ("userId" IS NULL OR "userId" = '')
+      AND teacher_id IS NOT NULL AND teacher_id <> ''
+  `).catch(e => console.warn('[exams:sync userId from teacher_id]', e.message));
 }
 _ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
 
