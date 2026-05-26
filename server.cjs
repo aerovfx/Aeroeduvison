@@ -4182,9 +4182,34 @@ if (USE_NODEJS_QUESTIONS) {
   }
 
   const _aiGating = require('./lib/gating.cjs');
-  app.post('/api/ai-tutor/chat', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
+  // User: "Rà soát lại toàn bộ dịch vụ AI ... Giáo viên có thể sử dụng dịch
+  // vụ AI 20 lần/ngày. Nếu hết thì chuyển sang chữ đăng ký Pro"
+  // → Bỏ gating ai_tutor paid (cũ block GV free).
+  // → Dùng cùng AiQuotaLog với /api/ai/generate-questions.
+  // → Admin + Pro unlimited; Free 20/day shared across ALL AI services.
+  app.post('/api/ai-tutor/chat', async (req, res) => {
     const startedAt = Date.now();
     try {
+      // Auth
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized', reply: 'Đăng nhập trước khi dùng AI Tutor' });
+      let decoded;
+      try { decoded = _akVerify(auth.slice(7)); }
+      catch { return res.status(401).json({ error: 'invalid_token', reply: 'Token không hợp lệ' }); }
+
+      // Unified quota (chung với /api/ai/generate-questions, /api/questions/bulk-generate)
+      const quotaCheck = await _checkAiQuestionGenQuota(decoded);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          error: 'quota_exceeded',
+          reply: `Đã dùng hết ${quotaCheck.limit} lượt AI miễn phí hôm nay. Đăng ký Pro để dùng không giới hạn.`,
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          retryAt: quotaCheck.retryAt,
+          upgradeUrl: '/payment?plan=pro&feature=ai_tutor',
+        });
+      }
+
       const body = req.body || {};
       const message = typeof body.message === 'string' ? body.message.trim() : '';
       const subject = typeof body.subject === 'string' ? body.subject : '';
@@ -4202,11 +4227,12 @@ if (USE_NODEJS_QUESTIONS) {
         messages.push({ role: 'user', content: message });
       }
 
-      // ── Provider routing: deepseek HOẶC Anthropic ──
-      // AI_PREFERRED_PROVIDER=deepseek → DeepSeek (OpenAI-compatible)
-      // Default → Anthropic Claude (như cũ)
-      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
-      const useDeepseek = (prefProvider === 'deepseek' && process.env.DEEPSEEK_API_KEY) ||
+      // ── Provider routing: DEEPSEEK PRIMARY → Claude FALLBACK ──
+      // User: "Rà soát lại toàn bộ dịch vụ AI, chuyển sang ưu tiên deepseek
+      // rồi mới đến Claude" — DeepSeek primary cho mọi AI service.
+      // Override: AI_PREFERRED_PROVIDER=anthropic → trở về Claude primary
+      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || 'deepseek').toLowerCase();
+      const useDeepseek = (prefProvider !== 'anthropic' && process.env.DEEPSEEK_API_KEY) ||
                           (!process.env.ANTHROPIC_API_KEY && process.env.DEEPSEEK_API_KEY);
 
       if (useDeepseek) {
@@ -4238,7 +4264,15 @@ if (USE_NODEJS_QUESTIONS) {
             || 'Xin lỗi, tôi chưa tạo được câu trả lời. Bạn thử đặt lại câu hỏi nhé.';
           const latencyMs = Date.now() - startedAt;
           console.log(`[ai-tutor] ok provider=deepseek model=${dsModel} subject="${subject}" latency=${latencyMs}ms tokens=${dsJson.usage?.completion_tokens || '?'}`);
-          return res.json({ reply, model: dsModel, usage: dsJson.usage || null, provider: 'deepseek' });
+          return res.json({
+            reply, model: dsModel, usage: dsJson.usage || null, provider: 'deepseek',
+            quota: {
+              used: quotaCheck.used,
+              limit: quotaCheck.limit === Infinity ? null : quotaCheck.limit,
+              remaining: quotaCheck.remaining === Infinity ? null : quotaCheck.remaining,
+              source: quotaCheck.source,
+            },
+          });
         } catch (e) {
           console.error('[ai-tutor:deepseek]', e.message);
           // Fall through to Anthropic if Anthropic key tồn tại
@@ -4289,6 +4323,12 @@ if (USE_NODEJS_QUESTIONS) {
         model: completion.model || AI_TUTOR_MODEL,
         usage: completion.usage || null,
         provider: 'anthropic',
+        quota: {
+          used: quotaCheck.used,
+          limit: quotaCheck.limit === Infinity ? null : quotaCheck.limit,
+          remaining: quotaCheck.remaining === Infinity ? null : quotaCheck.remaining,
+          source: quotaCheck.source,
+        },
       });
     } catch (err) {
       const status = err && err.status ? err.status : 500;
@@ -4706,6 +4746,237 @@ if (USE_NODEJS_QUESTIONS) {
         remaining: AI_GEN_QUOTA_DAILY, source: 'free', unlimited: false,
         error: e.message,
       });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // POST /api/questions/bulk-generate
+  // Sinh câu hỏi từ nhiều nguồn (text/youtube/website) — DeepSeek + Claude fallback
+  // User: "Tích hợp deepseek vào AI ra để nhé"
+  // Fix bug "aero-backend unavailable" trên /teacher/question-bank → BulkGenerateModal
+  //
+  // Body:
+  //   subject, grade, count, questionTypes[], difficulty, cognitiveLevels[],
+  //   sources: [{ type: 'text'|'youtube'|'website', content }]
+  // Response: { questions: [...], data: { inserted, totalInBank }, provider }
+  // ══════════════════════════════════════════════════════════════
+  app.post('/api/questions/bulk-generate', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+      // Auth
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized', message: 'Đăng nhập trước' });
+      let decoded;
+      try { decoded = _akVerify(auth.slice(7)); }
+      catch { return res.status(401).json({ error: 'invalid_token', message: 'Token không hợp lệ' }); }
+
+      // Quota
+      const quotaCheck = await _checkAiQuestionGenQuota(decoded);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          error: 'quota_exceeded',
+          message: `Đã dùng hết ${quotaCheck.limit} lượt AI miễn phí hôm nay. Đăng ký Pro để dùng không giới hạn.`,
+          used: quotaCheck.used,
+          limit: quotaCheck.limit,
+          retryAt: quotaCheck.retryAt,
+          upgradeUrl: '/payment?plan=pro&feature=quiz_generate',
+        });
+      }
+
+      const b = req.body || {};
+      const sources = Array.isArray(b.sources) ? b.sources : [];
+      if (sources.length === 0) {
+        return res.status(400).json({ error: 'no_sources', message: 'Vui lòng thêm ít nhất 1 nguồn (text/youtube/website)' });
+      }
+      const subject = b.subject || 'Toán';
+      const grade = b.grade || '11';
+      const count = Math.max(1, Math.min(30, Number(b.count) || 10));
+      const questionTypes = Array.isArray(b.questionTypes) && b.questionTypes.length > 0
+        ? b.questionTypes : ['MCQ'];
+      const difficulty = b.difficulty || 'mixed';
+      const cognitiveLevels = Array.isArray(b.cognitiveLevels) ? b.cognitiveLevels : [];
+
+      // Combine sources content thành 1 corpus (max 8000 chars để tiết kiệm token)
+      const corpus = sources.map(s => {
+        const content = String(s.content || '').slice(0, 4000);
+        return `--- Nguồn ${s.type || 'text'} ---\n${content}`;
+      }).join('\n\n').slice(0, 8000);
+
+      const system = buildQuestionGenPrompt() + '\n\nLƯU Ý: Sinh câu hỏi DỰA TRÊN nội dung nguồn được cung cấp, KHÔNG dùng kiến thức chung. Câu hỏi phải có nguồn gốc từ tài liệu này.';
+
+      const cognitiveHint = cognitiveLevels.length > 0
+        ? `Cấp độ Bloom: ${cognitiveLevels.join(', ')}` : '';
+      const userMsg = [
+        `Sinh ${count} câu hỏi cho HS lớp ${grade} môn ${subject}`,
+        `Loại câu: ${questionTypes.join(', ')}`,
+        `Độ khó: ${difficulty}`,
+        cognitiveHint,
+        '',
+        '── NGUỒN NỘI DUNG ──',
+        corpus,
+        '',
+        'Trả JSON OBJECT { "questions": [...] }. KHÔNG kèm markdown fence.',
+      ].filter(Boolean).join('\n');
+
+      const maxTokens = parseInt(process.env.AI_GEN_MAX_TOKENS || '4000', 10);
+      let rawText = '';
+      let provider = '';
+      let model = '';
+
+      // DeepSeek primary
+      if (process.env.DEEPSEEK_API_KEY) {
+        try {
+          const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: dsModel,
+              messages: [
+                { role: 'system', content: system },
+                { role: 'user', content: userMsg },
+              ],
+              max_tokens: maxTokens,
+              temperature: 0.4,
+              response_format: { type: 'json_object' },
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 200)}`);
+          }
+          const dsJson = await dsResp.json();
+          rawText = dsJson.choices?.[0]?.message?.content || '';
+          provider = 'deepseek'; model = dsModel;
+        } catch (e) {
+          console.warn('[bulk-generate] DeepSeek fail, fallback Claude:', e.message.slice(0, 100));
+        }
+      }
+
+      // Claude fallback
+      if (!provider && process.env.ANTHROPIC_API_KEY) {
+        try {
+          const client = getAnthropic();
+          const completion = await client.messages.create({
+            model: AI_TUTOR_MODEL,
+            max_tokens: maxTokens,
+            system: system + '\n\nIMPORTANT: Respond with ONLY valid JSON.',
+            messages: [{ role: 'user', content: userMsg }],
+          });
+          if (Array.isArray(completion.content)) {
+            for (const block of completion.content) {
+              if (block && block.type === 'text' && typeof block.text === 'string') {
+                rawText += block.text;
+              }
+            }
+          }
+          provider = 'anthropic'; model = completion.model || AI_TUTOR_MODEL;
+        } catch (e) {
+          console.error('[bulk-generate] both providers fail:', e.message);
+          return res.status(503).json({
+            error: 'all_providers_failed',
+            message: 'Cả DeepSeek và Claude đều không phản hồi. Thử lại sau.',
+          });
+        }
+      }
+
+      if (!provider) {
+        return res.status(503).json({
+          error: 'ai_not_configured',
+          message: 'AI chưa cấu hình DEEPSEEK_API_KEY và ANTHROPIC_API_KEY.',
+        });
+      }
+
+      const parsed = extractJson(rawText);
+      if (!parsed || !Array.isArray(parsed.questions)) {
+        return res.status(500).json({
+          error: 'parse_failed',
+          message: 'AI trả về dữ liệu không đúng format JSON. Thử lại với nguồn rõ ràng hơn.',
+        });
+      }
+
+      const questions = parsed.questions.filter(q => q && typeof q.content === 'string');
+      const latencyMs = Date.now() - startedAt;
+      console.log(`[bulk-generate] ok provider=${provider} sources=${sources.length} count=${questions.length} latency=${latencyMs}ms`);
+
+      // FE expects { data: { questions, inserted, totalInBank } }
+      return res.json({
+        success: true,
+        data: {
+          questions,
+          inserted: 0,  // preview mode — not yet saved
+          totalInBank: 0,
+        },
+        questions,  // backward compat
+        count: questions.length,
+        provider,
+        model,
+        latencyMs,
+        quota: {
+          used: quotaCheck.used,
+          limit: quotaCheck.limit === Infinity ? null : quotaCheck.limit,
+          remaining: quotaCheck.remaining === Infinity ? null : quotaCheck.remaining,
+          source: quotaCheck.source,
+        },
+      });
+    } catch (err) {
+      console.error('[bulk-generate]', err.message);
+      return res.status(500).json({ error: 'internal_error', message: err.message });
+    }
+  });
+
+  // POST /api/questions/bulk-save — lưu câu hỏi đã chọn vào ngân hàng
+  app.post('/api/questions/bulk-save', async (req, res) => {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized' });
+      let decoded;
+      try { decoded = _akVerify(auth.slice(7)); }
+      catch { return res.status(401).json({ error: 'invalid_token' }); }
+
+      const b = req.body || {};
+      const questions = Array.isArray(b.questions) ? b.questions : [];
+      if (questions.length === 0) return res.status(400).json({ error: 'no_questions' });
+
+      const pool = _getPool();
+      const { randomUUID } = require('crypto');
+      let inserted = 0;
+      for (const q of questions) {
+        try {
+          await pool.query(`
+            INSERT INTO "Question"(
+              id, content, type, options, answer, explanation,
+              subject, grade, difficulty, topic, teacher_id, created_at
+            ) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11, NOW())
+          `, [
+            randomUUID(),
+            q.content || '',
+            q.questionType || q.type || 'MCQ',
+            JSON.stringify(q.options || []),
+            q.correctAnswer || q.answer || '',
+            q.explanation || null,
+            q.subject || b.subject || null,
+            q.grade || b.grade || null,
+            q.difficulty || 'medium',
+            q.topic || null,
+            decoded.sub,
+          ]);
+          inserted++;
+        } catch (e) {
+          console.warn('[bulk-save] insert failed:', e.message.slice(0, 100));
+        }
+      }
+      const { rows } = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM "Question" WHERE teacher_id = $1`,
+        [decoded.sub]
+      ).catch(() => ({ rows: [{ n: 0 }] }));
+      return res.json({ success: true, inserted, totalInBank: rows[0]?.n || 0 });
+    } catch (e) {
+      console.error('[bulk-save]', e.message);
+      return res.status(500).json({ error: e.message });
     }
   });
 }
