@@ -7815,6 +7815,186 @@ function _akVerify(token) {
   return _akJwt.verify(token, _akSecret(), { ignoreExpiration: true });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ADMIN SECURITY LAYER — defense in depth
+// ════════════════════════════════════════════════════════════════════
+// Vấn đề: _akVerify dùng ignoreExpiration:true → JWT không bao giờ hết hạn.
+// Nếu admin bị demote về STUDENT trong DB nhưng JWT cũ vẫn role='ADMIN'
+// → bypass được. Cần DB check + cache để không spam DB.
+//
+// Layer 1: JWT verify (signature + payload)
+// Layer 2: DB role check (defense against revoked tokens)
+// Layer 3: Audit log (track tất cả admin actions cho forensics)
+// Layer 4: Rate limit per IP (chặn brute-force)
+// Layer 5: Bypass dev qua DISABLE_ADMIN_GATE=1 env var
+
+// LRU cache cho role check — 5 phút TTL, max 1000 entries.
+// Khi user bị demote, cache stale tối đa 5 phút (acceptable trade-off).
+const _adminRoleCache = new Map();  // sub → { role, exp }
+const _ADMIN_CACHE_TTL = 5 * 60 * 1000;
+const _ADMIN_CACHE_MAX = 1000;
+
+function _cacheGet(key) {
+  const v = _adminRoleCache.get(key);
+  if (!v) return null;
+  if (v.exp < Date.now()) { _adminRoleCache.delete(key); return null; }
+  return v;
+}
+function _cacheSet(key, role) {
+  // Simple LRU: nếu full, xoá entry cũ nhất
+  if (_adminRoleCache.size >= _ADMIN_CACHE_MAX) {
+    const firstKey = _adminRoleCache.keys().next().value;
+    if (firstKey) _adminRoleCache.delete(firstKey);
+  }
+  _adminRoleCache.set(key, { role, exp: Date.now() + _ADMIN_CACHE_TTL });
+}
+
+// Rate limit per IP: 200 req/phút cho /api/admin/* (đủ cho dashboard auto-refresh
+// mỗi 30s nhưng chặn brute-force/scraping)
+const _adminRateLimit = new Map();  // ip → { count, windowStart }
+const _ADMIN_RATE_LIMIT = 200;
+const _ADMIN_RATE_WINDOW = 60 * 1000;
+
+function _checkAdminRateLimit(ip) {
+  if (!ip) return true;  // Skip nếu không có IP
+  const now = Date.now();
+  const entry = _adminRateLimit.get(ip);
+  if (!entry || now - entry.windowStart >= _ADMIN_RATE_WINDOW) {
+    _adminRateLimit.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > _ADMIN_RATE_LIMIT) return false;
+  return true;
+}
+
+// AdminAuditLog table — lazy migration
+let _adminAuditTableReady = false;
+async function _ensureAdminAuditTable() {
+  if (_adminAuditTableReady) return;
+  try {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AdminAuditLog" (
+        id          BIGSERIAL PRIMARY KEY,
+        user_id     VARCHAR(255),
+        user_email  VARCHAR(255),
+        method      VARCHAR(10),
+        path        VARCHAR(500),
+        status      INTEGER,
+        ip_hash     VARCHAR(64),
+        user_agent  TEXT,
+        details     JSONB,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_user ON "AdminAuditLog"(user_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON "AdminAuditLog"(created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_path ON "AdminAuditLog"(path)`);
+    _adminAuditTableReady = true;
+  } catch (e) {
+    console.warn('[admin-audit] migration:', e.message);
+  }
+}
+_ensureAdminAuditTable().catch(() => {});
+
+// Async audit log — fire-and-forget, không block request
+function _auditAdmin(req, res, decoded, statusCode, details = null) {
+  try {
+    const pool = _getPool();
+    pool.query(
+      `INSERT INTO "AdminAuditLog"(user_id, user_email, method, path, status, ip_hash, user_agent, details)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+      [
+        decoded?.sub || decoded?.userId || null,
+        decoded?.email || null,
+        req.method,
+        String(req.originalUrl || req.url || '').slice(0, 500),
+        statusCode,
+        _hashIp(_clientIp(req)),
+        String(req.headers['user-agent'] || '').slice(0, 500),
+        details ? JSON.stringify(details) : null,
+      ]
+    ).catch(() => {/* silent — audit log không được fail UX */});
+  } catch { /* silent */ }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// _requireAdmin — module-scope middleware-style helper
+// Dùng: const decoded = await _requireAdmin(req, res); if (!decoded) return;
+// ════════════════════════════════════════════════════════════════════
+async function _requireAdmin(req, res) {
+  // ── Layer 4: Rate limit ──
+  const ip = _clientIp(req);
+  if (!_checkAdminRateLimit(ip)) {
+    res.status(429).json({ error: 'Quá nhiều request — thử lại sau' });
+    _auditAdmin(req, res, null, 429, { reason: 'rate-limit' });
+    return null;
+  }
+
+  // ── Layer 1: JWT verify ──
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized — yêu cầu Bearer token' });
+    _auditAdmin(req, res, null, 401, { reason: 'no-token' });
+    return null;
+  }
+  const token = auth.slice(7);
+  let decoded;
+  try { decoded = _akVerify(token); }
+  catch (e) {
+    res.status(401).json({ error: 'Token không hợp lệ' });
+    _auditAdmin(req, res, null, 401, { reason: 'jwt-verify-failed', err: e.message.slice(0, 100) });
+    return null;
+  }
+
+  // ── Layer 5: Dev bypass ──
+  if (process.env.DISABLE_ADMIN_GATE === '1') {
+    _auditAdmin(req, res, decoded, 200, { bypass: 'dev-gate' });
+    return decoded;
+  }
+
+  // ── Layer 2: DB role check (defense against revoked admins) ──
+  const cacheKey = decoded.sub || decoded.userId || decoded.email;
+  if (!cacheKey) {
+    res.status(403).json({ error: 'Token thiếu user identifier' });
+    _auditAdmin(req, res, decoded, 403, { reason: 'no-sub-in-token' });
+    return null;
+  }
+  // JWT role=ADMIN fast path — chỉ skip DB nếu cache hit gần đây
+  const cached = _cacheGet(cacheKey);
+  if (cached) {
+    if (cached.role === 'ADMIN') {
+      _auditAdmin(req, res, decoded, 200, { source: 'cache' });
+      return decoded;
+    }
+    res.status(403).json({ error: 'Chỉ admin truy cập được' });
+    _auditAdmin(req, res, decoded, 403, { reason: 'not-admin-cached', role: cached.role });
+    return null;
+  }
+  // Cache miss → query DB để xác nhận role hiện tại
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT role FROM "User" WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
+      [cacheKey]);
+    const role = rows[0]?.role || null;
+    _cacheSet(cacheKey, role);
+    if (role === 'ADMIN') {
+      _auditAdmin(req, res, decoded, 200, { source: 'db' });
+      return decoded;
+    }
+    res.status(403).json({ error: 'Chỉ admin truy cập được' });
+    _auditAdmin(req, res, decoded, 403, { reason: 'not-admin-db', role });
+    return null;
+  } catch (e) {
+    console.error('[require-admin] DB error:', e.message);
+    res.status(503).json({ error: 'Auth DB tạm thời không khả dụng' });
+    _auditAdmin(req, res, decoded, 503, { reason: 'db-error', err: e.message.slice(0, 100) });
+    return null;
+  }
+}
+
 // (_getPool helper đã được khai báo ở đầu file — TRƯỚC _ensureLatexProjectTable)
 
 app.post('/api/user/api-keys', async (req, res) => {
@@ -10814,12 +10994,19 @@ app.get('/api/agents/exam-prep/teacher_exams', (_req, res) => res.json({ exams: 
 app.get('/api/agents/exam-prep/community-stats', (_req, res) => res.json({ users: 0, sessions: 0 }));
 
 // Admin (additional stubs)
-app.get('/api/admin/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
-app.get('/api/admin/cameras/discover', (_req, res) => res.json({ discovered: [] }));
+app.get('/api/admin/cameras', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({ cameras: [], total: 0 });
+});
+app.get('/api/admin/cameras/discover', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({ discovered: [] });
+});
 // ── Admin Insights — real aggregations từ PageView + Exam + Question ──
 
 // /api/admin/insights/behavior — DAU/WAU/MAU + hourly + bounce
-app.get('/api/admin/insights/behavior', async (_req, res) => {
+app.get('/api/admin/insights/behavior', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const [hourly, dau, wau, mau, sessDur, topEntries, bounce] = await Promise.all([
@@ -10901,7 +11088,8 @@ const _NORMALIZE_SUBJECT = (s) => {
   return map[n] || n;
 };
 
-app.get('/api/admin/insights/trending-topics', async (_req, res) => {
+app.get('/api/admin/insights/trending-topics', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const { rows } = await pool.query(`
@@ -10928,7 +11116,8 @@ app.get('/api/admin/insights/trending-topics', async (_req, res) => {
 });
 
 // /api/admin/insights/trending-exams — top exam 30d (best-effort, không có attempt table)
-app.get('/api/admin/insights/trending-exams', async (_req, res) => {
+app.get('/api/admin/insights/trending-exams', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const { rows } = await pool.query(`
@@ -10948,7 +11137,8 @@ app.get('/api/admin/insights/trending-exams', async (_req, res) => {
 });
 
 // /api/admin/insights/recommendations — rule-based từ behavior data (defensive)
-app.get('/api/admin/insights/recommendations', async (_req, res) => {
+app.get('/api/admin/insights/recommendations', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   const recommendations = [];
   const pool = _getPool();
 
@@ -11056,6 +11246,7 @@ app.get('/api/admin/insights/recommendations', async (_req, res) => {
 
 // /api/admin/overview — KPI cards cho Dashboard
 app.get('/api/admin/overview', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const range = req.query.range || 'week';
@@ -11098,6 +11289,7 @@ app.get('/api/admin/overview', async (req, res) => {
 //   - networkLoad: PageView count last 30 hourly buckets
 //   - moduleRegistry: derived từ services-health (active/inactive)
 app.get('/api/admin/overview/full', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const range = req.query.range || 'week';
@@ -11297,6 +11489,7 @@ app.get('/api/admin/overview/full', async (req, res) => {
 
 // /api/admin/users/:id/stats — student detail stats
 app.get('/api/admin/users/:id/stats', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const id = req.params.id;
@@ -11599,11 +11792,18 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     } catch (e) { console.error('[admin:users:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá user' }); }
   });
 })();
-app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
-app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
+app.get('/api/admin/news/pending', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({ articles: [], total: 0 });
+});
+app.get('/api/admin/notifications', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({ notifications: [], total: 0 });
+});
 
 // ── Admin Operations — probe services + resources ──
-app.get('/api/admin/operations/services-health', async (_req, res) => {
+app.get('/api/admin/operations/services-health', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   const now = new Date().toISOString();
   const services = [];
 
@@ -11684,7 +11884,8 @@ app.get('/api/admin/operations/services-health', async (_req, res) => {
   });
 });
 
-app.get('/api/admin/operations/system-resources', (_req, res) => {
+app.get('/api/admin/operations/system-resources', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   const os = require('os');
   const mem = process.memoryUsage();
   const sysTotal = os.totalmem();
@@ -11708,17 +11909,23 @@ app.get('/api/admin/operations/system-resources', (_req, res) => {
   });
 });
 
-app.get('/api/admin/operations/security-events', (_req, res) => res.json({
-  events: [],
-  summary: { totalLast24h: 0, totalAll: 0, byType: {}, bySeverity: {} },
-}));
+app.get('/api/admin/operations/security-events', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({
+    events: [],
+    summary: { totalLast24h: 0, totalAll: 0, byType: {}, bySeverity: {} },
+  });
+});
 
-app.get('/api/admin/operations/crawler-attempts', (_req, res) => res.json({
-  events: [],
-  summary: { total: 0, last24h: 0, uniqueIps: 0, honeypotHits: 0, blockedByUa: 0 },
-  topUserAgents: [],
-  updatedAt: new Date().toISOString(),
-}));
+app.get('/api/admin/operations/crawler-attempts', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({
+    events: [],
+    summary: { total: 0, last24h: 0, uniqueIps: 0, honeypotHits: 0, blockedByUa: 0 },
+    topUserAgents: [],
+    updatedAt: new Date().toISOString(),
+  });
+});
 
 // ── Admin Analytics — query PageView table (real data, filter session_id NOT NULL) ──
 // Lọc historical noise (rows cũ insert từ Rust service không có session_id/user_id)
@@ -11726,7 +11933,8 @@ app.get('/api/admin/operations/crawler-attempts', (_req, res) => res.json({
 const _ANALYTICS_NULL_FILTER = process.env.FE_ANALYTICS_INCLUDE_NULL === '1'
   ? '' : 'AND session_id IS NOT NULL';
 
-app.get('/api/admin/analytics/overview', async (_req, res) => {
+app.get('/api/admin/analytics/overview', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const [t, d, r] = await Promise.all([
@@ -11766,6 +11974,7 @@ app.get('/api/admin/analytics/overview', async (_req, res) => {
 });
 
 app.get('/api/admin/analytics/routes', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const days = Math.min(Number(req.query.days) || 7, 90);
@@ -11788,7 +11997,8 @@ app.get('/api/admin/analytics/routes', async (req, res) => {
   }
 });
 
-app.get('/api/admin/analytics/realtime', async (_req, res) => {
+app.get('/api/admin/analytics/realtime', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const [active, recent] = await Promise.all([
@@ -11811,6 +12021,7 @@ app.get('/api/admin/analytics/realtime', async (_req, res) => {
 // REAL funnel: Landing → Login → Dashboard → Exam-prep / Course / Game
 // Tính trên DISTINCT session_id để biết user journey.
 app.get('/api/admin/analytics/funnel', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const days = Math.min(Number(req.query.days) || 7, 30);
@@ -11848,6 +12059,7 @@ app.get('/api/admin/analytics/funnel', async (req, res) => {
 
 // DELETE rows session_id NULL — admin only, dùng để cleanup historical noise
 app.delete('/api/admin/analytics/cleanup-null', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   let decoded;
@@ -11868,23 +12080,90 @@ app.delete('/api/admin/analytics/cleanup-null', async (req, res) => {
   }
 });
 
-app.get('/api/admin/analytics/source-mix', (_req, res) => res.json({
-  inNetwork:  { totalViews: 0, totalSessions: 0, breakdown: [] },
-  outNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
-  ratio: { inNetwork: 0, outNetwork: 0 },
-}));
+app.get('/api/admin/analytics/source-mix', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({
+    inNetwork:  { totalViews: 0, totalSessions: 0, breakdown: [] },
+    outNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
+    ratio: { inNetwork: 0, outNetwork: 0 },
+  });
+});
 
-app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
-  metric: String(req.query.metric || 'engagement'),
-  buckets: [],
-  total: 0,
-}));
+app.get('/api/admin/analytics/score-distribution', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  res.json({
+    metric: String(req.query.metric || 'engagement'),
+    buckets: [],
+    total: 0,
+  });
+});
 
 // ── /api/admin/analytics/audience — YouTube-style demographics ──
 // Aggregations từ PageView (device/OS/browser/country/screen/lang)
 // + User/UserProfile (role/grade/age bucket nếu có dob trong data JSONB)
 // Query days = 7|30|90 (default 30)
+// ── /api/admin/audit-log — admin xem lịch sử action ──
+// Filters: ?path=&userId=&days=&limit=&offset=
+// Trả về: events list + summary { total, by_path, by_user, suspicious }
+// Suspicious = 401/403/429 status (failed auth attempts)
+app.get('/api/admin/audit-log', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
+  try {
+    const pool = _getPool();
+    const days = Math.max(1, Math.min(90, parseInt(String(req.query.days || '7'), 10) || 7));
+    const limit = Math.max(1, Math.min(500, parseInt(String(req.query.limit || '100'), 10) || 100));
+    const offset = Math.max(0, parseInt(String(req.query.offset || '0'), 10) || 0);
+    const pathFilter = req.query.path ? `%${String(req.query.path)}%` : null;
+    const userFilter = req.query.userId ? String(req.query.userId) : null;
+
+    const where = [`created_at >= NOW() - INTERVAL '${days} day'`];
+    const params = [];
+    if (pathFilter) { params.push(pathFilter); where.push(`path ILIKE $${params.length}`); }
+    if (userFilter) { params.push(userFilter); where.push(`(user_id = $${params.length} OR user_email = $${params.length})`); }
+
+    const [eventsR, summaryR, suspiciousR] = await Promise.all([
+      pool.query(
+        `SELECT id, user_id, user_email, method, path, status, ip_hash,
+                user_agent, details, created_at
+         FROM "AdminAuditLog"
+         WHERE ${where.join(' AND ')}
+         ORDER BY created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        params).catch(() => ({ rows: [] })),
+      pool.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE status >= 400)::int AS failed,
+           COUNT(*) FILTER (WHERE status = 429)::int AS rate_limited,
+           COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS unique_admins,
+           COUNT(DISTINCT ip_hash) FILTER (WHERE ip_hash IS NOT NULL)::int AS unique_ips
+         FROM "AdminAuditLog"
+         WHERE ${where.join(' AND ')}`,
+        params).catch(() => ({ rows: [{ total: 0, failed: 0, rate_limited: 0, unique_admins: 0, unique_ips: 0 }] })),
+      pool.query(
+        `SELECT path, status, COUNT(*)::int AS n,
+                MAX(created_at) AS last_seen
+         FROM "AdminAuditLog"
+         WHERE created_at >= NOW() - INTERVAL '${days} day'
+           AND status IN (401, 403, 429)
+         GROUP BY path, status
+         ORDER BY n DESC LIMIT 20`).catch(() => ({ rows: [] })),
+    ]);
+
+    return res.json({
+      events: eventsR.rows,
+      summary: summaryR.rows[0] || { total: 0, failed: 0, rate_limited: 0, unique_admins: 0, unique_ips: 0 },
+      suspicious: suspiciousR.rows,
+      days, limit, offset,
+    });
+  } catch (e) {
+    console.error('[admin:audit-log]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/admin/analytics/audience', async (req, res) => {
+  if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
     const days = Math.max(1, Math.min(365, parseInt(String(req.query.days || '30'), 10) || 30));
