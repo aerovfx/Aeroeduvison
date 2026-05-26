@@ -14351,20 +14351,76 @@ app.get('/api/admin/analytics/realtime', async (req, res) => {
   if (!(await _requireAdmin(req, res))) return;
   try {
     const pool = _getPool();
-    const [active, recent] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active
-                  FROM "PageView"
-                  WHERE created_at >= NOW() - INTERVAL '5 minute' AND session_id IS NOT NULL`),
+    // User: "không nhận diện đúng tình trạng realtime khi các người dùng đang hoạt động"
+    //
+    // Bug cũ:
+    //   1. `session_id IS NOT NULL` filter loại bỏ PageView không có session
+    //      (vd sendBeacon trên tab close, hoặc rows cũ pre-sessionId)
+    //   2. Chỉ count distinct session_id → nếu 1 user mở 2 tab thì count 2
+    //   3. "recent" KHÔNG filter time → trả về rows từ tháng trước
+    //   4. Chỉ 1 cửa sổ 5 phút → không phân biệt "đang nhìn ngay" vs "ghé 4 phút trước"
+    //
+    // Fix:
+    //   - Định danh "active person": COALESCE(user_id, session_id, ip_hash)
+    //     → user login: dùng user_id (1 user dù mở nhiều tab)
+    //     → anonymous: session_id (1 tab = 1 session)
+    //     → fallback ip_hash khi session_id null
+    //   - 3 cửa sổ: 30s (realtime), 1m, 5m
+    //   - "recent" filter last 30 phút + enrich user name/image
+    //   - "byPath" group page đang được xem nhiều nhất
+    const [activeStats, recent, byPath] = await Promise.all([
+      // Multi-window active count, distinct user-or-session
       pool.query(`
-        SELECT pv.path, u.role AS "userRole", pv.created_at AS "createdAt"
-        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
-        WHERE pv.session_id IS NOT NULL
-        ORDER BY pv.created_at DESC LIMIT 20`),
+        WITH norm AS (
+          SELECT COALESCE(user_id, session_id, ip_hash, host(inet '0.0.0.0')) AS pid,
+                 user_id, created_at
+          FROM "PageView"
+          WHERE created_at >= NOW() - INTERVAL '5 minute'
+        )
+        SELECT
+          COUNT(DISTINCT pid) FILTER (WHERE created_at >= NOW() - INTERVAL '30 second')::int  AS last30s,
+          COUNT(DISTINCT pid) FILTER (WHERE created_at >= NOW() - INTERVAL '1 minute')::int   AS last1m,
+          COUNT(DISTINCT pid)::int                                                            AS last5m,
+          COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL AND created_at >= NOW() - INTERVAL '5 minute')::int AS users5m
+        FROM norm
+      `).catch(() => ({ rows: [{ last30s: 0, last1m: 0, last5m: 0, users5m: 0 }] })),
+
+      // Recent activity feed — last 30 min, enrich user info
+      pool.query(`
+        SELECT pv.path, pv.created_at AS "createdAt",
+               u.role AS "userRole", u.name AS "userName", u.image AS "userImage"
+        FROM "PageView" pv
+        LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.created_at >= NOW() - INTERVAL '30 minute'
+        ORDER BY pv.created_at DESC LIMIT 20
+      `).catch(() => ({ rows: [] })),
+
+      // Pages being viewed right now (last 5min) — top 10
+      pool.query(`
+        SELECT pv.path,
+               COUNT(DISTINCT COALESCE(pv.user_id, pv.session_id, pv.ip_hash))::int AS viewers,
+               MAX(pv.created_at) AS "lastView"
+        FROM "PageView" pv
+        WHERE pv.created_at >= NOW() - INTERVAL '5 minute'
+        GROUP BY pv.path
+        ORDER BY viewers DESC, "lastView" DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
     ]);
-    return res.json({ activeNow: active.rows[0]?.active || 0, recent: recent.rows });
+
+    const s = activeStats.rows[0] || {};
+    return res.json({
+      activeNow: s.last5m || 0,           // backward compat — count last 5 min
+      activeLast30s: s.last30s || 0,      // truly realtime
+      activeLast1min: s.last1m || 0,
+      activeLast5min: s.last5m || 0,
+      activeUsers5min: s.users5m || 0,    // logged-in only
+      recent: recent.rows,
+      byPath: byPath.rows,                // top pages being viewed
+      timestamp: new Date().toISOString(),
+    });
   } catch (e) {
     console.error('[admin:realtime]', e.message);
-    return res.json({ activeNow: 0, recent: [] });
+    return res.json({ activeNow: 0, recent: [], byPath: [] });
   }
 });
 

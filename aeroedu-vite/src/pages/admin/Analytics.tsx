@@ -38,8 +38,14 @@ interface RouteRow {
 }
 
 interface RealtimeData {
-  activeNow: number
-  recent: { path: string; userRole: string | null; createdAt: string }[]
+  activeNow: number               // last 5 min (backward compat)
+  activeLast30s?: number          // truly realtime
+  activeLast1min?: number
+  activeLast5min?: number
+  activeUsers5min?: number        // logged-in only
+  recent: { path: string; userRole: string | null; userName?: string | null; userImage?: string | null; createdAt: string }[]
+  byPath?: { path: string; viewers: number; lastView: string }[]
+  timestamp?: string
 }
 
 interface FunnelStage {
@@ -784,16 +790,70 @@ export default function AdminAnalytics() {
           </div>
         </div>
 
-        {/* Realtime indicator */}
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-          <div className="relative">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+        {/* Realtime indicator — multi-window */}
+        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            </div>
+            <span className="text-sm font-bold text-emerald-300">
+              {realtime.activeLast5min ?? realtime.activeNow} người đang hoạt động
+            </span>
+            {(realtime.activeUsers5min ?? 0) > 0 && (
+              <span className="text-xs text-emerald-200/70">
+                ({realtime.activeUsers5min} đã đăng nhập)
+              </span>
+            )}
+            <span className="text-xs text-white/40 ml-auto">— refresh 15s</span>
           </div>
-          <span className="text-sm font-bold text-emerald-300">
-            {realtime.activeNow} người đang online
-          </span>
-          <span className="text-xs text-white/40">— cập nhật mỗi 15 giây</span>
+
+          {/* Granular time windows */}
+          {(realtime.activeLast30s != null || realtime.activeLast1min != null) && (
+            <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-emerald-500/20 flex-wrap text-xs">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-bold text-emerald-200">{realtime.activeLast30s ?? 0}</span>
+                <span className="text-emerald-200/60">≤30s (ngay bây giờ)</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30">
+                <span className="font-bold text-cyan-200">{realtime.activeLast1min ?? 0}</span>
+                <span className="text-cyan-200/60">≤1 phút</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/15 border border-blue-500/30">
+                <span className="font-bold text-blue-200">{realtime.activeLast5min ?? realtime.activeNow}</span>
+                <span className="text-blue-200/60">≤5 phút</span>
+              </div>
+              {realtime.timestamp && (
+                <span className="text-[10px] text-white/40 ml-auto font-mono">
+                  Cập nhật {new Date(realtime.timestamp).toLocaleTimeString('vi-VN')}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Top pages being viewed RIGHT NOW */}
+          {realtime.byPath && realtime.byPath.length > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-emerald-500/20">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/80 mb-1.5">
+                🔥 Đang được xem nhiều nhất:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {realtime.byPath.slice(0, 6).map(p => (
+                  <a
+                    key={p.path}
+                    href={p.path}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/25 transition font-mono"
+                  >
+                    {p.path.length > 30 ? p.path.slice(0, 28) + '…' : p.path}
+                    <span className="ml-1.5 font-bold text-emerald-300">{p.viewers}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 4 stat cards */}
