@@ -383,6 +383,86 @@ function ShoeDisplaySim() {
 // 6. DNA HELIX SIMULATION
 // ============================================================================
 
+// ── DNA helpers ───────────────────────────────────────────────────────
+// Pair colors theo Watson-Crick: A=Red, T=Blue, G=Green, C=Yellow
+// A↔T (2 H-bonds), G↔C (3 H-bonds)
+const BASE_COLORS = {
+  A: '#ef4444', // red
+  T: '#3b82f6', // blue
+  G: '#22c55e', // green
+  C: '#f59e0b', // amber
+} as const
+type Base = keyof typeof BASE_COLORS
+const COMPLEMENT: Record<Base, Base> = { A: 'T', T: 'A', G: 'C', C: 'G' }
+
+// Cylinder giữa 2 điểm — orient ĐÚNG bằng quaternion (Vector3.UP → direction)
+function Bond({
+  from, to, radius = 0.05, color = '#94a3b8', opacity = 1,
+}: {
+  from: THREE.Vector3; to: THREE.Vector3; radius?: number; color?: string; opacity?: number;
+}) {
+  const ref = useRef<THREE.Mesh>(null)
+  useMemo(() => {
+    if (!ref.current) return
+    const dir = new THREE.Vector3().subVectors(to, from)
+    const length = dir.length()
+    const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5)
+    ref.current.position.copy(mid)
+    const up = new THREE.Vector3(0, 1, 0)
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize())
+    ref.current.quaternion.copy(quat)
+    ref.current.scale.y = length
+  }, [from, to])
+  return (
+    <mesh ref={ref}>
+      <cylinderGeometry args={[radius, radius, 1, 12]} />
+      <meshStandardMaterial
+        color={color}
+        metalness={0.4}
+        roughness={0.35}
+        transparent={opacity < 1}
+        opacity={opacity}
+      />
+    </mesh>
+  )
+}
+
+// Smooth helical strand qua TubeGeometry — tránh nhìn rời rạc như sphere chain
+function HelixBackbone({
+  phase, radius, height, turns, color,
+}: {
+  phase: number; radius: number; height: number; turns: number; color: string;
+}) {
+  const geometry = useMemo(() => {
+    const points: THREE.Vector3[] = []
+    const samples = 200
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples
+      const y = (t - 0.5) * height
+      const angle = t * turns * Math.PI * 2 + phase
+      points.push(new THREE.Vector3(
+        radius * Math.cos(angle),
+        y,
+        radius * Math.sin(angle),
+      ))
+    }
+    const curve = new THREE.CatmullRomCurve3(points)
+    return new THREE.TubeGeometry(curve, 200, 0.13, 12, false)
+  }, [phase, radius, height, turns])
+
+  return (
+    <mesh geometry={geometry}>
+      <meshStandardMaterial
+        color={color}
+        metalness={0.6}
+        roughness={0.3}
+        emissive={color}
+        emissiveIntensity={0.15}
+      />
+    </mesh>
+  )
+}
+
 function DNAHelix() {
   const groupRef = useRef<THREE.Group>(null)
 
@@ -392,75 +472,62 @@ function DNAHelix() {
     }
   })
 
-  const strand1Positions: [number, number, number][] = []
-  const strand2Positions: [number, number, number][] = []
-  const radius = 1.2
+  const RADIUS = 1.4
+  const HEIGHT = 8
+  const TURNS = 3
+  const PAIRS = 30 // 10 base pairs per turn (chuẩn B-DNA)
 
-  for (let t = 0; t < 20; t++) {
-    const angle = t * (Math.PI / 3)
-    const x1 = radius * Math.cos(angle)
-    const z1 = radius * Math.sin(angle)
-    const y1 = t * 0.3 - 3
-
-    const x2 = radius * Math.cos(angle + Math.PI)
-    const z2 = radius * Math.sin(angle + Math.PI)
-    const y2 = t * 0.3 - 3
-
-    strand1Positions.push([x1, y1, z1])
-    strand2Positions.push([x2, y2, z2])
-  }
+  // Sample base pair positions evenly along helix
+  const pairs = useMemo(() => {
+    const arr: { pos1: THREE.Vector3; pos2: THREE.Vector3; base: Base }[] = []
+    const bases: Base[] = ['A', 'T', 'G', 'C']
+    for (let i = 0; i < PAIRS; i++) {
+      const t = i / (PAIRS - 1)
+      const y = (t - 0.5) * HEIGHT
+      const angle = t * TURNS * Math.PI * 2
+      const pos1 = new THREE.Vector3(
+        RADIUS * Math.cos(angle),
+        y,
+        RADIUS * Math.sin(angle),
+      )
+      const pos2 = new THREE.Vector3(
+        RADIUS * Math.cos(angle + Math.PI),
+        y,
+        RADIUS * Math.sin(angle + Math.PI),
+      )
+      arr.push({ pos1, pos2, base: bases[i % 4] })
+    }
+    return arr
+  }, [])
 
   return (
     <group ref={groupRef}>
-      {/* Strand 1 */}
-      {strand1Positions.map((pos, i) => (
-        <mesh key={`s1-${i}`} position={pos}>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? '#ef4444' : '#3b82f6'}
-            metalness={0.3}
-            roughness={0.4}
-          />
-        </mesh>
-      ))}
+      {/* Two smooth helical backbones */}
+      <HelixBackbone phase={0} radius={RADIUS} height={HEIGHT} turns={TURNS} color="#06b6d4" />
+      <HelixBackbone phase={Math.PI} radius={RADIUS} height={HEIGHT} turns={TURNS} color="#a855f7" />
 
-      {/* Strand 2 */}
-      {strand2Positions.map((pos, i) => (
-        <mesh key={`s2-${i}`} position={pos}>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? '#22c55e' : '#f59e0b'}
-            metalness={0.3}
-            roughness={0.4}
-          />
-        </mesh>
-      ))}
-
-      {/* Base pair connections */}
-      {strand1Positions.map((pos1, i) => {
-        const pos2 = strand2Positions[i]
-        const midX = (pos1[0] + pos2[0]) / 2
-        const midY = (pos1[1] + pos2[1]) / 2
-        const midZ = (pos1[2] + pos2[2]) / 2
-        const dist = Math.hypot(
-          pos2[0] - pos1[0],
-          pos2[1] - pos1[1],
-          pos2[2] - pos1[2]
-        )
-        const angle = Math.atan2(
-          Math.hypot(pos2[0] - pos1[0], pos2[2] - pos1[2]),
-          pos2[1] - pos1[1]
-        )
-
+      {/* Base pairs */}
+      {pairs.map((p, i) => {
+        const baseColor = BASE_COLORS[p.base]
+        const compColor = BASE_COLORS[COMPLEMENT[p.base]]
+        // Mid point → 2 cylinders mỗi cylinder 1 nửa với màu base tương ứng
+        const mid = new THREE.Vector3().addVectors(p.pos1, p.pos2).multiplyScalar(0.5)
         return (
-          <mesh
-            key={`bp-${i}`}
-            position={[midX, midY, midZ]}
-            rotation={[angle, 0, 0]}
-          >
-            <cylinderGeometry args={[0.06, 0.06, dist, 8]} />
-            <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.5} />
-          </mesh>
+          <group key={i}>
+            {/* Strand-1 side (half cylinder color of base) */}
+            <Bond from={p.pos1} to={mid} radius={0.08} color={baseColor} />
+            {/* Strand-2 side (complement base color) */}
+            <Bond from={mid} to={p.pos2} radius={0.08} color={compColor} />
+            {/* Nucleotide spheres at the attachment points */}
+            <mesh position={p.pos1.toArray()}>
+              <sphereGeometry args={[0.18, 24, 24]} />
+              <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.3} emissive={baseColor} emissiveIntensity={0.25} />
+            </mesh>
+            <mesh position={p.pos2.toArray()}>
+              <sphereGeometry args={[0.18, 24, 24]} />
+              <meshStandardMaterial color={compColor} metalness={0.5} roughness={0.3} emissive={compColor} emissiveIntensity={0.25} />
+            </mesh>
+          </group>
         )
       })}
     </group>
@@ -469,14 +536,19 @@ function DNAHelix() {
 
 function DnaHelixSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 40 }}>
+    <Canvas style={canvasStyle} camera={{ position: [0, 0, 9], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
       <color attach="background" args={[BG]} />
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={1.5} />
+      <fog attach="fog" args={[BG, 12, 25]} />
+      {/* Studio 3-point lighting cho material glow */}
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[6, 8, 6]} intensity={1.4} color="#ffffff" />
+      <directionalLight position={[-6, 3, -4]} intensity={0.4} color="#a855f7" />
+      <pointLight position={[0, 0, 5]} intensity={0.6} color="#06b6d4" />
+      <Stars radius={50} depth={50} count={1500} factor={2} fade speed={0.5} />
 
       <DNAHelix />
 
-      <OrbitControls />
+      <OrbitControls enablePan={false} minDistance={4} maxDistance={18} autoRotate autoRotateSpeed={0.3} />
     </Canvas>
   )
 }
@@ -490,114 +562,141 @@ function DNADetail() {
 
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += 0.003
+      groupRef.current.rotation.y += 0.0025
     }
   })
 
-  const strand1Positions: [number, number, number][] = []
-  const strand2Positions: [number, number, number][] = []
-  const radius = 1.8
-  const yStep = 0.8
+  const RADIUS = 2
+  const HEIGHT = 7
+  const TURNS = 1.5         // ít vòng → mỗi base pair to dễ đọc label
+  const PAIRS = 10
 
-  for (let t = 0; t < 5; t++) {
-    const angle = t * (Math.PI / 3)
-    const x1 = radius * Math.cos(angle)
-    const z1 = radius * Math.sin(angle)
-    const y1 = t * yStep - 1.6
+  // Watson-Crick sequence demo — 10 base pairs đa dạng
+  const SEQUENCE: Base[] = ['A', 'T', 'G', 'C', 'A', 'T', 'G', 'C', 'T', 'A']
 
-    const x2 = radius * Math.cos(angle + Math.PI)
-    const z2 = radius * Math.sin(angle + Math.PI)
-    const y2 = t * yStep - 1.6
-
-    strand1Positions.push([x1, y1, z1])
-    strand2Positions.push([x2, y2, z2])
-  }
-
-  const labels = ['A', 'T', 'G', 'C', 'A']
-  const baseColors = ['#ef4444', '#3b82f6', '#22c55e', '#fbbf24', '#ef4444']
+  const pairs = useMemo(() => {
+    const arr: {
+      pos1: THREE.Vector3; pos2: THREE.Vector3;
+      base1: Base; base2: Base;
+      labelPos1: THREE.Vector3; labelPos2: THREE.Vector3;
+    }[] = []
+    for (let i = 0; i < PAIRS; i++) {
+      const t = i / (PAIRS - 1)
+      const y = (t - 0.5) * HEIGHT
+      const angle = t * TURNS * Math.PI * 2
+      const pos1 = new THREE.Vector3(
+        RADIUS * Math.cos(angle),
+        y,
+        RADIUS * Math.sin(angle),
+      )
+      const pos2 = new THREE.Vector3(
+        RADIUS * Math.cos(angle + Math.PI),
+        y,
+        RADIUS * Math.sin(angle + Math.PI),
+      )
+      // Label đặt xa hơn radius để không đè base sphere
+      const labelOffset = 0.7
+      const labelPos1 = new THREE.Vector3(
+        (RADIUS + labelOffset) * Math.cos(angle),
+        y,
+        (RADIUS + labelOffset) * Math.sin(angle),
+      )
+      const labelPos2 = new THREE.Vector3(
+        (RADIUS + labelOffset) * Math.cos(angle + Math.PI),
+        y,
+        (RADIUS + labelOffset) * Math.sin(angle + Math.PI),
+      )
+      arr.push({
+        pos1, pos2,
+        base1: SEQUENCE[i],
+        base2: COMPLEMENT[SEQUENCE[i]],
+        labelPos1, labelPos2,
+      })
+    }
+    return arr
+  }, [])
 
   return (
     <group ref={groupRef}>
-      {/* Strand 1 with labels */}
-      {strand1Positions.map((pos, i) => (
-        <group key={`s1-${i}`}>
-          <mesh position={pos}>
-            <sphereGeometry args={[0.25, 32, 32]} />
-            <meshStandardMaterial
-              color={baseColors[i]}
-              metalness={0.3}
-              roughness={0.4}
-            />
-          </mesh>
-          <Text position={[pos[0] + 0.5, pos[1], pos[2]]} fontSize={0.2} color="white">
-            {labels[i]}
-          </Text>
-        </group>
-      ))}
+      {/* Backbones */}
+      <HelixBackbone phase={0} radius={RADIUS} height={HEIGHT} turns={TURNS} color="#06b6d4" />
+      <HelixBackbone phase={Math.PI} radius={RADIUS} height={HEIGHT} turns={TURNS} color="#a855f7" />
 
-      {/* Strand 2 with labels */}
-      {strand2Positions.map((pos, i) => {
-        const complementLabel = labels[i] === 'A' ? 'T' : labels[i] === 'T' ? 'A' : labels[i] === 'G' ? 'C' : 'G'
-        const complementColor = labels[i] === 'A' || labels[i] === 'T' ? (labels[i] === 'A' ? '#3b82f6' : '#ef4444') : labels[i] === 'G' ? '#fbbf24' : '#22c55e'
-
+      {/* Base pairs + labels */}
+      {pairs.map((p, i) => {
+        const c1 = BASE_COLORS[p.base1]
+        const c2 = BASE_COLORS[p.base2]
+        const mid = new THREE.Vector3().addVectors(p.pos1, p.pos2).multiplyScalar(0.5)
         return (
-          <group key={`s2-${i}`}>
-            <mesh position={pos}>
-              <sphereGeometry args={[0.25, 32, 32]} />
-              <meshStandardMaterial
-                color={complementColor}
-                metalness={0.3}
-                roughness={0.4}
-              />
+          <group key={i}>
+            {/* H-bond cylinders giữa 2 base */}
+            <Bond from={p.pos1} to={mid} radius={0.1} color={c1} />
+            <Bond from={mid} to={p.pos2} radius={0.1} color={c2} />
+
+            {/* Nucleotide spheres lớn */}
+            <mesh position={p.pos1.toArray()}>
+              <sphereGeometry args={[0.32, 32, 32]} />
+              <meshStandardMaterial color={c1} metalness={0.55} roughness={0.25} emissive={c1} emissiveIntensity={0.3} />
             </mesh>
-            <Text position={[pos[0] - 0.5, pos[1], pos[2]]} fontSize={0.2} color="white">
-              {complementLabel}
+            <mesh position={p.pos2.toArray()}>
+              <sphereGeometry args={[0.32, 32, 32]} />
+              <meshStandardMaterial color={c2} metalness={0.55} roughness={0.25} emissive={c2} emissiveIntensity={0.3} />
+            </mesh>
+
+            {/* Labels — outline + faces camera tự động */}
+            <Text
+              position={p.labelPos1.toArray()}
+              fontSize={0.28}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.025}
+              outlineColor={c1}
+            >
+              {p.base1}
+            </Text>
+            <Text
+              position={p.labelPos2.toArray()}
+              fontSize={0.28}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.025}
+              outlineColor={c2}
+            >
+              {p.base2}
             </Text>
           </group>
         )
       })}
 
-      {/* Base pair connections */}
-      {strand1Positions.map((pos1, i) => {
-        const pos2 = strand2Positions[i]
-        const midX = (pos1[0] + pos2[0]) / 2
-        const midY = (pos1[1] + pos2[1]) / 2
-        const midZ = (pos1[2] + pos2[2]) / 2
-        const dist = Math.hypot(
-          pos2[0] - pos1[0],
-          pos2[1] - pos1[1],
-          pos2[2] - pos1[2]
-        )
-        const angle = Math.atan2(
-          Math.hypot(pos2[0] - pos1[0], pos2[2] - pos1[2]),
-          pos2[1] - pos1[1]
-        )
-
-        return (
-          <mesh
-            key={`bp-${i}`}
-            position={[midX, midY, midZ]}
-            rotation={[angle, 0, 0]}
-          >
-            <cylinderGeometry args={[0.08, 0.08, dist, 8]} />
-            <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.5} />
-          </mesh>
-        )
-      })}
+      {/* Legend ở phía trước (faces camera via Text default billboard) */}
+      <group position={[0, -HEIGHT / 2 - 1.2, 0]}>
+        <Text fontSize={0.22} color="#94a3b8" anchorX="center" outlineWidth={0.015} outlineColor="#000000">
+          A · Adenine    T · Thymine    G · Guanine    C · Cytosine
+        </Text>
+        <Text position={[0, -0.4, 0]} fontSize={0.16} color="#64748b" anchorX="center">
+          Watson-Crick base pairing · A↔T (2H)  ·  G↔C (3H)
+        </Text>
+      </group>
     </group>
   )
 }
 
 function DnaDetailSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 6], fov: 45 }}>
+    <Canvas style={canvasStyle} camera={{ position: [0, 0.5, 8], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
       <color attach="background" args={[BG]} />
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={1.5} />
+      <fog attach="fog" args={[BG, 14, 28]} />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[6, 8, 6]} intensity={1.5} color="#ffffff" />
+      <directionalLight position={[-6, 3, -4]} intensity={0.4} color="#a855f7" />
+      <pointLight position={[0, 0, 5]} intensity={0.6} color="#06b6d4" />
+      <Stars radius={50} depth={50} count={1000} factor={2} fade speed={0.5} />
 
       <DNADetail />
 
-      <OrbitControls />
+      <OrbitControls enablePan={false} minDistance={4} maxDistance={18} autoRotate autoRotateSpeed={0.25} />
     </Canvas>
   )
 }
