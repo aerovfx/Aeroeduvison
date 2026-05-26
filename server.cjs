@@ -4524,55 +4524,99 @@ if (USE_NODEJS_QUESTIONS) {
       const userMsg = buildQuestionGenUserMsg(topic, opts);
       const maxTokens = parseInt(process.env.AI_GEN_MAX_TOKENS || '4000', 10);
 
-      // ── DEEPSEEK PRIMARY (user yêu cầu cụ thể) ──
-      // Anthropic chỉ fallback nếu DeepSeek down VÀ không có DEEPSEEK_API_KEY.
+      // ── DEEPSEEK PRIMARY + CLAUDE FALLBACK ──
+      // User yêu cầu "Claude · DeepSeek": ưu tiên DeepSeek (rẻ + JSON mode),
+      // fallback Claude nếu DeepSeek down (vd Insufficient Balance, timeout).
+      // Đảm bảo service không vỡ khi DeepSeek hết credit / API issue tạm thời.
       let rawText = '';
       let provider = '';
       let model = '';
       let usage = null;
+      let deepseekError = null;
 
-      if (!process.env.DEEPSEEK_API_KEY) {
+      const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
+      const hasClaude = !!process.env.ANTHROPIC_API_KEY;
+      if (!hasDeepseek && !hasClaude) {
         return res.status(503).json({
-          error: 'deepseek_not_configured',
-          message: 'Tính năng AI ra đề cần DEEPSEEK_API_KEY (admin cấu hình).',
+          error: 'ai_not_configured',
+          message: 'Cả DeepSeek và Claude đều chưa cấu hình. Liên hệ admin để bật.',
         });
       }
 
-      try {
-        const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-        const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: dsModel,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: userMsg },
-            ],
-            max_tokens: maxTokens,
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
-          }),
-        });
-        if (!dsResp.ok) {
-          const errText = await dsResp.text().catch(() => '');
-          throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 300)}`);
+      // Try DeepSeek FIRST nếu có key
+      if (hasDeepseek) {
+        try {
+          const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: dsModel,
+              messages: [
+                { role: 'system', content: system },
+                { role: 'user', content: userMsg },
+              ],
+              max_tokens: maxTokens,
+              temperature: 0.3,
+              response_format: { type: 'json_object' },
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 300)}`);
+          }
+          const dsJson = await dsResp.json();
+          rawText = dsJson.choices?.[0]?.message?.content || '';
+          provider = 'deepseek';
+          model = dsModel;
+          usage = dsJson.usage || null;
+        } catch (deepseekErr) {
+          deepseekError = deepseekErr.message;
+          console.warn('[ai:generate-questions] DeepSeek failed, trying Claude fallback:', deepseekErr.message.slice(0, 150));
+          // Don't return — fall through to Claude
         }
-        const dsJson = await dsResp.json();
-        rawText = dsJson.choices?.[0]?.message?.content || '';
-        provider = 'deepseek';
-        model = dsModel;
-        usage = dsJson.usage || null;
-      } catch (deepseekErr) {
-        // DeepSeek fail → log + 503 (KHÔNG fallback Claude vì user yêu cầu rõ ràng dùng DeepSeek)
-        console.error('[ai:generate-questions] DeepSeek error:', deepseekErr.message);
+      }
+
+      // Fallback Claude nếu DeepSeek fail HOẶC không có DeepSeek key
+      if (!provider && hasClaude) {
+        try {
+          const client = getAnthropic();
+          const completion = await client.messages.create({
+            model: AI_TUTOR_MODEL,
+            max_tokens: maxTokens,
+            system: system + '\n\nIMPORTANT: Respond with ONLY valid JSON, no markdown fence, no explanation.',
+            messages: [{ role: 'user', content: userMsg }],
+          });
+          if (Array.isArray(completion.content)) {
+            for (const block of completion.content) {
+              if (block && block.type === 'text' && typeof block.text === 'string') {
+                rawText += block.text;
+              }
+            }
+          }
+          provider = 'anthropic';
+          model = completion.model || AI_TUTOR_MODEL;
+          usage = completion.usage || null;
+        } catch (claudeErr) {
+          console.error('[ai:generate-questions] Both providers failed. DS:', deepseekError, 'Claude:', claudeErr.message);
+          return res.status(503).json({
+            error: 'all_providers_failed',
+            message: 'Cả DeepSeek và Claude đều không phản hồi. Thử lại sau ít phút.',
+            deepseek: deepseekError ? deepseekError.slice(0, 200) : 'no key',
+            claude: claudeErr.message.slice(0, 200),
+          });
+        }
+      }
+
+      // Nếu vẫn không có provider (chỉ DeepSeek key, DeepSeek fail, không có Claude)
+      if (!provider) {
         return res.status(503).json({
-          error: 'deepseek_unavailable',
-          message: 'DeepSeek API tạm thời không phản hồi. Thử lại sau ít phút.',
-          detail: deepseekErr.message.slice(0, 200),
+          error: 'deepseek_unavailable_no_fallback',
+          message: 'DeepSeek tạm dừng và chưa cấu hình Claude fallback. Liên hệ admin.',
+          deepseek: deepseekError ? deepseekError.slice(0, 200) : 'unknown',
         });
       }
 

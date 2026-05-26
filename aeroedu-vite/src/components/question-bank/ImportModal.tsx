@@ -1073,10 +1073,16 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                         <Bot className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                        <p className="text-sm font-bold text-slate-200 flex items-center gap-1.5 flex-wrap">
                           AI Tạo câu hỏi tự động
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300">
-                            DeepSeek · MIỄN PHÍ
+                          {/* Badge provider — DeepSeek primary, Claude fallback */}
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+                            style={{
+                              background: 'linear-gradient(90deg, rgba(124,58,237,0.25), rgba(6,182,212,0.25))',
+                              color: '#e9d5ff',
+                              border: '1px solid rgba(139,92,246,0.4)',
+                            }}>
+                            Claude · DeepSeek
                           </span>
                         </p>
                         <p className="text-[10px] text-slate-400">Mô tả chủ đề → AI sinh JSON → 1 click import</p>
@@ -1094,15 +1100,32 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                             ∞ {aiQuota.source === 'admin' ? 'Admin' : 'Gói Pro'}
                           </span>
                         ) : (
-                          <span className={`text-[10px] px-2 py-1 rounded-full border font-bold ${
-                            (aiQuota.remaining ?? 0) === 0
-                              ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                              : (aiQuota.remaining ?? 0) <= 3
-                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
-                          }`} title={aiQuota.resetAt ? `Reset lúc ${new Date(aiQuota.resetAt).toLocaleString('vi-VN')}` : ''}>
-                            Còn {aiQuota.remaining}/{aiQuota.limit} lượt
-                          </span>
+                          <>
+                            <span className={`text-[10px] px-2 py-1 rounded-full border font-bold ${
+                              (aiQuota.remaining ?? 0) === 0
+                                ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                                : (aiQuota.remaining ?? 0) <= 3
+                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                            }`} title={aiQuota.resetAt ? `Reset lúc ${new Date(aiQuota.resetAt).toLocaleString('vi-VN')}` : ''}>
+                              Còn {aiQuota.remaining}/{aiQuota.limit} lượt
+                            </span>
+                            {/* Đăng ký — chỉ show cho free user, link tới /payment */}
+                            <a
+                              href="/payment?plan=pro&feature=quiz_generate"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] px-2.5 py-1 rounded-full font-bold transition-all hover:scale-105 inline-flex items-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg,#fbbf24,#f59e0b)',
+                                color: '#1a1a2e',
+                                boxShadow: '0 2px 8px rgba(245,158,11,0.35)',
+                              }}
+                              title="Nâng cấp gói Pro — sinh câu hỏi không giới hạn"
+                            >
+                              ✨ Đăng ký Pro
+                            </a>
+                          </>
                         )
                       )}
                     </div>
