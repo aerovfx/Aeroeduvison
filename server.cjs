@@ -1162,14 +1162,438 @@ app.get('/api/teacher/analytics', async (req, res) => {
     weeklyProgress: [],
   });
 });
-app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
+// REMOVED stub /api/teacher/dashboard — real handler ở /api/teacher/dashboard/full (xem dưới)
+//   FE Dashboard.tsx hiện gọi /api/teacher/students; ta thay bằng /dashboard/full
 app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
 // REMOVED stub /api/teacher/my-students — shadow real handler line ~1911 (TSL)
 app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
-app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
+// REMOVED stub /api/teacher/students — real handler dưới (đầy đủ metrics cho dashboard)
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
+
+// ── /api/teacher/dashboard + /api/teacher/dashboard/full + /api/teacher/students ──
+// 1 IIFE gói chung 3 endpoints: simple dashboard counters, FULL dashboard với
+// metrics chi tiết từng HS, và students list. Dùng TSL + ClassStudent merge.
+//
+// Per-student metrics tính từ:
+//   - LessonHistory: totalXP (sum xp_reward), lessonsCompleted (count)
+//   - PracticeExam: averageScore (AVG percentage), totalAttempts, last attempt
+//   - PageView: lastActive (MAX), engagement (count last 7d)
+//   - Streak: distinct DATE(created_at) consecutive from PageView
+//
+// atRisk = averageScore < 50% OR lastActive > 7 ngày
+// excelling = averageScore >= 85% AND engagement >= 50
+;(() => {
+  function tAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  function _myIds(d) {
+    return [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+  }
+
+  // Lấy danh sách HS của GV: merge ClassStudent (có user_id) + TSL approved
+  async function _resolveTeacherStudentIds(pool, myIds) {
+    // 1. TSL approved (HS đã connect)
+    const { rows: tslRows } = await pool.query(`
+      SELECT DISTINCT tsl.student_id, tsl.student_email
+      FROM "TeacherStudentLink" tsl
+      WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
+        AND tsl.student_id IS NOT NULL
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    // 2. ClassStudent (HS GV import vào lớp — có thể có user_id hoặc không)
+    const { rows: csRows } = await pool.query(`
+      SELECT DISTINCT cs.user_id, cs.student_id, cs.ho_ten, cs.email, c.id AS class_id, c.name AS class_name
+      FROM "Class" c
+      JOIN "ClassStudent" cs ON cs.class_id = c.id
+      WHERE c.teacher_id = ANY($1::text[])
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    const ids = new Set();
+    const meta = new Map();  // id → { source, name?, email?, classes[] }
+    for (const r of tslRows) {
+      const id = r.student_id;
+      ids.add(id);
+      const m = meta.get(id) || { sources: new Set(), classes: [] };
+      m.sources.add('tsl');
+      m.email = m.email || r.student_email;
+      meta.set(id, m);
+    }
+    for (const r of csRows) {
+      const id = r.user_id || r.student_id;
+      if (!id) continue;  // HS chưa có account → skip metrics (vẫn count totalStudents qua classCounter)
+      ids.add(id);
+      const m = meta.get(id) || { sources: new Set(), classes: [] };
+      m.sources.add('class');
+      m.name = m.name || r.ho_ten;
+      m.email = m.email || r.email;
+      m.classes.push({ id: r.class_id, name: r.class_name });
+      meta.set(id, m);
+    }
+    return { ids: Array.from(ids), meta, csRows };
+  }
+
+  // Per-student metrics in 1 batch
+  async function _batchStudentMetrics(pool, studentIds) {
+    if (studentIds.length === 0) return new Map();
+    const [xpR, examR, pvR, streakR] = await Promise.all([
+      // totalXP + lessonsCompleted từ LessonHistory
+      pool.query(`
+        SELECT "userId" AS uid,
+               COALESCE(SUM(xp_reward), 0)::int AS xp,
+               COUNT(*)::int AS lessons,
+               MAX(occurred_at) AS last_lesson
+        FROM "LessonHistory"
+        WHERE "userId" = ANY($1::text[])
+        GROUP BY "userId"`, [studentIds]).catch(() => ({ rows: [] })),
+      // PracticeExam aggregate
+      pool.query(`
+        SELECT "studentId" AS uid,
+               COUNT(*)::int AS attempts,
+               COUNT(*) FILTER (WHERE completed)::int AS completed_count,
+               ROUND(AVG(NULLIF(percentage, 0)))::int AS avg_pct,
+               MAX("completedAt") AS last_exam
+        FROM "PracticeExam"
+        WHERE "studentId" = ANY($1::text[])
+        GROUP BY "studentId"`, [studentIds]).catch(() => ({ rows: [] })),
+      // PageView engagement + last active
+      pool.query(`
+        SELECT user_id AS uid,
+               MAX(created_at) AS last_active,
+               COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day')::int AS pv_7d,
+               COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 day')::int AS pv_30d
+        FROM "PageView"
+        WHERE user_id = ANY($1::text[])
+        GROUP BY user_id`, [studentIds]).catch(() => ({ rows: [] })),
+      // Streak: longest consecutive distinct dates from PageView 60d qua
+      pool.query(`
+        WITH days AS (
+          SELECT user_id, DATE(created_at) AS d
+          FROM "PageView"
+          WHERE user_id = ANY($1::text[])
+            AND created_at >= NOW() - INTERVAL '60 day'
+          GROUP BY 1, 2
+        ),
+        ranked AS (
+          SELECT user_id, d,
+                 d - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY d))::int AS grp
+          FROM days
+        )
+        SELECT user_id AS uid, MAX(c)::int AS streak FROM (
+          SELECT user_id, grp, COUNT(*) AS c FROM ranked GROUP BY 1, 2
+        ) g GROUP BY user_id`, [studentIds]).catch(() => ({ rows: [] })),
+    ]);
+
+    const metrics = new Map();
+    for (const id of studentIds) {
+      metrics.set(id, {
+        xp: 0, lessons: 0, lastLesson: null,
+        attempts: 0, completedCount: 0, avgPct: 0, lastExam: null,
+        lastActive: null, pv7d: 0, pv30d: 0,
+        streak: 0,
+      });
+    }
+    for (const r of xpR.rows) { const m = metrics.get(r.uid); if (m) { m.xp = r.xp; m.lessons = r.lessons; m.lastLesson = r.last_lesson; } }
+    for (const r of examR.rows) { const m = metrics.get(r.uid); if (m) { m.attempts = r.attempts; m.completedCount = r.completed_count; m.avgPct = r.avg_pct || 0; m.lastExam = r.last_exam; } }
+    for (const r of pvR.rows) { const m = metrics.get(r.uid); if (m) { m.lastActive = r.last_active; m.pv7d = r.pv_7d; m.pv30d = r.pv_30d; } }
+    for (const r of streakR.rows) { const m = metrics.get(r.uid); if (m) m.streak = r.streak; }
+    return metrics;
+  }
+
+  // Format "X phút/giờ/ngày trước"
+  function _relTimeVi(ts) {
+    if (!ts) return 'Chưa hoạt động';
+    const ms = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return 'Vừa xong';
+    if (m < 60) return `${m} phút trước`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} giờ trước`;
+    const d = Math.floor(h / 24);
+    return `${d} ngày trước`;
+  }
+
+  // GET /api/teacher/dashboard — simple counters
+  app.get('/api/teacher/dashboard', async (req, res) => {
+    const decoded = tAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _myIds(decoded);
+      const [classesR, studentsR, examsR, asgnR] = await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS n FROM "Class" WHERE teacher_id = ANY($1::text[])`, [myIds]).catch(() => ({ rows: [{ n: 0 }] })),
+        pool.query(`SELECT COUNT(DISTINCT student_id)::int AS n FROM "TeacherStudentLink" WHERE status = 'approved' AND teacher_id = ANY($1::text[])`, [myIds]).catch(() => ({ rows: [{ n: 0 }] })),
+        pool.query(`SELECT COUNT(*)::int AS n FROM "Exam" WHERE teacher_id = ANY($1::text[]) OR "userId" = ANY($1::text[])`, [myIds]).catch(() => ({ rows: [{ n: 0 }] })),
+        pool.query(`SELECT COUNT(*)::int AS n FROM "Assignment" WHERE teacher_id = ANY($1::text[])`, [myIds]).catch(() => ({ rows: [{ n: 0 }] })),
+      ]);
+      return res.json({
+        classes: classesR.rows[0]?.n || 0,
+        students: studentsR.rows[0]?.n || 0,
+        exams: examsR.rows[0]?.n || 0,
+        assignments: asgnR.rows[0]?.n || 0,
+        pending_grading: 0,  // TODO: wire khi có AssignmentSubmission table
+      });
+    } catch (e) {
+      console.error('[teacher:dashboard]', e.message);
+      return res.json({ classes: 0, students: 0, exams: 0, assignments: 0, pending_grading: 0 });
+    }
+  });
+
+  // GET /api/teacher/students — list HS thuộc lớp của GV với full metrics
+  // Shape match Student interface trong FE Dashboard.tsx
+  app.get('/api/teacher/students', async (req, res) => {
+    const decoded = tAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _myIds(decoded);
+      const { ids: studentIds, meta } = await _resolveTeacherStudentIds(pool, myIds);
+
+      if (studentIds.length === 0) {
+        return res.json({ students: [], total: 0 });
+      }
+
+      // Fetch User info + metrics in parallel
+      const [userR, metricsMap] = await Promise.all([
+        pool.query(`
+          SELECT id, name, email, image, role, "createdAt"
+          FROM "User" WHERE id = ANY($1::text[]) OR LOWER(email) = ANY($2::text[])`,
+          [studentIds, studentIds.map(x => String(x).toLowerCase())]).catch(() => ({ rows: [] })),
+        _batchStudentMetrics(pool, studentIds),
+      ]);
+
+      const userById = new Map(userR.rows.map(u => [u.id, u]));
+      const userByEmail = new Map(userR.rows.map(u => [String(u.email || '').toLowerCase(), u]));
+
+      const students = studentIds.map(sid => {
+        const m = metricsMap.get(sid) || {};
+        const u = userById.get(sid) || userByEmail.get(String(sid).toLowerCase()) || {};
+        const localMeta = meta.get(sid) || {};
+        const avgPct = m.avgPct || 0;
+        const lastActive = m.lastActive || m.lastLesson || m.lastExam;
+        const daysSinceActive = lastActive
+          ? Math.floor((Date.now() - new Date(lastActive).getTime()) / (24 * 3600 * 1000))
+          : 999;
+        const atRisk = (avgPct > 0 && avgPct < 50) || daysSinceActive > 7;
+        const excelling = avgPct >= 85 && (m.pv7d || 0) >= 5;
+        const engagement = Math.min(100, Math.round(((m.pv7d || 0) / 50) * 100));
+        const capability = avgPct;
+        const motivation = Math.min(100, Math.round(((m.streak || 0) / 14) * 100 + engagement * 0.3));
+        const progress = Math.min(100, Math.round((m.lessons || 0) * 4));  // proxy: 25 lessons = 100%
+        const level = Math.max(1, Math.floor((m.xp || 0) / 1000) + 1);
+        // Emotion proxy from engagement + score
+        let emotion = 'neutral';
+        if (atRisk) emotion = 'sad';
+        else if (excelling) emotion = 'happy';
+        else if (engagement > 60) emotion = 'focused';
+        else if (avgPct > 0 && avgPct < 60) emotion = 'confused';
+
+        return {
+          id: sid,
+          name: u.name || localMeta.name || (u.email || localMeta.email || 'Học sinh').split('@')[0],
+          email: u.email || localMeta.email || '',
+          image: u.image || null,
+          totalXP: m.xp || 0,
+          level,
+          progress,
+          averageScore: Math.round(avgPct / 10 * 10) / 10,  // 0-10 scale
+          lessonsCompleted: m.lessons || 0,
+          examAttempts: m.attempts || 0,
+          lastActive: _relTimeVi(lastActive),
+          lastActiveAt: lastActive,
+          emotion,
+          atRisk,
+          excelling,
+          engagement,
+          streak: m.streak || 0,
+          capability,
+          motivation,
+          classes: localMeta.classes || [],
+        };
+      });
+
+      return res.json({ students, total: students.length });
+    } catch (e) {
+      console.error('[teacher:students]', e.message);
+      return res.json({ students: [], total: 0 });
+    }
+  });
+
+  // GET /api/teacher/dashboard/full — aggregated dashboard (students + stats + AI hints)
+  app.get('/api/teacher/dashboard/full', async (req, res) => {
+    const decoded = tAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _myIds(decoded);
+      const { ids: studentIds, csRows } = await _resolveTeacherStudentIds(pool, myIds);
+
+      // Classes list
+      const { rows: classes } = await pool.query(`
+        SELECT c.id, c.name,
+               (SELECT COUNT(*) FROM "ClassStudent" cs WHERE cs.class_id = c.id)::int AS student_count
+        FROM "Class" c
+        WHERE c.teacher_id = ANY($1::text[])
+        ORDER BY c.created_at DESC LIMIT 50`, [myIds]).catch(() => ({ rows: [] }));
+
+      // Fetch students với metrics (reuse logic từ /students)
+      let students = [];
+      if (studentIds.length > 0) {
+        const [userR, metricsMap] = await Promise.all([
+          pool.query(`
+            SELECT id, name, email, image, role
+            FROM "User" WHERE id = ANY($1::text[])`, [studentIds]).catch(() => ({ rows: [] })),
+          _batchStudentMetrics(pool, studentIds),
+        ]);
+        const userById = new Map(userR.rows.map(u => [u.id, u]));
+        students = studentIds.map(sid => {
+          const m = metricsMap.get(sid) || {};
+          const u = userById.get(sid) || {};
+          const avgPct = m.avgPct || 0;
+          const lastActive = m.lastActive || m.lastLesson || m.lastExam;
+          const daysSinceActive = lastActive
+            ? Math.floor((Date.now() - new Date(lastActive).getTime()) / (24 * 3600 * 1000))
+            : 999;
+          const atRisk = (avgPct > 0 && avgPct < 50) || daysSinceActive > 7;
+          const excelling = avgPct >= 85 && (m.pv7d || 0) >= 5;
+          const engagement = Math.min(100, Math.round(((m.pv7d || 0) / 50) * 100));
+          let emotion = 'neutral';
+          if (atRisk) emotion = 'sad';
+          else if (excelling) emotion = 'happy';
+          else if (engagement > 60) emotion = 'focused';
+          else if (avgPct > 0 && avgPct < 60) emotion = 'confused';
+          return {
+            id: sid,
+            name: u.name || (u.email || 'Học sinh').split('@')[0],
+            email: u.email || '',
+            image: u.image || null,
+            totalXP: m.xp || 0,
+            level: Math.max(1, Math.floor((m.xp || 0) / 1000) + 1),
+            progress: Math.min(100, Math.round((m.lessons || 0) * 4)),
+            averageScore: Math.round(avgPct / 10 * 10) / 10,
+            lessonsCompleted: m.lessons || 0,
+            examAttempts: m.attempts || 0,
+            lastActive: _relTimeVi(lastActive),
+            lastActiveAt: lastActive,
+            emotion,
+            atRisk, excelling,
+            engagement,
+            streak: m.streak || 0,
+            capability: avgPct,
+            motivation: Math.min(100, Math.round(((m.streak || 0) / 14) * 100 + engagement * 0.3)),
+          };
+        });
+      }
+
+      // Aggregate ClassStats
+      const n = students.length || 1;
+      const stats = students.length === 0 ? {
+        totalStudents: csRows.length, classCount: classes.length,
+        averageXP: 0, averageProgress: 0, averageScore: 0,
+        averageEngagement: 0, averageCapability: 0,
+        atRiskCount: 0, excellingCount: 0,
+        totalLessonsCompleted: 0, totalExamAttempts: 0,
+        activeToday: 0, activeThisWeek: 0,
+      } : {
+        totalStudents: students.length,
+        classCount: classes.length,
+        averageXP: Math.round(students.reduce((a, s) => a + s.totalXP, 0) / n),
+        averageProgress: Math.round(students.reduce((a, s) => a + s.progress, 0) / n),
+        averageScore: +(students.reduce((a, s) => a + s.averageScore, 0) / n).toFixed(1),
+        averageEngagement: Math.round(students.reduce((a, s) => a + s.engagement, 0) / n),
+        averageCapability: Math.round(students.reduce((a, s) => a + s.capability, 0) / n),
+        atRiskCount: students.filter(s => s.atRisk).length,
+        excellingCount: students.filter(s => s.excelling).length,
+        totalLessonsCompleted: students.reduce((a, s) => a + s.lessonsCompleted, 0),
+        totalExamAttempts: students.reduce((a, s) => a + s.examAttempts, 0),
+        activeToday: students.filter(s => {
+          if (!s.lastActiveAt) return false;
+          return (Date.now() - new Date(s.lastActiveAt).getTime()) < 24 * 3600 * 1000;
+        }).length,
+        activeThisWeek: students.filter(s => {
+          if (!s.lastActiveAt) return false;
+          return (Date.now() - new Date(s.lastActiveAt).getTime()) < 7 * 24 * 3600 * 1000;
+        }).length,
+      };
+
+      // Emotion distribution
+      const emotionCounts = students.reduce((acc, s) => {
+        acc[s.emotion] = (acc[s.emotion] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Top performers (top 5 by averageScore)
+      const topPerformers = [...students]
+        .sort((a, b) => b.averageScore - a.averageScore)
+        .slice(0, 5)
+        .map(s => ({ id: s.id, name: s.name, image: s.image, averageScore: s.averageScore, level: s.level }));
+
+      // Need attention (atRisk students sorted by daysSinceActive)
+      const needAttention = students
+        .filter(s => s.atRisk)
+        .sort((a, b) => (a.averageScore || 100) - (b.averageScore || 100))
+        .slice(0, 5)
+        .map(s => ({ id: s.id, name: s.name, image: s.image, averageScore: s.averageScore, lastActive: s.lastActive, engagement: s.engagement }));
+
+      // Rule-based AI suggestions từ data thật
+      const aiSuggestions = [];
+      if (stats.atRiskCount > 0) {
+        aiSuggestions.push({
+          type: 'alert', severity: 'high',
+          title: `${stats.atRiskCount} học sinh cần can thiệp`,
+          desc: `Điểm TB <50% hoặc không hoạt động >7 ngày. Gửi tin nhắn hoặc lên lịch hỗ trợ riêng.`,
+          action: 'view-at-risk',
+        });
+      }
+      if (stats.activeToday === 0 && stats.totalStudents > 0) {
+        aiSuggestions.push({
+          type: 'warning', severity: 'medium',
+          title: 'Không có HS nào hoạt động hôm nay',
+          desc: 'Cân nhắc gửi bài tập mới hoặc thông báo nhắc nhở.',
+          action: 'send-notification',
+        });
+      }
+      if (stats.excellingCount > 0) {
+        aiSuggestions.push({
+          type: 'success', severity: 'info',
+          title: `${stats.excellingCount} học sinh xuất sắc`,
+          desc: `Điểm TB ≥85% và tương tác cao. Cân nhắc nâng độ khó hoặc thử thách thêm.`,
+          action: 'view-top',
+        });
+      }
+      if (stats.averageEngagement < 30 && stats.totalStudents > 0) {
+        aiSuggestions.push({
+          type: 'tip', severity: 'medium',
+          title: 'Mức tương tác trung bình thấp',
+          desc: `Engagement TB chỉ ${stats.averageEngagement}%. Thử bài tập tương tác, video ngắn, hoặc game học tập.`,
+          action: 'browse-labs',
+        });
+      }
+      if (stats.averageCapability >= 70) {
+        aiSuggestions.push({
+          type: 'success', severity: 'info',
+          title: `Năng lực TB lớp đạt ${stats.averageCapability}%`,
+          desc: 'Tốt hơn ngưỡng tốt nghiệp. Tiếp tục duy trì lộ trình hiện tại.',
+        });
+      }
+
+      return res.json({
+        students,
+        stats,
+        classes: classes.map(c => ({ id: c.id, name: c.name, studentCount: c.student_count })),
+        emotionCounts,
+        topPerformers,
+        needAttention,
+        aiSuggestions,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error('[teacher:dashboard:full]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+})();
 
 // /api/teacher/roster — merge ClassStudent (PII-safe, no maDinhDanh) + TSL-approved
 // Shape: { students: RosterStudent[] } — match FE LearningPathBuilder
@@ -9335,7 +9759,7 @@ app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 })();
 
 // Teacher service (port 8106)
-app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
+// REMOVED stub /api/teacher/students — real handler ở line ~1347 (đầy đủ metrics)
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
 // (real /api/teacher/roster handler ở line ~1150 — không cần stub này)
 
@@ -10089,12 +10513,10 @@ app.get('/api/teacher/analytics', async (req, res) => {
     weeklyProgress: [],
   });
 });
-app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
-app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
-app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
+// REMOVED stub /api/teacher/dashboard — real handler ở line ~1321 (3 endpoints IIFE)
+// REMOVED stub /api/teacher/modules — moved to teacher-service stubs section
 // REMOVED stub /api/teacher/my-students — shadow real handler ~line 1911
-app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
-app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
+// REMOVED stub /api/teacher/student-requests + sprints — shadow real handlers ~line 1170
 
 // Student
 // Real /api/student/my-teachers — HS đã kết nối GV qua TSL (status=approved)

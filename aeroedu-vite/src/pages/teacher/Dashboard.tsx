@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
+import { api } from '@/services/api'
 import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
 import { recommendationService as rs, getRsTypeMeta } from '@/services/recommendation.service'
 import {
@@ -59,23 +60,28 @@ interface Student {
   id: string
   name: string
   email: string
+  image?: string | null
   totalXP: number
   level: number
   progress: number
-  averageScore: number
+  averageScore: number          // 0-10 scale
   lessonsCompleted: number
-  lastActive: string
+  examAttempts?: number
+  lastActive: string             // formatted "X phút trước"
+  lastActiveAt?: string | null   // ISO ts (raw, for sorting)
   emotion: 'happy' | 'neutral' | 'sad' | 'focused' | 'confused'
   atRisk: boolean
   excelling: boolean
-  engagement: number
-  streak: number
-  capability: number
-  motivation: number
+  engagement: number             // 0-100
+  streak: number                 // consecutive days
+  capability: number             // 0-100
+  motivation: number             // 0-100
+  classes?: { id: string; name: string }[]
 }
 
 interface ClassStats {
   totalStudents: number
+  classCount?: number
   averageXP: number
   averageProgress: number
   averageScore: number
@@ -83,32 +89,32 @@ interface ClassStats {
   averageCapability: number
   atRiskCount: number
   excellingCount: number
+  totalLessonsCompleted?: number
+  totalExamAttempts?: number
+  activeToday?: number
+  activeThisWeek?: number
 }
 
-/* ─── Demo data ─────────────────────────────────────────────────── */
-const DEMO_STUDENTS: Student[] = [
-  { id: 's1', name: 'Nguyễn Văn A',  email: 'nva@school.vn',  totalXP: 2480, level: 3, progress: 88, averageScore: 9.1, lessonsCompleted: 22, lastActive: '10 phút trước', emotion: 'happy',   atRisk: false, excelling: true,  engagement: 92, streak: 14, capability: 88, motivation: 91 },
-  { id: 's2', name: 'Trần Thị B',    email: 'ttb@school.vn',  totalXP: 620,  level: 1, progress: 38, averageScore: 5.8, lessonsCompleted: 7,  lastActive: '2 ngày trước', emotion: 'sad',     atRisk: true,  excelling: false, engagement: 32, streak: 0,  capability: 42, motivation: 28 },
-  { id: 's3', name: 'Lê Văn C',      email: 'lvc@school.vn',  totalXP: 1350, level: 2, progress: 62, averageScore: 7.6, lessonsCompleted: 14, lastActive: '3 giờ trước',  emotion: 'focused', atRisk: false, excelling: false, engagement: 71, streak: 5,  capability: 73, motivation: 68 },
-  { id: 's4', name: 'Phạm Thị D',    email: 'ptd@school.vn',  totalXP: 390,  level: 1, progress: 24, averageScore: 5.2, lessonsCompleted: 4,  lastActive: '4 ngày trước', emotion: 'confused',atRisk: true,  excelling: false, engagement: 22, streak: 0,  capability: 35, motivation: 20 },
-  { id: 's5', name: 'Hoàng Văn E',   email: 'hve@school.vn',  totalXP: 3120, level: 4, progress: 95, averageScore: 9.5, lessonsCompleted: 28, lastActive: '30 phút trước',emotion: 'happy',   atRisk: false, excelling: true,  engagement: 97, streak: 21, capability: 95, motivation: 96 },
-  { id: 's6', name: 'Vũ Thị F',      email: 'vtf@school.vn',  totalXP: 980,  level: 1, progress: 55, averageScore: 7.2, lessonsCompleted: 11, lastActive: '1 giờ trước',  emotion: 'neutral', atRisk: false, excelling: false, engagement: 64, streak: 3,  capability: 65, motivation: 62 },
-  { id: 's7', name: 'Đặng Văn G',    email: 'dvg@school.vn',  totalXP: 540,  level: 1, progress: 31, averageScore: 5.5, lessonsCompleted: 6,  lastActive: '3 ngày trước', emotion: 'sad',     atRisk: true,  excelling: false, engagement: 28, streak: 0,  capability: 38, motivation: 25 },
-  { id: 's8', name: 'Ngô Thị H',     email: 'nth@school.vn',  totalXP: 1780, level: 2, progress: 74, averageScore: 8.3, lessonsCompleted: 18, lastActive: '45 phút trước',emotion: 'focused', atRisk: false, excelling: false, engagement: 80, streak: 9,  capability: 79, motivation: 77 },
-]
+interface ClassInfo { id: string; name: string; studentCount: number }
+interface PerformerInfo { id: string; name: string; image: string | null; averageScore: number; level?: number }
+interface AttentionInfo { id: string; name: string; image: string | null; averageScore: number; lastActive: string; engagement: number }
+interface AiSuggestion {
+  type: 'alert' | 'warning' | 'success' | 'tip'
+  severity?: 'high' | 'medium' | 'info'
+  title: string
+  desc: string
+  action?: string
+}
 
-function buildStats(ss: Student[]): ClassStats {
-  const n = ss.length || 1
-  return {
-    totalStudents:    ss.length,
-    averageXP:        Math.round(ss.reduce((a, s) => a + s.totalXP, 0) / n),
-    averageProgress:  Math.round(ss.reduce((a, s) => a + s.progress, 0) / n),
-    averageScore:     +(ss.reduce((a, s) => a + s.averageScore, 0) / n).toFixed(1),
-    averageEngagement:Math.round(ss.reduce((a, s) => a + s.engagement, 0) / n),
-    averageCapability:Math.round(ss.reduce((a, s) => a + s.capability, 0) / n),
-    atRiskCount:      ss.filter(s => s.atRisk).length,
-    excellingCount:   ss.filter(s => s.excelling).length,
-  }
+interface DashboardFullData {
+  students: Student[]
+  stats: ClassStats
+  classes: ClassInfo[]
+  emotionCounts: Record<string, number>
+  topPerformers: PerformerInfo[]
+  needAttention: AttentionInfo[]
+  aiSuggestions: AiSuggestion[]
+  updatedAt: string
 }
 
 const EMOTION_META: Record<string, { icon: string; color: string; label: string }> = {
@@ -157,6 +163,11 @@ export default function TeacherDashboard() {
 
   const [students,     setStudents]     = useState<Student[]>([])
   const [classStats,   setClassStats]   = useState<ClassStats | null>(null)
+  const [classes,      setClasses]      = useState<ClassInfo[]>([])
+  const [topPerformers, setTopPerformers] = useState<PerformerInfo[]>([])
+  const [needAttention, setNeedAttention] = useState<AttentionInfo[]>([])
+  const [beSuggestions, setBeSuggestions] = useState<AiSuggestion[]>([])
+  const [updatedAt,    setUpdatedAt]    = useState<string>('')
   const [selectedView, setSelectedView] = useState<'overview' | 'heatmap' | 'emotions'>('overview')
   const [timeRange,    setTimeRange]    = useState<'today' | 'week' | 'month'>('week')
   const [searchQuery,  setSearchQuery]  = useState('')
@@ -164,19 +175,29 @@ export default function TeacherDashboard() {
   const [loading,      setLoading]      = useState(true)
   const [aiExpanded,   setAiExpanded]   = useState(true)
   const [refreshing,   setRefreshing]   = useState(false)
+  const [loadError,    setLoadError]    = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
+    setLoadError(null)
     try {
-      const res = await fetch('/api/teacher/students', { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        const list = data.students as Student[]
-        setStudents(list); setClassStats(buildStats(list))
-      } else throw new Error()
-    } catch {
-      setStudents(DEMO_STUDENTS); setClassStats(buildStats(DEMO_STUDENTS))
+      // FE Dashboard fetch real BE: /api/teacher/dashboard/full
+      // BE return: { students, stats, classes, emotionCounts, topPerformers,
+      //              needAttention, aiSuggestions, updatedAt }
+      const { data } = await api.get<DashboardFullData>('/teacher/dashboard/full')
+      setStudents(data.students || [])
+      setClassStats(data.stats || null)
+      setClasses(data.classes || [])
+      setTopPerformers(data.topPerformers || [])
+      setNeedAttention(data.needAttention || [])
+      setBeSuggestions(data.aiSuggestions || [])
+      setUpdatedAt(data.updatedAt || '')
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Không tải được dữ liệu lớp'
+      setLoadError(msg)
+      // KHÔNG fallback DEMO — show empty state thực tế
+      setStudents([]); setClassStats(null)
     } finally {
       setLoading(false)
     }
@@ -195,37 +216,32 @@ export default function TeacherDashboard() {
     return true
   })
 
-  /* ─── AI Co-Teacher suggestions ──────────────────────────── */
-  const aiSuggestions = [
-    ...(classStats && classStats.atRiskCount > 0 ? [{
-      type: 'alert',
-      color: D.red,
-      icon: AlertTriangle,
-      title: `${classStats.atRiskCount} học sinh cần can thiệp`,
-      desc: 'Gửi thông báo hỗ trợ hoặc lên lịch trao đổi riêng ngay hôm nay.',
-    }] : []),
-    {
-      type: 'tip',
-      color: D.cyan,
-      icon: Lightbulb,
-      title: 'Giờ học hiệu quả nhất: 8–10h sáng',
-      desc: 'Heatmap cho thấy học sinh tập trung cao nhất trong khung giờ này.',
-    },
-    {
-      type: 'action',
-      color: D.green,
-      icon: Sparkles,
-      title: `${classStats?.excellingCount ?? 0} học sinh xuất sắc`,
-      desc: 'Cân nhắc nâng độ khó bài tập để duy trì thử thách cho nhóm này.',
-    },
-    {
-      type: 'tip',
-      color: D.purple,
-      icon: Brain,
-      title: 'Điểm năng lực TB: ' + (classStats?.averageCapability ?? 0) + '%',
-      desc: 'Tốt hơn tuần trước 4%. Tiếp tục duy trì lộ trình hiện tại.',
-    },
-  ]
+  /* ─── AI Co-Teacher suggestions — từ BE thật (rule-based on real data) ──── */
+  // Map BE shape → FE display shape (icon + color)
+  const aiSuggestions = beSuggestions.length > 0
+    ? beSuggestions.map(s => {
+        const meta = s.severity === 'high' || s.type === 'alert'
+          ? { color: D.red,    icon: AlertTriangle }
+          : s.type === 'success'
+          ? { color: D.green,  icon: Sparkles }
+          : s.severity === 'medium' || s.type === 'warning'
+          ? { color: D.amber,  icon: AlertTriangle }
+          : { color: D.cyan,   icon: Lightbulb }
+        return { ...s, ...meta }
+      })
+    : [
+        // Empty fallback hint khi chưa có data — không phải mock
+        {
+          type: 'tip' as const,
+          color: D.cyan, icon: Lightbulb,
+          title: classStats?.totalStudents === 0
+            ? 'Chưa có HS nào kết nối với bạn'
+            : 'Đang phân tích dữ liệu lớp...',
+          desc: classStats?.totalStudents === 0
+            ? 'Mời HS qua /teacher/student-requests hoặc import lớp tại /teacher/classes'
+            : 'AI Co-Teacher sẽ gợi ý khi có đủ dữ liệu hoạt động.',
+        },
+      ]
 
   /* ─── Loading ─────────────────────────────────────────────── */
   if (loading) return (
@@ -287,7 +303,9 @@ export default function TeacherDashboard() {
                   }}>BETA</span>
                 </div>
                 <p style={{ fontSize: 12, color: D.muted, margin: 0 }}>
-                  Xin chào, {user?.name ?? 'Giáo viên'} · Lớp 12A1
+                  Xin chào, {user?.name ?? 'Giáo viên'}
+                  {classes.length > 0 && ` · ${classes.length} lớp · ${classStats?.totalStudents ?? 0} HS`}
+                  {classes.length === 0 && classStats && classStats.totalStudents > 0 && ` · ${classStats.totalStudents} HS đã kết nối`}
                 </p>
               </div>
             </div>
@@ -416,6 +434,53 @@ export default function TeacherDashboard() {
 
         {/* ── Left column (flex-1) ── */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Error banner */}
+          {loadError && (
+            <div style={{
+              padding: 12, borderRadius: 12,
+              background: D.redA(0.08), border: `1px solid ${D.redA(0.3)}`,
+              color: D.red, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <AlertTriangle size={16} />
+              <div style={{ flex: 1 }}>
+                <strong>Lỗi tải dữ liệu:</strong> {loadError}
+              </div>
+              <button onClick={handleRefresh} style={{
+                padding: '4px 10px', borderRadius: 6, border: `1px solid ${D.redA(0.4)}`,
+                background: 'transparent', color: D.red, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              }}>Thử lại</button>
+            </div>
+          )}
+
+          {/* Empty state — chưa có HS nào */}
+          {!loadError && classStats?.totalStudents === 0 && (
+            <div style={{
+              padding: 24, borderRadius: 14,
+              background: D.purpleA(0.05), border: `1px solid ${D.purpleA(0.2)}`,
+              textAlign: 'center',
+            }}>
+              <Users size={32} style={{ color: D.purpleL, margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: D.text, margin: '0 0 6px' }}>
+                Chưa có học sinh nào kết nối
+              </h3>
+              <p style={{ fontSize: 13, color: D.muted, margin: '0 0 16px' }}>
+                Mời HS qua link QR hoặc import danh sách lớp để bắt đầu theo dõi tiến độ.
+              </p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link to="/teacher/student-requests" style={{
+                  padding: '8px 16px', borderRadius: 8,
+                  background: D.purple, color: '#fff', fontSize: 13, fontWeight: 600,
+                  textDecoration: 'none',
+                }}>Mời HS</Link>
+                <Link to="/teacher/classes" style={{
+                  padding: '8px 16px', borderRadius: 8,
+                  background: D.white(0.06), color: D.text, fontSize: 13, fontWeight: 600,
+                  textDecoration: 'none', border: `1px solid ${D.border}`,
+                }}>Quản lý lớp</Link>
+              </div>
+            </div>
+          )}
 
           {/* Stat cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
