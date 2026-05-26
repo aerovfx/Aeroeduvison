@@ -419,18 +419,25 @@ function SetupGuide() {
               <p className="text-xs">Cần git + Node.js ≥ 18:</p>
               <div className="relative">
                 <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
-{`git clone https://github.com/aerovfx/aeroeduvision.git
-cd aeroeduvision/mcp-server
+{`git clone https://github.com/aerovfx/MCPaeroedu.git
+cd MCPaeroedu
 npm install && npm run build`}
                 </pre>
                 <CopyButton
-                  text={`git clone https://github.com/aerovfx/aeroeduvision.git\ncd aeroeduvision/mcp-server\nnpm install && npm run build`}
+                  text={`git clone https://github.com/aerovfx/MCPaeroedu.git\ncd MCPaeroedu\nnpm install && npm run build`}
                   className="absolute top-2 right-2"
                 />
               </div>
               <p className="text-xs">
                 Sau build xong, đường dẫn cấu hình:{' '}
                 <code className="font-mono bg-muted/60 px-1 rounded">[pwd]/dist/index.js</code>
+                {' · '}Repo riêng:{' '}
+                <a
+                  href="https://github.com/aerovfx/MCPaeroedu"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-300 underline"
+                >github.com/aerovfx/MCPaeroedu</a>
               </p>
             </div>
           </details>

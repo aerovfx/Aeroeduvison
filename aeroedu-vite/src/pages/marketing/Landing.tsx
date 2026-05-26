@@ -940,7 +940,21 @@ export default function Landing() {
                   <ArrowRight size={14} />
                 </Link>
                 <a
-                  href="https://github.com/aerovfx/aeroeduvision/tree/main/mcp-server"
+                  href="https://github.com/aerovfx/MCPaeroedu/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 22px', borderRadius: 99,
+                    background: '#10b981',
+                    color: '#fff', fontSize: 13, fontWeight: 700,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
+                  }}>
+                  <Download size={14} /> Tải bản đóng gói
+                </a>
+                <a
+                  href="https://github.com/aerovfx/MCPaeroedu"
                   target="_blank"
                   rel="noreferrer"
                   style={{
