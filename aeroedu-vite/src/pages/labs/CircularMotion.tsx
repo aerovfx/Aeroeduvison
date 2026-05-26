@@ -25,6 +25,7 @@ const PX_PER_M = 50
 export default function CircularMotion() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef({ theta: 0, cut: false, freeX: 0, freeY: 0, freeVx: 0, freeVy: 0 })
+  const trailRef = useRef<Array<{ x: number; y: number; alpha: number }>>([])
   const runningRef = useRef(true)
   const omegaRef = useRef(2)
   const rRef = useRef(2)
@@ -64,6 +65,7 @@ export default function CircularMotion() {
   const reset = () => {
     setCut(false)
     animRef.current = { theta: 0, cut: false, freeX: 0, freeY: 0, freeVx: 0, freeVy: 0 }
+    trailRef.current = []
   }
 
   // Animation loop
@@ -130,6 +132,38 @@ export default function CircularMotion() {
       } else {
         ox = CX + Math.cos(a.theta) * rPx
         oy = CY - Math.sin(a.theta) * rPx
+      }
+
+      // Update trail (sample every few frames)
+      if (runningRef.current) {
+        if (trailRef.current.length === 0 ||
+            Math.hypot(ox - trailRef.current[trailRef.current.length - 1].x,
+                       oy - trailRef.current[trailRef.current.length - 1].y) > 2) {
+          trailRef.current.push({ x: ox, y: oy, alpha: 1 })
+          if (trailRef.current.length > 120) trailRef.current.shift()
+        }
+        // Fade trail
+        for (const pt of trailRef.current) pt.alpha *= 0.985
+      }
+
+      // Draw trail (oldest first, with fading alpha)
+      if (trailRef.current.length > 1) {
+        ctx.lineCap = 'round'
+        for (let i = 1; i < trailRef.current.length; i++) {
+          const p0 = trailRef.current[i - 1]
+          const p1 = trailRef.current[i]
+          ctx.strokeStyle = `rgba(168,139,250,${p1.alpha * 0.6})`
+          ctx.lineWidth = 2.5
+          ctx.beginPath()
+          ctx.moveTo(p0.x, p0.y)
+          ctx.lineTo(p1.x, p1.y)
+          ctx.stroke()
+        }
+        ctx.lineCap = 'butt'
+      }
+
+      // Continue with the un-cut case (string + vectors)
+      if (!a.cut) {
 
         // String (rope)
         ctx.strokeStyle = 'rgba(255,255,255,0.4)'

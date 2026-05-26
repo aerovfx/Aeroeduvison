@@ -132,6 +132,9 @@ const CircularMotion     = lazy(() => import('@/pages/labs/CircularMotion'))
 const RotationalDynamics = lazy(() => import('@/pages/labs/RotationalDynamics'))
 const YoungDoubleSlit    = lazy(() => import('@/pages/labs/YoungDoubleSlit'))
 const CircularMotion3D   = lazy(() => import('@/pages/labs/CircularMotion3D'))
+const HarmonicMotion     = lazy(() => import('@/pages/labs/HarmonicMotion'))
+const RefractionExplorer = lazy(() => import('@/pages/labs/RefractionExplorer'))
+const DensityBuoyancy    = lazy(() => import('@/pages/labs/DensityBuoyancy'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -473,6 +476,13 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/circular-motion-3d"      element={<CircularMotion3D />} />
             <Route path="/dashboard/labtwin/circular-3d"             element={<CircularMotion3D />} />
             <Route path="/dashboard/labtwin/helix"                   element={<CircularMotion3D />} />
+            <Route path="/dashboard/labtwin/harmonic-motion"         element={<HarmonicMotion />} />
+            <Route path="/dashboard/labtwin/shm"                     element={<HarmonicMotion />} />
+            <Route path="/dashboard/labtwin/refraction"              element={<RefractionExplorer />} />
+            <Route path="/dashboard/labtwin/snell"                   element={<RefractionExplorer />} />
+            <Route path="/dashboard/labtwin/density-buoyancy"        element={<DensityBuoyancy />} />
+            <Route path="/dashboard/labtwin/archimedes"              element={<DensityBuoyancy />} />
+            <Route path="/dashboard/labtwin/floating-sinking"        element={<DensityBuoyancy />} />
             <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
             {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
             <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />

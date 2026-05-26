@@ -173,6 +173,9 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
   { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
   { name: 'Giao thoa Young',    emoji: '💡', path: '/dashboard/labtwin/young-double-slit',  desc: 'Ánh sáng đơn sắc qua 2 khe hẹp', accent: 'fuchsia',  group: 'physics' },
+  { name: 'Khúc xạ Snell',     emoji: '🔬', path: '/dashboard/labtwin/refraction',         desc: 'n₁sin(i) = n₂sin(r) · TIR',   accent: 'cyan',     group: 'physics' },
+  { name: 'SHM nâng cao',      emoji: '〰️', path: '/dashboard/labtwin/harmonic-motion',    desc: 'Phase plot · Energy · damping', accent: 'fuchsia',  group: 'physics' },
+  { name: 'Archimedes',        emoji: '🛁', path: '/dashboard/labtwin/density-buoyancy',   desc: 'Lực đẩy · 5 chất lỏng phân tầng', accent: 'cyan',  group: 'chemistry' },
 
   // ── Toán & Trực quan (3) ──
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
