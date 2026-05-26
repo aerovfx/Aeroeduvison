@@ -3,6 +3,7 @@
  * Clone từ: app/(dashboard)/(routes)/dashboard/labtwin/page.tsx
  * Dark-first Tailwind — giống hoàn toàn bố cục bản gốc
  */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FlaskConical, Star, Clock, ArrowRight, Sparkles,
@@ -240,12 +241,90 @@ async function downloadQrImage(src: string, filename: string) {
   }
 }
 
+// ─── QR helpers ──────────────────────────────────────────────────────────────
+// User: "đưa mã QR vào trong các card · Tối ưu không gian của labtwin"
+// QR thumbnail nhỏ inline trong card + click mở modal lớn để in/quét.
+
+function qrThumbnailUrl(url: string, size = 120) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${encodeURIComponent(url)}`
+}
+function qrHiResUrl(url: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(url)}`
+}
+
+interface QrModalState {
+  url: string
+  title: string
+  emoji?: string
+}
+
+function QrModal({ state, onClose, onDownload }: {
+  state: QrModalState
+  onClose: () => void
+  onDownload: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-card border-2 border-indigo-500/40 rounded-2xl p-6 max-w-md w-full shadow-[0_0_60px_rgba(99,102,241,0.3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white/70"
+        >
+          ✕
+        </button>
+        <div className="text-center">
+          {state.emoji && <div className="text-3xl mb-2">{state.emoji}</div>}
+          <h3 className="font-bold text-lg text-foreground mb-3 px-6">{state.title}</h3>
+          <div className="inline-block p-4 bg-white rounded-2xl mb-4 shadow-xl">
+            <img
+              src={qrThumbnailUrl(state.url, 280)}
+              alt={`QR ${state.title}`}
+              className="w-64 h-64 object-contain"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mb-4 px-4 leading-relaxed">
+            📱 Mở Camera điện thoại quét mã · Hoặc nhấn "Tải PNG" để in giấy dán lớp
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onDownload}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm transition-all"
+            >
+              📥 Tải PNG (1024×1024)
+            </button>
+            <a
+              href={state.url}
+              className="flex-1 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-border text-foreground/80 hover:text-foreground font-bold text-sm flex items-center justify-center transition-all"
+            >
+              Mở lab →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LabsIndexPage() {
   const totalExperiments = PYTHON_TOTAL
   const origin = siteOrigin()
   const labsCatalogUrl = `${origin}/dashboard/labtwin/labs`
+  const [qrModal, setQrModal] = useState<QrModalState | null>(null)
+  const openQrModal = (lab: { name: string; emoji: string; path: string }) => {
+    setQrModal({ url: `${origin}${lab.path}`, title: lab.name, emoji: lab.emoji })
+  }
+  const downloadCurrentQr = () => {
+    if (qrModal) downloadQrImage(qrHiResUrl(qrModal.url), `qr-${qrModal.title.toLowerCase().replace(/\s+/g, '-')}.png`)
+  }
 
   const achievements = [
     { icon: '🏆', title: 'Nhà khoa học mới',  desc: 'Hoàn thành 3 thí nghiệm đầu',     xp: 150, locked: true },
@@ -258,31 +337,32 @@ export default function LabsIndexPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* ── Header ── */}
-        <div className="mb-8">
+        <div className="mb-5">
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-4 font-medium transition-colors"
+            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-3 font-medium transition-colors text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             Quay lại Dashboard
           </Link>
 
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-4 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-2xl text-white shadow-xl hover:scale-105 transition-transform">
-              <FlaskConical className="h-12 w-12" />
+          {/* Compact header — inline stats */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="p-2.5 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-xl text-white shadow-lg hover:scale-105 transition-transform">
+              <FlaskConical className="h-7 w-7" />
             </div>
-            <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
                 🧪 LabTwin
               </h1>
-              <p className="text-white/50 mt-1 text-xl">
-                Phòng thí nghiệm ảo siêu cool! Khám phá khoa học như chơi game! 🚀
+              <p className="text-white/50 text-sm">
+                {POPULAR_LABS.length} lab phổ biến + {SIMULATIONS.length} Python labs · Quét QR mở trên điện thoại
               </p>
             </div>
           </div>
 
-          {/* ── Quick Stats ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {/* ── Quick Stats — compact 4-col ── */}
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {[
               { emoji: '🎯', value: totalExperiments, label: 'Thí nghiệm', border: 'border-purple-500/20', bg: 'bg-purple-500/10', text: 'text-purple-400', sub: 'text-purple-700/80 dark:text-purple-300/60' },
               { emoji: '✅', value: 0,                label: 'Hoàn thành', border: 'border-green-500/20',  bg: 'bg-green-500/10',  text: 'text-green-400',  sub: 'text-green-700/80 dark:text-green-300/60' },
@@ -291,11 +371,11 @@ export default function LabsIndexPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className={`${s.bg} border-2 ${s.border} rounded-2xl p-4 text-center hover:shadow-lg transition-shadow`}
+                className={`${s.bg} border ${s.border} rounded-lg p-2 text-center hover:shadow-md transition-shadow`}
               >
-                <div className="text-3xl mb-2">{s.emoji}</div>
-                <div className={`text-2xl font-bold ${s.text}`}>{s.value}</div>
-                <div className={`text-sm ${s.sub}`}>{s.label}</div>
+                <div className="text-xl mb-0.5">{s.emoji}</div>
+                <div className={`text-base font-bold ${s.text}`}>{s.value}</div>
+                <div className={`text-[10px] ${s.sub} leading-tight`}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -374,7 +454,8 @@ export default function LabsIndexPage() {
                 <h3 className="font-bold text-lg text-foreground">Phổ biến nhất</h3>
                 <span className="text-xs text-muted-foreground">— mỗi lab có UI riêng, vào thẳng</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 auto-rows-fr">
+              {/* Compact grid: 6 cols xl · QR inline corner — tối ưu không gian */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 auto-rows-fr">
                 {POPULAR_LABS.map(lab => {
                   const accentColors: Record<string, string> = {
                     rose:    'from-rose-500/15 to-pink-500/10 border-rose-300/40 dark:border-rose-500/30 hover:border-rose-500',
@@ -388,25 +469,40 @@ export default function LabsIndexPage() {
                     physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
                     electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
                   }
+                  const labUrl = `${origin}${lab.path}`
                   return (
-                    <Link
-                      key={lab.path}
-                      to={lab.path}
-                      className={`group relative rounded-2xl border-2 bg-gradient-to-br ${accentColors[lab.accent]} p-4 flex flex-col items-center text-center transition-all hover:scale-[1.04] hover:shadow-xl h-full`}
-                    >
-                      <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
-                        {groupLabel[lab.group]}
-                      </span>
-                      <div className="text-4xl md:text-5xl mb-2 group-hover:scale-125 transition-transform">
-                        {lab.emoji}
-                      </div>
-                      <h3 className="font-bold text-sm md:text-base text-foreground mb-1 leading-tight">
-                        {lab.name}
-                      </h3>
-                      <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2 mt-auto pt-2">
-                        {lab.desc}
-                      </p>
-                    </Link>
+                    <div key={lab.path} className="relative h-full">
+                      <Link
+                        to={lab.path}
+                        className={`group block relative rounded-xl border bg-gradient-to-br ${accentColors[lab.accent]} p-2.5 flex flex-col items-center text-center transition-all hover:scale-[1.03] hover:shadow-xl h-full`}
+                      >
+                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
+                          {groupLabel[lab.group]}
+                        </span>
+                        <div className="text-3xl md:text-4xl mb-1.5 mt-1 group-hover:scale-125 transition-transform">
+                          {lab.emoji}
+                        </div>
+                        <h3 className="font-bold text-xs md:text-sm text-foreground mb-1 leading-tight line-clamp-1">
+                          {lab.name}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-auto leading-snug">
+                          {lab.desc}
+                        </p>
+                      </Link>
+                      {/* QR thumbnail — bấm để mở modal lớn */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openQrModal(lab) }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-white rounded-md shadow-md hover:scale-110 transition-transform z-10"
+                        title="Quét QR để mở trên điện thoại"
+                      >
+                        <img
+                          src={qrThumbnailUrl(labUrl, 80)}
+                          alt={`QR ${lab.name}`}
+                          className="w-7 h-7 object-contain"
+                          loading="lazy"
+                        />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -453,15 +549,33 @@ export default function LabsIndexPage() {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                           {labs.map(lab => {
                             const href = lab.internal_link ?? `/dashboard/labtwin/${lab.id}`
+                            const labUrl = `${origin}${href}`
                             const diffColor = lab.difficulty === 'Dễ' ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
                                             : lab.difficulty === 'Trung bình' ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15 border-amber-500/30'
                                             : 'text-rose-700 dark:text-rose-300 bg-rose-500/15 border-rose-500/30'
                             return (
-                              <Link key={lab.id} to={href}
-                                className="rounded-xl bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/40 border border-border/60 hover:border-foreground/30 p-3 transition-all hover:scale-[1.02] group flex flex-col">
+                              <div key={lab.id} className="relative">
+                                {/* QR thumbnail — top-right corner */}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault(); e.stopPropagation()
+                                    openQrModal({ name: lab.name, emoji: '🐍', path: href })
+                                  }}
+                                  className="absolute top-1.5 right-1.5 p-0.5 bg-white rounded shadow-md hover:scale-110 transition-transform z-10"
+                                  title="QR cho thí nghiệm này"
+                                >
+                                  <img
+                                    src={qrThumbnailUrl(labUrl, 60)}
+                                    alt="QR"
+                                    className="w-5 h-5 object-contain"
+                                    loading="lazy"
+                                  />
+                                </button>
+                              <Link to={href}
+                                className="rounded-lg bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/40 border border-border/60 hover:border-foreground/30 p-2.5 pr-8 transition-all hover:scale-[1.02] group flex flex-col">
                                 <div className="flex items-start justify-between gap-2 mb-1.5">
                                   <h5 className="font-bold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-purple-600 dark:group-hover:text-yellow-300">
                                     {lab.name}
@@ -483,6 +597,7 @@ export default function LabsIndexPage() {
                                   </span>
                                 </div>
                               </Link>
+                              </div>
                             )
                           })}
                         </div>
@@ -804,103 +919,47 @@ export default function LabsIndexPage() {
             </div>
           </div>
 
-          {/* ── Mã QR cho từng thí nghiệm — tiện in ra dán lớp học ── */}
-          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-[hsl(240,50%,9%)] via-[hsl(260,45%,10%)] to-[hsl(225,45%,10%)] overflow-hidden relative">
-            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.05] select-none pointer-events-none leading-none">📱</div>
+          {/* ── QR section đã được INLINE vào mỗi card (xem nút QR góc trên-phải)
+              User: "đưa mã QR vào trong các card · Tối ưu không gian"
+              → Section riêng đã bỏ để tránh trùng lặp · Click QR thumbnail
+                trong card mở modal lớn để in / tải PNG. */}
 
-            <div className="relative z-10 px-6 pt-6 pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-indigo-100 flex items-center gap-2">
-                    <QrCode className="h-7 w-7 text-indigo-300" />
-                    Mã QR cho từng thí nghiệm
-                  </h2>
-                  <p className="text-base mt-1.5 text-indigo-300/70">
-                    Dành cho giáo viên — nhấn "Tải PNG" rồi in ra dán lớp, học sinh quét là vào thẳng đúng thí nghiệm.
-                  </p>
-                </div>
-                <Link
-                  to="/dashboard/labtwin"
-                  className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all text-sm"
-                >
-                  Xem tất cả labs
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
-                {POPULAR_LABS.map((lab) => {
-                  const url = `${origin}${lab.path}`
-                  const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(url)}`
-                  const qrHires = `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(url)}`
-                  return (
-                    <div
-                      key={lab.path}
-                      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] transition-all p-4 flex flex-col items-center text-center h-full"
-                    >
-                      <div className="p-2 bg-white rounded-xl mb-3 shadow-[0_0_24px_rgba(99,102,241,0.18)]">
-                        <img src={qrImg} alt={`QR ${lab.name}`} className="w-28 h-28 object-contain" loading="lazy" />
-                      </div>
-                      <div className="text-2xl mb-1">{lab.emoji}</div>
-                      <h4 className="text-sm font-bold text-white/90 mb-0.5 line-clamp-1">{lab.name}</h4>
-                      <p className="text-[11px] text-white/45 leading-snug mb-3 line-clamp-2 min-h-[28px] flex-1">
-                        {lab.desc}
-                      </p>
-                      <div className="flex items-center gap-1.5 w-full mt-auto">
-                        <Link
-                          to={lab.path}
-                          className="flex-1 text-center text-[11px] font-semibold px-2 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-400/30 text-indigo-200 hover:bg-indigo-500/25 transition-all"
-                        >
-                          Mở
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => downloadQrImage(qrHires, `qr-${lab.path.split('/').pop()}.png`)}
-                          className="text-[11px] font-medium px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white/70 hover:bg-white/[0.1] transition-all"
-                          title="Tải QR độ phân giải cao"
-                        >
-                          Tải PNG
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="mt-5 p-3 bg-indigo-500/5 border border-indigo-500/15 rounded-xl flex items-start gap-3">
-                <div className="text-2xl shrink-0">💡</div>
-                <p className="text-xs text-indigo-200/70 leading-relaxed">
-                  <span className="font-semibold text-indigo-100">Mẹo:</span> Tải PNG rồi in khổ A5 dán vào bàn thí nghiệm /
-                  bảng lớp. Học sinh quét bằng app Camera (iOS) hoặc Google Lens (Android) để vào thẳng thí nghiệm mà
-                  không cần đăng nhập. URL được sinh tự động theo domain hiện tại của trang — phù hợp cả staging lẫn production.
-                </p>
-              </div>
-            </div>
+          {/* QR usage tip — compact strip */}
+          <div className="mb-6 p-3 bg-indigo-500/5 border border-indigo-500/15 rounded-xl flex items-start gap-3">
+            <QrCode className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
+            <p className="text-xs text-indigo-200/80 leading-relaxed">
+              <span className="font-semibold text-indigo-100">QR trên mỗi card</span>:
+              Click vào thumbnail QR góc trên-phải để mở modal lớn → "Tải PNG" in khổ A5
+              dán bàn thí nghiệm. HS quét bằng Camera (iOS) hoặc Google Lens (Android) → vào thẳng lab.
+            </p>
           </div>
 
-          {/* ── CTA Banner ── */}
+          {/* ── CTA Banner — compact ── */}
           <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="p-8 text-center">
-              <div className="text-6xl mb-4">🎓✨</div>
-              <h2 className="text-3xl font-bold mb-3">Sẵn sàng khám phá khoa học?</h2>
-              <p className="text-xl mb-6 text-white/90">
-                Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! Mỗi thí nghiệm là một cuộc phiêu lưu mới! 🚀
+            <div className="p-5 md:p-6 text-center">
+              <div className="text-4xl mb-2">🎓✨</div>
+              <h2 className="text-xl md:text-2xl font-bold mb-2">Sẵn sàng khám phá khoa học?</h2>
+              <p className="text-base mb-4 text-white/90">
+                Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! 🚀
               </p>
               <Link
                 to="/dashboard/labtwin"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-white text-purple-600 hover:bg-gray-100 font-bold text-lg rounded-xl shadow-xl transition-all hover:scale-105"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-purple-600 hover:bg-gray-100 font-bold text-sm rounded-xl shadow-xl transition-all hover:scale-105"
               >
-                <FlaskConical className="h-6 w-6" />
+                <FlaskConical className="h-4 w-4" />
                 Khám phá ngay!
-                <ArrowRight className="h-6 w-6" />
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* QR modal — hiển thị khi click QR thumbnail trong card */}
+      {qrModal && (
+        <QrModal state={qrModal} onClose={() => setQrModal(null)} onDownload={downloadCurrentQr} />
+      )}
     </div>
   )
 }
