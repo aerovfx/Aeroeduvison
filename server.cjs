@@ -30,6 +30,7 @@
 'use strict';
 
 const express = require('express');
+const http = require('http');
 const path = require('path');
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 
@@ -91,6 +92,16 @@ app.use((_req, res, next) => {
 // các route đặc biệt (quiz-extract). express.json() chấp nhận limit duy nhất
 // nên ta dùng giới hạn lớn cho mọi request — tin tưởng vì backend đứng sau auth.
 app.use(express.json({ limit: '50mb' }));
+
+// ══════════════════════════════════════════════════════════════
+// REALTIME BROKER (Redis Pub/Sub + WebSocket) — /api/broker
+// - WebSocket  /api/broker?token=<JWT>          (client realtime)
+// - GET  /api/broker/health                     (status check)
+// - POST /api/broker/publish                    (server-side publish)
+// Code: lib/broker.cjs
+// ══════════════════════════════════════════════════════════════
+const broker = require('./lib/broker.cjs');
+app.use('/api/broker', broker.expressRouter());
 
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN NODE.JS AUTH — active when AUTH_SERVICE_URL is not set
@@ -11977,7 +11988,19 @@ app.use((_req, res) => {
 });
 
 // ── Start ───────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
+// Switched từ app.listen → http.createServer để có thể attach
+// WebSocket upgrade handler cho realtime broker (/api/broker).
+const httpServer = http.createServer(app);
+
+// Attach realtime broker (Redis Pub/Sub + WebSocket)
+try {
+  broker.attachToHttpServer(httpServer, { path: '/api/broker' });
+  console.log(`[server] 🔔 Broker WS    → ws(s)://<host>/api/broker?token=<JWT>`);
+} catch (e) {
+  console.warn('[server] ⚠ Broker attach failed:', e.message);
+}
+
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`[server] ✅ AeroEduVision listening on 0.0.0.0:${PORT}`);
   console.log(`[server] 📡 API proxy     → ${BACKEND_URL}`);
   if (!USE_NODEJS_AUTH) {
