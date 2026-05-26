@@ -42,34 +42,51 @@ function draw(
   const fKinetic = params.muKinetic * N
   const isMoving = state.phase === 'kinetic'
 
-  // ── Surface ──
+  // ── Coordinate system ──
+  // Pivot = lower-left corner của slope, slope nghiêng lên góc `angle` về bên phải
+  // ctx.rotate(-angle) trong canvas (Y-down) = slope rising up-to-right
+  // Slope dir trong WORLD: (cos(angle), -sin(angle))    — along surface
+  // Normal lên (vào không khí): (-sin(angle), -cos(angle))
+  const pivotX = W * 0.08
+  const pivotY = floorY
+  const slopeLength = W * 0.82  // local length cũ — vẫn dùng cho drawing slope
+  const cosA = Math.cos(angle)
+  const sinA = Math.sin(angle)
+
+  // ── Surface (vẽ slope) ──
   ctx.save()
-  ctx.translate(W * 0.08, floorY)
+  ctx.translate(pivotX, pivotY)
   ctx.rotate(-angle)
   ctx.fillStyle = '#1f2937'
-  ctx.fillRect(0, 0, W * 0.82, 12)
+  ctx.fillRect(0, 0, slopeLength, 12)
   ctx.fillStyle = '#374151'
-  ctx.fillRect(0, 12, W * 0.82, 6)
-  // grip texture
+  ctx.fillRect(0, 12, slopeLength, 6)
   ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1
   for (let i = 0; i < 25; i++) {
     ctx.beginPath()
-    ctx.moveTo(i * (W * 0.82 / 25), 0)
-    ctx.lineTo(i * (W * 0.82 / 25) + 8, 12)
+    ctx.moveTo(i * (slopeLength / 25), 0)
+    ctx.lineTo(i * (slopeLength / 25) + 8, 12)
     ctx.stroke()
   }
   ctx.restore()
 
-  // ── Block ──
-  const blockW = 52; const blockH = 44
-  const blockBaseX = W * 0.08 + state.x * 80
-  const blockX = blockBaseX + (floorY - blockH) * Math.tan(angle) * 0.5
-  const blockY = floorY - blockH - 2
+  // ── Block — FIX: tính vị trí theo slope direction ──
+  // FIX bug cũ: blockX chỉ shift horizontal + tan(angle) ad-hoc → block lệch
+  // khỏi slope khi angle > 0. Giờ tính đúng:
+  //   center = pivot + d × slope_dir + (blockH/2 + 2) × normal_up
+  const blockW = 52
+  const blockH = 44
+  const distAlongSlope = state.x * 80  // px từ pivot
+  const liftAboveSurface = blockH / 2 + 2  // block center cao hơn surface
+
+  // World position của block center:
+  const blockCenterX = pivotX + distAlongSlope * cosA - liftAboveSurface * sinA
+  const blockCenterY = pivotY - distAlongSlope * sinA - liftAboveSurface * cosA
 
   ctx.save()
-  ctx.translate(blockX + blockW / 2, blockY + blockH / 2)
+  ctx.translate(blockCenterX, blockCenterY)
   ctx.rotate(-angle)
-  // Block body
+  // Block body — luôn rotate cùng với slope nên block ngồi đúng trên mặt
   const grd = ctx.createLinearGradient(-blockW / 2, -blockH / 2, blockW / 2, blockH / 2)
   grd.addColorStop(0, isMoving ? '#7c3aed' : '#1d4ed8')
   grd.addColorStop(1, isMoving ? '#4c1d95' : '#1e3a8a')
@@ -80,9 +97,9 @@ function draw(
   ctx.fillText(`${params.mass}kg`, 0, 5)
   ctx.restore()
 
-  // ── Force arrows (in rotated frame) ──
+  // ── Force arrows (in rotated frame around block center) ──
   ctx.save()
-  ctx.translate(blockX + blockW / 2, blockY + blockH / 2)
+  ctx.translate(blockCenterX, blockCenterY)
   ctx.rotate(-angle)
   const arrowScale = 0.7
 
