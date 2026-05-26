@@ -9,12 +9,15 @@
  *   - COMPLETED khi nhấn "Đánh dấu hoàn thành"
  */
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Edit,
+  PlayCircle,
+  Upload,
   CheckCircle2,
   Circle,
   Play,
@@ -456,6 +459,11 @@ function FeedbackTab({ courseId }: { courseId: string }) {
 // ── Main Page ────────────────────────────────────────────────
 export default function CoursePlayer() {
   const { slug, courseId } = useParams<{ slug: string; courseId: string }>()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
+  // Preview mode: GV xem khoá học của mình ở chế độ HS (?preview=teacher)
+  // User: "giáo viên có thể xem bài giảng mình soạn như học sinh"
+  const isPreviewMode = searchParams.get('preview') === 'teacher' && user?.role === 'TEACHER'
   const [currentVideo, setCurrentVideo] = useState<CourseVideo | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   // Mobile mặc định ĐÓNG sidebar (w-80 = 320px nuốt hết video player trên màn nhỏ).
@@ -594,8 +602,10 @@ export default function CoursePlayer() {
   const logEvent = learningService.logEvent
 
   // Emit OPENED / RESUMED each time a video becomes current
+  // Preview mode (GV xem khoá của mình) → SKIP để không bẩn LessonHistory
   useEffect(() => {
     if (!currentVideo || !courseId) return
+    if (isPreviewMode) return  // GV preview — không ghi lịch sử
     const seen = openedSetRef.current.has(currentVideo.id)
     openedSetRef.current.add(currentVideo.id)
     logEvent({
@@ -612,12 +622,16 @@ export default function CoursePlayer() {
       qc.invalidateQueries({ queryKey: ['my-courses-activity'] })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentVideo?.id, courseId])
+  }, [currentVideo?.id, courseId, isPreviewMode])
 
   const markComplete = useMutation({
-    mutationFn: (videoId: string) =>
-      learningService.markVideoComplete(courseId!, videoId, true),
+    mutationFn: (videoId: string) => {
+      // Preview mode → no-op để banner promise đúng
+      if (isPreviewMode) return Promise.resolve({ ok: true, preview: true })
+      return learningService.markVideoComplete(courseId!, videoId, true)
+    },
     onSuccess: async (_data, videoId) => {
+      if (isPreviewMode) return  // không log
       const v = videos.find((x) => x.id === videoId)
       if (courseId) {
         await logEvent({
@@ -662,13 +676,53 @@ export default function CoursePlayer() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background protected-content">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background protected-content flex-col">
+      {/* ── Teacher Preview Banner ──────────────────────────────
+          User: "giáo viên có thể xem bài giảng mình soạn như học sinh,
+          ngoài ra họ còn có thể biên tập" → banner emerald nhắc GV đang
+          ở chế độ preview + 2 nút quay lại sửa */}
+      {isPreviewMode && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-emerald-500/15 via-cyan-500/15 to-purple-500/15 border-b border-emerald-500/30 flex-shrink-0">
+          <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 text-sm font-bold">
+            <PlayCircle className="w-4 h-4" />
+            <span>👁 Chế độ xem như học sinh</span>
+          </div>
+          <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80 hidden md:inline">
+            Tiến độ + lịch sử KHÔNG được ghi · Tất cả tương tác giống HS thật
+          </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <Link
+              to={`/teacher/course/${courseId}/edit`}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+              title="Quay lại biên tập khoá học"
+            >
+              <Edit className="w-3.5 h-3.5" />Biên tập
+            </Link>
+            <Link
+              to={`/teacher/course/${courseId}/edit?step=2`}
+              className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+              title="Mở Bài giảng & Video để upload thêm"
+            >
+              <Upload className="w-3.5 h-3.5" />Video
+            </Link>
+            <Link
+              to="/teacher/my-courses"
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition border border-emerald-500/30"
+              title="Quay lại danh sách khoá học của tôi"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />My Courses
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Top nav — Udemy style với progress badge */}
         <div className="flex items-center gap-3 px-4 py-3 border-b bg-card/50 flex-shrink-0">
           <Link
-            to="/student/my-courses"
+            to={isPreviewMode ? '/teacher/my-courses' : '/student/my-courses'}
             className="text-muted-foreground hover:text-foreground transition-colors p-2 -m-2 rounded-lg hover:bg-accent
                        min-w-[44px] min-h-[44px] flex items-center justify-center"
             style={{ touchAction: 'manipulation' }}
@@ -1016,6 +1070,7 @@ export default function CoursePlayer() {
           </aside>
         </>
       )}
+      </div>
     </div>
   )
 }
