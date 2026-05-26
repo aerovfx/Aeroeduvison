@@ -60,6 +60,7 @@ const studentSections: RouteSection[] = [
       { icon: Map,          labelKey: 'routeLearningPath',  href: '/learning-paths' },
       { icon: FileText,     labelKey: 'routeExamPrep',      href: '/student/exam-prep' },
       { icon: Sparkles,     labelKey: 'routeSelfStudy',     href: '/student/self-study',   badge: 'Mới' },
+      { icon: Zap,          labelKey: 'routeStemProjects',  href: '/student/stem-projects', badge: 'STEM' },
       { icon: Radio,        labelKey: 'routeExamRooms',     href: '/student/exams',        badge: 'Live' },
       { icon: GraduationCap,labelKey: 'routeCareer',        href: '/student/career' },
       { icon: Gamepad2,     labelKey: 'routePixelGames',    href: '/student/games',        badge: 'Game' },

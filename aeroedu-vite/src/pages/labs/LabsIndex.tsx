@@ -283,6 +283,64 @@ export default function LabsIndexPage() {
             ))}
           </div>
 
+          {/* ── 🚀 TẤT CẢ THÍ NGHIỆM — flat grid, không cần drill category ──
+              User: "tất cả đưa ra ngoài route labtwin"
+              Hiển thị thẳng 15 lab popular ngay trên /dashboard/labtwin
+              để HS không phải bấm vào category mới thấy lab. */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
+                  <Sparkles className="h-7 w-7 text-purple-500" />
+                  Tất cả thí nghiệm
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Bấm vào để vào thẳng — không cần drill qua category
+                </p>
+              </div>
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
+                {POPULAR_LABS.length} labs
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 auto-rows-fr">
+              {POPULAR_LABS.map(lab => {
+                const accentColors: Record<string, string> = {
+                  rose:    'from-rose-500/15 to-pink-500/10 border-rose-300/40 dark:border-rose-500/30 hover:border-rose-500',
+                  indigo:  'from-indigo-500/15 to-blue-500/10 border-indigo-300/40 dark:border-indigo-500/30 hover:border-indigo-500',
+                  emerald: 'from-emerald-500/15 to-teal-500/10 border-emerald-300/40 dark:border-emerald-500/30 hover:border-emerald-500',
+                  cyan:    'from-cyan-500/15 to-sky-500/10 border-cyan-300/40 dark:border-cyan-500/30 hover:border-cyan-500',
+                  amber:   'from-amber-500/15 to-orange-500/10 border-amber-300/40 dark:border-amber-500/30 hover:border-amber-500',
+                  fuchsia: 'from-fuchsia-500/15 to-purple-500/10 border-fuchsia-300/40 dark:border-fuchsia-500/30 hover:border-fuchsia-500',
+                }
+                const groupLabel: Record<string, string> = {
+                  physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
+                  electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
+                }
+                return (
+                  <Link
+                    key={lab.path}
+                    to={lab.path}
+                    className={`group relative rounded-2xl border-2 bg-gradient-to-br ${accentColors[lab.accent]} p-4 flex flex-col items-center text-center transition-all hover:scale-[1.04] hover:shadow-xl h-full`}
+                  >
+                    <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
+                      {groupLabel[lab.group]}
+                    </span>
+                    <div className="text-4xl md:text-5xl mb-2 group-hover:scale-125 transition-transform">
+                      {lab.emoji}
+                    </div>
+                    <h3 className="font-bold text-sm md:text-base text-foreground mb-1 leading-tight">
+                      {lab.name}
+                    </h3>
+                    <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2 mt-auto pt-2">
+                      {lab.desc}
+                    </p>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
           {/* ── QR truy cập nhanh — học sinh quét là vào thẳng LabTwin ── */}
           <div className="mb-8">
             <QuickScanQr
