@@ -82,6 +82,50 @@ const statusLabel = (s: string) =>
 // ── Time-phase helpers (past / ongoing / upcoming) ─────────────
 type TimePhase = 'upcoming' | 'ongoing' | 'past' | 'unscheduled'
 
+// User: "bố trí các đề thi theo các phòng là các khối lớp và phòng thi
+// Tốt nghiệp, Học sinh giỏi" — phân loại room theo mục đích thi.
+type RoomCategory = 'tn' | 'hsg' | 'olympic' | 'midterm' | 'final' | 'practice' | 'other'
+
+const CATEGORY_META: Record<RoomCategory, { label: string; emoji: string; color: string; bg: string; border: string }> = {
+  tn:       { label: 'Tốt nghiệp THPT',  emoji: '🎓', color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
+  hsg:      { label: 'Học sinh giỏi',    emoji: '🏆', color: '#a78bfa', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.35)' },
+  olympic:  { label: 'Olympic / Trại hè', emoji: '⭐', color: '#f472b6', bg: 'rgba(236,72,153,0.12)', border: 'rgba(236,72,153,0.35)' },
+  midterm:  { label: 'Giữa kỳ',          emoji: '📝', color: '#60a5fa', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)' },
+  final:    { label: 'Cuối kỳ',          emoji: '📋', color: '#34d399', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
+  practice: { label: 'Luyện tập',        emoji: '🎯', color: '#22d3ee', bg: 'rgba(6,182,212,0.12)', border: 'rgba(6,182,212,0.35)' },
+  other:    { label: 'Khác',             emoji: '📚', color: '#94a3b8', bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.35)' },
+}
+
+// Detect category từ room name + ExamMatrix.examType (regex Vietnamese-aware)
+function detectRoomCategory(room: ExamRoom): RoomCategory {
+  const text = `${room.name || ''} ${room.description || ''} ${room.ExamMatrix?.name || ''} ${room.ExamMatrix?.examType || ''}`.toLowerCase()
+  // Order matters — most specific first
+  if (/(tốt nghiệp|thpt qg|thptqg|tnthpt|tn thpt|tuyển sinh đại học)/i.test(text)) return 'tn'
+  if (/(học sinh giỏi|hsg|giỏi quốc gia|giỏi cấp tỉnh|giỏi cấp thành|giỏi cấp huyện)/i.test(text)) return 'hsg'
+  if (/(olympic|trại hè|trại đông|đề chọn đội tuyển)/i.test(text)) return 'olympic'
+  if (/(giữa kỳ|giữa kì|giua ky|giữa học kỳ|đề giữa|midterm)/i.test(text)) return 'midterm'
+  if (/(cuối kỳ|cuối kì|cuoi ky|cuối học kỳ|đề cuối|final|hết môn)/i.test(text)) return 'final'
+  if (/(luyện tập|luyen tap|kiểm tra 15 phút|đề ôn|on tap|practice|review)/i.test(text)) return 'practice'
+  return 'other'
+}
+
+// Detect grade — vd "Lớp 11", "Khối 12", "K10", "11A1" → "10"/"11"/"12"
+function detectRoomGrade(room: ExamRoom): string | null {
+  const matrixGrade = room.ExamMatrix?.grade
+  if (matrixGrade) {
+    const m = String(matrixGrade).match(/(\d{1,2})/)
+    if (m) return m[1]
+  }
+  const text = `${room.name || ''} ${room.description || ''}`
+  // Match patterns: "Lớp 11", "Khối 11", "K11", "lớp 11A1"
+  const m = text.match(/(?:lớp|khối|k)\s*(\d{1,2})/i)
+  if (m) return m[1]
+  // Match bare 10/11/12 (chỉ khi đứng riêng)
+  const m2 = text.match(/\b(10|11|12)\b/)
+  if (m2) return m2[1]
+  return null
+}
+
 function getTimePhase(startISO?: string, endISO?: string, now: number = Date.now()): TimePhase {
   if (!startISO || !endISO) return 'unscheduled'
   const start = new Date(startISO).getTime()
@@ -167,6 +211,10 @@ export default function OnlineExamRoomPage() {
   // Filter theo THỜI GIAN (tính từ startTime/endTime so với now):
   //   'all' | 'upcoming' (sẽ thi) | 'ongoing' (đang thi) | 'past' (đã thi)
   const [phaseFilter, setPhaseFilter] = useState<'all' | TimePhase>('all')
+  // User: "bố trí các đề thi theo các phòng là các khối lớp và phòng thi
+  // Tốt nghiệp, Học sinh giỏi" → tab category + chip grade
+  const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'all'>('all')
+  const [gradeFilter, setGradeFilter] = useState<string | 'all'>('all')
   // Tick mỗi 30s để countdown trên UI tự cập nhật mà không cần reload
   const [nowTick, setNowTick] = useState(Date.now())
 
@@ -482,6 +530,8 @@ export default function OnlineExamRoomPage() {
     .filter(r => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false
       if (phaseFilter !== "all" && getTimePhase(r.startTime, r.endTime, nowTick) !== phaseFilter) return false
+      if (categoryFilter !== "all" && detectRoomCategory(r) !== categoryFilter) return false
+      if (gradeFilter !== "all" && detectRoomGrade(r) !== gradeFilter) return false
       if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
       return true
     })
@@ -795,6 +845,99 @@ export default function OnlineExamRoomPage() {
           {/* Left col */}
           <div className="col-span-12 lg:col-span-8 space-y-4">
 
+            {/* ── Category tabs (Tốt nghiệp / HSG / Olympic / Giữa kỳ / ...) ── */}
+            <div className="rounded-xl p-2" style={{ background: D.card2, border: `1px solid ${D.border}` }}>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: D.muted }}>
+                  📂 Loại phòng:
+                </span>
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className="text-[11px] px-2.5 py-1 rounded-full font-bold transition-all"
+                  style={{
+                    background: categoryFilter === 'all' ? D.purple : 'transparent',
+                    color: categoryFilter === 'all' ? '#fff' : D.muted,
+                    border: `1px solid ${categoryFilter === 'all' ? D.purple : D.border}`,
+                  }}
+                >
+                  Tất cả ({rooms.length})
+                </button>
+                {(['tn', 'hsg', 'olympic', 'midterm', 'final', 'practice', 'other'] as RoomCategory[]).map(cat => {
+                  const meta = CATEGORY_META[cat]
+                  const count = rooms.filter(r => detectRoomCategory(r) === cat).length
+                  if (count === 0 && categoryFilter !== cat) return null
+                  const sel = categoryFilter === cat
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(sel ? 'all' : cat)}
+                      className="text-[11px] px-2.5 py-1 rounded-full font-bold transition-all flex items-center gap-1"
+                      style={{
+                        background: sel ? meta.bg : 'transparent',
+                        color: sel ? meta.color : D.muted,
+                        border: `1px solid ${sel ? meta.border : D.border}`,
+                      }}
+                    >
+                      <span>{meta.emoji}</span>
+                      {meta.label}
+                      {count > 0 && (
+                        <span className="ml-0.5 px-1 rounded text-[9px] font-bold"
+                          style={{ background: sel ? meta.color + '22' : 'rgba(255,255,255,0.05)' }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Grade chips */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: D.muted }}>
+                  🎒 Khối lớp:
+                </span>
+                <button
+                  onClick={() => setGradeFilter('all')}
+                  className="text-[11px] px-2 py-0.5 rounded-md font-bold"
+                  style={{
+                    background: gradeFilter === 'all' ? D.purple : 'transparent',
+                    color: gradeFilter === 'all' ? '#fff' : D.muted,
+                    border: `1px solid ${gradeFilter === 'all' ? D.purple : D.border}`,
+                  }}
+                >
+                  Tất cả
+                </button>
+                {['6','7','8','9','10','11','12'].map(g => {
+                  const count = rooms.filter(r => detectRoomGrade(r) === g).length
+                  if (count === 0) return null
+                  const sel = gradeFilter === g
+                  return (
+                    <button
+                      key={g}
+                      onClick={() => setGradeFilter(sel ? 'all' : g)}
+                      className="text-[11px] px-2 py-0.5 rounded-md font-bold transition-all"
+                      style={{
+                        background: sel ? 'rgba(124,58,237,0.2)' : 'transparent',
+                        color: sel ? '#c4b5fd' : D.muted,
+                        border: `1px solid ${sel ? D.purple : D.border}`,
+                      }}
+                    >
+                      K{g} <span className="text-[9px] opacity-60">({count})</span>
+                    </button>
+                  )
+                })}
+                {(categoryFilter !== 'all' || gradeFilter !== 'all') && (
+                  <button
+                    onClick={() => { setCategoryFilter('all'); setGradeFilter('all') }}
+                    className="text-[10px] px-2 py-0.5 ml-auto"
+                    style={{ color: D.muted2 }}
+                  >
+                    ✕ Bỏ filter
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* ── Time-phase tabs (Sắp diễn ra / Đang diễn ra / Đã thi) ── */}
             <div className="flex items-center gap-1 flex-wrap rounded-xl p-1"
               style={{ background: D.card2, border: `1px solid ${D.border}` }}>
@@ -940,6 +1083,27 @@ export default function OnlineExamRoomPage() {
                             : <Lock className="w-3.5 h-3.5 shrink-0" style={{ color: '#a78bfa' }} />
                           }
                           <h3 className="font-semibold truncate" style={{ color: D.text }}>{room.name}</h3>
+                          {/* Category + Grade badge — phân loại phòng thi */}
+                          {(() => {
+                            const cat = detectRoomCategory(room)
+                            const grade = detectRoomGrade(room)
+                            const meta = CATEGORY_META[cat]
+                            return (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                  style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                                  <span>{meta.emoji}</span>
+                                  {meta.label}
+                                </span>
+                                {grade && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                    style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.3)' }}>
+                                    K{grade}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          })()}
                           <StatusBadge status={room.status} />
                           {/* Time-phase badge với countdown */}
                           {phase !== 'unscheduled' && (
