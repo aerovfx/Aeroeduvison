@@ -200,6 +200,7 @@ const StudentAiTutorPage              = lazy(() => import('@/pages/student/AiTut
 const StudentCareerPage               = lazy(() => import('@/pages/student/Career'))
 const StudentExamPrepPage             = lazy(() => import('@/pages/student/ExamPrep'))
 const StudentExamsPage                = lazy(() => import('@/pages/student/Exams'))
+const StudentSelfStudyPage            = lazy(() => import('@/pages/student/SelfStudy'))
 const ForYouPage                      = lazy(() => import('@/pages/student/ForYou'))
 const StudentDailyPage                = lazy(() => import('@/pages/student/Daily'))
 const CareerGamesPage                 = lazy(() => import('@/pages/student/CareerGames'))
@@ -492,6 +493,7 @@ export function AppRouter() {
               <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
               <Route path="/student/exam/:examId"             element={<ExamModesPage />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
+              <Route path="/student/self-study"               element={<StudentSelfStudyPage />} />
               <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/daily"                    element={<StudentDailyPage />} />
               <Route path="/student/games"                    element={<CareerGamesPage />} />

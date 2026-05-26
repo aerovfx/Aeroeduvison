@@ -2746,6 +2746,294 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   }, 60_000);
 })();
 
+// ════════════════════════════════════════════════════════════════════
+// SELF-STUDY HUB — Tự ôn luyện cho HS với Flashcard / Quiz / Challenge
+// User: "áp dụng hình thức tự ôn luyện đề của học sinh với flashcard,
+//        quiz, thử thách"
+//
+// 3 chế độ tự ôn từ Ngân hàng câu hỏi:
+//   - flashcard: lật thẻ, có đáp án + giải thích, SRS rating ở FE
+//   - quiz:      10 MCQ random, instant feedback từng câu
+//   - challenge: 15 MCQ có timer + score + leaderboard tuần
+//
+// Pool 5x count → FE shuffle thêm để tránh trùng giữa các session
+// Filter:
+//   subject + grade match (Vietnamese-aware, "Vật lí"/"Vật lý"/Lớp/K)
+//   type = MCQ
+//   options >= 2 + content NOT NULL
+// ════════════════════════════════════════════════════════════════════
+;(() => {
+  function _ssAuth(req) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return null;
+    try { return _akVerify(auth.slice(7)); } catch { return null; }
+  }
+
+  function _ssNormalize(subject, grade) {
+    const sm = (subject || '').toLowerCase();
+    const subjects = /vật l[íý]|physics/.test(sm) ? ['vật lí', 'vật lý', 'physics']
+                   : /hóa|hoa/.test(sm) ? ['hóa học', 'hoá học', 'chemistry']
+                   : [sm];
+    const g = String(grade || '').replace(/\D/g, '');
+    const grades = g ? [g, `Lớp ${g}`, `Khối ${g}`, `K${g}`] : [];
+    return { subjects, grades };
+  }
+
+  // Modes config — câu/sesion + có hiện đáp án ngay không
+  const MODE_CFG = {
+    flashcard: { defaultCount: 20, maxCount: 50, showAnswer: true,  shuffleOptions: false },
+    quiz:      { defaultCount: 10, maxCount: 30, showAnswer: false, shuffleOptions: true  },
+    challenge: { defaultCount: 15, maxCount: 30, showAnswer: false, shuffleOptions: true  },
+  };
+
+  // GET /api/student/self-study/questions?subject=X&grade=Y&mode=quiz&count=10&topic=...
+  app.get('/api/student/self-study/questions', async (req, res) => {
+    const decoded = _ssAuth(req);
+    // Allow anonymous (cho landing page demo) — nhưng không track stats
+    const userId = decoded ? (decoded.sub || decoded.userId || decoded.id) : null;
+
+    const mode = String(req.query.mode || 'quiz').toLowerCase();
+    const cfg = MODE_CFG[mode] || MODE_CFG.quiz;
+    const subject = String(req.query.subject || '').trim();
+    const grade = String(req.query.grade || '').trim();
+    const count = Math.max(1, Math.min(parseInt(req.query.count, 10) || cfg.defaultCount, cfg.maxCount));
+    const topic = req.query.topic && req.query.topic !== '__all__' ? String(req.query.topic) : null;
+    const difficulty = req.query.difficulty ? String(req.query.difficulty).toUpperCase() : null;
+
+    if (!subject || !grade) {
+      return res.status(400).json({ error: 'missing_fields', message: 'Cần subject + grade' });
+    }
+
+    try {
+      const pool = _getPool();
+      const { subjects, grades } = _ssNormalize(subject, grade);
+
+      const whereExtra = [];
+      const params = [subjects, grades];
+      if (topic) { params.push(topic); whereExtra.push(`(chapter = $${params.length} OR topic = $${params.length})`); }
+      if (difficulty && ['NB', 'TH', 'VD', 'VDC'].includes(difficulty)) {
+        params.push(difficulty);
+        whereExtra.push(`UPPER(difficulty) = $${params.length}`);
+      }
+      const extraSQL = whereExtra.length ? ' AND ' + whereExtra.join(' AND ') : '';
+      params.push(count * 5);
+
+      // 2 schema variants: snake_case (canonical) vs camelCase (legacy Rust)
+      // Try snake_case first, fallback camelCase nếu rỗng
+      let qs = [];
+      try {
+        const r = await pool.query(`
+          SELECT id, content, options, answer, explanation, difficulty,
+                 subject, grade, COALESCE(chapter, topic, '') AS topic
+          FROM "Question"
+          WHERE type IN ('multiple_choice', 'mcq', 'tracnghiem')
+            AND lower(subject) = ANY($1::text[])
+            AND (grade = ANY($2::text[]) OR grade ~ ('^(' || array_to_string($2::text[], '|') || ')$'))
+            AND content IS NOT NULL AND content <> ''
+            AND options IS NOT NULL AND jsonb_array_length(options) >= 2
+            ${extraSQL}
+          LIMIT $${params.length}
+        `, params);
+        qs = r.rows;
+      } catch (e) {
+        // Schema fallback: camelCase legacy
+        try {
+          const camelParams = [...params];
+          const r2 = await pool.query(`
+            SELECT id, content, options, "correctAnswer" AS answer, explanation, difficulty,
+                   subject, grade, COALESCE(topic, '') AS topic
+            FROM "Question"
+            WHERE "questionType" IN ('multiple_choice', 'mcq', 'tracnghiem')
+              AND lower(subject) = ANY($1::text[])
+              AND grade = ANY($2::text[])
+              AND status = 'Hoạt động'
+              AND content IS NOT NULL AND content <> ''
+            LIMIT $${camelParams.length}
+          `, camelParams);
+          qs = r2.rows;
+        } catch (e2) {
+          console.warn('[self-study:query]', e2.message);
+          qs = [];
+        }
+      }
+
+      if (!qs.length) {
+        return res.json({ items: [], count: 0, mode, subject, grade, message: 'Chưa có câu hỏi cho chủ đề này' });
+      }
+
+      // Fisher-Yates partial shuffle → pick top N
+      const shuffled = qs.slice();
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      const picked = shuffled.slice(0, count);
+
+      // Format items theo mode
+      const items = picked.map((q, idx) => {
+        let options = Array.isArray(q.options) ? q.options : [];
+        // Shuffle options nếu mode yêu cầu (giữ index đáp án)
+        if (cfg.shuffleOptions && options.length > 1) {
+          const idxMap = options.map((_, i) => i);
+          for (let i = idxMap.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [idxMap[i], idxMap[j]] = [idxMap[j], idxMap[i]];
+          }
+          options = idxMap.map(i => options[i]);
+        }
+        const result = {
+          id: q.id,
+          order: idx + 1,
+          content: q.content,
+          options,
+          difficulty: q.difficulty || 'TH',
+          subject: q.subject,
+          grade: q.grade,
+          topic: q.topic || '',
+        };
+        // Flashcard mode → hiện đáp án + giải thích ngay (cho HS tự kiểm tra)
+        if (cfg.showAnswer) {
+          result.answer = q.answer;
+          result.explanation = q.explanation;
+        }
+        return result;
+      });
+
+      return res.json({
+        items, count: items.length, mode, subject, grade,
+        sessionId: `ss-${mode}-${Date.now().toString(36)}`,
+        userId,
+      });
+    } catch (e) {
+      console.error('[self-study:questions]', e.message);
+      return res.status(500).json({ error: 'Lỗi server: ' + e.message, items: [], count: 0 });
+    }
+  });
+
+  // POST /api/student/self-study/submit — submit kết quả quiz/challenge
+  // Body: { mode, subject, grade, answers: [{ qid, picked, correct }], durationSec }
+  // → Lưu PracticeExam record + trả về score
+  app.post('/api/student/self-study/submit', async (req, res) => {
+    const decoded = _ssAuth(req);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = decoded.sub || decoded.userId || decoded.id;
+
+    try {
+      const b = req.body || {};
+      const mode = String(b.mode || 'quiz');
+      const answers = Array.isArray(b.answers) ? b.answers : [];
+      if (!answers.length) return res.status(400).json({ error: 'Cần answers' });
+
+      // Verify đáp án từ DB — không tin client
+      const pool = _getPool();
+      const qids = answers.map(a => a.qid).filter(Boolean);
+      let correctMap = {};
+      try {
+        const { rows } = await pool.query(
+          `SELECT id, answer, COALESCE("correctAnswer", answer) AS canswer FROM "Question" WHERE id = ANY($1::text[])`,
+          [qids]
+        );
+        for (const r of rows) correctMap[r.id] = (r.answer || r.canswer || '').trim().toLowerCase();
+      } catch { /* ignore — graded sai sẽ all wrong */ }
+
+      let correct = 0;
+      const breakdown = answers.map(a => {
+        const exp = correctMap[a.qid];
+        const got = String(a.picked || '').trim().toLowerCase();
+        const isOk = exp && got && (exp === got || exp === a.picked);
+        if (isOk) correct++;
+        return { qid: a.qid, picked: a.picked, correct: isOk, expected: exp };
+      });
+      const total = answers.length;
+      const percentage = total ? Math.round((correct / total) * 1000) / 10 : 0;
+
+      // Lưu PracticeExam (nếu table sẵn có)
+      try {
+        const { randomUUID } = require('crypto');
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "PracticeExam" (
+            id TEXT PRIMARY KEY, "studentId" TEXT, subject TEXT, grade TEXT,
+            "examType" TEXT, "questionCount" INTEGER, "timeLimit" INTEGER,
+            questions JSONB DEFAULT '[]'::jsonb, answers JSONB DEFAULT '[]'::jsonb,
+            score DOUBLE PRECISION, percentage DOUBLE PRECISION,
+            completed BOOLEAN DEFAULT false,
+            "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+            "completedAt" TIMESTAMPTZ
+          )
+        `).catch(() => {});
+        await pool.query(`
+          INSERT INTO "PracticeExam"(id, "studentId", subject, grade, "examType",
+            "questionCount", "timeLimit", questions, answers, score, percentage,
+            completed, "completedAt")
+          VALUES ($1,$2,$3,$4,$5, $6,$7,$8::jsonb,$9::jsonb, $10,$11, true, NOW())
+        `, [
+          randomUUID(), userId,
+          String(b.subject || ''), String(b.grade || ''),
+          `self-study-${mode}`, total,
+          parseInt(b.durationSec, 10) || 0,
+          JSON.stringify(qids),
+          JSON.stringify(breakdown),
+          correct, percentage,
+        ]).catch(e => console.warn('[self-study:save]', e.message));
+      } catch { /* best-effort */ }
+
+      return res.json({
+        ok: true, correct, total, percentage, breakdown,
+        message: percentage >= 80 ? '🏆 Xuất sắc!' : percentage >= 50 ? '👍 Khá tốt' : '📚 Cần ôn thêm',
+      });
+    } catch (e) {
+      console.error('[self-study:submit]', e.message);
+      return res.status(500).json({ error: 'Lỗi submit: ' + e.message });
+    }
+  });
+
+  // GET /api/student/self-study/challenge-leaderboard?subject=X&grade=Y&days=7
+  // Top HS tuần cho mode challenge
+  app.get('/api/student/self-study/challenge-leaderboard', async (req, res) => {
+    const decoded = _ssAuth(req);
+    const myId = decoded ? (decoded.sub || decoded.userId || decoded.id) : null;
+    const subject = String(req.query.subject || '').trim();
+    const grade = String(req.query.grade || '').trim();
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 90);
+    try {
+      const pool = _getPool();
+      const filters = ['pe."examType" = $1', `pe."completedAt" >= NOW() - INTERVAL '${days} day'`, 'pe.completed = true'];
+      const params = ['self-study-challenge'];
+      if (subject) { params.push(subject); filters.push(`pe.subject = $${params.length}`); }
+      if (grade)   { params.push(grade);   filters.push(`pe.grade   = $${params.length}`); }
+      const { rows } = await pool.query(`
+        SELECT pe."studentId" AS user_id,
+               u.name, u.image,
+               COUNT(*)::int AS sessions,
+               ROUND(AVG(pe.percentage)::numeric, 1)::float AS avg_score,
+               MAX(pe.percentage)::float AS best_score,
+               MAX(pe."completedAt") AS last_at
+        FROM "PracticeExam" pe
+        LEFT JOIN "User" u ON u.id = pe."studentId"
+        WHERE ${filters.join(' AND ')}
+        GROUP BY pe."studentId", u.name, u.image
+        ORDER BY best_score DESC, avg_score DESC, sessions DESC
+        LIMIT 20
+      `, params).catch(() => ({ rows: [] }));
+      const items = rows.map((r, i) => ({
+        rank: i + 1,
+        userId: r.user_id,
+        name: r.name || `HS ${String(r.user_id).slice(0, 6)}`,
+        avatar: r.image,
+        sessions: r.sessions,
+        avgScore: r.avg_score,
+        bestScore: r.best_score,
+        lastAt: r.last_at,
+        isMe: r.user_id === myId,
+      }));
+      return res.json({ items, count: items.length, days, subject, grade });
+    } catch (e) {
+      console.error('[self-study:leaderboard]', e.message);
+      return res.json({ items: [], count: 0 });
+    }
+  });
+})();
+
 // ── Teacher-Student Link (kết nối GV-HS) — TRƯỚC proxy teacher-service ──
 ;(() => {
   async function _ensureTSLTable() {

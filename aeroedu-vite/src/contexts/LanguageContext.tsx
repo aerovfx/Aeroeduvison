@@ -51,6 +51,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeAiTutor:       'Gia Sư AI',
     routeLearningPath:  'Lộ trình học',
     routeExamPrep:      'Ôn thi',
+    routeSelfStudy:     'Tự ôn luyện',
     routeCareer:        'Hướng nghiệp',
     routeProgress:      'Tiến độ',
     routeEmotion:       'Cảm xúc',
@@ -88,6 +89,35 @@ export const translations: Record<Language, Record<string, string>> = {
     routeApiKeys:       'API Keys',
     routeProfKG:        'Cây tri thức GV',
     routeKnowledgeGraph:'Cây tri thức',
+    // Student extras
+    routeForYou:        'Dành cho bạn',
+    routeDaily:         'Hôm nay',
+    routeMyTeachers:    'GV của tôi',
+    routeExamRooms:     'Phòng thi',
+    routePixelGames:    'Game Pixel',
+    routeSchedule:      'Thời khoá biểu',
+    routeGames:         'Game học tập',
+    routeWishlist:      'Yêu thích',
+    routePurchase:      'Lịch sử mua',
+    // Teacher extras
+    routeSprint:        'Sprint AI',
+    routeTaodethi:      'Tạo đề thi',
+    routeLessonPlans:   'Giáo án',
+    routeStudentRequests:'Yêu cầu HS',
+    routeGradeBook:     'Sổ điểm',
+    routeNewsCompose:   'Soạn tin',
+    // Admin extras
+    routeAdminUsers:    'Quản lý người dùng',
+    routeInsights:      'Thông tin chuyên sâu',
+    routeAdminPayments: 'Thanh toán',
+    routeRsExperiments: 'A/B Reco',
+    routeNewsReview:    'Duyệt tin',
+    // Common
+    routeDocs:          'Tài liệu',
+    routeNews:          'Tin tức',
+    // Section headers
+    sectionStore:       'Cửa hàng',
+    sectionHelp:        'Trợ giúp',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Tổng quan',
@@ -368,6 +398,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeAiTutor:       'AI Tutor',
     routeLearningPath:  'Learning Path',
     routeExamPrep:      'Exam Prep',
+    routeSelfStudy:     'Self-study',
     routeCareer:        'Career Guidance',
     routeProgress:      'Progress',
     routeEmotion:       'Emotion',
@@ -403,8 +434,37 @@ export const translations: Record<Language, Record<string, string>> = {
     routeEnvironment:   'Environment',
     routeCalendar:      'Calendar',
     routeApiKeys:       'API Keys',
-    routeProfKG:        'Cây tri thức GV',
-    routeKnowledgeGraph:'Cây tri thức',
+    routeProfKG:        'Teacher KG',
+    routeKnowledgeGraph:'Knowledge Graph',
+    // Student extras
+    routeForYou:        'For You',
+    routeDaily:         'Today',
+    routeMyTeachers:    'My Teachers',
+    routeExamRooms:     'Exam Rooms',
+    routePixelGames:    'Pixel Games',
+    routeSchedule:      'Schedule',
+    routeGames:         'Learning Games',
+    routeWishlist:      'Wishlist',
+    routePurchase:      'Purchase History',
+    // Teacher extras
+    routeSprint:        'Sprint AI',
+    routeTaodethi:      'Exam Creator',
+    routeLessonPlans:   'Lesson Plans',
+    routeStudentRequests:'Student Requests',
+    routeGradeBook:     'Grade Book',
+    routeNewsCompose:   'Compose News',
+    // Admin extras
+    routeAdminUsers:    'Users',
+    routeInsights:      'Insights',
+    routeAdminPayments: 'Payments',
+    routeRsExperiments: 'A/B Reco',
+    routeNewsReview:    'News Review',
+    // Common
+    routeDocs:          'Docs',
+    routeNews:          'News',
+    // Section headers
+    sectionStore:       'Store',
+    sectionHelp:        'Help',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Overview',
