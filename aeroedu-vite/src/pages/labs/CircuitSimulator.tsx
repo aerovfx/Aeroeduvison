@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Zap, Power, Settings2, Info, Lightbulb, Battery, ToggleLeft } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  Zap, Power, Settings2, Info, Lightbulb, Battery, ToggleLeft, ArrowLeft,
+  Cpu, Sparkles, Activity, Thermometer, Sun,
+} from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type FlowType = 'conventional' | 'electron'
@@ -204,6 +208,7 @@ export default function CircuitSimulator() {
 
   const [isClosed,  setIsClosed]  = useState(false)
   const [voltage,   setVoltage]   = useState(5)
+  const [resistance, setResistance] = useState(10)  // Ω — now adjustable
   const [flowType,  setFlowType]  = useState<FlowType>('conventional')
   const [current,   setCurrent]   = useState(0)
   const [quizPicked, setQuizPicked] = useState<number | null>(null)
@@ -211,8 +216,8 @@ export default function CircuitSimulator() {
   // Sync ref
   useEffect(() => {
     stateRef.current = { ...stateRef.current, isClosed, voltage, flowType }
-    setCurrent(isClosed ? voltage / 10 : 0)
-  }, [isClosed, voltage, flowType])
+    setCurrent(isClosed ? voltage / resistance : 0)
+  }, [isClosed, voltage, resistance, flowType])
 
   // Animation loop
   useEffect(() => {
@@ -238,33 +243,58 @@ export default function CircuitSimulator() {
   const power = voltage * current
 
   return (
-    <div className="min-h-screen bg-[hsl(260,30%,8%)] p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 p-4 md:p-6 text-white/90">
+      <div className="max-w-7xl mx-auto space-y-5">
 
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl text-white shadow-lg shadow-orange-500/25">
-              <Zap className="h-8 w-8" />
+        {/* ── Header — compact + back button ── */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Link to="/dashboard/labtwin" className="p-2 hover:bg-white/[0.08] rounded-lg transition">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div className="p-2.5 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 rounded-xl shadow-lg shadow-orange-500/30">
+              <Zap className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                ⚡ Mạch Điện DC Cơ Bản
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-amber-300 via-orange-300 to-rose-300 bg-clip-text text-transparent">
+                Mạch điện DC — Định luật Ohm
               </h1>
-              <p className="text-white/50 text-base mt-1">Khám phá dòng điện một chiều và định luật Ohm</p>
+              <p className="text-white/45 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1"><Battery className="h-3 w-3" /> Vật lý 11</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1"><Activity className="h-3 w-3" /> Mô phỏng tương tác</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1"><Sparkles className="h-3 w-3" /> R · V · I · P</span>
+              </p>
             </div>
           </div>
-          <div className="flex justify-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/15 border border-blue-500/20 text-blue-300">
-              <Battery className="h-3 w-3" /> Vật lý 11
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-purple-500/15 border border-purple-500/20 text-purple-300">
-              <Lightbulb className="h-3 w-3" /> Điện học
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-500/15 border border-green-500/20 text-green-300">
-              <Settings2 className="h-3 w-3" /> Interactive
-            </span>
-          </div>
+        </div>
+
+        {/* ── Preset scenarios ── */}
+        <div className="rounded-2xl bg-slate-900/40 border border-white/[0.08] p-3 flex items-center gap-2 overflow-x-auto">
+          <span className="text-xs text-white/45 font-semibold uppercase tracking-wide shrink-0 pl-2">🎯 Kịch bản</span>
+          {([
+            { label: 'LED đỏ', icon: Sun, V: 2, R: 220, hint: 'I rất nhỏ — LED không cháy' },
+            { label: 'Đèn tròn 5W', icon: Lightbulb, V: 5, R: 5, hint: 'Đèn sợi đốt — R thấp' },
+            { label: 'Quạt mini', icon: Cpu, V: 6, R: 12, hint: 'Motor DC' },
+            { label: 'Đèn sưởi', icon: Thermometer, V: 12, R: 4, hint: 'Tải lớn — I cao' },
+            { label: 'Tuỳ chỉnh', icon: Settings2, V: 5, R: 10, hint: 'Mặc định' },
+          ] as const).map((p) => {
+            const isActive = voltage === p.V && resistance === p.R
+            return (
+              <button key={p.label}
+                onClick={() => { setVoltage(p.V); setResistance(p.R) }}
+                title={p.hint}
+                className={`shrink-0 px-3 py-2 rounded-lg flex items-center gap-1.5 text-xs font-bold transition ${
+                  isActive
+                    ? 'bg-amber-500/25 border border-amber-500/40 text-amber-200'
+                    : 'bg-white/[0.04] border border-white/[0.08] text-white/65 hover:bg-white/[0.08]'
+                }`}>
+                <p.icon className="w-3 h-3" /> {p.label}
+                <span className="text-white/40 ml-0.5 font-mono">{p.V}V/{p.R}Ω</span>
+              </button>
+            )
+          })}
         </div>
 
         {/* ── Stats Bar ──────────────────────────────────────────────── */}
@@ -272,7 +302,7 @@ export default function CircuitSimulator() {
           {[
             { icon: <Battery className="h-8 w-8 text-orange-400" />, value: `${voltage}V`, label: 'Điện áp', color: 'text-orange-400' },
             { icon: <Zap     className="h-8 w-8 text-blue-400"   />, value: `${current.toFixed(2)}A`, label: 'Dòng điện', color: 'text-blue-400' },
-            { icon: <Settings2 className="h-8 w-8 text-purple-400" />, value: '10Ω', label: 'Điện trở', color: 'text-purple-400' },
+            { icon: <Settings2 className="h-8 w-8 text-purple-400" />, value: `${resistance}Ω`, label: 'Điện trở', color: 'text-purple-400' },
             {
               icon: <Power className={`h-8 w-8 ${isClosed ? 'text-green-400' : 'text-white/25'}`} />,
               value: isClosed ? 'ON' : 'OFF',
@@ -356,8 +386,39 @@ export default function CircuitSimulator() {
                 </div>
 
                 <div className="rounded-lg bg-blue-500/10 border border-blue-500/15 p-3 text-sm text-blue-300">
-                  💡 <strong>Định luật Ohm:</strong> I = V/R = {voltage}V / 10Ω ={' '}
-                  <strong>{current.toFixed(2)}A</strong>
+                  💡 <strong>Định luật Ohm:</strong> I = V/R = {voltage}V / {resistance}Ω ={' '}
+                  <strong>{current.toFixed(3)}A</strong> = {(current * 1000).toFixed(1)} mA
+                </div>
+              </div>
+            </div>
+
+            {/* Resistance slider — mới */}
+            <div className="rounded-xl border-2 border-emerald-500/25 bg-white/[0.02] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 border-b border-white/[0.05]">
+                <h3 className="flex items-center gap-2 font-semibold text-white/85">
+                  <Cpu className="h-5 w-5 text-emerald-400" /> Điện trở R
+                </h3>
+                <p className="text-xs text-white/40 mt-1">Đổi điện trở tải để thấy I = V/R thay đổi</p>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="flex justify-between text-sm font-semibold">
+                  <span className="text-white/70">Điện trở:</span>
+                  <span className="text-emerald-400 font-mono">{resistance} Ω</span>
+                </div>
+                <input
+                  type="range" min={1} max={500} step={1} value={resistance}
+                  onChange={(e) => setResistance(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                  style={{
+                    background: `linear-gradient(to right, hsl(160,80%,45%) ${((Math.log(resistance) - Math.log(1)) / (Math.log(500) - Math.log(1))) * 100}%, rgba(255,255,255,0.1) ${((Math.log(resistance) - Math.log(1)) / (Math.log(500) - Math.log(1))) * 100}%)`,
+                  }}
+                />
+                <div className="flex justify-between text-xs text-white/35">
+                  <span>1Ω</span>
+                  <span>500Ω</span>
+                </div>
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/15 p-3 text-xs text-emerald-300">
+                  📐 R nhỏ → I lớn (đèn sáng) · R lớn → I nhỏ (an toàn cho linh kiện nhạy như LED)
                 </div>
               </div>
             </div>
@@ -417,11 +478,23 @@ export default function CircuitSimulator() {
               </div>
             </div>
 
-            {/* Power readout */}
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm">
-              <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Công suất</p>
-              <p className="text-yellow-400 font-bold text-xl">{(power * 1000).toFixed(1)} mW</p>
-              <p className="text-white/35 text-xs mt-1">P = V × I = {voltage}V × {current.toFixed(2)}A</p>
+            {/* Power readout — modernized */}
+            <div className="rounded-xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/[0.06] to-orange-500/[0.04] p-4 space-y-2">
+              <p className="text-yellow-300/70 text-xs uppercase tracking-wide font-bold flex items-center gap-1.5">
+                <Activity className="w-3 h-3" /> Công suất tiêu thụ
+              </p>
+              <p className="text-yellow-300 font-bold text-2xl font-mono">
+                {power >= 1 ? `${power.toFixed(2)} W` : `${(power * 1000).toFixed(1)} mW`}
+              </p>
+              <p className="text-white/40 text-xs font-mono">P = V × I = {voltage} × {current.toFixed(3)}</p>
+              {/* Brightness viz */}
+              <div className="pt-2 border-t border-yellow-500/15">
+                <div className="text-[10px] text-white/45 mb-1">Độ sáng tương đối</div>
+                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-orange-500 via-yellow-400 to-amber-200 transition-all duration-500"
+                    style={{ width: `${Math.min(100, (power / 10) * 100)}%` }} />
+                </div>
+              </div>
             </div>
           </div>
 

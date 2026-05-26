@@ -124,6 +124,8 @@ const SimplePendulum     = lazy(() => import('@/pages/labs/SimplePendulum'))
 const OpticsLab          = lazy(() => import('@/pages/labs/OpticsLab'))
 const WaveInterference   = lazy(() => import('@/pages/labs/WaveInterference'))
 const MechaForce         = lazy(() => import('@/pages/labs/MechaForce'))
+const MotionSim          = lazy(() => import('@/pages/labs/MotionSim'))
+const PhysicsEngine2D    = lazy(() => import('@/pages/labs/PhysicsEngine2D'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -450,6 +452,9 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/optics-lab"              element={<OpticsLab />} />
             <Route path="/dashboard/labtwin/wave-interference"       element={<WaveInterference />} />
             <Route path="/dashboard/labtwin/mechaforce"              element={<MechaForce />} />
+            <Route path="/dashboard/labtwin/motionsim"               element={<MotionSim />} />
+            <Route path="/dashboard/labtwin/motion-sim"              element={<MotionSim />} />
+            <Route path="/dashboard/labtwin/physics-engine-2d"       element={<PhysicsEngine2D />} />
             <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
             {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
             <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />

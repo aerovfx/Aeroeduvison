@@ -25,8 +25,16 @@ import * as THREE from 'three'
 import { ArrowLeft, Home, Play, RotateCcw, Box, Layers, Sparkles } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────
-type ShapeKey = 'cube' | 'cuboid' | 'cylinder' | 'pyramid'
-interface Dims { a: number; w: number; h: number; d: number; r: number; height: number; slant: number }
+type ShapeKey = 'cube' | 'cuboid' | 'cylinder' | 'pyramid' | 'triprism' | 'cone' | 'hexprism'
+interface Dims {
+  a: number; w: number; h: number; d: number; r: number; height: number; slant: number
+  // Triangular prism: base side b, prism length L
+  triB: number; triL: number
+  // Cone: radius coneR, height coneH (slant auto-computed)
+  coneR: number; coneH: number
+  // Hexagonal prism: hex side hexS, height hexH
+  hexS: number; hexH: number
+}
 
 interface SliderDef { key: keyof Dims; label: string; min: number; max: number; step: number }
 const SLIDER_DEFS: Record<ShapeKey, SliderDef[]> = {
@@ -44,6 +52,18 @@ const SLIDER_DEFS: Record<ShapeKey, SliderDef[]> = {
     { key:'a',     label:'Cạnh đáy a', min:1, max:8, step:0.5 },
     { key:'slant', label:'Trung đoạn l', min:2, max:9, step:0.5 },
   ],
+  triprism: [
+    { key:'triB', label:'Cạnh đáy tam giác b', min:1, max:8, step:0.5 },
+    { key:'triL', label:'Chiều dài lăng trụ L', min:1, max:10, step:0.5 },
+  ],
+  cone: [
+    { key:'coneR', label:'Bán kính đáy r', min:1, max:5, step:0.25 },
+    { key:'coneH', label:'Chiều cao h', min:1, max:8, step:0.5 },
+  ],
+  hexprism: [
+    { key:'hexS', label:'Cạnh lục giác s', min:1, max:5, step:0.25 },
+    { key:'hexH', label:'Chiều cao H', min:1, max:8, step:0.5 },
+  ],
 }
 
 const SHAPE_META: Record<ShapeKey, { name: string; icon: string; desc: string; color: string }> = {
@@ -51,6 +71,9 @@ const SHAPE_META: Record<ShapeKey, { name: string; icon: string; desc: string; c
   cuboid:   { name: 'Hình hộp chữ nhật',  icon: '📦', desc: '6 mặt chữ nhật theo 3 cặp song song.',                  color: '#a78bfa' },
   cylinder: { name: 'Hình trụ',           icon: '🥫', desc: '2 đáy tròn + 1 mặt bên hình chữ nhật khi trải ra.',     color: '#34d399' },
   pyramid:  { name: 'Hình chóp tứ giác đều', icon: '🔺', desc: '1 đáy vuông + 4 mặt tam giác cân xung quanh.',       color: '#f97316' },
+  triprism: { name: 'Lăng trụ tam giác',  icon: '🔻', desc: '2 đáy tam giác đều + 3 mặt chữ nhật bên.',             color: '#22d3ee' },
+  cone:     { name: 'Hình nón',           icon: '🎩', desc: '1 đáy tròn + 1 mặt bên là hình quạt khi trải ra.',     color: '#ec4899' },
+  hexprism: { name: 'Lăng trụ lục giác',  icon: '⬡', desc: '2 đáy lục giác đều + 6 mặt chữ nhật bên.',              color: '#fbbf24' },
 }
 
 const FACE_COLORS = {
@@ -60,7 +83,10 @@ const FACE_COLORS = {
   cylinder_lat:  '#4fc3f750',
   pyramid: ['#f9731680','#fbbf2480','#f59e0b80','#ef444480','#f97316a0'],
 }
-const STROKE = { cube:'#4fc3f7', cuboid:'#a78bfa', cylinder:'#34d399', pyramid:'#f97316' }
+const STROKE: Record<ShapeKey, string> = {
+  cube: '#4fc3f7', cuboid: '#a78bfa', cylinder: '#34d399', pyramid: '#f97316',
+  triprism: '#22d3ee', cone: '#ec4899', hexprism: '#fbbf24',
+}
 
 const round2 = (x: number) => Math.round(x * 100) / 100
 
@@ -362,6 +388,333 @@ function PyramidUnfold({ a, slant, t }: { a: number; slant: number; t: number })
   )
 }
 
+// ─── EdgeLabel — Hiển thị giá trị chiều dài trên cạnh 3D ─────────
+// User: "thiết kế các cạnh có giá trị chiều dài cụ thể để dễ quan sát"
+function EdgeLabel({ start, end, value, suffix = '', color = '#f7c948', size = 0.28, opacity = 0.95 }: {
+  start: [number, number, number]
+  end: [number, number, number]
+  value: number | string
+  suffix?: string
+  color?: string
+  size?: number
+  opacity?: number
+}) {
+  const s = new THREE.Vector3(...start)
+  const e = new THREE.Vector3(...end)
+  const mid = new THREE.Vector3().addVectors(s, e).multiplyScalar(0.5)
+  // Offset perpendicular for readability
+  const dir = new THREE.Vector3().subVectors(e, s).normalize()
+  const up = new THREE.Vector3(0, 1, 0)
+  const offset = new THREE.Vector3().crossVectors(dir, up).normalize()
+  if (offset.lengthSq() < 0.001) offset.set(0, 0, 1)
+  const v = typeof value === 'number' ? value.toFixed(value % 1 === 0 ? 0 : 1) : value
+  return (
+    <Text
+      position={[mid.x + offset.x * size * 1.2, mid.y + offset.y * size * 1.2 + size * 0.4, mid.z + offset.z * size * 1.2]}
+      fontSize={size}
+      color={color}
+      anchorX="center"
+      anchorY="middle"
+      outlineWidth={0.025}
+      outlineColor="#000"
+      fillOpacity={opacity}
+    >
+      {`${v}${suffix}`}
+    </Text>
+  )
+}
+
+// ── TRIANGULAR PRISM — 2 đáy tam giác đều + 3 mặt chữ nhật ──────
+function TriPrismUnfold({ b, L, t }: { b: number; L: number; t: number }) {
+  const e = ease(t)
+  // Tam giác đều cạnh b: chiều cao = b√3/2, trọng tâm tại y=h/3
+  const triH = b * Math.sqrt(3) / 2
+
+  // Khi đóng: lăng trụ dọc theo trục Z, đáy tam giác ở z=±L/2
+  // Khi mở: 2 tam giác đáy + 3 chữ nhật trải ra phẳng
+
+  // Tam giác đều với centroid tại gốc → 3 đỉnh
+  const triVerts: [number, number, number][] = [
+    [-b / 2, -triH / 3, 0],
+    [b / 2, -triH / 3, 0],
+    [0, 2 * triH / 3, 0],
+  ]
+
+  // Khi đóng: tam giác sau (z=-L/2) và trước (z=+L/2)
+  // Khi mở: tam giác sau giữ nguyên, tam giác trước trượt sang phải
+  return (
+    <SpinningGroup t={t}>
+      {/* Đáy 1 (trước) */}
+      <group
+        position={[e * (b * 1.2), 0, (1 - e) * (L / 2)]}
+        rotation={[0, 0, 0]}
+      >
+        <mesh>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array([
+              ...triVerts[0], ...triVerts[1], ...triVerts[2],
+            ]), 3]} />
+            <bufferAttribute attach="attributes-normal" args={[new Float32Array([0,0,1, 0,0,1, 0,0,1]), 3]} />
+          </bufferGeometry>
+          <meshStandardMaterial color="#22d3ee" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+        </mesh>
+        <lineSegments>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array([
+              ...triVerts[0], ...triVerts[1],
+              ...triVerts[1], ...triVerts[2],
+              ...triVerts[2], ...triVerts[0],
+            ]), 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial color="#22d3ee" />
+        </lineSegments>
+        <EdgeLabel start={triVerts[0]} end={triVerts[1]} value={b} suffix=" cm" />
+      </group>
+      {/* Đáy 2 (sau) */}
+      <group position={[0, 0, -(1 - e) * (L / 2) - e * (L / 2 + 0.1)]}>
+        <mesh>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array([
+              ...triVerts[0], ...triVerts[1], ...triVerts[2],
+            ]), 3]} />
+            <bufferAttribute attach="attributes-normal" args={[new Float32Array([0,0,1, 0,0,1, 0,0,1]), 3]} />
+          </bufferGeometry>
+          <meshStandardMaterial color="#22d3ee" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+        </mesh>
+        <lineSegments>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array([
+              ...triVerts[0], ...triVerts[1],
+              ...triVerts[1], ...triVerts[2],
+              ...triVerts[2], ...triVerts[0],
+            ]), 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial color="#22d3ee" />
+        </lineSegments>
+      </group>
+      {/* 3 mặt chữ nhật bên (size b × L). Khi đóng: nối 2 tam giác qua các cạnh tương ứng */}
+      {[0, 1, 2].map((i) => {
+        const v1 = triVerts[i]
+        const v2 = triVerts[(i + 1) % 3]
+        const edgeMid = [(v1[0] + v2[0]) / 2, (v1[1] + v2[1]) / 2, 0] as [number, number, number]
+        const edgeAngle = Math.atan2(v2[1] - v1[1], v2[0] - v1[0])
+        // Khi đóng: rect nằm dọc theo edge của tam giác, hướng vào trong z
+        // Khi mở: trải ra mặt phẳng
+        const closedYaw = edgeAngle + Math.PI / 2
+        const unfoldedYaw = Math.PI / 2  // ngang
+        const yaw = closedYaw * (1 - e) + unfoldedYaw * e
+        const pitch = (Math.PI / 2) * (1 - e)
+        const offsetX = e * (i * (b + 0.2) - b)
+        const offsetY = e * (-triH * 1.2)
+        return (
+          <group key={i}
+            position={[edgeMid[0] + offsetX, edgeMid[1] + offsetY, 0]}
+            rotation={[pitch, yaw, 0]}>
+            <mesh>
+              <planeGeometry args={[b, L]} />
+              <meshStandardMaterial color={['#06b6d4', '#0891b2', '#0e7490'][i]} side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+            </mesh>
+            <lineSegments>
+              <edgesGeometry args={[new THREE.PlaneGeometry(b, L)]} />
+              <lineBasicMaterial color="#22d3ee" />
+            </lineSegments>
+            {t < 0.05 && (
+              <>
+                <EdgeLabel start={[-b/2, -L/2, 0]} end={[b/2, -L/2, 0]} value={b} suffix=" cm" size={0.25} />
+                <EdgeLabel start={[b/2, -L/2, 0]} end={[b/2, L/2, 0]} value={L} suffix=" cm" size={0.25} />
+              </>
+            )}
+          </group>
+        )
+      })}
+    </SpinningGroup>
+  )
+}
+
+// ── CONE — đáy tròn + mặt bên hình quạt ──────────────────────────
+function ConeUnfold({ r, h, t }: { r: number; h: number; t: number }) {
+  const e = ease(t)
+  const slant = Math.sqrt(r * r + h * h)        // đường sinh l = √(r² + h²)
+  const arcAngle = (2 * Math.PI * r) / slant     // góc quạt = 2πr / l (radians)
+  const halfH = h / 2
+
+  return (
+    <SpinningGroup t={t}>
+      {/* Cone surface (khi đóng) */}
+      {t < 0.5 && (
+        <mesh position={[0, 0, 0]}>
+          <coneGeometry args={[r, h, 48, 1, true]} />
+          <meshStandardMaterial color="#ec4899" side={THREE.DoubleSide} transparent
+            opacity={0.85 * (1 - e * 1.5)} metalness={0.2} roughness={0.45} />
+        </mesh>
+      )}
+
+      {/* Đáy tròn — trượt xuống khi mở */}
+      <mesh
+        position={[0, -halfH - e * (r + 0.5), 0]}
+        rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[r, 48]} />
+        <meshStandardMaterial color="#ec4899" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+      </mesh>
+
+      {/* Đáy có nhãn 2πr */}
+      {t > 0.5 && (
+        <Text position={[0, -halfH - e * (r + 0.5) - r - 0.4, 0]}
+          fontSize={0.28} color="#f7c948" anchorX="center" anchorY="middle"
+          outlineWidth={0.025} outlineColor="#000">
+          {`Chu vi đáy: 2πr = ${(2 * Math.PI * r).toFixed(2)}`}
+        </Text>
+      )}
+
+      {/* Mặt bên (sector) khi mở */}
+      {t > 0.3 && (
+        <group position={[0, halfH + 0.5, 0]}>
+          {(() => {
+            // Vẽ sector bằng cách dùng nhiều triangles
+            const segments = 48
+            const positions: number[] = []
+            const normals: number[] = []
+            for (let i = 0; i < segments; i++) {
+              const a1 = -arcAngle / 2 + (i / segments) * arcAngle
+              const a2 = -arcAngle / 2 + ((i + 1) / segments) * arcAngle
+              // Triangle: (0,0,0) → (l·cos(a1), l·sin(a1)) → (l·cos(a2), l·sin(a2))
+              positions.push(0, 0, 0)
+              positions.push(slant * Math.cos(a1 - Math.PI / 2), slant * Math.sin(a1 - Math.PI / 2), 0)
+              positions.push(slant * Math.cos(a2 - Math.PI / 2), slant * Math.sin(a2 - Math.PI / 2), 0)
+              normals.push(0, 0, 1, 0, 0, 1, 0, 0, 1)
+            }
+            return (
+              <>
+                <mesh scale={[e, e, 1]}>
+                  <bufferGeometry>
+                    <bufferAttribute attach="attributes-position" args={[new Float32Array(positions), 3]} />
+                    <bufferAttribute attach="attributes-normal" args={[new Float32Array(normals), 3]} />
+                  </bufferGeometry>
+                  <meshStandardMaterial color="#f43f5e" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+                </mesh>
+                {/* Đường sinh trái + phải */}
+                <lineSegments scale={[e, e, 1]}>
+                  <bufferGeometry>
+                    <bufferAttribute attach="attributes-position" args={[new Float32Array([
+                      0, 0, 0, slant * Math.cos(-arcAngle / 2 - Math.PI / 2), slant * Math.sin(-arcAngle / 2 - Math.PI / 2), 0,
+                      0, 0, 0, slant * Math.cos(arcAngle / 2 - Math.PI / 2), slant * Math.sin(arcAngle / 2 - Math.PI / 2), 0,
+                    ]), 3]} />
+                  </bufferGeometry>
+                  <lineBasicMaterial color="#ec4899" />
+                </lineSegments>
+                {/* Nhãn đường sinh l */}
+                {t > 0.6 && (
+                  <Text position={[slant * 0.55 * e, -slant * 0.05, 0.05]}
+                    fontSize={0.3} color="#f7c948" anchorX="center" anchorY="middle"
+                    outlineWidth={0.025} outlineColor="#000">
+                    {`l = ${slant.toFixed(2)}`}
+                  </Text>
+                )}
+              </>
+            )
+          })()}
+        </group>
+      )}
+    </SpinningGroup>
+  )
+}
+
+// ── HEXAGONAL PRISM — 2 đáy lục giác + 6 mặt chữ nhật ─────────────
+function HexPrismUnfold({ s, H, t }: { s: number; H: number; t: number }) {
+  const e = ease(t)
+  const halfH = H / 2
+  // Lục giác đều cạnh s — 6 đỉnh
+  const hexVerts: [number, number, number][] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2
+    hexVerts.push([Math.cos(a) * s, Math.sin(a) * s, 0])
+  }
+  // Center + 6 verts thành 6 triangles for the base mesh
+  const baseTriPos: number[] = []
+  for (let i = 0; i < 6; i++) {
+    const v1 = hexVerts[i]
+    const v2 = hexVerts[(i + 1) % 6]
+    baseTriPos.push(0, 0, 0, ...v1, ...v2)
+  }
+  const baseLinePos: number[] = []
+  for (let i = 0; i < 6; i++) {
+    baseLinePos.push(...hexVerts[i], ...hexVerts[(i + 1) % 6])
+  }
+
+  return (
+    <SpinningGroup t={t}>
+      {/* Đáy dưới */}
+      <group position={[0, -halfH - e * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array(baseTriPos), 3]} />
+          </bufferGeometry>
+          <meshStandardMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+        </mesh>
+        <lineSegments>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array(baseLinePos), 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial color="#f59e0b" />
+        </lineSegments>
+        {t < 0.05 && (
+          <EdgeLabel start={hexVerts[0]} end={hexVerts[1]} value={s} suffix=" cm" />
+        )}
+      </group>
+      {/* Đáy trên */}
+      <group position={[e * 6 * s, halfH + e * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array(baseTriPos), 3]} />
+          </bufferGeometry>
+          <meshStandardMaterial color="#fbbf24" side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+        </mesh>
+        <lineSegments>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[new Float32Array(baseLinePos), 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial color="#f59e0b" />
+        </lineSegments>
+      </group>
+      {/* 6 mặt chữ nhật bên (s × H) */}
+      {hexVerts.map((_, i) => {
+        const v1 = hexVerts[i]
+        const v2 = hexVerts[(i + 1) % 6]
+        const mid: [number, number, number] = [(v1[0] + v2[0]) / 2, 0, (v1[1] + v2[1]) / 2]
+        const edgeAngle = Math.atan2(v2[1] - v1[1], v2[0] - v1[0])
+        // Khi mở: 6 rect trải thành 1 hàng dài 6s × H
+        const unfoldedX = i * s - 2.5 * s
+        const unfoldedY = 0
+        const unfoldedZ = -s * 2.5
+        const px = mid[0] * (1 - e) + unfoldedX * e
+        const py = mid[1] * (1 - e) + unfoldedY * e
+        const pz = mid[2] * (1 - e) + unfoldedZ * e
+        const closedYaw = edgeAngle + Math.PI / 2
+        const yaw = closedYaw * (1 - e) + 0 * e
+        return (
+          <group key={i} position={[px, py, pz]} rotation={[0, yaw, 0]}>
+            <mesh>
+              <planeGeometry args={[s, H]} />
+              <meshStandardMaterial color={['#fbbf24', '#f59e0b', '#d97706', '#fbbf24', '#f59e0b', '#d97706'][i]}
+                side={THREE.DoubleSide} transparent opacity={0.85} metalness={0.2} roughness={0.45} />
+            </mesh>
+            <lineSegments>
+              <edgesGeometry args={[new THREE.PlaneGeometry(s, H)]} />
+              <lineBasicMaterial color="#f59e0b" />
+            </lineSegments>
+            {t > 0.7 && i === 0 && (
+              <>
+                <EdgeLabel start={[-s/2, -H/2, 0]} end={[s/2, -H/2, 0]} value={s} suffix=" cm" size={0.22} />
+                <EdgeLabel start={[s/2, -H/2, 0]} end={[s/2, H/2, 0]} value={H} suffix=" cm" size={0.22} />
+              </>
+            )}
+          </group>
+        )
+      })}
+    </SpinningGroup>
+  )
+}
+
 // ── R3F Scene wrapper ─────────────────────────────────────────
 function GeometryScene({ shape, dims, t }: { shape: ShapeKey; dims: Dims; t: number }) {
   const meta = SHAPE_META[shape]
@@ -382,6 +735,9 @@ function GeometryScene({ shape, dims, t }: { shape: ShapeKey; dims: Dims; t: num
         {shape === 'cuboid' && <CuboidUnfold w={dims.w} h={dims.h} d={dims.d} t={t} />}
         {shape === 'cylinder' && <CylinderUnfold r={dims.r} height={dims.height} t={t} />}
         {shape === 'pyramid' && <PyramidUnfold a={dims.a} slant={dims.slant} t={t} />}
+        {shape === 'triprism' && <TriPrismUnfold b={dims.triB} L={dims.triL} t={t} />}
+        {shape === 'cone' && <ConeUnfold r={dims.coneR} h={dims.coneH} t={t} />}
+        {shape === 'hexprism' && <HexPrismUnfold s={dims.hexS} H={dims.hexH} t={t} />}
       </Suspense>
 
       <OrbitControls
@@ -404,7 +760,12 @@ export default function GeometryUnfold() {
 
   const [shape, setShape] = useState<ShapeKey>('cube')
   const [unfoldPct, setUnfoldPct] = useState(0)
-  const [dims, setDims] = useState<Dims>({ a: 4, w: 5, h: 3, d: 3, r: 2.5, height: 5, slant: 4 })
+  const [dims, setDims] = useState<Dims>({
+    a: 4, w: 5, h: 3, d: 3, r: 2.5, height: 5, slant: 4,
+    triB: 4, triL: 6,
+    coneR: 2.5, coneH: 5,
+    hexS: 2, hexH: 5,
+  })
 
   // ── Formulas ─────────────────────────────────────────────
   const computed = (() => {
@@ -448,22 +809,73 @@ export default function GeometryUnfold() {
         ],
       }
     }
-    // pyramid
-    const base = a * a
-    const faceA = 0.5 * a * slant
-    const sa = base + 4 * faceA
-    // V = ⅓ × a² × h_apex. h_apex = √(slant² - (a/2)²) — Pythagorean exact
-    const hApex = Math.sqrt(Math.max(0, slant*slant - (a/2)*(a/2)))
-    const vol = (1/3) * a * a * hApex
-    return {
-      sa: round2(sa), vol: round2(vol),
-      saFormula: 'S = a² + 4 × (½ × a × l)',
-      volFormula: 'V = ⅓ × a² × h',
-      breakdown: [
-        { label: 'Đáy vuông',     color: '#f97316', val: `${a}² = ${round2(base)}` },
-        { label: '4 mặt tam giác',color: '#fbbf24', val: `4 × ${round2(faceA)} = ${round2(4*faceA)}` },
-      ],
+    if (shape === 'pyramid') {
+      const base = a * a
+      const faceA = 0.5 * a * slant
+      const sa = base + 4 * faceA
+      const hApex = Math.sqrt(Math.max(0, slant*slant - (a/2)*(a/2)))
+      const vol = (1/3) * a * a * hApex
+      return {
+        sa: round2(sa), vol: round2(vol),
+        saFormula: 'S = a² + 4 × (½ × a × l)',
+        volFormula: 'V = ⅓ × a² × h',
+        breakdown: [
+          { label: 'Đáy vuông',     color: '#f97316', val: `${a}² = ${round2(base)}` },
+          { label: '4 mặt tam giác',color: '#fbbf24', val: `4 × ${round2(faceA)} = ${round2(4*faceA)}` },
+        ],
+      }
     }
+    if (shape === 'triprism') {
+      const triB = dims.triB, triL = dims.triL
+      const triHeight = triB * Math.sqrt(3) / 2
+      const triBase = 0.5 * triB * triHeight   // diện tích 1 đáy tam giác đều
+      const sideRect = triB * triL              // mỗi mặt bên là chữ nhật triB × triL
+      const sa = 2 * triBase + 3 * sideRect
+      const vol = triBase * triL
+      return {
+        sa: round2(sa), vol: round2(vol),
+        saFormula: 'S = 2·(√3/4·b²) + 3·b·L',
+        volFormula: 'V = (√3/4·b²)·L',
+        breakdown: [
+          { label: '2 đáy tam giác',  color: '#22d3ee', val: `2 × ${round2(triBase)} = ${round2(2*triBase)}` },
+          { label: '3 mặt chữ nhật',  color: '#06b6d4', val: `3 × ${round2(sideRect)} = ${round2(3*sideRect)}` },
+        ],
+      }
+    }
+    if (shape === 'cone') {
+      const cR = dims.coneR, cH = dims.coneH
+      const cSlant = Math.sqrt(cR * cR + cH * cH)  // đường sinh l = √(r² + h²)
+      const baseArea = Math.PI * cR * cR
+      const lateralArea = Math.PI * cR * cSlant    // S_xq = πrl
+      const sa = baseArea + lateralArea
+      const vol = (1/3) * Math.PI * cR * cR * cH
+      return {
+        sa: round2(sa), vol: round2(vol),
+        saFormula: 'S = πr² + πrl  (l = √(r² + h²))',
+        volFormula: 'V = ⅓·πr²·h',
+        breakdown: [
+          { label: 'Đáy tròn',     color: '#ec4899', val: `π × ${cR}² = ${round2(baseArea)}` },
+          { label: `Mặt bên (l=${round2(cSlant)})`, color: '#f43f5e', val: `π × ${cR} × ${round2(cSlant)} = ${round2(lateralArea)}` },
+        ],
+      }
+    }
+    if (shape === 'hexprism') {
+      const hS = dims.hexS, hH = dims.hexH
+      const hexBase = (3 * Math.sqrt(3) / 2) * hS * hS  // diện tích lục giác đều
+      const sideRect = hS * hH
+      const sa = 2 * hexBase + 6 * sideRect
+      const vol = hexBase * hH
+      return {
+        sa: round2(sa), vol: round2(vol),
+        saFormula: 'S = 2·(3√3/2·s²) + 6·s·H',
+        volFormula: 'V = (3√3/2·s²)·H',
+        breakdown: [
+          { label: '2 đáy lục giác', color: '#fbbf24', val: `2 × ${round2(hexBase)} = ${round2(2*hexBase)}` },
+          { label: '6 mặt chữ nhật', color: '#f59e0b', val: `6 × ${round2(sideRect)} = ${round2(6*sideRect)}` },
+        ],
+      }
+    }
+    return { sa: 0, vol: 0, saFormula: '', volFormula: '', breakdown: [] }
   })()
 
   // ── Drawing ──────────────────────────────────────────────
