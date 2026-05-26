@@ -558,65 +558,310 @@ function SolarSystemSim() {
 // 3. COLLISION (NEWTON'S CRADLE) SIM
 // ============================================================================
 
-function CradleBall({ idx, total }: { idx: number; total: number }) {
+const CRADLE_COLORS = [
+  '#ef4444', // red
+  '#f97316', // orange
+  '#eab308', // yellow
+  '#22c55e', // green
+  '#06b6d4', // cyan
+  '#6366f1', // indigo
+  '#a855f7', // purple
+]
+
+function CradleBall({
+  idx,
+  total,
+  stringLen,
+  ballR,
+  speed,
+}: {
+  idx: number
+  total: number
+  stringLen: number
+  ballR: number
+  speed: number
+}) {
   const group = useRef<THREE.Group>(null)
+  const color = CRADLE_COLORS[idx % CRADLE_COLORS.length]
 
   useFrame(({ clock }) => {
     if (!group.current) return
     const t = clock.getElapsedTime()
-    const s = Math.sin(t * 2.8)
+    const s = Math.sin(t * speed)
     let angle = 0
 
     if (idx === 0) {
-      angle = s > 0 ? -s * 0.45 : 0
+      angle = s > 0 ? -s * 0.5 : 0
     }
     if (idx === total - 1) {
-      angle = s < 0 ? -s * 0.45 : 0
+      angle = s < 0 ? -s * 0.5 : 0
     }
 
     group.current.rotation.z = angle
   })
 
-  const x = (idx - (total - 1) / 2) * 0.52
+  const spacing = ballR * 2.05
+  const x = (idx - (total - 1) / 2) * spacing
+  // Anchor at y=1.2, ball hangs at y = 1.2 - stringLen
+  const stringCenterY = -stringLen / 2
+  const ballCenterY = -stringLen
 
   return (
     <group ref={group} position={[x, 1.2, 0]}>
-      {/* sphere */}
-      <mesh position={[0, -1, 0]}>
-        <sphereGeometry args={[0.22, 24, 24]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
+      {/* anchor point on bar */}
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.025, 12, 12]} />
+        <meshStandardMaterial color="#1f2937" />
       </mesh>
       {/* string */}
-      <mesh position={[0, -0.5, 0]}>
-        <cylinderGeometry args={[0.01, 0.01, 1, 4]} />
-        <meshStandardMaterial color="#666" />
+      <mesh position={[0, stringCenterY, 0]}>
+        <cylinderGeometry args={[0.012, 0.012, stringLen, 6]} />
+        <meshStandardMaterial color="#94a3b8" />
+      </mesh>
+      {/* sphere */}
+      <mesh position={[0, ballCenterY, 0]} castShadow>
+        <sphereGeometry args={[ballR, 32, 32]} />
+        <meshStandardMaterial
+          color={color}
+          metalness={0.5}
+          roughness={0.25}
+          emissive={color}
+          emissiveIntensity={0.15}
+        />
       </mesh>
     </group>
   )
 }
 
 function CollisionSim() {
-  const total = 5
+  const [total, setTotal] = useState(5)
+  const [stringLen, setStringLen] = useState(1.0)
+  const [ballR, setBallR] = useState(0.22)
+  const [speed, setSpeed] = useState(2.8)
+  const [showShadows, setShowShadows] = useState(true)
+
+  const barWidth = total * ballR * 2.2 + 0.4
+  const period = 2 * Math.PI * Math.sqrt(stringLen / 9.8)
 
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 5], fov: 45 }}>
-      <color attach="background" args={[BG]} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[5, 5, 5]} intensity={1} />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <Canvas
+        style={canvasStyle}
+        camera={{ position: [0, 0, 5], fov: 45 }}
+        shadows={showShadows}
+      >
+        <color attach="background" args={[BG]} />
+        <ambientLight intensity={0.45} />
+        <directionalLight
+          position={[3, 5, 4]}
+          intensity={1.1}
+          castShadow={showShadows}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+        <directionalLight position={[-3, 2, -2]} intensity={0.35} color="#a5b4fc" />
 
-      {/* bar */}
-      <mesh position={[0, 1.25, 0]}>
-        <boxGeometry args={[3, 0.08, 0.08]} />
-        <meshStandardMaterial color="#444" />
-      </mesh>
+        {/* bar */}
+        <mesh position={[0, 1.2, 0]}>
+          <boxGeometry args={[barWidth, 0.08, 0.08]} />
+          <meshStandardMaterial color="#3f3f46" metalness={0.5} roughness={0.4} />
+        </mesh>
 
-      {/* 5 cradle balls */}
-      {Array.from({ length: total }).map((_, i) => (
-        <CradleBall key={i} idx={i} total={total} />
-      ))}
+        {/* support legs (4 corners) */}
+        {[
+          [-barWidth / 2 + 0.05, 0, 0.4],
+          [barWidth / 2 - 0.05, 0, 0.4],
+          [-barWidth / 2 + 0.05, 0, -0.4],
+          [barWidth / 2 - 0.05, 0, -0.4],
+        ].map((pos, i) => (
+          <mesh key={i} position={[pos[0], (pos[1] + 1.2) / 2, pos[2]]}>
+            <cylinderGeometry args={[0.04, 0.04, 1.2 - pos[1], 8]} />
+            <meshStandardMaterial color="#52525b" metalness={0.4} roughness={0.5} />
+          </mesh>
+        ))}
 
-      <OrbitControls />
-    </Canvas>
+        {/* base ground */}
+        {showShadows && (
+          <mesh
+            position={[0, -1.2, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            receiveShadow
+          >
+            <planeGeometry args={[10, 6]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.9} />
+          </mesh>
+        )}
+
+        {/* cradle balls */}
+        {Array.from({ length: total }).map((_, i) => (
+          <CradleBall
+            key={i}
+            idx={i}
+            total={total}
+            stringLen={stringLen}
+            ballR={ballR}
+            speed={speed}
+          />
+        ))}
+
+        <OrbitControls enablePan={false} />
+      </Canvas>
+
+      {/* info badge */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          padding: '6px 10px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(99, 102, 241, 0.35)',
+          borderRadius: 8,
+          color: '#e2e8f0',
+          fontSize: 11,
+          fontWeight: 500,
+          pointerEvents: 'none',
+        }}
+      >
+        ⚡ Bảo toàn động lượng + KE · Va chạm đàn hồi
+      </div>
+
+      {/* controls overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 12,
+          bottom: 12,
+          width: 240,
+          padding: 12,
+          background: 'rgba(15, 23, 42, 0.78)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(148, 163, 184, 0.25)',
+          borderRadius: 10,
+          color: '#e2e8f0',
+          fontSize: 11,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 12, color: '#a5b4fc' }}>
+          ⚙️ Điều khiển
+        </div>
+        <CtrlSlider
+          label="Số quả bóng"
+          value={total}
+          min={3}
+          max={7}
+          step={1}
+          onChange={setTotal}
+          suffix=""
+        />
+        <CtrlSlider
+          label="Chiều dài dây"
+          value={stringLen}
+          min={0.5}
+          max={2.2}
+          step={0.05}
+          onChange={setStringLen}
+          suffix="m"
+        />
+        <CtrlSlider
+          label="Bán kính bóng"
+          value={ballR}
+          min={0.12}
+          max={0.35}
+          step={0.01}
+          onChange={setBallR}
+          suffix="m"
+        />
+        <CtrlSlider
+          label="Tốc độ"
+          value={speed}
+          min={1}
+          max={5}
+          step={0.1}
+          onChange={setSpeed}
+          suffix="×"
+        />
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showShadows}
+            onChange={(e) => setShowShadows(e.target.checked)}
+          />
+          <span>Hiện đổ bóng</span>
+        </label>
+        <div
+          style={{
+            marginTop: 4,
+            paddingTop: 8,
+            borderTop: '1px solid rgba(148, 163, 184, 0.25)',
+            fontSize: 10,
+            color: '#94a3b8',
+          }}
+        >
+          T = 2π·√(L/g) ={' '}
+          <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+            {period.toFixed(2)}s
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CtrlSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  suffix,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+  suffix: string
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 10,
+        }}
+      >
+        <span>{label}</span>
+        <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+          {step < 1 ? value.toFixed(2) : value}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#a5b4fc' }}
+      />
+    </div>
   )
 }
 
