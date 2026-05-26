@@ -19,6 +19,51 @@ export interface Milestone {
   title: string
   status: 'pending' | 'in-progress' | 'completed'
   dueDate: string
+  // ── Agile Scrum extensions (optional, backward-compat) ──
+  /** Fibonacci estimate: 1, 2, 3, 5, 8, 13. Null = chưa estimate. */
+  storyPoints?: number
+  /** ID Sprint mà milestone thuộc về. null/undefined = Backlog. */
+  sprintId?: string | null
+  /** Tiêu chí "Done" — check từng dòng để complete milestone. */
+  acceptanceCriteria?: string[]
+  /** ID teamMember chịu trách nhiệm. */
+  assigneeId?: string
+  /** Description chi tiết (story format: As X, I want Y, so Z) */
+  description?: string
+}
+
+// ─── Scrum types ─────────────────────────────────────────────────────────
+
+export interface SprintRetro {
+  wentWell: string[]
+  didNotGoWell: string[]
+  improvements: string[]
+}
+
+export interface Sprint {
+  id: string
+  number: number                    // Sprint #1, #2, ...
+  name: string                      // "Sprint 1: MVP cảm biến"
+  goal: string                      // Sprint goal — what should be achieved
+  startDate: string                 // ISO date
+  endDate: string                   // ISO date (default 2 weeks)
+  status: 'planned' | 'active' | 'completed'
+  /** Story points dự kiến cho sprint (capacity). */
+  capacity?: number
+  /** Demo notes / sản phẩm bàn giao của sprint. */
+  reviewNotes?: string
+  retro?: SprintRetro
+  createdAt: string
+}
+
+export interface DailyStandup {
+  id: string
+  sprintId: string
+  date: string                      // ISO date (only)
+  author: string
+  yesterday: string                 // hôm qua đã làm
+  today: string                     // hôm nay sẽ làm
+  blockers: string                  // chặn ngại
 }
 
 export interface Feedback {
@@ -112,6 +157,14 @@ export interface STEMProject {
 
   // ── Tài nguyên tham khảo ──
   resources?: Resource[]
+
+  // ── Agile Scrum ──
+  sprints?: Sprint[]
+  standups?: DailyStandup[]
+  /** Definition of Done project-wide — checklist tiêu chí "xong" áp dụng cho mọi
+   *  milestone. Khi tạo milestone mới, list này được dùng làm acceptanceCriteria
+   *  mặc định. */
+  definitionOfDone?: string[]
 }
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
@@ -439,4 +492,198 @@ export function moveMilestone(
     ;[next[idx], next[target]] = [next[target], next[idx]]
     return next
   })
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Agile Scrum — Sprint / Standup / Retro / DoD CRUD
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Persist project mutation + bump updatedAt. */
+function withProject(
+  projectId: string,
+  mutator: (p: STEMProject) => STEMProject,
+): STEMProject | undefined {
+  const projects = loadProjects()
+  const idx = projects.findIndex((p) => p.id === projectId)
+  if (idx < 0) return undefined
+  const updated: STEMProject = {
+    ...mutator(projects[idx]),
+    id: projects[idx].id,
+    updatedAt: new Date().toISOString(),
+  }
+  projects[idx] = updated
+  saveProjects(projects)
+  return updated
+}
+
+function newId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+/** Đếm sprint number tiếp theo (max + 1, hoặc 1 nếu trống). */
+function nextSprintNumber(sprints: Sprint[] | undefined): number {
+  if (!sprints || sprints.length === 0) return 1
+  return Math.max(...sprints.map((s) => s.number)) + 1
+}
+
+/** Tạo sprint mới (default 14 ngày, status planned). */
+export function createSprint(
+  projectId: string,
+  input: Partial<Sprint> & { name?: string; goal?: string },
+): STEMProject | undefined {
+  return withProject(projectId, (p) => {
+    const number = nextSprintNumber(p.sprints)
+    const start = input.startDate || new Date().toISOString().slice(0, 10)
+    const endDefault = new Date(new Date(start).getTime() + 14 * 86400_000)
+      .toISOString().slice(0, 10)
+    const sprint: Sprint = {
+      id: newId('spr'),
+      number,
+      name: input.name?.trim() || `Sprint ${number}`,
+      goal: input.goal?.trim() || '',
+      startDate: start,
+      endDate: input.endDate || endDefault,
+      status: input.status || 'planned',
+      capacity: input.capacity,
+      createdAt: new Date().toISOString(),
+    }
+    return { ...p, sprints: [...(p.sprints || []), sprint] }
+  })
+}
+
+/** Cập nhật fields cho 1 sprint. */
+export function updateSprint(
+  projectId: string,
+  sprintId: string,
+  fields: Partial<Sprint>,
+): STEMProject | undefined {
+  return withProject(projectId, (p) => ({
+    ...p,
+    sprints: (p.sprints || []).map((s) =>
+      s.id === sprintId ? { ...s, ...fields, id: s.id } : s,
+    ),
+  }))
+}
+
+/** Kích hoạt sprint — đổi status. Chỉ cho phép 1 sprint active cùng lúc. */
+export function activateSprint(projectId: string, sprintId: string): STEMProject | undefined {
+  return withProject(projectId, (p) => ({
+    ...p,
+    sprints: (p.sprints || []).map((s) =>
+      s.id === sprintId
+        ? { ...s, status: 'active' as const }
+        : s.status === 'active'
+          ? { ...s, status: 'completed' as const }
+          : s,
+    ),
+  }))
+}
+
+/** Đóng sprint — chuyển status sang completed. */
+export function completeSprint(projectId: string, sprintId: string): STEMProject | undefined {
+  return withProject(projectId, (p) => ({
+    ...p,
+    sprints: (p.sprints || []).map((s) =>
+      s.id === sprintId ? { ...s, status: 'completed' as const } : s,
+    ),
+  }))
+}
+
+/** Xoá sprint — milestone trong sprint trở về Backlog (sprintId = null). */
+export function deleteSprint(projectId: string, sprintId: string): STEMProject | undefined {
+  return withProject(projectId, (p) => ({
+    ...p,
+    sprints: (p.sprints || []).filter((s) => s.id !== sprintId),
+    milestones: p.milestones.map((m) =>
+      m.sprintId === sprintId ? { ...m, sprintId: null } : m,
+    ),
+    standups: (p.standups || []).filter((st) => st.sprintId !== sprintId),
+  }))
+}
+
+/** Gán milestone vào sprint (sprintId = null để đưa về Backlog). */
+export function assignMilestoneToSprint(
+  projectId: string,
+  milestoneId: string,
+  sprintId: string | null,
+): STEMProject | undefined {
+  return withMilestones(projectId, (ms) =>
+    ms.map((m) => (m.id === milestoneId ? { ...m, sprintId } : m)),
+  )
+}
+
+/** Cập nhật story points cho milestone. */
+export function setMilestoneStoryPoints(
+  projectId: string,
+  milestoneId: string,
+  points: number | undefined,
+): STEMProject | undefined {
+  return withMilestones(projectId, (ms) =>
+    ms.map((m) => (m.id === milestoneId ? { ...m, storyPoints: points } : m)),
+  )
+}
+
+/** Thêm daily standup note. */
+export function addStandup(
+  projectId: string,
+  sprintId: string,
+  note: Omit<DailyStandup, 'id' | 'sprintId'>,
+): STEMProject | undefined {
+  return withProject(projectId, (p) => {
+    const standup: DailyStandup = { ...note, id: newId('su'), sprintId }
+    return { ...p, standups: [...(p.standups || []), standup] }
+  })
+}
+
+export function deleteStandup(projectId: string, standupId: string): STEMProject | undefined {
+  return withProject(projectId, (p) => ({
+    ...p,
+    standups: (p.standups || []).filter((s) => s.id !== standupId),
+  }))
+}
+
+/** Cập nhật retro cho 1 sprint (3 cột: wentWell / didNotGoWell / improvements). */
+export function updateRetro(
+  projectId: string,
+  sprintId: string,
+  retro: SprintRetro,
+): STEMProject | undefined {
+  return updateSprint(projectId, sprintId, { retro })
+}
+
+/** Cập nhật Definition of Done project-wide. */
+export function setDefinitionOfDone(
+  projectId: string,
+  items: string[],
+): STEMProject | undefined {
+  return withProject(projectId, (p) => ({ ...p, definitionOfDone: items }))
+}
+
+// ─── Computed helpers (Velocity / Burndown) ──────────────────────────────
+
+/** Velocity = avg story points hoàn thành / sprint (chỉ tính completed sprints). */
+export function computeVelocity(project: STEMProject): number {
+  const sprints = (project.sprints || []).filter((s) => s.status === 'completed')
+  if (sprints.length === 0) return 0
+  const total = sprints.reduce((sum, sprint) => {
+    const ms = project.milestones.filter(
+      (m) => m.sprintId === sprint.id && m.status === 'completed',
+    )
+    return sum + ms.reduce((s, m) => s + (m.storyPoints || 0), 0)
+  }, 0)
+  return Math.round((total / sprints.length) * 10) / 10
+}
+
+/** Tổng story points của milestones trong 1 sprint. */
+export function sprintTotalPoints(project: STEMProject, sprintId: string): number {
+  return project.milestones
+    .filter((m) => m.sprintId === sprintId)
+    .reduce((s, m) => s + (m.storyPoints || 0), 0)
+}
+
+/** Story points đã hoàn thành trong 1 sprint. */
+export function sprintCompletedPoints(project: STEMProject, sprintId: string): number {
+  return project.milestones
+    .filter((m) => m.sprintId === sprintId && m.status === 'completed')
+    .reduce((s, m) => s + (m.storyPoints || 0), 0)
 }

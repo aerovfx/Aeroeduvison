@@ -21,6 +21,14 @@ import {
   Kanban, ChevronLeft, ChevronRight, Flame, Timer,
 } from 'lucide-react'
 import { api } from '@/services/api'
+import {
+  getSprintGoal, setSprintGoal as saveSprintGoal,
+  getRetro, setRetro as saveRetro,
+  getStandupsForSprint, addStandup as addStandupOverlay, deleteStandup as deleteStandupOverlay,
+  getDefinitionOfDone, setDefinitionOfDone as saveDoD,
+  getReviewNotes, setReviewNote as saveReviewNote,
+  type SprintRetro, type DailyStandup,
+} from '@/lib/stem-scrum-overlay'
 
 interface Project {
   id: string; teacher_id: string; title: string; description: string | null;
@@ -177,6 +185,7 @@ export default function StemProjectDetail() {
           <ScrumTab
             tasks={tasks} members={members} milestones={milestones} project={project}
             isOwner={isOwner}
+            projectId={id || ''}
             onMoveTask={async (taskId, newStatus) => {
               try { await api.patch(`/teacher/stem-projects/${id}/tasks/${taskId}`, { status: newStatus }); reload() }
               catch (e: any) { toast.error(e?.response?.data?.error || 'Lỗi') }
@@ -615,9 +624,10 @@ interface ScrumTabProps {
   isOwner: boolean
   onMoveTask: (taskId: string, newStatus: string) => Promise<void>
   onCreate: () => void
+  projectId: string
 }
 
-function ScrumTab({ tasks, members, milestones, isOwner, onMoveTask, onCreate }: ScrumTabProps) {
+function ScrumTab({ tasks, members, milestones, project, isOwner, onMoveTask, onCreate, projectId }: ScrumTabProps) {
   // ── Sprint calculation ──
   // Mỗi sprint = 14 ngày. Sprint 1 bắt đầu từ phase 1 milestone hoặc project created_at.
   const SPRINT_DAYS = 14
@@ -928,17 +938,522 @@ function ScrumTab({ tasks, members, milestones, isOwner, onMoveTask, onCreate }:
         </p>
       </div>
 
-      {/* ── Daily standup hint ── */}
-      <div className="rounded-2xl bg-emerald-500/5 border border-emerald-500/20 p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-emerald-400 text-base">☕</span>
-          <h4 className="text-sm font-bold text-emerald-300">Daily Standup · 15 phút mỗi sáng</h4>
+      {/* ── Sprint Goal — Scrum essential ── */}
+      <SprintGoalSection
+        projectId={projectId}
+        sprintNumber={viewSprintNum}
+        isCurrentSprint={isCurrentSprint}
+        isOwner={isOwner}
+      />
+
+      {/* ── Daily Standup — actual interactive form ── */}
+      <DailyStandupSection
+        projectId={projectId}
+        sprintNumber={viewSprintNum}
+        isCurrentSprint={isCurrentSprint}
+        members={members}
+      />
+
+      {/* ── Sprint Review notes (chỉ hiện cho sprint đã qua hoặc đang chạy) ── */}
+      {viewSprintNum < currentSprintNum && (
+        <SprintReviewSection
+          projectId={projectId}
+          sprintNumber={viewSprintNum}
+          totalPoints={totalPoints}
+          completedPoints={completedPoints}
+          isOwner={isOwner}
+        />
+      )}
+
+      {/* ── Retrospective — chỉ cho sprint đã qua ── */}
+      {viewSprintNum < currentSprintNum && (
+        <RetrospectiveSection
+          projectId={projectId}
+          sprintNumber={viewSprintNum}
+          isOwner={isOwner}
+        />
+      )}
+
+      {/* ── Definition of Done — project-wide checklist ── */}
+      <DefinitionOfDoneSection projectId={projectId} isOwner={isOwner} />
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Scrum essentials: Goal, Standup, Retro, DoD, Review
+// (Lưu localStorage qua stem-scrum-overlay.ts — BE chưa persist các metadata
+//  này, nhưng UX phong phú cho GV vẫn cần)
+// ──────────────────────────────────────────────────────────────────
+
+function SprintGoalSection({ projectId, sprintNumber, isCurrentSprint, isOwner }: {
+  projectId: string; sprintNumber: number; isCurrentSprint: boolean; isOwner: boolean
+}) {
+  const [goal, setGoalState] = useState(getSprintGoal(projectId, sprintNumber))
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(goal)
+
+  useEffect(() => {
+    setGoalState(getSprintGoal(projectId, sprintNumber))
+    setDraft(getSprintGoal(projectId, sprintNumber))
+    setEditing(false)
+  }, [projectId, sprintNumber])
+
+  const handleSave = () => {
+    saveSprintGoal(projectId, sprintNumber, draft)
+    setGoalState(draft.trim())
+    setEditing(false)
+    toast.success('Đã lưu sprint goal')
+  }
+
+  return (
+    <div className="rounded-2xl bg-purple-500/5 border border-purple-500/20 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-bold text-purple-300 flex items-center gap-2">
+          <Target className="w-4 h-4" />
+          🎯 Sprint Goal · Sprint {sprintNumber}
+          {isCurrentSprint && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300">ACTIVE</span>}
+        </h4>
+        {isOwner && !editing && (
+          <button onClick={() => setEditing(true)} className="text-xs text-purple-300 hover:text-purple-200 underline">
+            {goal ? 'Sửa' : 'Đặt goal'}
+          </button>
+        )}
+      </div>
+      {!editing ? (
+        goal ? (
+          <p className="text-sm text-foreground/90 italic leading-relaxed">"{goal}"</p>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            Chưa đặt mục tiêu cho sprint này. VD: "Hoàn thành prototype mạch cảm biến + demo cho lớp."
+          </p>
+        )
+      ) : (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="VD: Sprint này sẽ giao 1 sản phẩm cụ thể — prototype cảm biến PM2.5 chạy được + báo cáo demo"
+            rows={3}
+            className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg outline-none focus:border-purple-500/40 resize-none"
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave}
+              className="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold rounded">
+              Lưu goal
+            </button>
+            <button onClick={() => { setDraft(goal); setEditing(false) }}
+              className="px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-xs rounded">
+              Huỷ
+            </button>
+          </div>
         </div>
-        <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
-          <li>HS ghi log "Hôm qua làm gì" trong tab <strong className="text-foreground">Tiến trình</strong></li>
-          <li>"Hôm nay làm gì" — chọn task từ cột <strong className="text-foreground">To Do</strong> kéo sang <strong className="text-foreground">In Progress</strong></li>
-          <li>"Có vướng mắc gì" — ghi vào log + GV feedback ở tab <strong className="text-foreground">Feedback</strong></li>
-        </ul>
+      )}
+    </div>
+  )
+}
+
+function DailyStandupSection({ projectId, sprintNumber, isCurrentSprint, members }: {
+  projectId: string; sprintNumber: number; isCurrentSprint: boolean; members: Member[]
+}) {
+  const [standups, setStandupsState] = useState<DailyStandup[]>(() =>
+    getStandupsForSprint(projectId, sprintNumber))
+  const [open, setOpen] = useState(false)
+  const [author, setAuthor] = useState('')
+  const [yesterday, setYesterday] = useState('')
+  const [today, setToday] = useState('')
+  const [blockers, setBlockers] = useState('')
+
+  useEffect(() => {
+    setStandupsState(getStandupsForSprint(projectId, sprintNumber))
+  }, [projectId, sprintNumber])
+
+  const refresh = () => setStandupsState(getStandupsForSprint(projectId, sprintNumber))
+
+  const handleAdd = () => {
+    if (!author.trim() || !today.trim()) {
+      toast.error('Cần tên + "Hôm nay làm gì"')
+      return
+    }
+    addStandupOverlay(projectId, {
+      sprintNumber,
+      date: new Date().toISOString().slice(0, 10),
+      author: author.trim(),
+      yesterday: yesterday.trim(),
+      today: today.trim(),
+      blockers: blockers.trim(),
+    })
+    setYesterday(''); setToday(''); setBlockers('')
+    refresh()
+    toast.success('Đã ghi nhận standup')
+  }
+
+  return (
+    <div className="rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+      <button onClick={() => setOpen(!open)}
+        className="w-full p-4 flex items-center justify-between hover:bg-emerald-500/[0.03] transition rounded-2xl">
+        <h4 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+          <span className="text-base">☕</span>
+          Daily Standup ({standups.length})
+          {isCurrentSprint && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300">SPRINT HIỆN TẠI</span>}
+        </h4>
+        {open
+          ? <ChevronLeft className="w-4 h-4 rotate-90 text-muted-foreground" />
+          : <ChevronRight className="w-4 h-4 rotate-90 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="p-4 pt-0 space-y-3">
+          {isCurrentSprint && (
+            <div className="rounded-lg bg-card border border-border p-3 space-y-2">
+              <input
+                value={author} onChange={(e) => setAuthor(e.target.value)}
+                placeholder="Tên (VD: Bạn An / Cô Hương)"
+                list="members-dl"
+                className="w-full px-2.5 py-1.5 text-sm bg-background border border-border rounded outline-none focus:border-emerald-500/40"
+              />
+              <datalist id="members-dl">
+                {members.map((m) => <option key={m.id} value={m.name || ''} />)}
+              </datalist>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <textarea
+                  value={yesterday} onChange={(e) => setYesterday(e.target.value)}
+                  placeholder="🟢 Hôm qua đã làm..." rows={2}
+                  className="px-2 py-1.5 text-xs bg-background border border-border rounded outline-none focus:border-emerald-500/40 resize-none"
+                />
+                <textarea
+                  value={today} onChange={(e) => setToday(e.target.value)}
+                  placeholder="🎯 Hôm nay sẽ làm... *" rows={2}
+                  className="px-2 py-1.5 text-xs bg-background border border-border rounded outline-none focus:border-emerald-500/40 resize-none"
+                />
+                <textarea
+                  value={blockers} onChange={(e) => setBlockers(e.target.value)}
+                  placeholder="🚧 Đang bị kẹt..." rows={2}
+                  className="px-2 py-1.5 text-xs bg-background border border-border rounded outline-none focus:border-emerald-500/40 resize-none"
+                />
+              </div>
+              <button onClick={handleAdd}
+                className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded flex items-center justify-center gap-1">
+                <Plus className="w-3.5 h-3.5" /> Ghi standup hôm nay
+              </button>
+            </div>
+          )}
+
+          {standups.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic text-center py-2">
+              {isCurrentSprint ? 'Chưa có standup nào trong sprint này' : 'Sprint này không có standup ghi nhận'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {standups.slice(0, 15).map((s) => (
+                <div key={s.id} className="rounded-lg bg-card border border-border p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-xs font-bold">
+                      <span>{s.author}</span>
+                      <span className="text-muted-foreground ml-2 font-normal">
+                        · {new Date(s.date).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                      </span>
+                    </div>
+                    <button onClick={() => { deleteStandupOverlay(projectId, s.id); refresh() }}
+                      className="text-rose-400/60 hover:text-rose-400">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                    {s.yesterday && (
+                      <div>
+                        <div className="text-emerald-300/70 font-bold mb-0.5">🟢 Hôm qua</div>
+                        <div className="text-muted-foreground">{s.yesterday}</div>
+                      </div>
+                    )}
+                    {s.today && (
+                      <div>
+                        <div className="text-blue-300/70 font-bold mb-0.5">🎯 Hôm nay</div>
+                        <div className="text-muted-foreground">{s.today}</div>
+                      </div>
+                    )}
+                    {s.blockers && (
+                      <div>
+                        <div className="text-rose-300/70 font-bold mb-0.5">🚧 Kẹt ở</div>
+                        <div className="text-muted-foreground">{s.blockers}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SprintReviewSection({ projectId, sprintNumber, totalPoints, completedPoints, isOwner }: {
+  projectId: string; sprintNumber: number; totalPoints: number; completedPoints: number; isOwner: boolean
+}) {
+  const [note, setNote] = useState(() => getReviewNotes(projectId)[sprintNumber] || '')
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => {
+    setNote(getReviewNotes(projectId)[sprintNumber] || '')
+    setEditing(false)
+  }, [projectId, sprintNumber])
+
+  const handleSave = () => {
+    saveReviewNote(projectId, sprintNumber, note)
+    setEditing(false)
+    toast.success('Đã lưu sprint review')
+  }
+
+  return (
+    <div className="rounded-2xl bg-blue-500/5 border border-blue-500/20 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-bold text-blue-300 flex items-center gap-2">
+          <Send className="w-4 h-4" />
+          🎤 Sprint Review · Sprint {sprintNumber}
+        </h4>
+        {isOwner && !editing && (
+          <button onClick={() => setEditing(true)} className="text-xs text-blue-300 hover:text-blue-200 underline">
+            {note ? 'Sửa' : 'Viết review'}
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground mb-2">
+        Đã bàn giao {completedPoints}/{totalPoints} story points
+        {totalPoints > 0 && ` (${Math.round((completedPoints / totalPoints) * 100)}%)`}
+      </p>
+      {!editing ? (
+        note ? (
+          <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{note}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">Chưa có review — ghi tóm tắt demo & sản phẩm bàn giao</p>
+        )
+      ) : (
+        <div className="space-y-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="VD: Demo trước lớp ngày 25/05. Sản phẩm: prototype cảm biến + báo cáo + video. Phản hồi GV: positivE, gợi ý thêm app mobile."
+            rows={4}
+            className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg outline-none focus:border-blue-500/40 resize-none"
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave}
+              className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded">
+              Lưu review
+            </button>
+            <button onClick={() => setEditing(false)}
+              className="px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-xs rounded">
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RetrospectiveSection({ projectId, sprintNumber, isOwner }: {
+  projectId: string; sprintNumber: number; isOwner: boolean
+}) {
+  const [retro, setRetroState] = useState<SprintRetro>(() => getRetro(projectId, sprintNumber))
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    setRetroState(getRetro(projectId, sprintNumber))
+    setExpanded(false)
+  }, [projectId, sprintNumber])
+
+  const total = retro.wentWell.length + retro.didNotGoWell.length + retro.improvements.length
+
+  const addItem = (key: keyof SprintRetro, v: string) => {
+    if (!v.trim()) return
+    const next = { ...retro, [key]: [...retro[key], v.trim()] }
+    setRetroState(next)
+    saveRetro(projectId, sprintNumber, next)
+  }
+  const removeItem = (key: keyof SprintRetro, i: number) => {
+    const next = { ...retro, [key]: retro[key].filter((_, j) => j !== i) }
+    setRetroState(next)
+    saveRetro(projectId, sprintNumber, next)
+  }
+
+  return (
+    <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20">
+      <button onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-amber-500/[0.03] transition rounded-2xl">
+        <h4 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          🔍 Retrospective · Sprint {sprintNumber}
+          <span className="text-[10px] font-normal text-muted-foreground">
+            ({total > 0 ? `${total} điểm reflect` : 'chưa retro'})
+          </span>
+        </h4>
+        {expanded
+          ? <ChevronLeft className="w-4 h-4 rotate-90 text-muted-foreground" />
+          : <ChevronRight className="w-4 h-4 rotate-90 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <RetroCol title="🟢 Đi tốt" color="emerald" items={retro.wentWell} canEdit={isOwner}
+            onAdd={(v) => addItem('wentWell', v)} onRemove={(i) => removeItem('wentWell', i)} />
+          <RetroCol title="🔴 Chưa tốt" color="rose" items={retro.didNotGoWell} canEdit={isOwner}
+            onAdd={(v) => addItem('didNotGoWell', v)} onRemove={(i) => removeItem('didNotGoWell', i)} />
+          <RetroCol title="🟡 Cải thiện sprint tới" color="amber" items={retro.improvements} canEdit={isOwner}
+            onAdd={(v) => addItem('improvements', v)} onRemove={(i) => removeItem('improvements', i)} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RetroCol({ title, color, items, canEdit, onAdd, onRemove }: {
+  title: string; color: 'emerald' | 'rose' | 'amber'
+  items: string[]; canEdit: boolean
+  onAdd: (v: string) => void; onRemove: (i: number) => void
+}) {
+  const [input, setInput] = useState('')
+  const map = {
+    emerald: { bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', text: 'text-emerald-300' },
+    rose: { bg: 'bg-rose-500/[0.06]', border: 'border-rose-500/20', text: 'text-rose-300' },
+    amber: { bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', text: 'text-amber-300' },
+  }[color]
+  return (
+    <div className={`rounded-lg ${map.bg} border ${map.border} p-3`}>
+      <h5 className={`text-xs font-bold ${map.text} mb-2`}>{title}</h5>
+      <div className="space-y-1 mb-2">
+        {items.length === 0 && <div className="text-[11px] text-muted-foreground italic">(chưa có)</div>}
+        {items.map((it, i) => (
+          <div key={i} className="text-[11px] text-foreground/85 bg-card rounded p-2 flex items-start gap-2 border border-border">
+            <span className="flex-1">{it}</span>
+            {canEdit && (
+              <button onClick={() => onRemove(i)} className="text-rose-400/60 hover:text-rose-400 shrink-0">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {canEdit && (
+        <div className="flex gap-1">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && input.trim()) { onAdd(input); setInput('') }
+            }}
+            placeholder="+ thêm"
+            className="flex-1 px-2 py-1 text-[11px] bg-card border border-border rounded outline-none focus:border-foreground/30"
+          />
+          <button
+            onClick={() => { if (input.trim()) { onAdd(input); setInput('') } }}
+            className="px-2 py-1 text-[11px] bg-white/[0.06] hover:bg-white/[0.1] rounded">+</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DefinitionOfDoneSection({ projectId, isOwner }: { projectId: string; isOwner: boolean }) {
+  const [items, setItems] = useState<string[]>(() => getDefinitionOfDone(projectId))
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<string[]>(items)
+  const [newItem, setNewItem] = useState('')
+
+  useEffect(() => {
+    setItems(getDefinitionOfDone(projectId))
+    setEditing(false)
+  }, [projectId])
+
+  const handleSave = () => {
+    const cleaned = draft.filter((x) => x.trim())
+    saveDoD(projectId, cleaned)
+    setItems(cleaned)
+    setEditing(false)
+    toast.success('Đã lưu Definition of Done')
+  }
+
+  if (!editing) {
+    return (
+      <div className="rounded-2xl bg-cyan-500/5 border border-cyan-500/20 p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-bold text-cyan-300 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            ✅ Definition of Done ({items.length})
+          </h4>
+          {isOwner && (
+            <button onClick={() => { setDraft(items); setEditing(true) }} className="text-xs text-cyan-300 hover:text-cyan-200 underline">
+              {items.length ? 'Sửa' : 'Đặt DoD'}
+            </button>
+          )}
+        </div>
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">
+            Chưa định nghĩa "Done". Checklist áp dụng cho mọi task: VD code review xong · có demo · merge code · test pass · GV duyệt.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {items.map((it, i) => (
+              <li key={i} className="text-xs text-foreground/85 flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <span>{it}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-2xl bg-cyan-500/5 border-2 border-cyan-500/30 p-4">
+      <h4 className="text-sm font-bold text-cyan-300 mb-3 flex items-center gap-2">
+        <Edit3 className="w-4 h-4" /> Sửa Definition of Done
+      </h4>
+      <div className="space-y-2 mb-3">
+        {draft.map((it, i) => (
+          <div key={i} className="flex items-center gap-2 bg-card rounded p-2 border border-border">
+            <input
+              value={it}
+              onChange={(e) => {
+                const n = [...draft]; n[i] = e.target.value; setDraft(n)
+              }}
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
+            <button onClick={() => setDraft(draft.filter((_, j) => j !== i))}
+              className="text-rose-400/60 hover:text-rose-400">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-1 mb-3">
+        <input
+          value={newItem} onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newItem.trim()) {
+              setDraft([...draft, newItem.trim()]); setNewItem('')
+            }
+          }}
+          placeholder="+ Thêm tiêu chí (VD: Code review xong · có demo)"
+          className="flex-1 px-2 py-1.5 text-sm bg-card border border-border rounded outline-none focus:border-cyan-500/40"
+        />
+        <button
+          onClick={() => { if (newItem.trim()) { setDraft([...draft, newItem.trim()]); setNewItem('') } }}
+          className="px-3 py-1.5 text-xs bg-white/[0.06] hover:bg-white/[0.1] rounded">
+          + Thêm
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={handleSave}
+          className="flex-1 py-2 text-sm font-bold bg-cyan-500 hover:bg-cyan-600 text-white rounded flex items-center justify-center gap-1">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Lưu DoD
+        </button>
+        <button onClick={() => setEditing(false)}
+          className="px-4 py-2 text-sm bg-white/[0.06] hover:bg-white/[0.1] rounded">
+          Huỷ
+        </button>
       </div>
     </div>
   )
