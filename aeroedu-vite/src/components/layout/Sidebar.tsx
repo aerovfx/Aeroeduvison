@@ -157,6 +157,16 @@ const teacherSections: RouteSection[] = [
     ],
   },
   {
+    titleKey: 'sectionLabsTools',
+    routes: [
+      { icon: Zap,            labelKey: 'routeStem',    href: '/teacher/stem-projects', badge: 'Mới' },
+      { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab' },
+      { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
+      { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
+      { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/teacher/knowledge-graph' },
+    ],
+  },
+  {
     titleKey: 'sectionManage',
     routes: [
       { icon: BookOpenCheck,labelKey: 'routeClasses',     href: '/teacher/classes' },

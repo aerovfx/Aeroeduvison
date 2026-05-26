@@ -81,11 +81,13 @@ const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
 const ContactsPage     = lazy(() => import('@/pages/dashboard/Contacts'))
 
 // ── STEM Sub-pages ───────────────────────────────────────────
-const StemDetailPage    = lazy(() => import('@/pages/stem/StemDetail'))
-const StemEditPage      = lazy(() => import('@/pages/stem/StemEdit'))
-const StemTimelinePage  = lazy(() => import('@/pages/stem/StemTimeline'))
-const StemCreatePage    = lazy(() => import('@/pages/stem/StemCreate'))
-const StemTemplatesPage = lazy(() => import('@/pages/stem/StemTemplates'))
+const StemDetailPage      = lazy(() => import('@/pages/stem/StemDetail'))
+const StemEditPage        = lazy(() => import('@/pages/stem/StemEdit'))
+const StemTimelinePage    = lazy(() => import('@/pages/stem/StemTimeline'))
+const StemCreatePage      = lazy(() => import('@/pages/stem/StemCreate'))
+const StemTemplatesPage   = lazy(() => import('@/pages/stem/StemTemplates'))
+const TeacherStemProjects = lazy(() => import('@/pages/teacher/StemProjects'))
+const StemJoinByToken     = lazy(() => import('@/pages/stem/JoinByToken'))
 
 // ── Courses ─────────────────────────────────────────────────
 const CourseViewPage   = lazy(() => import('@/pages/courses/CourseView'))
@@ -103,6 +105,11 @@ const PixelOdyssey       = lazy(() => import('@/pages/labs/PixelOdyssey'))
 const GamesIndexPage     = lazy(() => import('@/pages/games/GamesIndex'))
 const BuffaloRunnerPage  = lazy(() => import('@/pages/games/BuffaloRunnerPage'))
 const ArduinoEmulator    = lazy(() => import('@/pages/labs/ArduinoEmulator'))
+// IoT sub-pages — deep-link cho assignment "lắp ráp / nghiên cứu mạch"
+const CircuitBuilder     = lazy(() => import('@/pages/labs/CircuitBuilder'))
+const CircuitPresets     = lazy(() => import('@/pages/labs/CircuitPresets'))
+const CustomWokwiBoard   = lazy(() => import('@/pages/labs/CustomWokwiBoard'))
+const SemiconductorLab   = lazy(() => import('@/pages/labs/SemiconductorLab'))
 const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
 const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
 const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
@@ -275,6 +282,7 @@ export function AppRouter() {
         <Route path="/a/:token"       element={<ScanAssignmentPage />} />
         <Route path="/k/:token"       element={<KeoCoJoinPage />} />
         <Route path="/join/:token"    element={<JoinByTokenPage />} />{/* HS quét QR vào lớp */}
+        <Route path="/stem/join/:token" element={<StemJoinByToken />} />{/* HS join dự án STEM qua QR/link */}
         <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
         <Route path="/kl/:token"      element={<KeoCoLivePage />} />
         <Route path="/contact-sales"  element={<ContactSalesPage />} />
@@ -342,8 +350,15 @@ export function AppRouter() {
             <Route path="/dashboard/competition"           element={<PageFallback />} />
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
-            <Route path="/dashboard/iot-lab"               element={<IoTLab />} />
-            <Route path="/dashboard/iot-lab/emulator"      element={<ArduinoEmulator />} />
+            <Route path="/dashboard/iot-lab"                       element={<IoTLab />} />
+            <Route path="/dashboard/iot-lab/emulator"              element={<ArduinoEmulator />} />
+            {/* ── Deep-link routes cho assignment "lắp ráp / nghiên cứu mạch" ── */}
+            <Route path="/dashboard/iot-lab/circuit-builder"       element={<CircuitBuilder />} />
+            <Route path="/dashboard/iot-lab/circuit-presets"       element={<CircuitPresets />} />
+            <Route path="/dashboard/iot-lab/custom-board"          element={<CustomWokwiBoard />} />
+            <Route path="/dashboard/iot-lab/semiconductor"         element={<SemiconductorLab />} />
+            <Route path="/dashboard/iot-lab/circuit-simulator"     element={<CircuitSimulator />} />
+            <Route path="/dashboard/iot-lab/digital-logic"         element={<DigitalLogicLab />} />
             <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
             <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
             <Route path="/dashboard/learning"              element={<PageFallback />} />
@@ -474,7 +489,7 @@ export function AppRouter() {
               <Route path="/student/ai-tutor"                 element={<StudentAiTutorPage />} />
               <Route path="/student/career"                   element={<StudentCareerPage />} />
               <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
-              <Route path="/student/exam/:id"                 element={<PageFallback />} />
+              <Route path="/student/exam/:examId"             element={<ExamModesPage />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
               <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/daily"                    element={<StudentDailyPage />} />
@@ -490,6 +505,8 @@ export function AppRouter() {
             <Route element={<RoleGuard roles={['TEACHER', 'ADMIN']} />}>
               {/* Đã port */}
               <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
+              <Route path="/teacher/stem-projects"          element={<TeacherStemProjects />} />
+              <Route path="/teacher/stem-projects/:id"      element={<StemEditPage />} />{/* reuse student edit canvas */}
               <Route path="/teacher/sprint"                 element={<TeacherSprintPage />} />
               <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
               <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />
