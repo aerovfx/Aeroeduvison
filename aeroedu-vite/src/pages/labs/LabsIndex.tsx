@@ -176,6 +176,7 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Khúc xạ Snell',     emoji: '🔬', path: '/dashboard/labtwin/refraction',         desc: 'n₁sin(i) = n₂sin(r) · TIR',   accent: 'cyan',     group: 'physics' },
   { name: 'SHM nâng cao',      emoji: '〰️', path: '/dashboard/labtwin/harmonic-motion',    desc: 'Phase plot · Energy · damping', accent: 'fuchsia',  group: 'physics' },
   { name: 'Archimedes',        emoji: '🛁', path: '/dashboard/labtwin/density-buoyancy',   desc: 'Lực đẩy · 5 chất lỏng phân tầng', accent: 'cyan',  group: 'chemistry' },
+  { name: 'Scratch Kids',      emoji: '🐱', path: '/dashboard/labtwin/scratch-kids',       desc: 'Lập trình kéo thả · vẽ · phát nhạc', accent: 'amber', group: 'ai' },
 
   // ── Toán & Trực quan (3) ──
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
