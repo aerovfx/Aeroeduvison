@@ -188,7 +188,8 @@ const teacherSections: RouteSection[] = [
       { icon: Zap,            labelKey: 'routeStem',           href: '/dashboard/stem' },
       { icon: Zap,            labelKey: 'routeStemProjects',   href: '/teacher/stem-projects',      badge: 'STEM' },
       { icon: Gamepad2,       labelKey: 'routeGames',          href: '/dashboard/games',            badge: 'Game' },
-      { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/dashboard/knowledge-graph',  badge: 'AI' },
+      // KG HS (/dashboard/knowledge-graph) đã bỏ — GV dùng "Cây tri thức GV"
+      // ở sectionOverview (/teacher/knowledge-graph) thay vì xem KG của HS
     ],
   },
   {
