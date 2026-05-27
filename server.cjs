@@ -1174,6 +1174,130 @@ app.get('/api/teacher/analytics', async (req, res) => {
   });
 });
 app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
+
+// /api/teacher/dashboard/full — FE TeacherDashboard.tsx fetch endpoint này
+// Shape DashboardFullData: { students[], stats, classes[], topPerformers[],
+//   needAttention[], aiSuggestions[], updatedAt }
+// Query DB Class + ClassStudent join User; fail soft trả empty nếu lỗi.
+app.get('/api/teacher/dashboard/full', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let teacherId = null;
+  if (auth.startsWith('Bearer ')) { try { teacherId = _akVerify(auth.slice(7)).sub; } catch {} }
+  if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const emptyShape = {
+    students: [],
+    stats: {
+      totalStudents: 0, classCount: 0, averageXP: 0, averageProgress: 0,
+      averageScore: 0, averageEngagement: 0, averageCapability: 0,
+      atRiskCount: 0, excellingCount: 0, totalLessonsCompleted: 0,
+      totalExamAttempts: 0, activeToday: 0, activeThisWeek: 0,
+    },
+    classes: [], topPerformers: [], needAttention: [], aiSuggestions: [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const pool = _getPool();
+    // 1. List teacher's classes
+    const classRes = await pool.query(`
+      SELECT c.id, c.name,
+             (SELECT COUNT(*)::int FROM "ClassStudent" cs WHERE cs.class_id = c.id) AS "studentCount"
+      FROM "Class" c
+      WHERE c.teacher_id = $1
+      ORDER BY c.created_at DESC NULLS LAST
+    `, [teacherId]).catch(() => ({ rows: [] }));
+    const classes = classRes.rows.map(r => ({
+      id: r.id, name: r.name, studentCount: r.studentCount || 0,
+    }));
+    const classIds = classes.map(c => c.id);
+
+    if (classIds.length === 0) {
+      return res.json({
+        ...emptyShape,
+        aiSuggestions: [{
+          type: 'tip', severity: 'info',
+          title: '🎓 Chưa có lớp nào',
+          desc: 'Tạo lớp đầu tiên ở /teacher/classes để bắt đầu quản lý học sinh.',
+          action: '/teacher/classes',
+        }],
+      });
+    }
+
+    // 2. Aggregate students from ClassStudent + LEFT JOIN User
+    const studentsRes = await pool.query(`
+      SELECT cs.id,
+        COALESCE(u.id, cs.id) AS user_id,
+        COALESCE(u.name, cs.ho_ten, 'Học sinh') AS name,
+        COALESCE(u.email, '') AS email,
+        u.image, cs.class_id, cl.name AS class_name
+      FROM "ClassStudent" cs
+      LEFT JOIN "User" u ON u.id = cs.user_id
+      LEFT JOIN "Class" cl ON cl.id = cs.class_id
+      WHERE cs.class_id = ANY($1::text[])
+      ORDER BY cs.stt NULLS LAST, cs.ho_ten
+    `, [classIds]).catch(() => ({ rows: [] }));
+
+    // Group by user_id (HS có thể trong nhiều lớp)
+    const studentMap = new Map();
+    for (const r of studentsRes.rows) {
+      const key = r.user_id;
+      if (!studentMap.has(key)) {
+        studentMap.set(key, {
+          id: key, name: r.name, email: r.email, image: r.image || null,
+          totalXP: 0, level: 1, progress: 0, averageScore: 0,
+          lessonsCompleted: 0, examAttempts: 0,
+          lastActive: 'Chưa có hoạt động', lastActiveAt: null,
+          emotion: 'neutral', atRisk: false, excelling: false,
+          engagement: 50, streak: 0, capability: 50, motivation: 50,
+          classes: [],
+        });
+      }
+      const stu = studentMap.get(key);
+      if (r.class_id && r.class_name && !stu.classes.find(c => c.id === r.class_id)) {
+        stu.classes.push({ id: r.class_id, name: r.class_name });
+      }
+    }
+    const students = Array.from(studentMap.values());
+    const totalStudents = students.length;
+
+    const stats = {
+      totalStudents, classCount: classes.length,
+      averageXP: 0, averageProgress: 0, averageScore: 0,
+      averageEngagement: 50, averageCapability: 50,
+      atRiskCount: 0, excellingCount: 0,
+      totalLessonsCompleted: 0, totalExamAttempts: 0,
+      activeToday: 0, activeThisWeek: 0,
+    };
+
+    const aiSuggestions = [];
+    if (totalStudents === 0) {
+      aiSuggestions.push({
+        type: 'tip', severity: 'info',
+        title: '👥 Lớp chưa có học sinh',
+        desc: `Có ${classes.length} lớp nhưng chưa có HS. Import danh sách Excel hoặc mời HS qua link/QR.`,
+        action: '/teacher/classes',
+      });
+    } else {
+      aiSuggestions.push({
+        type: 'success', severity: 'info',
+        title: `✅ Quản lý ${totalStudents} HS qua ${classes.length} lớp`,
+        desc: 'Dữ liệu chi tiết (điểm, tiến độ, cảm xúc) sẽ hiển thị khi HS bắt đầu hoạt động trên platform.',
+      });
+    }
+
+    return res.json({
+      students, stats, classes,
+      topPerformers: [], needAttention: [],
+      aiSuggestions,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[teacher:dashboard:full]', err.message);
+    return res.json(emptyShape); // fail soft
+  }
+});
+
 app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
