@@ -33,6 +33,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
+const { normalizeSubject } = require('./lib/subject-normalize.cjs');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -2389,7 +2390,8 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     const myId = decoded.userId || decoded.id || decoded.sub;
     try {
       const { title = 'Giáo án mới', content = '', contentJson = null,
-              subject = null, grade = null, tags = [] } = req.body || {};
+              subject: subjectRaw = null, grade = null, tags = [] } = req.body || {};
+      const subject = subjectRaw ? normalizeSubject(subjectRaw) : null;
       const { randomUUID } = require('crypto');
       const id = randomUUID();
       const wordCount = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
@@ -2414,7 +2416,7 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const updates = ['updated_at = NOW()', 'last_saved_at = NOW()'];
       const params = [req.params.id, _ids(decoded)];
       if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
-      if (subject !== undefined)      { params.push(subject);                       updates.push(`subject = $${params.length}`); }
+      if (subject !== undefined)      { params.push(subject ? normalizeSubject(subject) : null); updates.push(`subject = $${params.length}`); }
       if (grade !== undefined)        { params.push(grade);                         updates.push(`grade = $${params.length}`); }
       if (tags !== undefined)         { params.push(JSON.stringify(Array.isArray(tags) ? tags : [])); updates.push(`tags = $${params.length}::jsonb`); }
       if (content !== undefined) {
@@ -5045,12 +5047,13 @@ if (USE_NODEJS_QUESTIONS) {
     try {
       const pool = getQPool();
       const {
-        content, questionType = 'MCQ', subject = 'Vật lý', grade = 'Khối 12',
+        content, questionType = 'MCQ', subject: subjectRaw = 'Vật lí', grade = 'Khối 12',
         difficulty = 'MEDIUM', topic = '', explanation = '',
         options = [], correctAnswer = '',
         learningObjectives = [], keywords = [], tags = [],
         status = 'Hoạt động',
       } = req.body || {};
+      const subject = normalizeSubject(subjectRaw);
 
       if (!content) return res.status(400).json({ success: false, error: 'content is required' });
 
@@ -8099,7 +8102,7 @@ if (USE_NODEJS_QUESTIONS) {
 
       const b = req.body || {};
       const title = String(b.title || 'Kéo Co Kiến Thức').slice(0, 500);
-      const subject = String(b.subject || 'Vật lý').slice(0, 100);
+      const subject = normalizeSubject(String(b.subject || 'Vật lí').slice(0, 100));
       const grade = String(b.grade || 'Khối 12').slice(0, 50);
       const difficulty = b.difficulty ? String(b.difficulty).slice(0, 20) : null;
       const topic = b.topic ? String(b.topic).slice(0, 200) : null;
@@ -8651,7 +8654,7 @@ if (USE_NODEJS_QUESTIONS) {
       if (!creatorName) return res.status(400).json({ success: false, error: 'creator_name_required' });
 
       const title = String(b.title || `Thách đấu của ${creatorName}`).slice(0, 500);
-      const subject = String(b.subject || 'Vật lý').slice(0, 100);
+      const subject = normalizeSubject(String(b.subject || 'Vật lí').slice(0, 100));
       const grade = String(b.grade || 'Khối 12').slice(0, 50);
       const difficulty = b.difficulty ? String(b.difficulty).slice(0, 20) : null;
       const topic = b.topic ? String(b.topic).slice(0, 200) : null;
@@ -9019,7 +9022,7 @@ if (USE_NODEJS_QUESTIONS) {
 
       const b = req.body || {};
       const title = String(b.title || 'Đối kháng Kéo Co').slice(0, 500);
-      const subject = String(b.subject || 'Vật lý').slice(0, 100);
+      const subject = normalizeSubject(String(b.subject || 'Vật lí').slice(0, 100));
       const grade = String(b.grade || 'Khối 12').slice(0, 50);
       const difficulty = b.difficulty ? String(b.difficulty).slice(0, 20) : null;
       const topic = b.topic ? String(b.topic).slice(0, 200) : null;
@@ -11308,6 +11311,24 @@ async function _ensureLessonPlanTable() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_public ON "LessonPlan"(is_public, shared_at DESC) WHERE is_public = true`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
+
+// ── Subject normalization backfill — chạy 1 lần lúc boot ──
+// "Vật lý" → "Vật lí", "Hóa học" → "Hoá học", "Vat ly" → "Vật lí", ...
+// Lib: lib/subject-normalize.cjs (export normalizeSubject + backfillSubjects)
+;(async () => {
+  try {
+    const { backfillSubjects } = require('./lib/subject-normalize.cjs');
+    const log = await backfillSubjects(_getPool());
+    if (log.length > 0) {
+      console.log('[subject-normalize] ✅ Backfill done:',
+        log.map(l => `${l.table}=${l.updated}`).join(', '));
+    } else {
+      console.log('[subject-normalize] ✅ Tất cả subject đã chuẩn hoá');
+    }
+  } catch (e) {
+    console.warn('[subject-normalize] backfill skipped:', e.message);
+  }
+})();
 
 function _lpAuth(req, res) {
   const auth = req.headers.authorization || '';
