@@ -597,6 +597,94 @@ function Plot({
     return { fills, boundaries }
   }, [compiled, xMin, xMax, yMin, yMax, w, h])
 
+  // ─── Intersection points between functions ───
+  // Pair-wise: tìm sign change của (f_i - f_j) qua sampling, refine bằng
+  // bisection/linear interp. Hiển thị chấm tròn lớn + tooltip toạ độ.
+  const intersections = useMemo(() => {
+    const fns = compiled.filter((c) => c.row.visible && !c.err && !c.ineq)
+    if (fns.length < 2) return [] as { x: number; y: number; ids: [string, string]; colors: [string, string] }[]
+    const N = 600  // sample density — đủ tinh cho hầu hết hàm bậc cao
+    const out: { x: number; y: number; ids: [string, string]; colors: [string, string] }[] = []
+    const dx = (xMax - xMin) / N
+    const TOL = (xMax - xMin) * 1e-6
+    // Helper: bisection refine sign change x_a, x_b — trả về x với |g(x)| ≈ 0
+    const refine = (g: (x: number) => number, xa: number, xb: number): number | null => {
+      let a = xa, b = xb
+      let ga = g(a), gb = g(b)
+      if (!Number.isFinite(ga) || !Number.isFinite(gb) || ga * gb > 0) return null
+      for (let iter = 0; iter < 40; iter++) {
+        if (Math.abs(b - a) < TOL) break
+        const m = (a + b) / 2
+        const gm = g(m)
+        if (!Number.isFinite(gm)) return null
+        if (gm === 0) return m
+        if (ga * gm < 0) { b = m; gb = gm } else { a = m; ga = gm }
+      }
+      return (a + b) / 2
+    }
+    for (let i = 0; i < fns.length; i++) {
+      for (let j = i + 1; j < fns.length; j++) {
+        const fA = fns[i], fB = fns[j]
+        const g = (x: number) => {
+          try {
+            const ya = fA.fn(x), yb = fB.fn(x)
+            if (!Number.isFinite(ya) || !Number.isFinite(yb)) return NaN
+            return ya - yb
+          } catch { return NaN }
+        }
+        let prevX = xMin
+        let prevG = g(prevX)
+        for (let k = 1; k <= N; k++) {
+          const x = xMin + dx * k
+          const gNow = g(x)
+          if (Number.isFinite(prevG) && Number.isFinite(gNow) && prevG !== 0 && gNow !== 0 && prevG * gNow < 0) {
+            const xCross = refine(g, prevX, x)
+            if (xCross !== null) {
+              let yA = NaN
+              try { yA = fA.fn(xCross) } catch {}
+              if (Number.isFinite(yA) && yA >= yMin - (yMax - yMin) * 0.05 && yA <= yMax + (yMax - yMin) * 0.05) {
+                // Dedup gần (cùng pair + cách < 1px display)
+                const last = out[out.length - 1]
+                const samePair = last && last.ids[0] === fA.row.id && last.ids[1] === fB.row.id
+                if (!samePair || Math.abs(xS(last.x) - xS(xCross)) > 2) {
+                  out.push({
+                    x: xCross, y: yA,
+                    ids: [fA.row.id, fB.row.id],
+                    colors: [fA.row.color, fB.row.color],
+                  })
+                }
+              }
+            }
+          }
+          prevX = x
+          prevG = gNow
+        }
+      }
+    }
+    // Cap để tránh render quá nhiều (vd hàm dao động)
+    return out.slice(0, 40)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compiled, xMin, xMax, yMin, yMax])
+
+  // ─── Snap cursor tới giao điểm gần nhất (trong bán kính 14px) ───
+  const SNAP_RADIUS_PX = 14
+  const snappedIntersection = useMemo(() => {
+    if (!cursor) return null
+    const cx = xS(cursor.x), cy = yS(cursor.y)
+    let bestIdx = -1
+    let bestDist = Infinity
+    intersections.forEach((p, idx) => {
+      const ddx = xS(p.x) - cx, ddy = yS(p.y) - cy
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy)
+      if (dist <= SNAP_RADIUS_PX && dist < bestDist) {
+        bestIdx = idx
+        bestDist = dist
+      }
+    })
+    return bestIdx >= 0 ? intersections[bestIdx] : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, intersections, w, h, xMin, xMax, yMin, yMax])
+
   // Compute paths for each function. Break path on NaN / discontinuities.
   const paths = useMemo(() => {
     const N = Math.max(400, Math.min(1500, Math.floor(w * 1.5)))
@@ -761,14 +849,40 @@ function Plot({
                 strokeLinejoin="round" strokeLinecap="round" />
         ))}
 
+        {/* Intersection points — chấm tròn vàng (snap = lớn hơn + glow) */}
+        {intersections.map((p, idx) => {
+          const isSnap = snappedIntersection === p
+          const cx = xS(p.x), cy = yS(p.y)
+          if (cx < -12 || cx > w + 12 || cy < -12 || cy > h + 12) return null
+          return (
+            <g key={`isect-${idx}`} pointerEvents="none">
+              {isSnap && (
+                <>
+                  <circle cx={cx} cy={cy} r={20} fill="#fbbf24" fillOpacity={0.18} />
+                  <circle cx={cx} cy={cy} r={14} fill="#fbbf24" fillOpacity={0.28} />
+                </>
+              )}
+              <circle cx={cx} cy={cy} r={isSnap ? 10 : 5.5}
+                      fill="#fbbf24" stroke="#0a0f1a" strokeWidth={isSnap ? 2.5 : 1.75} />
+              <circle cx={cx} cy={cy} r={isSnap ? 4.5 : 2.5} fill="#fff" />
+            </g>
+          )
+        })}
+
         {/* Cursor marker + value readout */}
         {cursor && (
           <g>
-            <line x1={xS(cursor.x)} y1={0} x2={xS(cursor.x)} y2={h}
-                  stroke="#475569" strokeWidth={0.6} strokeDasharray="3 3" />
-            <line x1={0} y1={yS(cursor.y)} x2={w} y2={yS(cursor.y)}
-                  stroke="#475569" strokeWidth={0.6} strokeDasharray="3 3" />
-            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).map((c) => {
+            <line x1={xS(snappedIntersection?.x ?? cursor.x)} y1={0}
+                  x2={xS(snappedIntersection?.x ?? cursor.x)} y2={h}
+                  stroke={snappedIntersection ? '#fbbf24' : '#475569'}
+                  strokeWidth={snappedIntersection ? 1 : 0.6}
+                  strokeDasharray="3 3" />
+            <line x1={0} y1={yS(snappedIntersection?.y ?? cursor.y)}
+                  x2={w} y2={yS(snappedIntersection?.y ?? cursor.y)}
+                  stroke={snappedIntersection ? '#fbbf24' : '#475569'}
+                  strokeWidth={snappedIntersection ? 1 : 0.6}
+                  strokeDasharray="3 3" />
+            {!snappedIntersection && compiled.filter((c) => c.row.visible && !c.err && !c.ineq).map((c) => {
               let y: number
               try { y = c.fn(cursor.x) } catch { y = NaN }
               if (!Number.isFinite(y)) return null
@@ -783,6 +897,32 @@ function Plot({
           </g>
         )}
 
+        {/* Snap coordinate label cạnh giao điểm */}
+        {snappedIntersection && (() => {
+          const cx = xS(snappedIntersection.x)
+          const cy = yS(snappedIntersection.y)
+          const label = `(${snappedIntersection.x.toFixed(3)}, ${snappedIntersection.y.toFixed(3)})`
+          // Lệch label lên-phải; nếu vượt biên → flip xuống/trái
+          const flipRight = cx + 140 > w
+          const flipDown = cy - 30 < 6
+          const tx = flipRight ? cx - 14 : cx + 14
+          const ty = flipDown ? cy + 28 : cy - 14
+          const anchor = flipRight ? 'end' : 'start'
+          return (
+            <g pointerEvents="none">
+              <rect x={anchor === 'end' ? tx - 132 : tx - 4} y={ty - 16}
+                    width={136} height={22} rx={5}
+                    fill="#0a0f1a" fillOpacity={0.92}
+                    stroke="#fbbf24" strokeWidth={1.2} />
+              <text x={tx + (anchor === 'end' ? -8 : 4)} y={ty}
+                    fill="#fbbf24" fontSize={13} fontFamily="monospace"
+                    fontWeight={700} textAnchor={anchor}>
+                🎯 {label}
+              </text>
+            </g>
+          )
+        })()}
+
         {/* Axis labels */}
         <text x={w - 8} y={yMin <= 0 && yMax >= 0 ? yS(0) - 6 : h - 20}
               fill='var(--td-muted)' fontSize={11}
@@ -793,23 +933,53 @@ function Plot({
 
       {/* Cursor readout */}
       {cursor && (
-        <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-slate-900/85 border border-border px-2.5 py-1.5 text-[10.5px] font-mono text-foreground">
-          <div>x = <span className="text-cyan-300">{cursor.x.toFixed(3)}</span></div>
-          <div>y = <span className="text-amber-300">{cursor.y.toFixed(3)}</span></div>
-          {compiled.filter((c) => c.row.visible && !c.err).slice(0, 4).map((c) => {
-            let y: number
-            try { y = c.fn(cursor.x) } catch { y = NaN }
-            return (
-              <div key={c.row.id} className="mt-0.5 flex items-center gap-1.5">
-                <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: c.row.color }} />
-                <span className="text-slate-400">f({cursor.x.toFixed(2)})</span>
-                <span className="text-white">=</span>
-                <span style={{ color: c.row.color }}>
-                  {Number.isFinite(y) ? y.toFixed(3) : '—'}
-                </span>
+        <div className={`pointer-events-none absolute right-2 top-2 rounded-lg border px-2.5 py-1.5 font-mono text-foreground ${
+          snappedIntersection
+            ? 'bg-amber-900/40 border-amber-400 text-[11.5px] shadow-[0_0_18px_rgba(251,191,36,0.35)]'
+            : 'bg-slate-900/85 border-border text-[10.5px]'
+        }`}>
+          {snappedIntersection ? (
+            <>
+              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
+                <span>🎯</span><span>Giao điểm</span>
               </div>
-            )
-          })}
+              <div className="text-[13px] leading-tight">
+                x = <span className="text-amber-200 font-bold">{snappedIntersection.x.toFixed(4)}</span>
+              </div>
+              <div className="text-[13px] leading-tight">
+                y = <span className="text-amber-200 font-bold">{snappedIntersection.y.toFixed(4)}</span>
+              </div>
+              <div className="mt-1 flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: snappedIntersection.colors[0] }} />
+                <span className="text-slate-300">∩</span>
+                <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: snappedIntersection.colors[1] }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>x = <span className="text-cyan-300">{cursor.x.toFixed(3)}</span></div>
+              <div>y = <span className="text-amber-300">{cursor.y.toFixed(3)}</span></div>
+              {compiled.filter((c) => c.row.visible && !c.err).slice(0, 4).map((c) => {
+                let y: number
+                try { y = c.fn(cursor.x) } catch { y = NaN }
+                return (
+                  <div key={c.row.id} className="mt-0.5 flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: c.row.color }} />
+                    <span className="text-slate-400">f({cursor.x.toFixed(2)})</span>
+                    <span className="text-white">=</span>
+                    <span style={{ color: c.row.color }}>
+                      {Number.isFinite(y) ? y.toFixed(3) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+              {intersections.length > 0 && (
+                <div className="mt-1 pt-1 border-t border-slate-700 text-[9.5px] text-slate-400">
+                  💡 {intersections.length} giao điểm — rê chuột gần để snap
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
