@@ -3050,6 +3050,626 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
       return res.status(500).json({ error: err.message });
     }
   });
+
+  // ════════════════════════════════════════════════════════════
+  // CURRICULUM CRUD — Chapter / Lesson / LessonBlock
+  //   Endpoints needed bởi /teacher/course/:id/edit?step=2 (CurriculumStep)
+  //
+  //   - GET    /api/instructor/courses/:courseId/chapters
+  //   - POST   /api/instructor/courses/:courseId/chapters
+  //   - PATCH  /api/instructor/courses/:courseId/chapters/:chapterId
+  //   - DELETE /api/instructor/courses/:courseId/chapters/:chapterId
+  //   - POST   /api/instructor/courses/:courseId/chapters/reorder
+  //   - POST   /api/instructor/courses/:courseId/chapters/:chapterId/lessons
+  //   - POST   /api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder
+  //   - PATCH  /api/instructor/lessons/:lessonId
+  //   - DELETE /api/instructor/lessons/:lessonId
+  //   - GET    /api/instructor/lessons/:lessonId/blocks
+  //   - POST   /api/instructor/lessons/:lessonId/blocks
+  //   - PATCH  /api/instructor/lesson-blocks/:blockId
+  //   - DELETE /api/instructor/lesson-blocks/:blockId
+  //   - POST   /api/instructor/lessons/:lessonId/blocks/reorder
+  //
+  // Tables: "Chapter" (Prisma), "Lesson" (lazy), "LessonBlock" (lazy).
+  // ════════════════════════════════════════════════════════════
+  const { randomUUID: curriculumUUID } = require('crypto');
+
+  let _curriculumTablesReady = false;
+  async function ensureCurriculumTables(pool) {
+    if (_curriculumTablesReady) return;
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "Lesson" (
+          id           TEXT PRIMARY KEY,
+          "chapterId"  TEXT NOT NULL REFERENCES "Chapter"(id) ON DELETE CASCADE,
+          title        TEXT NOT NULL,
+          description  TEXT,
+          duration     INT,
+          type         TEXT NOT NULL DEFAULT 'video',
+          position     INT  NOT NULL DEFAULT 0,
+          "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Lesson_chapter_idx" ON "Lesson"("chapterId");`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "LessonBlock" (
+          id           TEXT PRIMARY KEY,
+          "lessonId"   TEXT NOT NULL REFERENCES "Lesson"(id) ON DELETE CASCADE,
+          type         TEXT NOT NULL,
+          title        TEXT,
+          content      TEXT,
+          metadata     JSONB,
+          position     INT  NOT NULL DEFAULT 0,
+          "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LessonBlock_lesson_idx" ON "LessonBlock"("lessonId");`);
+      _curriculumTablesReady = true;
+      console.log('[curriculum] ✅ Lesson + LessonBlock tables ready');
+    } catch (e) {
+      console.warn('[curriculum] ensureTables failed (will retry next req):', e.message);
+    }
+  }
+
+  // Verify ownership of a course (returns boolean)
+  async function ownsCourse(pool, courseId, userId) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+      [courseId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  // Verify ownership of a chapter via its course
+  async function ownsChapter(pool, chapterId, userId) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM "Chapter" ch
+       JOIN "Course" c ON c.id = ch."courseId"
+       WHERE ch.id=$1 AND c."userId"=$2 LIMIT 1`,
+      [chapterId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  // Verify ownership of a lesson via chapter→course
+  async function ownsLesson(pool, lessonId, userId) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM "Lesson" l
+       JOIN "Chapter" ch ON ch.id = l."chapterId"
+       JOIN "Course" c ON c.id = ch."courseId"
+       WHERE l.id=$1 AND c."userId"=$2 LIMIT 1`,
+      [lessonId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  function mapChapter(row, lessons = []) {
+    return {
+      id:           row.id,
+      title:        row.title,
+      description:  row.description,
+      duration:     null,
+      position:     row.position,
+      isPublished:  row.isPublished,
+      isFree:       row.isFree,
+      createdAt:    row.createdAt,
+      updatedAt:    row.updatedAt,
+      lessons,
+    };
+  }
+
+  function mapLesson(row, blockCount = 0) {
+    return {
+      id:          row.id,
+      chapterId:   row.chapterId,
+      title:       row.title,
+      description: row.description,
+      duration:    row.duration,
+      type:        row.type || 'video',
+      position:    row.position,
+      blockCount,
+      createdAt:   row.createdAt,
+      updatedAt:   row.updatedAt,
+    };
+  }
+
+  function mapBlock(row) {
+    return {
+      id:        row.id,
+      lessonId:  row.lessonId,
+      type:      row.type,
+      title:     row.title,
+      content:   row.content,
+      metadata:  row.metadata || {},
+      position:  row.position,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  // ── GET /api/instructor/courses/:courseId/chapters ────────
+  app.get('/api/instructor/courses/:courseId/chapters', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsCourse(pool, req.params.courseId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await ensureCurriculumTables(pool);
+
+      const { rows: chapters } = await pool.query(
+        `SELECT id, title, description, position, "isPublished", "isFree", "createdAt", "updatedAt"
+         FROM "Chapter" WHERE "courseId"=$1 ORDER BY position ASC, "createdAt" ASC`,
+        [req.params.courseId]
+      );
+      if (chapters.length === 0) return res.json([]);
+
+      const chapterIds = chapters.map(c => c.id);
+      const [lessonsRes, blockCountsRes] = await Promise.all([
+        pool.query(
+          `SELECT id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt"
+           FROM "Lesson" WHERE "chapterId" = ANY($1::text[])
+           ORDER BY position ASC, "createdAt" ASC`,
+          [chapterIds]
+        ).catch(() => ({ rows: [] })),
+        pool.query(
+          `SELECT "lessonId", COUNT(*)::int AS n FROM "LessonBlock"
+           WHERE "lessonId" IN (SELECT id FROM "Lesson" WHERE "chapterId" = ANY($1::text[]))
+           GROUP BY "lessonId"`,
+          [chapterIds]
+        ).catch(() => ({ rows: [] })),
+      ]);
+
+      const blockCountByLesson = {};
+      for (const r of blockCountsRes.rows) blockCountByLesson[r.lessonId] = r.n;
+
+      const lessonsByChapter = {};
+      for (const l of lessonsRes.rows) {
+        (lessonsByChapter[l.chapterId] = lessonsByChapter[l.chapterId] || [])
+          .push(mapLesson(l, blockCountByLesson[l.id] || 0));
+      }
+
+      return res.json(chapters.map(c => mapChapter(c, lessonsByChapter[c.id] || [])));
+    } catch (err) {
+      console.error('[curriculum:list] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/courses/:courseId/chapters ───────
+  app.post('/api/instructor/courses/:courseId/chapters', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsCourse(pool, req.params.courseId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await ensureCurriculumTables(pool);
+
+      const { title, description, position } = req.body || {};
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ error: 'Tiêu đề chương không được trống' });
+      }
+
+      // Auto-assign position nếu không truyền
+      let pos = Number.isFinite(position) ? position : null;
+      if (pos === null) {
+        const { rows } = await pool.query(
+          `SELECT COALESCE(MAX(position), -1) + 1 AS p FROM "Chapter" WHERE "courseId"=$1`,
+          [req.params.courseId]
+        );
+        pos = rows[0]?.p ?? 0;
+      }
+
+      const id = curriculumUUID();
+      const now = new Date();
+      const { rows } = await pool.query(
+        `INSERT INTO "Chapter" (id, title, description, position, "isPublished", "isFree", "courseId", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, false, false, $5, $6, $6) RETURNING *`,
+        [id, title.trim(), (description || '').trim() || null, pos, req.params.courseId, now]
+      );
+      console.log(`[curriculum:chapter:create] ✅ ${id} in course ${req.params.courseId}`);
+      return res.json(mapChapter(rows[0], []));
+    } catch (err) {
+      console.error('[curriculum:chapter:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/instructor/courses/:courseId/chapters/:chapterId
+  app.patch('/api/instructor/courses/:courseId/chapters/:chapterId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsChapter(pool, req.params.chapterId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const allowed = ['title', 'description', 'position', 'isPublished', 'isFree'];
+      const sets = [];
+      const vals = [];
+      let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`"${k}" = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      sets.push(`"updatedAt" = NOW()`);
+      vals.push(req.params.chapterId);
+
+      const { rows } = await pool.query(
+        `UPDATE "Chapter" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Chapter not found' });
+      return res.json(mapChapter(rows[0], []));
+    } catch (err) {
+      console.error('[curriculum:chapter:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/instructor/courses/:courseId/chapters/:chapterId
+  app.delete('/api/instructor/courses/:courseId/chapters/:chapterId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsChapter(pool, req.params.chapterId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { rowCount } = await pool.query(`DELETE FROM "Chapter" WHERE id=$1`, [req.params.chapterId]);
+      if (!rowCount) return res.status(404).json({ error: 'Chapter not found' });
+      console.log(`[curriculum:chapter:delete] ✅ ${req.params.chapterId}`);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:chapter:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/courses/:courseId/chapters/reorder
+  app.post('/api/instructor/courses/:courseId/chapters/reorder', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsCourse(pool, req.params.courseId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const ids = Array.isArray(req.body?.chapterIds) ? req.body.chapterIds : [];
+      // Update position theo thứ tự — batch trong 1 transaction
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (let i = 0; i < ids.length; i++) {
+          await client.query(
+            `UPDATE "Chapter" SET position=$1, "updatedAt"=NOW()
+             WHERE id=$2 AND "courseId"=$3`,
+            [i, ids[i], req.params.courseId]
+          );
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:chapter:reorder] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons
+  app.post('/api/instructor/courses/:courseId/chapters/:chapterId/lessons', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsChapter(pool, req.params.chapterId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await ensureCurriculumTables(pool);
+
+      const { title, description, duration, type, position } = req.body || {};
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ error: 'Tiêu đề bài học không được trống' });
+      }
+      const allowedTypes = ['video', 'reading', 'quiz', 'assignment'];
+      const safeType = allowedTypes.includes(type) ? type : 'video';
+
+      let pos = Number.isFinite(position) ? position : null;
+      if (pos === null) {
+        const { rows } = await pool.query(
+          `SELECT COALESCE(MAX(position), -1) + 1 AS p FROM "Lesson" WHERE "chapterId"=$1`,
+          [req.params.chapterId]
+        );
+        pos = rows[0]?.p ?? 0;
+      }
+
+      const id = curriculumUUID();
+      const now = new Date();
+      const { rows } = await pool.query(
+        `INSERT INTO "Lesson" (id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING *`,
+        [
+          id, req.params.chapterId, title.trim(),
+          (description || '').trim() || null,
+          Number.isFinite(duration) ? duration : null,
+          safeType, pos, now,
+        ]
+      );
+      console.log(`[curriculum:lesson:create] ✅ ${id} in chapter ${req.params.chapterId}`);
+      return res.json(mapLesson(rows[0], 0));
+    } catch (err) {
+      console.error('[curriculum:lesson:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/instructor/lessons/:lessonId
+  app.patch('/api/instructor/lessons/:lessonId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsLesson(pool, req.params.lessonId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const allowed = ['title', 'description', 'duration', 'type', 'position'];
+      const sets = [];
+      const vals = [];
+      let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`"${k}" = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      sets.push(`"updatedAt" = NOW()`);
+      vals.push(req.params.lessonId);
+
+      const { rows } = await pool.query(
+        `UPDATE "Lesson" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Lesson not found' });
+      return res.json(mapLesson(rows[0], 0));
+    } catch (err) {
+      console.error('[curriculum:lesson:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/instructor/lessons/:lessonId
+  app.delete('/api/instructor/lessons/:lessonId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsLesson(pool, req.params.lessonId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { rowCount } = await pool.query(`DELETE FROM "Lesson" WHERE id=$1`, [req.params.lessonId]);
+      if (!rowCount) return res.status(404).json({ error: 'Lesson not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:lesson:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder
+  app.post('/api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsChapter(pool, req.params.chapterId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const ids = Array.isArray(req.body?.lessonIds) ? req.body.lessonIds : [];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (let i = 0; i < ids.length; i++) {
+          await client.query(
+            `UPDATE "Lesson" SET position=$1, "updatedAt"=NOW()
+             WHERE id=$2 AND "chapterId"=$3`,
+            [i, ids[i], req.params.chapterId]
+          );
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:lesson:reorder] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/instructor/lessons/:lessonId/blocks
+  app.get('/api/instructor/lessons/:lessonId/blocks', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsLesson(pool, req.params.lessonId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await ensureCurriculumTables(pool);
+      const { rows } = await pool.query(
+        `SELECT id, "lessonId", type, title, content, metadata, position, "createdAt", "updatedAt"
+         FROM "LessonBlock" WHERE "lessonId"=$1 ORDER BY position ASC, "createdAt" ASC`,
+        [req.params.lessonId]
+      );
+      return res.json(rows.map(mapBlock));
+    } catch (err) {
+      console.error('[curriculum:block:list] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/lessons/:lessonId/blocks
+  app.post('/api/instructor/lessons/:lessonId/blocks', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsLesson(pool, req.params.lessonId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await ensureCurriculumTables(pool);
+      const { type, title, content, metadata, position } = req.body || {};
+      if (!type || typeof type !== 'string') {
+        return res.status(400).json({ error: 'Block type không được trống' });
+      }
+      let pos = Number.isFinite(position) ? position : null;
+      if (pos === null) {
+        const { rows } = await pool.query(
+          `SELECT COALESCE(MAX(position), -1) + 1 AS p FROM "LessonBlock" WHERE "lessonId"=$1`,
+          [req.params.lessonId]
+        );
+        pos = rows[0]?.p ?? 0;
+      }
+      const id = curriculumUUID();
+      const now = new Date();
+      const { rows } = await pool.query(
+        `INSERT INTO "LessonBlock" (id, "lessonId", type, title, content, metadata, position, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $8) RETURNING *`,
+        [
+          id, req.params.lessonId, type,
+          title || null,
+          content || null,
+          JSON.stringify(metadata || {}),
+          pos, now,
+        ]
+      );
+      return res.json(mapBlock(rows[0]));
+    } catch (err) {
+      console.error('[curriculum:block:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Helper: ownership của block qua lesson→chapter→course
+  async function ownsBlock(pool, blockId, userId) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM "LessonBlock" b
+       JOIN "Lesson" l   ON l.id = b."lessonId"
+       JOIN "Chapter" ch ON ch.id = l."chapterId"
+       JOIN "Course" c   ON c.id = ch."courseId"
+       WHERE b.id=$1 AND c."userId"=$2 LIMIT 1`,
+      [blockId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  // ── PATCH /api/instructor/lesson-blocks/:blockId
+  app.patch('/api/instructor/lesson-blocks/:blockId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsBlock(pool, req.params.blockId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const allowed = ['type', 'title', 'content', 'position'];
+      const sets = [];
+      const vals = [];
+      let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`"${k}" = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if ('metadata' in req.body) {
+        sets.push(`metadata = $${idx++}::jsonb`);
+        vals.push(JSON.stringify(req.body.metadata || {}));
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      sets.push(`"updatedAt" = NOW()`);
+      vals.push(req.params.blockId);
+      const { rows } = await pool.query(
+        `UPDATE "LessonBlock" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Block not found' });
+      return res.json(mapBlock(rows[0]));
+    } catch (err) {
+      console.error('[curriculum:block:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/instructor/lesson-blocks/:blockId
+  app.delete('/api/instructor/lesson-blocks/:blockId', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsBlock(pool, req.params.blockId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { rowCount } = await pool.query(`DELETE FROM "LessonBlock" WHERE id=$1`, [req.params.blockId]);
+      if (!rowCount) return res.status(404).json({ error: 'Block not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:block:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/instructor/lessons/:lessonId/blocks/reorder
+  app.post('/api/instructor/lessons/:lessonId/blocks/reorder', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      if (!(await ownsLesson(pool, req.params.lessonId, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const ids = Array.isArray(req.body?.blockIds) ? req.body.blockIds : [];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (let i = 0; i < ids.length; i++) {
+          await client.query(
+            `UPDATE "LessonBlock" SET position=$1, "updatedAt"=NOW()
+             WHERE id=$2 AND "lessonId"=$3`,
+            [i, ids[i], req.params.lessonId]
+          );
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[curriculum:block:reorder] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
