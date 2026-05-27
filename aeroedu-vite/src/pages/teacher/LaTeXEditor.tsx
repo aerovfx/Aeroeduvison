@@ -135,75 +135,82 @@ export default function LaTeXEditorPage() {
   )
 
   return (
-    <div style={{ background: D.bg, minHeight: '100vh', padding: 24 }}>
+    <div style={{ background: D.bg, minHeight: '100vh', padding: 'clamp(12px, 3vw, 24px)' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ color: D.purple, fontSize: 32, fontWeight: 800, margin: 0 }}>Tài Liệu LaTeX</h1>
-          <p style={{ color: D.muted, fontSize: 14, margin: '6px 0 0' }}>Soạn thảo, sinh đề bằng AI và xuất PDF chuyên nghiệp</p>
+      {/* Header — compact responsive */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ color: D.purple, fontSize: 'clamp(18px, 4vw, 28px)', fontWeight: 800, margin: 0 }}>Tài Liệu LaTeX</h1>
+          <p style={{ color: D.muted, fontSize: 'clamp(11px, 2.5vw, 13px)', margin: '4px 0 0' }}>Soạn thảo + sinh đề AI + xuất PDF</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {/* V2 (2026-05-22): Nút hướng dẫn dùng AI (ChatGPT/Gemini/Claude)
-              để tự tạo văn bản LaTeX với prompt mẫu — đặt ĐẦU TIÊN cho dễ thấy */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Buttons rút gọn label ngắn để mobile fit */}
           <button
             onClick={() => setGuideOpen(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
-              border: 'none', borderRadius: 10,
+              border: 'none', borderRadius: 8,
               color: '#fff', cursor: 'pointer',
-              fontWeight: 700, fontSize: 14, padding: '10px 20px',
-              boxShadow: '0 0 18px rgba(239,68,68,0.35)',
+              fontWeight: 700, fontSize: 'clamp(11px, 2.5vw, 13px)',
+              padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px)',
+              boxShadow: '0 0 12px rgba(239,68,68,0.3)',
+              whiteSpace: 'nowrap',
             }}
-            title="Hướng dẫn dùng ChatGPT/Gemini/Claude tạo văn bản LaTeX với prompt mẫu"
+            title="Hướng dẫn dùng ChatGPT/Gemini/Claude tạo văn bản LaTeX"
           >
-            <BookOpenCheck size={16} />
-            Hướng dẫn AI
+            <BookOpenCheck size={14} />
+            Hướng dẫn
           </button>
           <button
             onClick={() => setAiDialogOpen(true)}
             disabled={aiCreating}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'linear-gradient(135deg, #7c3aed, #22d3ee)',
-              border: 'none', borderRadius: 10,
+              border: 'none', borderRadius: 8,
               color: '#fff', cursor: aiCreating ? 'not-allowed' : 'pointer',
-              fontWeight: 700, fontSize: 14, padding: '10px 20px',
+              fontWeight: 700, fontSize: 'clamp(11px, 2.5vw, 13px)',
+              padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px)',
               opacity: aiCreating ? 0.75 : 1,
-              boxShadow: '0 0 18px rgba(124,58,237,0.4)',
+              boxShadow: '0 0 12px rgba(124,58,237,0.35)',
+              whiteSpace: 'nowrap',
             }}
           >
             {aiCreating
-              ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Sparkles size={16} />
+              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Sparkles size={14} />
             }
-            Tạo đề bằng AI
+            Sinh đề AI
           </button>
           <button
             onClick={handleCreate}
             disabled={creating}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: D.purple, border: 'none', borderRadius: 10,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: D.purple, border: 'none', borderRadius: 8,
               color: '#fff', cursor: creating ? 'not-allowed' : 'pointer',
-              fontWeight: 600, fontSize: 14, padding: '10px 20px',
+              fontWeight: 600, fontSize: 'clamp(11px, 2.5vw, 13px)',
+              padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px)',
               opacity: creating ? 0.7 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
             {creating
-              ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Plus size={16} />
+              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Plus size={14} />
             }
-            Tạo Tài Liệu Trắng
+            Tài liệu trắng
           </button>
         </div>
       </div>
 
-      {/* ── AI banner: 2 tính năng cốt lõi ── */}
+      {/* ── AI banner: 2 tính năng — auto-wrap mobile ── */}
       <div
         style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 10, marginBottom: 16,
         }}
       >
         {/* Card 1: AI generate */}
@@ -213,74 +220,71 @@ export default function LaTeXEditorPage() {
           style={{
             textAlign: 'left', cursor: aiCreating ? 'not-allowed' : 'pointer',
             background: 'linear-gradient(135deg, rgba(124,58,237,0.18), rgba(34,211,238,0.1))',
-            border: '1px solid rgba(124,58,237,0.35)', borderRadius: 16,
-            padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 18,
-            transition: 'transform 0.15s, box-shadow 0.15s',
+            border: '1px solid rgba(124,58,237,0.35)', borderRadius: 12,
+            padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+            transition: 'transform 0.15s',
           }}
-          onMouseEnter={e => { if (!aiCreating) e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
         >
           <div style={{
-            width: 56, height: 56, borderRadius: 14, flexShrink: 0,
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: 'linear-gradient(135deg, #7c3aed, #22d3ee)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 24px rgba(124,58,237,0.5)',
+            boxShadow: '0 0 14px rgba(124,58,237,0.4)',
           }}>
-            <Wand2 size={28} color="#fff" />
+            <Wand2 size={18} color="#fff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ color: D.text, fontSize: 17, fontWeight: 800, margin: '0 0 4px' }}>
-              Tạo đề với AI dưới định dạng LaTeX
+            <h3 style={{ color: D.text, fontSize: 13, fontWeight: 700, margin: '0 0 2px' }}>
+              Sinh đề LaTeX bằng AI
             </h3>
-            <p style={{ color: D.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-              Chọn môn · khối · chủ đề · độ khó — hệ thống sinh tài liệu LaTeX hoàn chỉnh (TN 4 lựa chọn, Đúng/Sai, tự luận), kèm bảng đáp án.
+            <p style={{ color: D.muted, fontSize: 11, margin: 0, lineHeight: 1.4 }}>
+              Chọn môn · khối · chủ đề → AI sinh đề kèm đáp án
             </p>
           </div>
-          <Sparkles size={22} style={{ color: '#a78bfa', flexShrink: 0 }} />
         </button>
 
         {/* Card 2: LaTeX → PDF */}
         <div
           style={{
             background: 'linear-gradient(135deg, rgba(37,99,235,0.18), rgba(22,163,74,0.1))',
-            border: '1px solid rgba(37,99,235,0.3)', borderRadius: 16,
-            padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 18,
+            border: '1px solid rgba(37,99,235,0.3)', borderRadius: 12,
+            padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
           }}
         >
           <div style={{
-            width: 56, height: 56, borderRadius: 14, flexShrink: 0,
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: 'linear-gradient(135deg, #2563eb, #16a34a)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 24px rgba(37,99,235,0.5)',
+            boxShadow: '0 0 14px rgba(37,99,235,0.4)',
           }}>
-            <Download size={28} color="#fff" />
+            <Download size={18} color="#fff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ color: D.text, fontSize: 17, fontWeight: 800, margin: '0 0 4px' }}>
-              Chuyển LaTeX ra PDF — tải xuống để in ấn
+            <h3 style={{ color: D.text, fontSize: 13, fontWeight: 700, margin: '0 0 2px' }}>
+              Xuất PDF in ấn
             </h3>
-            <p style={{ color: D.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-              Trong editor, bấm <strong style={{ color: '#4ade80' }}>Biên dịch</strong> để chuyển file LaTeX sang PDF chuẩn A4, sau đó tải về máy và in cho học sinh.
+            <p style={{ color: D.muted, fontSize: 11, margin: 0, lineHeight: 1.4 }}>
+              Bấm <strong style={{ color: '#4ade80' }}>Biên dịch</strong> → PDF A4 chuẩn để in
             </p>
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+      {/* Stats — compact 3 cột auto-wrap */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
         {[
-          { icon: FileCode2, value: stats.total,               label: 'Tổng tài liệu',      color: '#60a5fa' },
-          { icon: Edit3,     value: stats.recent,              label: 'Cập nhật tuần này',  color: '#4ade80' },
-          { icon: Pencil,    value: stats.total - stats.recent, label: 'Tài liệu cũ',        color: '#a78bfa' },
+          { icon: FileCode2, value: stats.total,               label: 'Tổng',           color: '#60a5fa' },
+          { icon: Edit3,     value: stats.recent,              label: 'Tuần này',       color: '#4ade80' },
+          { icon: Pencil,    value: stats.total - stats.recent, label: 'Cũ',            color: '#a78bfa' },
         ].map(({ icon: Icon, value, label, color }) => (
           <div key={label} style={{
-            background: D.card, border: `1px solid ${D.border}`, borderRadius: 14,
-            padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16,
+            background: D.card, border: `1px solid ${D.border}`, borderRadius: 10,
+            padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <Icon size={32} style={{ color, flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-              <div style={{ fontSize: 13, color: D.muted, marginTop: 4 }}>{label}</div>
+            <Icon size={18} style={{ color, flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 'clamp(18px, 4vw, 24px)', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: 'clamp(10px, 2vw, 11px)', color: D.muted, marginTop: 2 }}>{label}</div>
             </div>
           </div>
         ))}
