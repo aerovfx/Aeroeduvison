@@ -303,6 +303,54 @@ function CourseCard({ course }: { course: InstructorCourse }) {
   )
 }
 
+/* ─── Grade detection: extract khối lớp từ title/category ─── */
+const GRADE_KEYS = [
+  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'university', 'other',
+] as const
+type GradeKey = typeof GRADE_KEYS[number]
+
+const GRADE_LABELS: Record<GradeKey, string> = {
+  '1':  'Lớp 1',  '2':  'Lớp 2',  '3':  'Lớp 3',  '4':  'Lớp 4',
+  '5':  'Lớp 5',  '6':  'Lớp 6',  '7':  'Lớp 7',  '8':  'Lớp 8',
+  '9':  'Lớp 9',  '10': 'Lớp 10', '11': 'Lớp 11', '12': 'Lớp 12',
+  university: '🎓 Đại học / Cao đẳng',
+  other:      '📂 Khác / Chưa phân khối',
+}
+
+const GRADE_COLORS: Record<GradeKey, string> = {
+  '1':  'from-pink-500/15 to-rose-500/10 border-pink-500/30',
+  '2':  'from-rose-500/15 to-red-500/10 border-rose-500/30',
+  '3':  'from-orange-500/15 to-amber-500/10 border-orange-500/30',
+  '4':  'from-amber-500/15 to-yellow-500/10 border-amber-500/30',
+  '5':  'from-yellow-500/15 to-lime-500/10 border-yellow-500/30',
+  '6':  'from-lime-500/15 to-green-500/10 border-lime-500/30',
+  '7':  'from-green-500/15 to-emerald-500/10 border-green-500/30',
+  '8':  'from-emerald-500/15 to-teal-500/10 border-emerald-500/30',
+  '9':  'from-teal-500/15 to-cyan-500/10 border-teal-500/30',
+  '10': 'from-cyan-500/15 to-blue-500/10 border-cyan-500/30',
+  '11': 'from-blue-500/15 to-indigo-500/10 border-blue-500/30',
+  '12': 'from-indigo-500/15 to-violet-500/10 border-indigo-500/30',
+  university: 'from-violet-500/15 to-fuchsia-500/10 border-violet-500/30',
+  other:      'from-slate-500/15 to-gray-500/10 border-slate-500/30',
+}
+
+/** Detect khối lớp từ title + category name. Heuristic regex. */
+function detectGrade(course: InstructorCourse): GradeKey {
+  const text = `${course.title} ${course.category?.name || ''}`.toLowerCase()
+  // University variants
+  if (/\b(đại học|cao đẳng|university|sinh viên|đh\b|cđ\b)/i.test(text)) {
+    return 'university'
+  }
+  // Class N — try 12 → 1 order (12 first vì "lớp 12" should match before "lớp 1")
+  for (const g of ['12', '11', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1'] as const) {
+    const re = new RegExp(`\\b(lớp|grade|khối|class|k|gr)[\\s-]*${g}\\b`, 'i')
+    if (re.test(text)) return g
+  }
+  return 'other'
+}
+
+type ViewMode = 'grid' | 'grouped'
+
 export default function TeacherMyCourses() {
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ['instructor-courses'],
@@ -312,6 +360,8 @@ export default function TeacherMyCourses() {
   const [search, setSearch]     = useState('')
   const [status, setStatus]     = useState<StatusFilter>('all')
   const [sort, setSort]         = useState<SortKey>('newest')
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped')  // default grouped — user request
+  const [collapsedGrades, setCollapsedGrades] = useState<Set<GradeKey>>(new Set())
 
   const totalStudents = courses.reduce((sum, c) => sum + (c.enrollments?.length ?? 0), 0)
   const totalEarnings = courses.reduce((sum, c) =>
@@ -340,6 +390,26 @@ export default function TeacherMyCourses() {
     )
     return list
   }, [courses, search, status, sort])
+
+  // Group by grade (after visible filter applied)
+  const groupedByGrade = useMemo(() => {
+    const groups: Record<GradeKey, InstructorCourse[]> = Object.fromEntries(
+      GRADE_KEYS.map((g) => [g, [] as InstructorCourse[]]),
+    ) as Record<GradeKey, InstructorCourse[]>
+    for (const c of visible) {
+      const g = detectGrade(c)
+      groups[g].push(c)
+    }
+    return groups
+  }, [visible])
+
+  const toggleGrade = (g: GradeKey) => {
+    setCollapsedGrades((prev) => {
+      const next = new Set(prev)
+      if (next.has(g)) next.delete(g); else next.add(g)
+      return next
+    })
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -400,6 +470,29 @@ export default function TeacherMyCourses() {
               <option value="students">Nhiều HV nhất</option>
               <option value="earnings">Doanh thu cao</option>
             </select>
+            {/* View mode toggle — Grid vs Grouped by grade */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-white/5 border border-white/10">
+              <button
+                onClick={() => setViewMode('grouped')}
+                className={cn(
+                  'px-2.5 py-1.5 rounded text-xs font-bold transition-colors',
+                  viewMode === 'grouped' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white',
+                )}
+                title="Sắp xếp theo khối lớp"
+              >
+                📚 Khối
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  'px-2.5 py-1.5 rounded text-xs font-bold transition-colors',
+                  viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white',
+                )}
+                title="Hiển thị dạng lưới"
+              >
+                ⊞ Lưới
+              </button>
+            </div>
             <Link
               to="/teacher/course/create?step=0"
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition-colors whitespace-nowrap"
@@ -444,10 +537,50 @@ export default function TeacherMyCourses() {
         </div>
       )}
 
-      {/* Grid */}
-      {!isLoading && visible.length > 0 && (
+      {/* Grid mode — flat layout */}
+      {!isLoading && visible.length > 0 && viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visible.map(course => <CourseCard key={course.id} course={course} />)}
+        </div>
+      )}
+
+      {/* Grouped mode — sections theo khối lớp (1-12 + đại học + khác) */}
+      {!isLoading && visible.length > 0 && viewMode === 'grouped' && (
+        <div className="space-y-5">
+          {GRADE_KEYS.map((g) => {
+            const list = groupedByGrade[g]
+            if (list.length === 0) return null
+            const collapsed = collapsedGrades.has(g)
+            return (
+              <section key={g}
+                className={cn(
+                  'rounded-xl border bg-gradient-to-br p-4',
+                  GRADE_COLORS[g],
+                )}>
+                <button
+                  onClick={() => toggleGrade(g)}
+                  className="w-full flex items-center justify-between gap-3 mb-3 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-base sm:text-lg font-bold text-white">
+                      {GRADE_LABELS[g]}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-black/30 text-white/70 text-xs font-bold">
+                      {list.length} khoá
+                    </span>
+                  </div>
+                  <span className="text-white/50 text-sm group-hover:text-white transition-colors">
+                    {collapsed ? '▶ Mở' : '▼ Thu gọn'}
+                  </span>
+                </button>
+                {!collapsed && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {list.map(course => <CourseCard key={course.id} course={course} />)}
+                  </div>
+                )}
+              </section>
+            )
+          })}
         </div>
       )}
     </div>
