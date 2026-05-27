@@ -3678,6 +3678,886 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 }
 
 // ══════════════════════════════════════════════════════════════
+// STEM PROJECT MODULE — Agile Scrum dự án STEM (GV ↔ HS)
+//
+//   Tables: StemProject / StemMember / StemInvite /
+//           StemTask / StemLog / StemFeedback / StemMilestone
+//
+//   Endpoints:
+//   Public:
+//   - GET    /api/stem/invite/:token/info
+//   - POST   /api/stem/invite/:token/join          (auth)
+//   Teacher:
+//   - GET    /api/teacher/stem-projects
+//   - POST   /api/teacher/stem-projects
+//   - GET    /api/teacher/stem-projects/:id        (invites + members)
+//   - PATCH  /api/teacher/stem-projects/:id
+//   - DELETE /api/teacher/stem-projects/:id
+//   - POST   /api/teacher/stem-projects/:id/invites
+//   - DELETE /api/teacher/stem-projects/invites/:token
+//   - GET    /api/teacher/stem-projects/:id/dashboard
+//   - POST   /api/teacher/stem-projects/:id/tasks
+//   - PATCH  /api/teacher/stem-projects/:id/tasks/:taskId
+//   - DELETE /api/teacher/stem-projects/:id/tasks/:taskId
+//   - POST   /api/teacher/stem-projects/:id/milestones
+//   - PATCH  /api/teacher/stem-projects/:id/milestones/:msId
+//   - DELETE /api/teacher/stem-projects/:id/milestones/:msId
+//   - POST   /api/teacher/stem-projects/:id/logs
+//   - POST   /api/teacher/stem-projects/:id/feedbacks
+//   Student:
+//   - GET    /api/student/stem-projects
+// ══════════════════════════════════════════════════════════════
+{
+  console.log('[stem] Built-in STEM project handlers active');
+  const { Pool: SPool } = require('pg');
+  const sjwt = require('jsonwebtoken');
+  const { randomUUID: stemUUID, randomBytes: stemRandom } = require('crypto');
+
+  let _spool = null;
+  function getSPool() {
+    if (!_spool) {
+      const DATABASE_URL = process.env.DATABASE_URL;
+      if (!DATABASE_URL) throw new Error('DATABASE_URL env var not set');
+      _spool = new SPool({ connectionString: DATABASE_URL, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _spool;
+  }
+
+  const SJWT_SECRET = process.env.JWT_SECRET
+    || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+
+  function getStemUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = sjwt.verify(auth.slice(7), SJWT_SECRET, { ignoreExpiration: true });
+      return decoded.sub || decoded.userId || null;
+    } catch { return null; }
+  }
+  function getStemUser(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = sjwt.verify(auth.slice(7), SJWT_SECRET, { ignoreExpiration: true });
+      return { sub: decoded.sub || decoded.userId, role: decoded.role };
+    } catch { return null; }
+  }
+
+  // ── Lazy-create tables ──────────────────────────────────────
+  let _stemTablesReady = false;
+  async function ensureStemTables(pool) {
+    if (_stemTablesReady) return;
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemProject" (
+          id          TEXT PRIMARY KEY,
+          teacher_id  TEXT NOT NULL,
+          title       TEXT NOT NULL,
+          description TEXT,
+          category    TEXT NOT NULL DEFAULT 'Science',
+          status      TEXT NOT NULL DEFAULT 'draft',
+          subject     TEXT,
+          grade       TEXT,
+          difficulty  TEXT NOT NULL DEFAULT 'medium',
+          tags        TEXT[],
+          due_date    TIMESTAMPTZ,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemProject_teacher_idx" ON "StemProject"(teacher_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemMember" (
+          id          TEXT PRIMARY KEY,
+          project_id  TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          student_id  TEXT NOT NULL,
+          role        TEXT NOT NULL DEFAULT 'member',
+          status      TEXT NOT NULL DEFAULT 'active',
+          joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(project_id, student_id)
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemMember_project_idx" ON "StemMember"(project_id);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemMember_student_idx" ON "StemMember"(student_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemInvite" (
+          token       TEXT PRIMARY KEY,
+          project_id  TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          label       TEXT,
+          max_uses    INT,
+          used_count  INT NOT NULL DEFAULT 0,
+          expires_at  TIMESTAMPTZ,
+          revoked_at  TIMESTAMPTZ,
+          created_by  TEXT NOT NULL,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemInvite_project_idx" ON "StemInvite"(project_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemTask" (
+          id           TEXT PRIMARY KEY,
+          project_id   TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          title        TEXT NOT NULL,
+          description  TEXT,
+          assigned_to  TEXT[],
+          status       TEXT NOT NULL DEFAULT 'todo',
+          priority     TEXT NOT NULL DEFAULT 'medium',
+          due_date     TIMESTAMPTZ,
+          points       INT NOT NULL DEFAULT 0,
+          completed_at TIMESTAMPTZ,
+          created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemTask_project_idx" ON "StemTask"(project_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemLog" (
+          id           TEXT PRIMARY KEY,
+          project_id   TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          student_id   TEXT NOT NULL,
+          log_date     DATE NOT NULL,
+          content      TEXT NOT NULL,
+          hours_spent  NUMERIC(5,2) NOT NULL DEFAULT 0,
+          task_id      TEXT,
+          created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemLog_project_idx" ON "StemLog"(project_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemFeedback" (
+          id            TEXT PRIMARY KEY,
+          project_id    TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          author_id     TEXT NOT NULL,
+          target_type   TEXT NOT NULL,
+          target_id     TEXT,
+          content       TEXT NOT NULL,
+          rating        INT,
+          feedback_type TEXT NOT NULL DEFAULT 'general',
+          created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemFeedback_project_idx" ON "StemFeedback"(project_id);`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StemMilestone" (
+          id            TEXT PRIMARY KEY,
+          project_id    TEXT NOT NULL REFERENCES "StemProject"(id) ON DELETE CASCADE,
+          title         TEXT NOT NULL,
+          description   TEXT,
+          phase_order   INT NOT NULL DEFAULT 0,
+          status        TEXT NOT NULL DEFAULT 'pending',
+          due_date      TIMESTAMPTZ,
+          criteria      JSONB,
+          score         NUMERIC(5,2),
+          max_score     NUMERIC(5,2) NOT NULL DEFAULT 10,
+          evaluation    TEXT,
+          evaluated_at  TIMESTAMPTZ
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemMilestone_project_idx" ON "StemMilestone"(project_id);`);
+
+      _stemTablesReady = true;
+      console.log('[stem] ✅ 7 tables ready (StemProject/Member/Invite/Task/Log/Feedback/Milestone)');
+    } catch (e) {
+      console.warn('[stem] ensureTables failed:', e.message);
+    }
+  }
+
+  async function ownsStemProject(pool, projectId, userId) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM "StemProject" WHERE id=$1 AND teacher_id=$2 LIMIT 1`,
+      [projectId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  function mapStemProject(row, extras = {}) {
+    return {
+      id: row.id,
+      teacher_id: row.teacher_id,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      status: row.status,
+      subject: row.subject,
+      grade: row.grade,
+      difficulty: row.difficulty,
+      tags: row.tags || [],
+      due_date: row.due_date,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      ...extras,
+    };
+  }
+
+  // ── GET /api/stem/invite/:token/info (PUBLIC) ───────────────
+  app.get('/api/stem/invite/:token/info', async (req, res) => {
+    try {
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { rows } = await pool.query(
+        `SELECT i.*, p.id AS p_id, p.title, p.description, p.category, p.subject, p.grade,
+                u.name AS teacher_name, u.image AS teacher_image
+         FROM "StemInvite" i
+         JOIN "StemProject" p ON p.id = i.project_id
+         LEFT JOIN "User" u ON u.id = p.teacher_id
+         WHERE i.token=$1 LIMIT 1`,
+        [req.params.token]
+      );
+      const inv = rows[0];
+      if (!inv) {
+        return res.json({ valid: false, reason: 'Link không tồn tại',
+          project: { id: '', title: '', description: null, category: '', subject: null, grade: null },
+          teacher: { name: '', image: null }, usedCount: 0, maxUses: null, expiresAt: null });
+      }
+      if (inv.revoked_at) {
+        return res.json({ valid: false, reason: 'Link đã thu hồi',
+          project: { id: inv.p_id, title: inv.title, description: inv.description, category: inv.category, subject: inv.subject, grade: inv.grade },
+          teacher: { name: inv.teacher_name || '', image: inv.teacher_image },
+          usedCount: inv.used_count, maxUses: inv.max_uses, expiresAt: inv.expires_at });
+      }
+      if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
+        return res.json({ valid: false, reason: 'Link đã hết hạn',
+          project: { id: inv.p_id, title: inv.title, description: inv.description, category: inv.category, subject: inv.subject, grade: inv.grade },
+          teacher: { name: inv.teacher_name || '', image: inv.teacher_image },
+          usedCount: inv.used_count, maxUses: inv.max_uses, expiresAt: inv.expires_at });
+      }
+      if (inv.max_uses && inv.used_count >= inv.max_uses) {
+        return res.json({ valid: false, reason: 'Link đã dùng hết lượt',
+          project: { id: inv.p_id, title: inv.title, description: inv.description, category: inv.category, subject: inv.subject, grade: inv.grade },
+          teacher: { name: inv.teacher_name || '', image: inv.teacher_image },
+          usedCount: inv.used_count, maxUses: inv.max_uses, expiresAt: inv.expires_at });
+      }
+      return res.json({
+        valid: true,
+        project: { id: inv.p_id, title: inv.title, description: inv.description, category: inv.category, subject: inv.subject, grade: inv.grade },
+        teacher: { name: inv.teacher_name || '', image: inv.teacher_image },
+        usedCount: inv.used_count, maxUses: inv.max_uses, expiresAt: inv.expires_at,
+      });
+    } catch (err) {
+      console.error('[stem:invite:info]', err.message);
+      return res.status(500).json({ valid: false, reason: 'Lỗi server' });
+    }
+  });
+
+  // ── POST /api/stem/invite/:token/join (AUTH) ────────────────
+  app.post('/api/stem/invite/:token/join', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Cần đăng nhập' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { rows: invs } = await pool.query(
+        `SELECT * FROM "StemInvite" WHERE token=$1 LIMIT 1`,
+        [req.params.token]
+      );
+      const inv = invs[0];
+      if (!inv) return res.status(404).json({ error: 'Link không tồn tại' });
+      if (inv.revoked_at) return res.status(400).json({ error: 'Link đã thu hồi' });
+      if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
+        return res.status(400).json({ error: 'Link đã hết hạn' });
+      }
+      if (inv.max_uses && inv.used_count >= inv.max_uses) {
+        return res.status(400).json({ error: 'Link đã dùng hết lượt' });
+      }
+      // Check đã member chưa
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM "StemMember" WHERE project_id=$1 AND student_id=$2 LIMIT 1`,
+        [inv.project_id, userId]
+      );
+      if (existing[0]) {
+        return res.json({ ok: true, projectId: inv.project_id, alreadyMember: true,
+          message: 'Bạn đã là thành viên dự án này' });
+      }
+      // Insert member + tăng used_count trong transaction
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `INSERT INTO "StemMember" (id, project_id, student_id, role, status)
+           VALUES ($1, $2, $3, 'member', 'active')`,
+          [stemUUID(), inv.project_id, userId]
+        );
+        await client.query(
+          `UPDATE "StemInvite" SET used_count = used_count + 1 WHERE token=$1`,
+          [req.params.token]
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+      return res.json({ ok: true, projectId: inv.project_id, alreadyMember: false,
+        message: '🎉 Đã tham gia dự án STEM thành công!' });
+    } catch (err) {
+      console.error('[stem:invite:join]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/stem-projects ──────────────────────────
+  app.get('/api/teacher/stem-projects', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { rows } = await pool.query(`
+        SELECT p.*,
+          (SELECT COUNT(*)::int FROM "StemMember" m WHERE m.project_id=p.id) AS member_count,
+          (SELECT COUNT(*)::int FROM "StemInvite" i WHERE i.project_id=p.id AND i.revoked_at IS NULL) AS invite_count
+        FROM "StemProject" p
+        WHERE p.teacher_id=$1
+        ORDER BY p.created_at DESC
+      `, [userId]);
+      return res.json({ projects: rows.map(r => mapStemProject(r, {
+        member_count: r.member_count, invite_count: r.invite_count,
+      })) });
+    } catch (err) {
+      console.error('[stem:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects ─────────────────────────
+  app.post('/api/teacher/stem-projects', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { title, description, category, subject, grade, difficulty, tags, due_date, status } = req.body || {};
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ error: 'Tiêu đề không được trống' });
+      }
+      const id = stemUUID();
+      const now = new Date();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemProject" (id, teacher_id, title, description, category, status,
+          subject, grade, difficulty, tags, due_date, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+        RETURNING *
+      `, [
+        id, userId, title.trim(), description || null,
+        category || 'Science', status || 'draft',
+        subject || null, grade || null, difficulty || 'medium',
+        Array.isArray(tags) ? tags : null,
+        due_date || null, now,
+      ]);
+      console.log(`[stem:create] ✅ ${id} by ${userId}`);
+      return res.json(mapStemProject(rows[0]));
+    } catch (err) {
+      console.error('[stem:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/stem-projects/:id (invites + members) ──
+  app.get('/api/teacher/stem-projects/:id', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const [pRes, iRes, mRes] = await Promise.all([
+        pool.query(`SELECT * FROM "StemProject" WHERE id=$1`, [req.params.id]),
+        pool.query(`SELECT * FROM "StemInvite" WHERE project_id=$1 ORDER BY created_at DESC`, [req.params.id]),
+        pool.query(`
+          SELECT m.id, m.student_id, m.role, m.joined_at, m.status,
+                 u.name, u.email, u.image
+          FROM "StemMember" m
+          LEFT JOIN "User" u ON u.id = m.student_id
+          WHERE m.project_id=$1
+          ORDER BY m.joined_at ASC
+        `, [req.params.id]),
+      ]);
+      return res.json({
+        project: mapStemProject(pRes.rows[0]),
+        invites: iRes.rows,
+        members: mRes.rows,
+      });
+    } catch (err) {
+      console.error('[stem:detail]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/teacher/stem-projects/:id ────────────────────
+  app.patch('/api/teacher/stem-projects/:id', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const allowed = ['title', 'description', 'category', 'status', 'subject', 'grade', 'difficulty', 'tags', 'due_date'];
+      const sets = []; const vals = []; let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`${k} = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      sets.push(`updated_at = NOW()`);
+      vals.push(req.params.id);
+      const { rows } = await pool.query(
+        `UPDATE "StemProject" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      return res.json(mapStemProject(rows[0]));
+    } catch (err) {
+      console.error('[stem:update]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/stem-projects/:id ───────────────────
+  app.delete('/api/teacher/stem-projects/:id', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await pool.query(`DELETE FROM "StemProject" WHERE id=$1`, [req.params.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:delete]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects/:id/invites ─────────────
+  app.post('/api/teacher/stem-projects/:id/invites', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { label, max_uses, expires_at } = req.body || {};
+      // Sinh token URL-safe ~22 ký tự
+      const token = stemRandom(16).toString('base64').replace(/[+/=]/g, '').slice(0, 22);
+      await pool.query(`
+        INSERT INTO "StemInvite" (token, project_id, label, max_uses, expires_at, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [token, req.params.id, label || null,
+          Number.isFinite(max_uses) ? max_uses : null,
+          expires_at || null, userId]);
+      const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+      const url = `${proto}://${host}/stem/join/${token}`;
+      return res.json({ token, url });
+    } catch (err) {
+      console.error('[stem:invite:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/stem-projects/invites/:token ────────
+  app.delete('/api/teacher/stem-projects/invites/:token', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      // Verify ownership qua project
+      const { rows } = await pool.query(`
+        SELECT i.token FROM "StemInvite" i
+        JOIN "StemProject" p ON p.id = i.project_id
+        WHERE i.token=$1 AND p.teacher_id=$2
+      `, [req.params.token, userId]);
+      if (!rows[0]) return res.status(403).json({ error: 'Forbidden' });
+      await pool.query(
+        `UPDATE "StemInvite" SET revoked_at = NOW() WHERE token=$1`,
+        [req.params.token]
+      );
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:invite:revoke]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/stem-projects/:id/dashboard ────────────
+  app.get('/api/teacher/stem-projects/:id/dashboard', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      // Allow access nếu là teacher_id HOẶC member
+      const { rows: pRows } = await pool.query(
+        `SELECT * FROM "StemProject" WHERE id=$1`, [req.params.id]
+      );
+      const project = pRows[0];
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      const isOwner = project.teacher_id === userId;
+      let isMember = false;
+      if (!isOwner) {
+        const { rows: mRows } = await pool.query(
+          `SELECT 1 FROM "StemMember" WHERE project_id=$1 AND student_id=$2 LIMIT 1`,
+          [req.params.id, userId]
+        );
+        isMember = mRows.length > 0;
+      }
+      if (!isOwner && !isMember) return res.status(403).json({ error: 'Forbidden' });
+
+      const [mRes, tRes, lRes, fRes, msRes] = await Promise.all([
+        pool.query(`
+          SELECT m.id, m.student_id, m.joined_at, m.status,
+                 u.name, u.email, u.image
+          FROM "StemMember" m
+          LEFT JOIN "User" u ON u.id = m.student_id
+          WHERE m.project_id=$1
+          ORDER BY m.joined_at ASC
+        `, [req.params.id]),
+        pool.query(`SELECT * FROM "StemTask" WHERE project_id=$1 ORDER BY created_at DESC`, [req.params.id]),
+        pool.query(`
+          SELECT l.*, u.name AS student_name, u.image AS student_image,
+                 (SELECT COUNT(*)::int FROM "StemFeedback" f WHERE f.target_type='log' AND f.target_id=l.id) AS feedback_count
+          FROM "StemLog" l
+          LEFT JOIN "User" u ON u.id = l.student_id
+          WHERE l.project_id=$1
+          ORDER BY l.log_date DESC
+        `, [req.params.id]),
+        pool.query(`
+          SELECT f.*, u.name AS author_name, u.image AS author_image, u.role AS author_role
+          FROM "StemFeedback" f
+          LEFT JOIN "User" u ON u.id = f.author_id
+          WHERE f.project_id=$1
+          ORDER BY f.created_at DESC
+        `, [req.params.id]),
+        pool.query(`SELECT * FROM "StemMilestone" WHERE project_id=$1 ORDER BY phase_order ASC`, [req.params.id]),
+      ]);
+
+      const tasks = tRes.rows;
+      const completedTasks = tasks.filter(t => t.status === 'done').length;
+      const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
+      const overdueTasks = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
+      const milestones = msRes.rows;
+      const completedMilestones = milestones.filter(m => m.status === 'done').length;
+      const scoredMilestones = milestones.filter(m => m.score != null);
+      const avgPhaseScore = scoredMilestones.length > 0
+        ? scoredMilestones.reduce((sum, m) => sum + parseFloat(m.score), 0) / scoredMilestones.length
+        : null;
+      const totalHours = lRes.rows.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0);
+
+      return res.json({
+        project: mapStemProject(project),
+        members: mRes.rows.map(m => ({ ...m, user_linked: !!m.name })),
+        tasks,
+        logs: lRes.rows,
+        feedbacks: fRes.rows,
+        milestones,
+        stats: {
+          members: mRes.rows.length,
+          totalTasks: tasks.length,
+          completedTasks, inProgressTasks, overdueTasks,
+          totalLogs: lRes.rows.length,
+          totalHours,
+          completedMilestones,
+          totalMilestones: milestones.length,
+          avgPhaseScore,
+        },
+        isOwner,
+      });
+    } catch (err) {
+      console.error('[stem:dashboard]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects/:id/tasks ───────────────
+  app.post('/api/teacher/stem-projects/:id/tasks', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { title, description, assigned_to, status, priority, due_date, points } = req.body || {};
+      if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề' });
+      const id = stemUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemTask" (id, project_id, title, description, assigned_to, status, priority, due_date, points)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
+      `, [id, req.params.id, title.trim(), description || null,
+          Array.isArray(assigned_to) ? assigned_to : null,
+          status || 'todo', priority || 'medium',
+          due_date || null, Number.isFinite(points) ? points : 0]);
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:task:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/teacher/stem-projects/:id/tasks/:taskId ──────
+  app.patch('/api/teacher/stem-projects/:id/tasks/:taskId', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      // Owner or member can update task
+      const { rows: ownerCheck } = await pool.query(
+        `SELECT teacher_id FROM "StemProject" WHERE id=$1`, [req.params.id]
+      );
+      if (!ownerCheck[0]) return res.status(404).json({ error: 'Project not found' });
+      const isOwner = ownerCheck[0].teacher_id === userId;
+      if (!isOwner) {
+        const { rows: memCheck } = await pool.query(
+          `SELECT 1 FROM "StemMember" WHERE project_id=$1 AND student_id=$2 LIMIT 1`,
+          [req.params.id, userId]
+        );
+        if (!memCheck[0]) return res.status(403).json({ error: 'Forbidden' });
+      }
+      const allowed = ['title', 'description', 'assigned_to', 'status', 'priority', 'due_date', 'points'];
+      const sets = []; const vals = []; let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`${k} = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      // Auto set completed_at khi status='done'
+      if (req.body.status === 'done') {
+        sets.push(`completed_at = NOW()`);
+      } else if (req.body.status && req.body.status !== 'done') {
+        sets.push(`completed_at = NULL`);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      vals.push(req.params.taskId);
+      const { rows } = await pool.query(
+        `UPDATE "StemTask" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:task:update]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/stem-projects/:id/tasks/:taskId ─────
+  app.delete('/api/teacher/stem-projects/:id/tasks/:taskId', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await pool.query(`DELETE FROM "StemTask" WHERE id=$1 AND project_id=$2`,
+        [req.params.taskId, req.params.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:task:delete]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects/:id/milestones ──────────
+  app.post('/api/teacher/stem-projects/:id/milestones', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { title, description, phase_order, status, due_date, criteria, max_score } = req.body || {};
+      if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề' });
+      const id = stemUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemMilestone" (id, project_id, title, description, phase_order, status, due_date, criteria, max_score)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9) RETURNING *
+      `, [id, req.params.id, title.trim(), description || null,
+          Number.isFinite(phase_order) ? phase_order : 0,
+          status || 'pending', due_date || null,
+          JSON.stringify(criteria || []),
+          Number.isFinite(max_score) ? max_score : 10]);
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:ms:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/teacher/stem-projects/:id/milestones/:msId ──
+  app.patch('/api/teacher/stem-projects/:id/milestones/:msId', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const allowed = ['title', 'description', 'phase_order', 'status', 'due_date', 'score', 'evaluation'];
+      const sets = []; const vals = []; let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`${k} = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if ('criteria' in req.body) {
+        sets.push(`criteria = $${idx++}::jsonb`);
+        vals.push(JSON.stringify(req.body.criteria || []));
+      }
+      if (req.body.score != null) {
+        sets.push(`evaluated_at = NOW()`);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      vals.push(req.params.msId);
+      const { rows } = await pool.query(
+        `UPDATE "StemMilestone" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:ms:update]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/stem-projects/:id/milestones/:msId ──
+  app.delete('/api/teacher/stem-projects/:id/milestones/:msId', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      if (!(await ownsStemProject(pool, req.params.id, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      await pool.query(`DELETE FROM "StemMilestone" WHERE id=$1 AND project_id=$2`,
+        [req.params.msId, req.params.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:ms:delete]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects/:id/logs (GV + HS member) ──
+  app.post('/api/teacher/stem-projects/:id/logs', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      // Allow owner or member
+      const { rows: ownerCheck } = await pool.query(
+        `SELECT teacher_id FROM "StemProject" WHERE id=$1`, [req.params.id]
+      );
+      if (!ownerCheck[0]) return res.status(404).json({ error: 'Project not found' });
+      const isOwner = ownerCheck[0].teacher_id === userId;
+      if (!isOwner) {
+        const { rows: memCheck } = await pool.query(
+          `SELECT 1 FROM "StemMember" WHERE project_id=$1 AND student_id=$2 LIMIT 1`,
+          [req.params.id, userId]
+        );
+        if (!memCheck[0]) return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { log_date, content, hours_spent, task_id, student_id } = req.body || {};
+      if (!content) return res.status(400).json({ error: 'Thiếu nội dung log' });
+      const id = stemUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemLog" (id, project_id, student_id, log_date, content, hours_spent, task_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+      `, [id, req.params.id,
+          isOwner ? (student_id || userId) : userId,  // GV ghi cho HS, HS ghi cho mình
+          log_date || new Date().toISOString().split('T')[0],
+          content,
+          Number.isFinite(hours_spent) ? hours_spent : 0,
+          task_id || null]);
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:log:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/stem-projects/:id/feedbacks ───────────
+  app.post('/api/teacher/stem-projects/:id/feedbacks', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      // Allow owner or member
+      const { rows: ownerCheck } = await pool.query(
+        `SELECT teacher_id FROM "StemProject" WHERE id=$1`, [req.params.id]
+      );
+      if (!ownerCheck[0]) return res.status(404).json({ error: 'Project not found' });
+      const isOwner = ownerCheck[0].teacher_id === userId;
+      if (!isOwner) {
+        const { rows: memCheck } = await pool.query(
+          `SELECT 1 FROM "StemMember" WHERE project_id=$1 AND student_id=$2 LIMIT 1`,
+          [req.params.id, userId]
+        );
+        if (!memCheck[0]) return res.status(403).json({ error: 'Forbidden' });
+      }
+      const { target_type, target_id, content, rating, feedback_type } = req.body || {};
+      if (!content || !target_type) return res.status(400).json({ error: 'Thiếu nội dung hoặc target_type' });
+      const id = stemUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemFeedback" (id, project_id, author_id, target_type, target_id, content, rating, feedback_type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+      `, [id, req.params.id, userId, target_type, target_id || null,
+          content, Number.isFinite(rating) ? rating : null,
+          feedback_type || 'general']);
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[stem:fb:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/student/stem-projects ──────────────────────────
+  app.get('/api/student/stem-projects', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { rows } = await pool.query(`
+        SELECT p.*, m.joined_at, m.role AS member_role,
+          (SELECT COUNT(*)::int FROM "StemMember" m2 WHERE m2.project_id=p.id) AS member_count
+        FROM "StemProject" p
+        JOIN "StemMember" m ON m.project_id=p.id
+        WHERE m.student_id=$1 AND m.status='active'
+        ORDER BY m.joined_at DESC
+      `, [userId]);
+      return res.json({ projects: rows.map(r => ({
+        ...mapStemProject(r, { member_count: r.member_count }),
+        joined_at: r.joined_at,
+        member_role: r.member_role,
+      })) });
+    } catch (err) {
+      console.error('[stem:student:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 // BUILT-IN QUESTION BANK — active when MEDIA_SERVICE_URL is localhost
 // Handles: GET/POST /api/questions, /api/question-bank
 //          POST /api/questions/batch, PUT/DELETE /api/questions/:id
