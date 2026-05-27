@@ -14,7 +14,7 @@
  *   - Wildcard sections       → PageFallback tự mirror path hiện tại
  */
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -81,11 +81,14 @@ const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
 const ContactsPage     = lazy(() => import('@/pages/dashboard/Contacts'))
 
 // ── STEM Sub-pages ───────────────────────────────────────────
-const StemDetailPage    = lazy(() => import('@/pages/stem/StemDetail'))
-const StemEditPage      = lazy(() => import('@/pages/stem/StemEdit'))
-const StemTimelinePage  = lazy(() => import('@/pages/stem/StemTimeline'))
-const StemCreatePage    = lazy(() => import('@/pages/stem/StemCreate'))
-const StemTemplatesPage = lazy(() => import('@/pages/stem/StemTemplates'))
+const StemDetailPage      = lazy(() => import('@/pages/stem/StemDetail'))
+const StemEditPage        = lazy(() => import('@/pages/stem/StemEdit'))
+const StemTimelinePage    = lazy(() => import('@/pages/stem/StemTimeline'))
+const StemCreatePage      = lazy(() => import('@/pages/stem/StemCreate'))
+const StemTemplatesPage   = lazy(() => import('@/pages/stem/StemTemplates'))
+const TeacherStemProjects = lazy(() => import('@/pages/teacher/StemProjects'))
+const TeacherStemProjectDetail = lazy(() => import('@/pages/teacher/StemProjectDetail'))
+const StemJoinByToken     = lazy(() => import('@/pages/stem/JoinByToken'))
 
 // ── Courses ─────────────────────────────────────────────────
 const CourseViewPage   = lazy(() => import('@/pages/courses/CourseView'))
@@ -93,8 +96,13 @@ const ChapterViewPage  = lazy(() => import('@/pages/courses/ChapterView'))
 
 // ── Labs (3D heavy) ─────────────────────────────────────────
 const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
-const PythonLabsPage     = lazy(() => import('@/pages/labs/PythonLabs'))
+// PythonLabsPage removed — flattened all sims into /dashboard/labtwin (LabsIndex)
 const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
+const FourierEpicycles   = lazy(() => import('@/pages/labs/FourierEpicycles'))
+const CircularSHM        = lazy(() => import('@/pages/labs/CircularSHM'))
+const VideoTrackingLab   = lazy(() => import('@/pages/labs/VideoTracking'))
+const GeometryUnfoldLab  = lazy(() => import('@/pages/labs/GeometryUnfold'))
+const PixelOfficeRPGLab  = lazy(() => import('@/pages/labs/PixelOfficeRPG'))
 const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
 const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
@@ -116,6 +124,24 @@ const SimplePendulum     = lazy(() => import('@/pages/labs/SimplePendulum'))
 const OpticsLab          = lazy(() => import('@/pages/labs/OpticsLab'))
 const WaveInterference   = lazy(() => import('@/pages/labs/WaveInterference'))
 const MechaForce         = lazy(() => import('@/pages/labs/MechaForce'))
+const MotionSim          = lazy(() => import('@/pages/labs/MotionSim'))
+const PhysicsEngine2D    = lazy(() => import('@/pages/labs/PhysicsEngine2D'))
+const MomentumCollision  = lazy(() => import('@/pages/labs/MomentumCollision'))
+const ProjectileMotion   = lazy(() => import('@/pages/labs/ProjectileMotion'))
+const CircularMotion     = lazy(() => import('@/pages/labs/CircularMotion'))
+const RotationalDynamics = lazy(() => import('@/pages/labs/RotationalDynamics'))
+const YoungDoubleSlit    = lazy(() => import('@/pages/labs/YoungDoubleSlit'))
+const CircularMotion3D   = lazy(() => import('@/pages/labs/CircularMotion3D'))
+const HarmonicMotion     = lazy(() => import('@/pages/labs/HarmonicMotion'))
+const RefractionExplorer = lazy(() => import('@/pages/labs/RefractionExplorer'))
+const DensityBuoyancy    = lazy(() => import('@/pages/labs/DensityBuoyancy'))
+const ScratchKids        = lazy(() => import('@/pages/labs/ScratchKids'))
+const CFDFlow            = lazy(() => import('@/pages/labs/CFDFlow'))
+const StandingWaves      = lazy(() => import('@/pages/labs/StandingWaves'))
+const StemDIYLibrary     = lazy(() => import('@/pages/labs/StemDIYLibrary'))
+const BioGrowth          = lazy(() => import('@/pages/labs/BioGrowth'))
+const ThermalGas         = lazy(() => import('@/pages/labs/ThermalGas'))
+const WfcBuilder         = lazy(() => import('@/pages/labs/WfcBuilder'))
 const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
 const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
 const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
@@ -155,6 +181,7 @@ const TranscriptRecordingPage = lazy(() => import('@/pages/teacher/TranscriptRec
 const CreateModulePage      = lazy(() => import('@/pages/teacher/CreateModule'))
 const LaTeXEditorPage       = lazy(() => import('@/pages/teacher/LaTeXEditor'))
 const TeacherMyCoursesPage  = lazy(() => import('@/pages/teacher/MyCourses'))
+const TeacherWayArena       = lazy(() => import('@/pages/teacher/WayArena'))
 const TeacherCourseEditorPage = lazy(() => import('@/pages/teacher/CourseEditor'))
 const TeacherCourseVideosPage = lazy(() => import('@/pages/teacher/CourseVideos'))
 const TeacherCourseAssetsPage = lazy(() => import('@/pages/teacher/CourseAssets'))
@@ -198,6 +225,9 @@ const StudentAiTutorPage              = lazy(() => import('@/pages/student/AiTut
 const StudentCareerPage               = lazy(() => import('@/pages/student/Career'))
 const StudentExamPrepPage             = lazy(() => import('@/pages/student/ExamPrep'))
 const StudentExamsPage                = lazy(() => import('@/pages/student/Exams'))
+const StudentSelfStudyPage            = lazy(() => import('@/pages/student/SelfStudy'))
+const StudentKidsProgressPage         = lazy(() => import('@/pages/student/KidsProgress'))
+const StudentStemProjects             = lazy(() => import('@/pages/student/StemProjects'))
 const ForYouPage                      = lazy(() => import('@/pages/student/ForYou'))
 const StudentDailyPage                = lazy(() => import('@/pages/student/Daily'))
 const CareerGamesPage                 = lazy(() => import('@/pages/student/CareerGames'))
@@ -253,6 +283,13 @@ const AdminPaymentsPage     = lazy(() => import('@/pages/admin/Payments'))
 // vì component rất nhẹ (chỉ là iframe)
 
 // Track lượt truy cập từng route → bảng PageView, hiện ở /admin/analytics
+// Backward-compat: /dashboard/labtwin/<slug> → /dashboard/labtwin/<slug>
+// User: "bỏ route /labs/ chuyển toàn bộ giả lập ra route cha"
+function LegacyLabSlugRedirect() {
+  const { labSlug } = useParams<{ labSlug: string }>()
+  return <Navigate to={`/dashboard/labtwin/${labSlug ?? ''}`} replace />
+}
+
 function PageTracker() {
   usePageTracking()
   return null
@@ -281,6 +318,7 @@ export function AppRouter() {
         <Route path="/a/:token"       element={<ScanAssignmentPage />} />
         <Route path="/k/:token"       element={<KeoCoJoinPage />} />
         <Route path="/join/:token"    element={<JoinByTokenPage />} />{/* HS quét QR vào lớp */}
+        <Route path="/stem/join/:token" element={<StemJoinByToken />} />{/* HS join dự án STEM qua QR/link */}
         <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
         <Route path="/kl/:token"      element={<KeoCoLivePage />} />
         <Route path="/contact-sales"  element={<ContactSalesPage />} />
@@ -344,11 +382,15 @@ export function AppRouter() {
             {/* Dashboard pages chưa port → PageFallback */}
             <Route path="/dashboard/ai-content-generator" element={<PageFallback />} />
             <Route path="/dashboard/aura"                  element={<AuraPage />} />
+            <Route path="/dashboard/aura/:simId"           element={<AuraPage />} />
             <Route path="/dashboard/change-password"       element={<PageFallback />} />
             <Route path="/dashboard/competition"           element={<PageFallback />} />
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
             <Route path="/dashboard/iot-lab"                       element={<IoTLab />} />
+            {/* User: "thêm các routes cho các thí nghiệm trong /dashboard/iot-lab" */}
+            <Route path="/dashboard/iot-lab/sketch/:sketchId"      element={<IoTLab />} />
+            <Route path="/dashboard/iot-lab/arduino/:sketchId"     element={<IoTLab />} />
             <Route path="/dashboard/iot-lab/emulator"              element={<ArduinoEmulator />} />
             {/* ── Deep-link routes cho assignment "lắp ráp / nghiên cứu mạch" ── */}
             <Route path="/dashboard/iot-lab/circuit-builder"       element={<CircuitBuilder />} />
@@ -358,7 +400,8 @@ export function AppRouter() {
             <Route path="/dashboard/iot-lab/circuit-simulator"     element={<CircuitSimulator />} />
             <Route path="/dashboard/iot-lab/digital-logic"         element={<DigitalLogicLab />} />
             <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
-            <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
+            <Route path="/dashboard/labtwin/graph-lab" element={<GraphLab />} />
+            <Route path="/dashboard/periodic-table"        element={<PeriodicTablePage />} />
             <Route path="/dashboard/learning"              element={<PageFallback />} />
             <Route path="/dashboard/learning/*"            element={<PageFallback />} />
             <Route path="/dashboard/logo-a-demo"           element={<PageFallback />} />
@@ -391,14 +434,17 @@ export function AppRouter() {
             {/* /labs catalog page — phải register TRƯỚC :labSlug catch-all
                 để khớp đúng route. Trước đây bị Navigate redirect về /labtwin
                 khiến mọi card "Xem tất cả" / category filter loop vô tận. */}
-            <Route path="/dashboard/labtwin/labs"                         element={<PythonLabsPage />} />
-            <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
-            <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
-            <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
-            <Route path="/dashboard/labtwin/labs/periodic-table"          element={<PeriodicTablePage />} />
-            <Route path="/dashboard/periodic-table"                       element={<PeriodicTablePage />} />{/* shortcut */}
-            <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
-            <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
+            {/* User: "bỏ route /dashboard/labtwin/" — flatten all sims into /dashboard/labtwin */}
+            <Route path="/dashboard/labtwin/labs"                         element={<Navigate to="/dashboard/labtwin" replace />} />
+            <Route path="/dashboard/labtwin/aerodynamics"            element={<AerodynamicsLab />} />
+            <Route path="/dashboard/labtwin/fourier-epicycles"       element={<FourierEpicycles />} />
+            <Route path="/dashboard/labtwin/circular-shm"            element={<CircularSHM />} />
+            <Route path="/dashboard/labtwin/airflow-cfd"             element={<AirflowCFDLab />} />
+            <Route path="/dashboard/labtwin/chemistry-lab"           element={<ChemistryLab />} />
+            <Route path="/dashboard/labtwin/circuit-simulator"       element={<CircuitSimulator />} />
+            <Route path="/dashboard/labtwin/digital-logic-lab"       element={<DigitalLogicLab />} />
+            <Route path="/dashboard/labtwin/geometry-unfold"         element={<GeometryUnfoldLab />} />
+            <Route path="/dashboard/labtwin/pixel-office-rpg"        element={<PixelOfficeRPGLab />} />
             {/* ── GAME HUB — mọi game mount trực tiếp dưới /dashboard/games/* ── */}
             <Route path="/dashboard/games"                                element={<GamesIndexPage />} />
             <Route path="/dashboard/games/pixel-odyssey"                  element={<PixelOdyssey />} />
@@ -411,31 +457,83 @@ export function AppRouter() {
             <Route path="/dashboard/games/wayground"                      element={<Navigate to="/dashboard/games/keo-co" replace />} />
             <Route path="/dashboard/games/quiz-tug-of-war"                element={<Navigate to="/dashboard/games/keo-co" replace />} />
             {/* ── Backward compat — old labtwin/labs/* paths cho games → redirect ── */}
-            <Route path="/dashboard/labtwin/labs/pixel-odyssey"           element={<Navigate to="/dashboard/games/pixel-odyssey" replace />} />
-            <Route path="/dashboard/labtwin/labs/pixel-agents"            element={<Navigate to="/dashboard/games/pixel-agents" replace />} />
-            <Route path="/dashboard/labtwin/labs/keo-co-app"              element={<Navigate to="/dashboard/games/keo-co" replace />} />
-            <Route path="/dashboard/labtwin/labs/quiz-tug-of-war"         element={<Navigate to="/dashboard/games/keo-co" replace />} />
-            <Route path="/dashboard/labtwin/labs/roll-call-wheel"         element={<Navigate to="/dashboard/games/roll-call-wheel" replace />} />
-            <Route path="/dashboard/labtwin/labs/gesture-swarm"           element={<Navigate to="/dashboard/games/gesture-swarm" replace />} />
-            <Route path="/dashboard/labtwin/labs/assembly-sim"            element={<Navigate to="/dashboard/games/assembly-sim" replace />} />
+            <Route path="/dashboard/labtwin/pixel-odyssey"           element={<Navigate to="/dashboard/games/pixel-odyssey" replace />} />
+            <Route path="/dashboard/labtwin/pixel-agents"            element={<Navigate to="/dashboard/games/pixel-agents" replace />} />
+            <Route path="/dashboard/labtwin/keo-co-app"              element={<Navigate to="/dashboard/games/keo-co" replace />} />
+            <Route path="/dashboard/labtwin/quiz-tug-of-war"         element={<Navigate to="/dashboard/games/keo-co" replace />} />
+            <Route path="/dashboard/labtwin/roll-call-wheel"         element={<Navigate to="/dashboard/games/roll-call-wheel" replace />} />
+            <Route path="/dashboard/labtwin/gesture-swarm"           element={<Navigate to="/dashboard/games/gesture-swarm" replace />} />
+            <Route path="/dashboard/labtwin/assembly-sim"            element={<Navigate to="/dashboard/games/assembly-sim" replace />} />
             {/* ── Pure science labs (vẫn ở labtwin) ── */}
-            <Route path="/dashboard/labtwin/labs/physics-motion"          element={<PhysicsMotion />} />
-            <Route path="/dashboard/labtwin/labs/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
-            <Route path="/dashboard/labtwin/labs/spring-pendulum"         element={<SpringPendulum />} />
-            <Route path="/dashboard/labtwin/labs/simple-pendulum"         element={<SimplePendulum />} />
-            <Route path="/dashboard/labtwin/labs/optics-lab"              element={<OpticsLab />} />
-            <Route path="/dashboard/labtwin/labs/wave-interference"       element={<WaveInterference />} />
-            <Route path="/dashboard/labtwin/labs/mechaforce"              element={<MechaForce />} />
-            <Route path="/dashboard/labtwin/labs/physics-dungeon"         element={<PhysicsDungeon />} />
+            <Route path="/dashboard/labtwin/physics-motion"          element={<PhysicsMotion />} />
+            <Route path="/dashboard/labtwin/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
+            <Route path="/dashboard/labtwin/spring-pendulum"         element={<SpringPendulum />} />
+            <Route path="/dashboard/labtwin/simple-pendulum"         element={<SimplePendulum />} />
+            <Route path="/dashboard/labtwin/optics-lab"              element={<OpticsLab />} />
+            <Route path="/dashboard/labtwin/wave-interference"       element={<WaveInterference />} />
+            <Route path="/dashboard/labtwin/mechaforce"              element={<MechaForce />} />
+            <Route path="/dashboard/labtwin/motionsim"               element={<MotionSim />} />
+            <Route path="/dashboard/labtwin/motion-sim"              element={<MotionSim />} />
+            <Route path="/dashboard/labtwin/physics-engine-2d"       element={<PhysicsEngine2D />} />
+            <Route path="/dashboard/labtwin/momentum-collision"      element={<MomentumCollision />} />
+            <Route path="/dashboard/labtwin/projectile"              element={<ProjectileMotion />} />
+            <Route path="/dashboard/labtwin/projectile-motion"       element={<ProjectileMotion />} />
+            <Route path="/dashboard/labtwin/circular-motion"         element={<CircularMotion />} />
+            <Route path="/dashboard/labtwin/rotational-dynamics"     element={<RotationalDynamics />} />
+            <Route path="/dashboard/labtwin/young-double-slit"       element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/young"                   element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/double-slit"             element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/light-interference"      element={<YoungDoubleSlit />} />
+            <Route path="/dashboard/labtwin/circular-motion-3d"      element={<CircularMotion3D />} />
+            <Route path="/dashboard/labtwin/circular-3d"             element={<CircularMotion3D />} />
+            <Route path="/dashboard/labtwin/helix"                   element={<CircularMotion3D />} />
+            <Route path="/dashboard/labtwin/harmonic-motion"         element={<HarmonicMotion />} />
+            <Route path="/dashboard/labtwin/shm"                     element={<HarmonicMotion />} />
+            <Route path="/dashboard/labtwin/refraction"              element={<RefractionExplorer />} />
+            <Route path="/dashboard/labtwin/snell"                   element={<RefractionExplorer />} />
+            <Route path="/dashboard/labtwin/density-buoyancy"        element={<DensityBuoyancy />} />
+            <Route path="/dashboard/labtwin/archimedes"              element={<DensityBuoyancy />} />
+            <Route path="/dashboard/labtwin/floating-sinking"        element={<DensityBuoyancy />} />
+            <Route path="/dashboard/labtwin/scratch-kids"            element={<ScratchKids />} />
+            <Route path="/dashboard/labtwin/scratch"                 element={<ScratchKids />} />
+            <Route path="/dashboard/labtwin/code-kids"               element={<ScratchKids />} />
+            <Route path="/dashboard/labtwin/coding"                  element={<ScratchKids />} />
+            <Route path="/dashboard/labtwin/cfd-flow"                element={<CFDFlow />} />
+            <Route path="/dashboard/labtwin/cfd"                     element={<CFDFlow />} />
+            <Route path="/dashboard/labtwin/lbm"                     element={<CFDFlow />} />
+            <Route path="/dashboard/labtwin/karman"                  element={<CFDFlow />} />
+            <Route path="/dashboard/labtwin/standing-waves"          element={<StandingWaves />} />
+            <Route path="/dashboard/labtwin/standing-wave"           element={<StandingWaves />} />
+            <Route path="/dashboard/labtwin/harmonics"               element={<StandingWaves />} />
+            <Route path="/dashboard/labtwin/stem-diy"                element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/diy"                     element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/diy-library"             element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/tutorials"               element={<StemDIYLibrary />} />
+            <Route path="/dashboard/labtwin/biogrowth"               element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/bio-growth"              element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/population"              element={<BioGrowth />} />
+            <Route path="/dashboard/labtwin/thermal-gas"             element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/gas-laws"                element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/thermodynamics"          element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/ideal-gas"               element={<ThermalGas />} />
+            <Route path="/dashboard/labtwin/wfc-builder"             element={<WfcBuilder />} />
+            <Route path="/dashboard/labtwin/wfc"                     element={<WfcBuilder />} />
+            <Route path="/dashboard/labtwin/wave-function-collapse"  element={<WfcBuilder />} />
+            {/* Wokwi sim → redirect đến Arduino emulator hiện có */}
+            <Route path="/dashboard/labtwin/wokwi-sim"               element={<Navigate to="/dashboard/iot-lab/emulator" replace />} />
+            <Route path="/dashboard/labtwin/wokwi"                   element={<Navigate to="/dashboard/iot-lab/emulator" replace />} />
+            <Route path="/dashboard/labtwin/physics-dungeon"         element={<PhysicsDungeon />} />
+            {/* Backward compat — old /labs/<slug> URLs redirect to new /<slug> */}
+            <Route path="/dashboard/labtwin/:labSlug"            element={<LegacyLabSlugRedirect />} />
             {/* Tất cả labs khác → LabNextJsFallback (info card, no iframe) */}
-            <Route path="/dashboard/labtwin/labs/:labSlug"                element={<LabNextJsFallback />} />
+            <Route path="/dashboard/labtwin/:labSlug"                element={<LabNextJsFallback />} />
             {/* Lab experiment pages */}
             <Route path="/dashboard/labtwin/experiment/*"   element={<PageFallback />} />
             {/* /dashboard/labtwin/labs registered ở trên (line ~345) trước :labSlug */}
             <Route path="/dashboard/labtwin/labs-simple"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/ml-training"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/simulations-simple" element={<PageFallback />} />
-            <Route path="/dashboard/labtwin/video-tracking" element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/video-tracking" element={<VideoTrackingLab />} />
 
             {/* ── COURSES ───────────────────────────────────── */}
             <Route path="/courses/:courseId"                              element={<CourseViewPage />} />
@@ -491,6 +589,10 @@ export function AppRouter() {
               <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
               <Route path="/student/exam/:examId"             element={<ExamModesPage />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
+              <Route path="/student/self-study"               element={<StudentSelfStudyPage />} />
+              <Route path="/student/kids-progress"            element={<StudentKidsProgressPage />} />
+              <Route path="/student/stem-projects"            element={<StudentStemProjects />} />
+              <Route path="/student/stem-projects/:id"        element={<StudentStemProjects />} />
               <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/daily"                    element={<StudentDailyPage />} />
               <Route path="/student/games"                    element={<CareerGamesPage />} />
@@ -505,10 +607,14 @@ export function AppRouter() {
             <Route element={<RoleGuard roles={['TEACHER', 'ADMIN']} />}>
               {/* Đã port */}
               <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
+              <Route path="/teacher/stem-projects"          element={<TeacherStemProjects />} />
+              <Route path="/teacher/stem-projects/:id"      element={<TeacherStemProjectDetail />} />{/* Tabs: tasks/logs/feedback/milestones */}
               <Route path="/teacher/sprint"                 element={<TeacherSprintPage />} />
               <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
               <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />
               <Route path="/teacher/my-courses"             element={<TeacherMyCoursesPage />} />
+              <Route path="/teacher/way-arena"              element={<TeacherWayArena />} />
+              <Route path="/teacher/way-arena/:code"        element={<TeacherWayArena />} />
               <Route path="/teacher/course/create"          element={<TeacherCourseEditorPage />} />
               <Route path="/teacher/course/:courseId/edit"  element={<TeacherCourseEditorPage />} />
               <Route path="/teacher/course/:courseId/videos" element={<TeacherCourseVideosPage />} />

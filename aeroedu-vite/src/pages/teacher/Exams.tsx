@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import {
   Plus, FileText, Eye, Edit, Trash2, Copy,
   Grid3x3, Search, BarChart3, Sparkles, Loader2, Swords,
+  Trophy, Users, Award, TrendingUp, Crown,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
@@ -52,7 +53,52 @@ interface Exam {
   totalQuestions: number
   status: string
   createdAt: string
+  // Community fields (chỉ có khi scope=all/public)
+  isOwner?: boolean
+  authorName?: string
+  authorImage?: string | null
+  attempts?: number
+  uniqueStudents?: number
+  avgScore?: number
 }
+
+interface MostAttemptedExam {
+  id: string
+  title: string
+  subject: string
+  grade: string | null
+  questionCount: number
+  attempts: number
+  uniqueStudents: number
+  avgScore: number
+  teacher: { id: string; name: string; image: string | null } | null
+}
+
+interface TopTeacher {
+  id: string
+  name: string
+  email: string
+  image: string | null
+  examCount: number
+  totalAttempts: number
+  avgScore: number
+}
+
+interface CommunityStats {
+  mostAttempted: MostAttemptedExam[]
+  topTeachers: TopTeacher[]
+  summary: {
+    total_exams?: number
+    public_exams?: number
+    contributing_teachers?: number
+    total_attempts?: number
+    active_students?: number
+    avg_score?: number
+  }
+  updatedAt: string
+}
+
+type ScopeTab = 'mine' | 'all'
 
 // ── Status badge ──────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -95,14 +141,19 @@ export default function ExamsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [addingToGameId, setAddingToGameId] = useState<string | null>(null)
+  const [scope, setScope] = useState<ScopeTab>('all')  // Default 'all' = hiện TẤT CẢ đề
+  const [community, setCommunity] = useState<CommunityStats | null>(null)
+  const [communityLoading, setCommunityLoading] = useState(true)
 
-  useEffect(() => { loadExams() }, [subjectFilter])
+  useEffect(() => { loadExams() }, [subjectFilter, scope])
+  useEffect(() => { loadCommunity() }, [])
 
   // ── API calls ──────────────────────────────────────────────
   const loadExams = async () => {
     try {
       setLoading(true)
-      const { data } = await api.get('/teacher/exams')
+      // Pass scope=mine/all → BE filter accordingly
+      const { data } = await api.get(`/teacher/exams?scope=${scope}`)
       const list = Array.isArray(data?.exams) ? data.exams : Array.isArray(data?.data) ? data.data : []
       setExams(
         list.map((e: any) => ({
@@ -110,16 +161,22 @@ export default function ExamsPage() {
           title: String(e.title || 'Untitled'),
           subject: e.subject ? String(e.subject) : undefined,
           examType: String(e.examType || 'N/A'),
-          duration: Number(e.duration || 0),
-          totalQuestions: Number(e.totalQuestions || 0),
+          duration: Number(e.duration || e.duration_min || 0),
+          totalQuestions: Number(e.totalQuestions || e.question_count || 0),
           status: String(e.status || 'Nháp'),
-          createdAt: String(e.createdAt || new Date().toISOString()),
+          createdAt: String(e.createdAt || e.created_at || new Date().toISOString()),
+          // Community enrichment
+          isOwner: !!e.isOwner,
+          authorName: e.authorName ? String(e.authorName) : undefined,
+          authorImage: e.authorImage || null,
+          attempts: Number(e.attempts || 0),
+          uniqueStudents: Number(e.uniqueStudents || 0),
+          avgScore: Number(e.avgScore || 0),
         }))
       )
     } catch (err: any) {
       const status = err?.response?.status
       if (status === 503 || status === 502) {
-        // Service not yet deployed — show empty list silently, no error toast spam
         setExams([])
       } else {
         console.error(err)
@@ -128,6 +185,18 @@ export default function ExamsPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCommunity = async () => {
+    setCommunityLoading(true)
+    try {
+      const { data } = await api.get<CommunityStats>('/exams/community-stats?limit=10')
+      setCommunity(data)
+    } catch {
+      setCommunity(null)
+    } finally {
+      setCommunityLoading(false)
     }
   }
 
@@ -265,6 +334,173 @@ export default function ExamsPage() {
 
       {/* ── Main content ────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-6">
+
+        {/* ── COMMUNITY STATS — bảng vinh danh đầu trang ──── */}
+        {community && (community.summary?.total_attempts ?? 0) > 0 && (
+          <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            {/* TOP đề được làm nhiều nhất */}
+            <div style={{ background: D.card, border: `1px solid ${D.border}` }}
+                 className="rounded-2xl p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(245,158,11,0.15)' }}>
+                  <Trophy className="w-5 h-5" style={{ color: '#fbbf24' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold" style={{ color: D.text }}>🔥 Top đề được làm nhiều nhất</h3>
+                  <p className="text-xs" style={{ color: D.muted }}>
+                    {community.summary.total_attempts?.toLocaleString('vi-VN')} lượt thi · {community.summary.active_students?.toLocaleString('vi-VN')} HS hoạt động
+                  </p>
+                </div>
+              </div>
+              {community.mostAttempted.length === 0 ? (
+                <p className="text-sm py-6 text-center italic" style={{ color: D.muted2 }}>
+                  Chưa có đề nào được làm. Khi HS làm bài, đề sẽ xuất hiện ở đây.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {community.mostAttempted.slice(0, 5).map((e, i) => (
+                    <button
+                      key={e.id}
+                      onClick={() => navigate(`/teacher/exams/${e.id}`)}
+                      className="w-full flex items-center gap-3 p-2.5 rounded-lg transition-colors text-left"
+                      style={{ background: i === 0 ? 'rgba(245,158,11,0.08)' : D.card2 }}
+                      onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
+                      onMouseLeave={ev => (ev.currentTarget.style.background = i === 0 ? 'rgba(245,158,11,0.08)' : D.card2)}
+                    >
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{
+                          background: i === 0 ? '#fbbf24' : i === 1 ? '#a3a3a3' : i === 2 ? '#cd7f32' : D.border2,
+                          color: i < 3 ? '#000' : D.muted,
+                        }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: D.text }}>{e.title}</p>
+                        <p className="text-xs" style={{ color: D.muted }}>
+                          {e.subject}{e.grade ? ` · Lớp ${e.grade}` : ''} · {e.teacher?.name || 'Chưa rõ tác giả'}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold" style={{ color: '#fbbf24' }}>{e.attempts.toLocaleString('vi-VN')}</p>
+                        <p className="text-[10px]" style={{ color: D.muted }}>lượt thi</p>
+                      </div>
+                      {e.avgScore > 0 && (
+                        <div className="text-right flex-shrink-0 hidden sm:block">
+                          <p className="text-sm font-bold" style={{ color: e.avgScore >= 70 ? '#4ade80' : e.avgScore >= 50 ? '#60a5fa' : '#f87171' }}>{e.avgScore}%</p>
+                          <p className="text-[10px]" style={{ color: D.muted }}>điểm TB</p>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* TOP giáo viên có đề chất lượng */}
+            <div style={{ background: D.card, border: `1px solid ${D.border}` }}
+                 className="rounded-2xl p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(124,58,237,0.15)' }}>
+                  <Crown className="w-5 h-5" style={{ color: '#a78bfa' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold" style={{ color: D.text }}>👑 Giáo viên có đề được đánh giá cao</h3>
+                  <p className="text-xs" style={{ color: D.muted }}>
+                    {community.summary.contributing_teachers ?? 0} GV đóng góp · {community.summary.total_exams?.toLocaleString('vi-VN')} đề
+                  </p>
+                </div>
+              </div>
+              {community.topTeachers.length === 0 ? (
+                <p className="text-sm py-6 text-center italic" style={{ color: D.muted2 }}>
+                  Chưa có GV nào có đề được làm. Cộng đồng vẫn còn mới!
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {community.topTeachers.slice(0, 5).map((t, i) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-3 p-2.5 rounded-lg"
+                      style={{ background: i === 0 ? 'rgba(124,58,237,0.08)' : D.card2 }}
+                    >
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{
+                          background: i === 0 ? '#fbbf24' : i === 1 ? '#a3a3a3' : i === 2 ? '#cd7f32' : D.border2,
+                          color: i < 3 ? '#000' : D.muted,
+                        }}>
+                        {i + 1}
+                      </div>
+                      {t.image ? (
+                        <img src={t.image} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                          style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>
+                          {(t.name || 'G')[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: D.text }}>{t.name}</p>
+                        <p className="text-xs" style={{ color: D.muted }}>{t.examCount} đề · {t.totalAttempts.toLocaleString('vi-VN')} lượt thi</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold" style={{ color: t.avgScore >= 70 ? '#4ade80' : t.avgScore >= 50 ? '#60a5fa' : '#f87171' }}>
+                          {t.avgScore || '—'}%
+                        </p>
+                        <p className="text-[10px]" style={{ color: D.muted }}>điểm TB</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Empty community state — loading */}
+        {communityLoading && !community && (
+          <div className="mb-6 p-4 rounded-xl flex items-center justify-center gap-3"
+               style={{ background: D.card, border: `1px solid ${D.border}` }}>
+            <Loader2 className="w-4 h-4 animate-spin" style={{ color: D.purpleL }} />
+            <span className="text-sm" style={{ color: D.muted }}>Đang tải bảng vinh danh...</span>
+          </div>
+        )}
+
+        {/* ── SCOPE TABS — Của tôi vs Tất cả ──── */}
+        <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: D.card }}>
+            {([
+              { key: 'mine' as const, label: 'Đề của tôi', icon: FileText },
+              { key: 'all'  as const, label: 'Tất cả đề (Cộng đồng)', icon: Users },
+            ]).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setScope(key)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                style={{
+                  background: scope === key ? D.purple : 'transparent',
+                  color: scope === key ? '#fff' : D.muted,
+                }}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+                {scope === key && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={{ background: 'rgba(255,255,255,0.2)' }}>
+                    {exams.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs" style={{ color: D.muted }}>
+            {scope === 'mine'
+              ? '👤 Chỉ hiển thị đề bạn tạo'
+              : '🌍 Đề của bạn + đề public từ GV khác trong cộng đồng'}
+          </span>
+        </div>
+
         <div className="grid grid-cols-12 gap-6">
 
           {/* ── Left column (8) ────────────────────────────── */}
@@ -306,10 +542,13 @@ export default function ExamsPage() {
                 <table className="w-full">
                   <thead style={{ background: D.card2, borderBottom: `1px solid ${D.border}` }}>
                     <tr>
-                      {['Đề thi', 'Môn', 'Loại', 'Thời gian', 'SL câu', 'Trạng thái', 'Hành động'].map((h, i) => (
+                      {(scope === 'all'
+                        ? ['Đề thi', 'Tác giả', 'Môn', 'Lượt thi', 'Điểm TB', 'Trạng thái', 'Hành động']
+                        : ['Đề thi', 'Môn', 'Loại', 'Thời gian', 'SL câu', 'Trạng thái', 'Hành động']
+                      ).map((h, i, arr) => (
                         <th
                           key={h}
-                          className={`p-4 text-xs font-medium uppercase tracking-wide ${i === 6 ? 'text-right' : 'text-left'}`}
+                          className={`p-4 text-xs font-medium uppercase tracking-wide ${i === arr.length - 1 ? 'text-right' : 'text-left'}`}
                           style={{ color: D.muted }}
                         >
                           {h}
@@ -367,19 +606,74 @@ export default function ExamsPage() {
                                 <FileText className="w-5 h-5" style={{ color: '#a78bfa' }} />
                               </div>
                               <div>
-                                <div className="font-medium text-sm" style={{ color: D.text }}>{exam.title}</div>
-                                <div className="text-xs mt-0.5" style={{ color: D.muted }}>ID: {exam.id}</div>
+                                <div className="font-medium text-sm flex items-center gap-1.5" style={{ color: D.text }}>
+                                  {exam.title}
+                                  {exam.isOwner && scope === 'all' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                      style={{ background: 'rgba(34,211,238,0.2)', color: '#22d3ee' }}>
+                                      của bạn
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: D.muted }}>
+                                  <span>{exam.duration}p · {exam.totalQuestions} câu</span>
+                                  {scope === 'all' && (exam.uniqueStudents ?? 0) > 0 && (
+                                    <span className="text-[10px]">· {exam.uniqueStudents} HS</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
-                          {/* Môn */}
-                          <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.subject || 'Chưa phân môn'}</td>
-                          {/* Loại */}
-                          <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.examType}</td>
-                          {/* Thời gian */}
-                          <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.duration} phút</td>
-                          {/* SL câu */}
-                          <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.totalQuestions} câu</td>
+                          {scope === 'all' ? (
+                            <>
+                              {/* Tác giả */}
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  {exam.authorImage ? (
+                                    <img src={exam.authorImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                                      style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>
+                                      {(exam.authorName || 'G')[0].toUpperCase()}
+                                    </div>
+                                  )}
+                                  <span className="text-sm truncate max-w-[120px]" style={{ color: D.muted }}>
+                                    {exam.authorName || 'Chưa rõ'}
+                                  </span>
+                                </div>
+                              </td>
+                              {/* Môn */}
+                              <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.subject || 'Chưa phân môn'}</td>
+                              {/* Lượt thi */}
+                              <td className="p-4 text-sm">
+                                <span className="font-bold" style={{ color: (exam.attempts ?? 0) > 0 ? '#fbbf24' : D.muted2 }}>
+                                  {(exam.attempts ?? 0).toLocaleString('vi-VN')}
+                                </span>
+                              </td>
+                              {/* Điểm TB */}
+                              <td className="p-4 text-sm">
+                                {(exam.avgScore ?? 0) > 0 ? (
+                                  <span className="font-bold" style={{
+                                    color: (exam.avgScore ?? 0) >= 70 ? '#4ade80'
+                                         : (exam.avgScore ?? 0) >= 50 ? '#60a5fa' : '#f87171'
+                                  }}>
+                                    {exam.avgScore}%
+                                  </span>
+                                ) : <span style={{ color: D.muted2 }}>—</span>}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {/* Môn */}
+                              <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.subject || 'Chưa phân môn'}</td>
+                              {/* Loại */}
+                              <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.examType}</td>
+                              {/* Thời gian */}
+                              <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.duration} phút</td>
+                              {/* SL câu */}
+                              <td className="p-4 text-sm" style={{ color: D.muted }}>{exam.totalQuestions} câu</td>
+                            </>
+                          )}
                           {/* Trạng thái */}
                           <td className="p-4"><StatusBadge status={exam.status} /></td>
                           {/* Hành động */}
@@ -396,21 +690,23 @@ export default function ExamsPage() {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {/* Edit */}
-                              <button
-                                onClick={() => navigate(`/teacher/exams/${exam.id}/edit`)}
-                                title="Sửa"
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: D.muted }}
-                                onMouseEnter={e => (e.currentTarget.style.background = D.card2)}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              {/* Duplicate */}
+                              {/* Edit — chỉ owner mới sửa được */}
+                              {(scope === 'mine' || exam.isOwner) && (
+                                <button
+                                  onClick={() => navigate(`/teacher/exams/${exam.id}/edit`)}
+                                  title="Sửa"
+                                  className="p-2 rounded-lg transition-colors"
+                                  style={{ color: D.muted }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = D.card2)}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {/* Duplicate — ai cũng nhân bản được (để dùng làm template) */}
                               <button
                                 onClick={() => handleDuplicate(exam.id)}
-                                title="Nhân bản"
+                                title={scope === 'all' && !exam.isOwner ? 'Nhân bản về đề của tôi' : 'Nhân bản'}
                                 disabled={duplicatingId === exam.id}
                                 className="p-2 rounded-lg transition-colors disabled:opacity-50"
                                 style={{ color: D.muted }}
@@ -452,21 +748,23 @@ export default function ExamsPage() {
                                   : <Swords className="w-4 h-4" />
                                 }
                               </button>
-                              {/* Delete */}
-                              <button
-                                onClick={() => handleDelete(exam.id)}
-                                title="Xóa"
-                                disabled={deletingId === exam.id}
-                                className="p-2 rounded-lg transition-colors disabled:opacity-50"
-                                style={{ color: '#f87171' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.15)')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                              >
-                                {deletingId === exam.id
-                                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                                  : <Trash2 className="w-4 h-4" />
-                                }
-                              </button>
+                              {/* Delete — chỉ owner mới xoá */}
+                              {(scope === 'mine' || exam.isOwner) && (
+                                <button
+                                  onClick={() => handleDelete(exam.id)}
+                                  title="Xóa"
+                                  disabled={deletingId === exam.id}
+                                  className="p-2 rounded-lg transition-colors disabled:opacity-50"
+                                  style={{ color: '#f87171' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.15)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                  {deletingId === exam.id
+                                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    : <Trash2 className="w-4 h-4" />
+                                  }
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { LatexEditor, insertAtMonacoCursor } from '@/components/latex-editor'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
+import { AiSectionWizardDialog } from '@/components/latex-editor/AiSectionWizardDialog'
 import LatexSnippetsPanel from '@/components/latex-editor/LatexSnippetsPanel'
 import { LATEX_TEMPLATES, getTemplateById } from '@/lib/latex-templates'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
@@ -189,6 +190,7 @@ export default function LaTeXEditorDocument() {
   const [savingLessonPlan, setSavingLessonPlan] = useState(false)
   const [savedAsLessonPlan, setSavedAsLessonPlan] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
 
   // ── Realtime preview + Snippets panel ──
   // autoCompile=true → auto biên dịch sau 2.5s im lặng (giúp GV thấy ngay
@@ -366,6 +368,19 @@ export default function LaTeXEditorDocument() {
       saveContent(result.latex)
     }
     setAiDialogOpen(false)
+  }
+
+  /* ── AI Section Wizard — sinh đề LaTeX 4 phần theo nội dung GV nhập riêng ── */
+  const handleWizardGenerated = (latex: string, meta: { sections: number; totalQuestions: number; provider: string }) => {
+    setContent(latex)
+    if (!title.trim()) {
+      setTitle('Đề kiểm tra (AI sinh)')
+      saveContent(latex, 'Đề kiểm tra (AI sinh)')
+    } else {
+      saveContent(latex)
+    }
+    setWizardOpen(false)
+    toast.success(`✓ AI đã sinh ${meta.totalQuestions} câu hỏi qua ${meta.sections} phần. Chỉnh sửa và biên dịch để xem PDF.`)
   }
 
   const handleCompile = useCallback(async () => {
@@ -552,11 +567,11 @@ export default function LaTeXEditorDocument() {
           ))}
         </select>
 
-        {/* AI exam generator */}
+        {/* AI exam generator (single-pass với topic chung) */}
         <button
           type="button"
           onClick={() => setAiDialogOpen(true)}
-          title="Sinh đề trắc nghiệm / tự luận bằng AI"
+          title="Sinh đề trắc nghiệm / tự luận bằng AI (cấu hình tổng)"
           style={{
             background: 'linear-gradient(135deg, #7c3aed, #22d3ee)',
             border: 'none', borderRadius: 8, color: '#fff',
@@ -567,6 +582,23 @@ export default function LaTeXEditorDocument() {
         >
           <Sparkles size={14} />
           Tạo đề bằng AI
+        </button>
+
+        {/* AI Section Wizard — sinh theo từng phần riêng */}
+        <button
+          type="button"
+          onClick={() => setWizardOpen(true)}
+          title="AI ra đề theo phần — bạn khai báo nội dung từng phần (MCQ / Đ-S / Trả lời ngắn / Tự luận)"
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b, #ec4899)',
+            border: 'none', borderRadius: 8, color: '#fff',
+            cursor: 'pointer', padding: '6px 14px', fontSize: 13, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 0 14px rgba(236,72,153,0.35)',
+          }}
+        >
+          <Zap size={14} />
+          AI theo phần
         </button>
 
         {/* Save */}
@@ -1019,7 +1051,14 @@ export default function LaTeXEditorDocument() {
         onInsert={handleSnippetInsert}
       />
 
-      {/* ── AI exam generator modal ── */}
+      {/* ── AI Section Wizard — sinh đề theo từng phần riêng (mới) ── */}
+      <AiSectionWizardDialog
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onGenerated={handleWizardGenerated}
+      />
+
+      {/* ── AI exam generator modal (tổng quát) ── */}
       <AiExamDialog
         open={aiDialogOpen}
         onClose={() => setAiDialogOpen(false)}

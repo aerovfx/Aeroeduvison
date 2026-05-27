@@ -1,397 +1,768 @@
 /**
- * PeriodicTable — Bảng tuần hoàn 118 nguyên tố tương tác.
+ * PeriodicTable — Bảng tuần hoàn tương tác museum-grade
  *
- *   Route: /dashboard/labtwin/labs/periodic-table
+ * Route: /dashboard/periodic-table (sidebar dưới Graph Lab)
  *
- *   Tính năng:
- *   - Grid 18×9 đầy đủ (s/p/d/f-blocks) với placement chuẩn IUPAC
- *   - Click 1 nguyên tố → modal chi tiết (Z, M, electronegativity,
- *     cấu hình e, phân nhóm, oxi hoá thường gặp, ứng dụng)
- *   - Highlight theo nhóm (10 nhóm màu) — phi kim/kim loại/khí trơ/...
- *   - Filter ô tìm kiếm theo tên VI/EN/symbol/Z
- *   - Bộ lọc trạng thái (rắn/lỏng/khí) + lớp electron
- *   - Light/dark mode aware qua var(--td-*) tokens
+ * Aesthetic refs (theo user):
+ *   - "Things We Take" framed boxes — typography hierarchy minimalist
+ *   - Acrylic specimen cubes — glassmorphism với refraction
+ *   - "Encoding Landscape" posters — dark cinematic + đối tượng float
+ *
+ * 3 sections:
+ *   1. Periodic Table 2D — framed shadow boxes, mass top-left + atomic# top-right + symbol center
+ *   2. 3D Atom Viewer — atom inside transparent acrylic cube, R3F refraction
+ *   3. Detail Card — full museum-style framed card với "ELEMENT FACTS" panel
  */
-import { useMemo, useState } from 'react'
-import { ArrowLeft, Search, X, Atom, Layers } from 'lucide-react'
+import { useState, useMemo, useRef, Suspense } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, Stars } from '@react-three/drei'
+import { ChevronLeft, Atom } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import * as THREE from 'three'
 
-/* ─── Element data — gói gọn 118 nguyên tố ────────────────────── */
-interface Element {
-  z: number               // số hiệu nguyên tử
-  symbol: string
-  name: string            // tên VI
-  nameEn: string
-  mass: number            // khối lượng nguyên tử
-  category: Category      // phân loại
-  group: number | null    // nhóm IUPAC (1-18, null cho La/Ac series)
-  period: number          // chu kì
-  block: 's' | 'p' | 'd' | 'f'
-  state: 'solid' | 'liquid' | 'gas' | 'unknown'
-  electronegativity: number | null
-  config: string          // cấu hình electron ngắn gọn
-}
-
+// ── Element data ─────────────────────────────────────────────
 type Category =
-  | 'alkali'      // kiềm
-  | 'alkaline'    // kiềm thổ
-  | 'transition'  // chuyển tiếp
-  | 'post'        // sau chuyển tiếp
-  | 'metalloid'   // á kim
-  | 'nonmetal'    // phi kim
-  | 'halogen'     // halogen
-  | 'noble'       // khí hiếm
-  | 'lanthanide'
-  | 'actinide'
+  | 'alkali' | 'alkali-earth' | 'transition' | 'post-transition'
+  | 'metalloid' | 'nonmetal' | 'halogen' | 'noble' | 'lanthanide'
 
-const CAT_STYLE: Record<Category, { bg: string; fg: string; label: string }> = {
-  alkali:     { bg: 'bg-red-500/15 hover:bg-red-500/30 border-red-500/30',           fg: 'text-red-300',    label: 'Kim loại kiềm' },
-  alkaline:   { bg: 'bg-orange-500/15 hover:bg-orange-500/30 border-orange-500/30',  fg: 'text-orange-300', label: 'Kiềm thổ' },
-  transition: { bg: 'bg-yellow-500/15 hover:bg-yellow-500/30 border-yellow-500/30',  fg: 'text-yellow-200', label: 'Chuyển tiếp' },
-  post:       { bg: 'bg-teal-500/15 hover:bg-teal-500/30 border-teal-500/30',        fg: 'text-teal-200',   label: 'Hậu chuyển tiếp' },
-  metalloid:  { bg: 'bg-emerald-500/15 hover:bg-emerald-500/30 border-emerald-500/30',fg:'text-emerald-300', label: 'Á kim' },
-  nonmetal:   { bg: 'bg-green-500/15 hover:bg-green-500/30 border-green-500/30',     fg: 'text-green-300',  label: 'Phi kim' },
-  halogen:    { bg: 'bg-cyan-500/15 hover:bg-cyan-500/30 border-cyan-500/30',        fg: 'text-cyan-300',   label: 'Halogen' },
-  noble:      { bg: 'bg-violet-500/15 hover:bg-violet-500/30 border-violet-500/30',  fg: 'text-violet-300', label: 'Khí hiếm' },
-  lanthanide: { bg: 'bg-pink-500/15 hover:bg-pink-500/30 border-pink-500/30',        fg: 'text-pink-300',   label: 'Lanthanide' },
-  actinide:   { bg: 'bg-fuchsia-500/15 hover:bg-fuchsia-500/30 border-fuchsia-500/30',fg: 'text-fuchsia-300',label: 'Actinide' },
+const CATEGORY_META: Record<Category, { label: string; color: string; glow: string }> = {
+  'alkali':         { label: 'Alkali Metal',       color: '#ff6b6b', glow: '#ff8787' },
+  'alkali-earth':   { label: 'Alkaline Earth',     color: '#ffd166', glow: '#ffe066' },
+  'transition':     { label: 'Transition Metal',   color: '#ff9f1c', glow: '#ffb845' },
+  'post-transition':{ label: 'Post-transition',    color: '#a8dadc', glow: '#caffff' },
+  'metalloid':      { label: 'Metalloid',          color: '#06d6a0', glow: '#5ef5c5' },
+  'nonmetal':       { label: 'Nonmetal',           color: '#118ab2', glow: '#3fbbe0' },
+  'halogen':        { label: 'Halogen',            color: '#c77dff', glow: '#e0aaff' },
+  'noble':          { label: 'Noble Gas',          color: '#9d4edd', glow: '#c77dff' },
+  'lanthanide':     { label: 'Lanthanide',         color: '#f72585', glow: '#ff70a6' },
 }
 
-// Compact data — chỉ phần đặc trưng. Đầy đủ 118 nguyên tố
+interface Element {
+  z: number
+  symbol: string
+  name: string
+  nameVi: string
+  category: Category
+  mass: number
+  electronConfig: string
+  shells: number[]
+  meltK: number | null
+  boilK: number | null
+  density: number | null
+  electronegativity: number | null
+  discoveredBy: string
+  uses: string
+  period: number
+  group: number
+}
+
 const ELEMENTS: Element[] = [
-  // Chu kì 1
-  { z:1,  symbol:'H',  name:'Hydro',     nameEn:'Hydrogen',   mass:1.008,   category:'nonmetal',   group:1,  period:1, block:'s', state:'gas',     electronegativity:2.20, config:'1s¹' },
-  { z:2,  symbol:'He', name:'Heli',      nameEn:'Helium',     mass:4.0026,  category:'noble',      group:18, period:1, block:'s', state:'gas',     electronegativity:null, config:'1s²' },
-  // Chu kì 2
-  { z:3,  symbol:'Li', name:'Liti',      nameEn:'Lithium',    mass:6.94,    category:'alkali',     group:1,  period:2, block:'s', state:'solid',   electronegativity:0.98, config:'[He]2s¹' },
-  { z:4,  symbol:'Be', name:'Beri',      nameEn:'Beryllium',  mass:9.0122,  category:'alkaline',   group:2,  period:2, block:'s', state:'solid',   electronegativity:1.57, config:'[He]2s²' },
-  { z:5,  symbol:'B',  name:'Bo',        nameEn:'Boron',      mass:10.81,   category:'metalloid',  group:13, period:2, block:'p', state:'solid',   electronegativity:2.04, config:'[He]2s²2p¹' },
-  { z:6,  symbol:'C',  name:'Cacbon',    nameEn:'Carbon',     mass:12.011,  category:'nonmetal',   group:14, period:2, block:'p', state:'solid',   electronegativity:2.55, config:'[He]2s²2p²' },
-  { z:7,  symbol:'N',  name:'Nitơ',      nameEn:'Nitrogen',   mass:14.007,  category:'nonmetal',   group:15, period:2, block:'p', state:'gas',     electronegativity:3.04, config:'[He]2s²2p³' },
-  { z:8,  symbol:'O',  name:'Oxi',       nameEn:'Oxygen',     mass:15.999,  category:'nonmetal',   group:16, period:2, block:'p', state:'gas',     electronegativity:3.44, config:'[He]2s²2p⁴' },
-  { z:9,  symbol:'F',  name:'Flo',       nameEn:'Fluorine',   mass:18.998,  category:'halogen',    group:17, period:2, block:'p', state:'gas',     electronegativity:3.98, config:'[He]2s²2p⁵' },
-  { z:10, symbol:'Ne', name:'Neon',      nameEn:'Neon',       mass:20.180,  category:'noble',      group:18, period:2, block:'p', state:'gas',     electronegativity:null, config:'[He]2s²2p⁶' },
-  // Chu kì 3
-  { z:11, symbol:'Na', name:'Natri',     nameEn:'Sodium',     mass:22.990,  category:'alkali',     group:1,  period:3, block:'s', state:'solid',   electronegativity:0.93, config:'[Ne]3s¹' },
-  { z:12, symbol:'Mg', name:'Magie',     nameEn:'Magnesium',  mass:24.305,  category:'alkaline',   group:2,  period:3, block:'s', state:'solid',   electronegativity:1.31, config:'[Ne]3s²' },
-  { z:13, symbol:'Al', name:'Nhôm',      nameEn:'Aluminium',  mass:26.982,  category:'post',       group:13, period:3, block:'p', state:'solid',   electronegativity:1.61, config:'[Ne]3s²3p¹' },
-  { z:14, symbol:'Si', name:'Silic',     nameEn:'Silicon',    mass:28.085,  category:'metalloid',  group:14, period:3, block:'p', state:'solid',   electronegativity:1.90, config:'[Ne]3s²3p²' },
-  { z:15, symbol:'P',  name:'Photpho',   nameEn:'Phosphorus', mass:30.974,  category:'nonmetal',   group:15, period:3, block:'p', state:'solid',   electronegativity:2.19, config:'[Ne]3s²3p³' },
-  { z:16, symbol:'S',  name:'Lưu huỳnh', nameEn:'Sulfur',     mass:32.06,   category:'nonmetal',   group:16, period:3, block:'p', state:'solid',   electronegativity:2.58, config:'[Ne]3s²3p⁴' },
-  { z:17, symbol:'Cl', name:'Clo',       nameEn:'Chlorine',   mass:35.45,   category:'halogen',    group:17, period:3, block:'p', state:'gas',     electronegativity:3.16, config:'[Ne]3s²3p⁵' },
-  { z:18, symbol:'Ar', name:'Argon',     nameEn:'Argon',      mass:39.948,  category:'noble',      group:18, period:3, block:'p', state:'gas',     electronegativity:null, config:'[Ne]3s²3p⁶' },
-  // Chu kì 4
-  { z:19, symbol:'K',  name:'Kali',      nameEn:'Potassium',  mass:39.098,  category:'alkali',     group:1,  period:4, block:'s', state:'solid',   electronegativity:0.82, config:'[Ar]4s¹' },
-  { z:20, symbol:'Ca', name:'Canxi',     nameEn:'Calcium',    mass:40.078,  category:'alkaline',   group:2,  period:4, block:'s', state:'solid',   electronegativity:1.00, config:'[Ar]4s²' },
-  { z:21, symbol:'Sc', name:'Scandi',    nameEn:'Scandium',   mass:44.956,  category:'transition', group:3,  period:4, block:'d', state:'solid',   electronegativity:1.36, config:'[Ar]3d¹4s²' },
-  { z:22, symbol:'Ti', name:'Titan',     nameEn:'Titanium',   mass:47.867,  category:'transition', group:4,  period:4, block:'d', state:'solid',   electronegativity:1.54, config:'[Ar]3d²4s²' },
-  { z:23, symbol:'V',  name:'Vanadi',    nameEn:'Vanadium',   mass:50.942,  category:'transition', group:5,  period:4, block:'d', state:'solid',   electronegativity:1.63, config:'[Ar]3d³4s²' },
-  { z:24, symbol:'Cr', name:'Crom',      nameEn:'Chromium',   mass:51.996,  category:'transition', group:6,  period:4, block:'d', state:'solid',   electronegativity:1.66, config:'[Ar]3d⁵4s¹' },
-  { z:25, symbol:'Mn', name:'Mangan',    nameEn:'Manganese',  mass:54.938,  category:'transition', group:7,  period:4, block:'d', state:'solid',   electronegativity:1.55, config:'[Ar]3d⁵4s²' },
-  { z:26, symbol:'Fe', name:'Sắt',       nameEn:'Iron',       mass:55.845,  category:'transition', group:8,  period:4, block:'d', state:'solid',   electronegativity:1.83, config:'[Ar]3d⁶4s²' },
-  { z:27, symbol:'Co', name:'Coban',     nameEn:'Cobalt',     mass:58.933,  category:'transition', group:9,  period:4, block:'d', state:'solid',   electronegativity:1.88, config:'[Ar]3d⁷4s²' },
-  { z:28, symbol:'Ni', name:'Niken',     nameEn:'Nickel',     mass:58.693,  category:'transition', group:10, period:4, block:'d', state:'solid',   electronegativity:1.91, config:'[Ar]3d⁸4s²' },
-  { z:29, symbol:'Cu', name:'Đồng',      nameEn:'Copper',     mass:63.546,  category:'transition', group:11, period:4, block:'d', state:'solid',   electronegativity:1.90, config:'[Ar]3d¹⁰4s¹' },
-  { z:30, symbol:'Zn', name:'Kẽm',       nameEn:'Zinc',       mass:65.38,   category:'transition', group:12, period:4, block:'d', state:'solid',   electronegativity:1.65, config:'[Ar]3d¹⁰4s²' },
-  { z:31, symbol:'Ga', name:'Gali',      nameEn:'Gallium',    mass:69.723,  category:'post',       group:13, period:4, block:'p', state:'solid',   electronegativity:1.81, config:'[Ar]3d¹⁰4s²4p¹' },
-  { z:32, symbol:'Ge', name:'Gecmani',   nameEn:'Germanium',  mass:72.630,  category:'metalloid',  group:14, period:4, block:'p', state:'solid',   electronegativity:2.01, config:'[Ar]3d¹⁰4s²4p²' },
-  { z:33, symbol:'As', name:'Asen',      nameEn:'Arsenic',    mass:74.922,  category:'metalloid',  group:15, period:4, block:'p', state:'solid',   electronegativity:2.18, config:'[Ar]3d¹⁰4s²4p³' },
-  { z:34, symbol:'Se', name:'Selen',     nameEn:'Selenium',   mass:78.971,  category:'nonmetal',   group:16, period:4, block:'p', state:'solid',   electronegativity:2.55, config:'[Ar]3d¹⁰4s²4p⁴' },
-  { z:35, symbol:'Br', name:'Brom',      nameEn:'Bromine',    mass:79.904,  category:'halogen',    group:17, period:4, block:'p', state:'liquid',  electronegativity:2.96, config:'[Ar]3d¹⁰4s²4p⁵' },
-  { z:36, symbol:'Kr', name:'Krypton',   nameEn:'Krypton',    mass:83.798,  category:'noble',      group:18, period:4, block:'p', state:'gas',     electronegativity:3.00, config:'[Ar]3d¹⁰4s²4p⁶' },
-  // Chu kì 5
-  { z:37, symbol:'Rb', name:'Rubidi',    nameEn:'Rubidium',   mass:85.468,  category:'alkali',     group:1,  period:5, block:'s', state:'solid',   electronegativity:0.82, config:'[Kr]5s¹' },
-  { z:38, symbol:'Sr', name:'Stronti',   nameEn:'Strontium',  mass:87.62,   category:'alkaline',   group:2,  period:5, block:'s', state:'solid',   electronegativity:0.95, config:'[Kr]5s²' },
-  { z:39, symbol:'Y',  name:'Yttri',     nameEn:'Yttrium',    mass:88.906,  category:'transition', group:3,  period:5, block:'d', state:'solid',   electronegativity:1.22, config:'[Kr]4d¹5s²' },
-  { z:40, symbol:'Zr', name:'Ziriconi',  nameEn:'Zirconium',  mass:91.224,  category:'transition', group:4,  period:5, block:'d', state:'solid',   electronegativity:1.33, config:'[Kr]4d²5s²' },
-  { z:41, symbol:'Nb', name:'Niobi',     nameEn:'Niobium',    mass:92.906,  category:'transition', group:5,  period:5, block:'d', state:'solid',   electronegativity:1.60, config:'[Kr]4d⁴5s¹' },
-  { z:42, symbol:'Mo', name:'Molyp',     nameEn:'Molybdenum', mass:95.95,   category:'transition', group:6,  period:5, block:'d', state:'solid',   electronegativity:2.16, config:'[Kr]4d⁵5s¹' },
-  { z:43, symbol:'Tc', name:'Tecnesi',   nameEn:'Technetium', mass:98,      category:'transition', group:7,  period:5, block:'d', state:'solid',   electronegativity:1.9,  config:'[Kr]4d⁵5s²' },
-  { z:44, symbol:'Ru', name:'Rutheni',   nameEn:'Ruthenium',  mass:101.07,  category:'transition', group:8,  period:5, block:'d', state:'solid',   electronegativity:2.2,  config:'[Kr]4d⁷5s¹' },
-  { z:45, symbol:'Rh', name:'Rhodi',     nameEn:'Rhodium',    mass:102.91,  category:'transition', group:9,  period:5, block:'d', state:'solid',   electronegativity:2.28, config:'[Kr]4d⁸5s¹' },
-  { z:46, symbol:'Pd', name:'Paladi',    nameEn:'Palladium',  mass:106.42,  category:'transition', group:10, period:5, block:'d', state:'solid',   electronegativity:2.20, config:'[Kr]4d¹⁰' },
-  { z:47, symbol:'Ag', name:'Bạc',       nameEn:'Silver',     mass:107.87,  category:'transition', group:11, period:5, block:'d', state:'solid',   electronegativity:1.93, config:'[Kr]4d¹⁰5s¹' },
-  { z:48, symbol:'Cd', name:'Cadmi',     nameEn:'Cadmium',    mass:112.41,  category:'transition', group:12, period:5, block:'d', state:'solid',   electronegativity:1.69, config:'[Kr]4d¹⁰5s²' },
-  { z:49, symbol:'In', name:'Indi',      nameEn:'Indium',     mass:114.82,  category:'post',       group:13, period:5, block:'p', state:'solid',   electronegativity:1.78, config:'[Kr]4d¹⁰5s²5p¹' },
-  { z:50, symbol:'Sn', name:'Thiếc',     nameEn:'Tin',        mass:118.71,  category:'post',       group:14, period:5, block:'p', state:'solid',   electronegativity:1.96, config:'[Kr]4d¹⁰5s²5p²' },
-  { z:51, symbol:'Sb', name:'Antimon',   nameEn:'Antimony',   mass:121.76,  category:'metalloid',  group:15, period:5, block:'p', state:'solid',   electronegativity:2.05, config:'[Kr]4d¹⁰5s²5p³' },
-  { z:52, symbol:'Te', name:'Telu',      nameEn:'Tellurium',  mass:127.60,  category:'metalloid',  group:16, period:5, block:'p', state:'solid',   electronegativity:2.10, config:'[Kr]4d¹⁰5s²5p⁴' },
-  { z:53, symbol:'I',  name:'Iot',       nameEn:'Iodine',     mass:126.90,  category:'halogen',    group:17, period:5, block:'p', state:'solid',   electronegativity:2.66, config:'[Kr]4d¹⁰5s²5p⁵' },
-  { z:54, symbol:'Xe', name:'Xenon',     nameEn:'Xenon',      mass:131.29,  category:'noble',      group:18, period:5, block:'p', state:'gas',     electronegativity:2.60, config:'[Kr]4d¹⁰5s²5p⁶' },
-  // Chu kì 6
-  { z:55, symbol:'Cs', name:'Xesi',      nameEn:'Caesium',    mass:132.91,  category:'alkali',     group:1,  period:6, block:'s', state:'solid',   electronegativity:0.79, config:'[Xe]6s¹' },
-  { z:56, symbol:'Ba', name:'Bari',      nameEn:'Barium',     mass:137.33,  category:'alkaline',   group:2,  period:6, block:'s', state:'solid',   electronegativity:0.89, config:'[Xe]6s²' },
-  // Lanthanides 57-71
-  { z:57, symbol:'La', name:'Lantan',    nameEn:'Lanthanum',  mass:138.91,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.10, config:'[Xe]5d¹6s²' },
-  { z:58, symbol:'Ce', name:'Xeri',      nameEn:'Cerium',     mass:140.12,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.12, config:'[Xe]4f¹5d¹6s²' },
-  { z:59, symbol:'Pr', name:'Praseodi',  nameEn:'Praseodymium',mass:140.91, category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.13, config:'[Xe]4f³6s²' },
-  { z:60, symbol:'Nd', name:'Neodi',     nameEn:'Neodymium',  mass:144.24,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.14, config:'[Xe]4f⁴6s²' },
-  { z:61, symbol:'Pm', name:'Promethi',  nameEn:'Promethium', mass:145,     category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:null, config:'[Xe]4f⁵6s²' },
-  { z:62, symbol:'Sm', name:'Samari',    nameEn:'Samarium',   mass:150.36,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.17, config:'[Xe]4f⁶6s²' },
-  { z:63, symbol:'Eu', name:'Europi',    nameEn:'Europium',   mass:151.96,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:null, config:'[Xe]4f⁷6s²' },
-  { z:64, symbol:'Gd', name:'Gadolini',  nameEn:'Gadolinium', mass:157.25,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.20, config:'[Xe]4f⁷5d¹6s²' },
-  { z:65, symbol:'Tb', name:'Terbi',     nameEn:'Terbium',    mass:158.93,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:null, config:'[Xe]4f⁹6s²' },
-  { z:66, symbol:'Dy', name:'Dysprosi',  nameEn:'Dysprosium', mass:162.50,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.22, config:'[Xe]4f¹⁰6s²' },
-  { z:67, symbol:'Ho', name:'Holmi',     nameEn:'Holmium',    mass:164.93,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.23, config:'[Xe]4f¹¹6s²' },
-  { z:68, symbol:'Er', name:'Erbi',      nameEn:'Erbium',     mass:167.26,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.24, config:'[Xe]4f¹²6s²' },
-  { z:69, symbol:'Tm', name:'Tuli',      nameEn:'Thulium',    mass:168.93,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:1.25, config:'[Xe]4f¹³6s²' },
-  { z:70, symbol:'Yb', name:'Ytterbi',   nameEn:'Ytterbium',  mass:173.05,  category:'lanthanide', group:null, period:6, block:'f', state:'solid', electronegativity:null, config:'[Xe]4f¹⁴6s²' },
-  { z:71, symbol:'Lu', name:'Luteti',    nameEn:'Lutetium',   mass:174.97,  category:'lanthanide', group:3,  period:6, block:'d', state:'solid', electronegativity:1.27, config:'[Xe]4f¹⁴5d¹6s²' },
-  { z:72, symbol:'Hf', name:'Hafni',     nameEn:'Hafnium',    mass:178.49,  category:'transition', group:4,  period:6, block:'d', state:'solid', electronegativity:1.30, config:'[Xe]4f¹⁴5d²6s²' },
-  { z:73, symbol:'Ta', name:'Tantal',    nameEn:'Tantalum',   mass:180.95,  category:'transition', group:5,  period:6, block:'d', state:'solid', electronegativity:1.50, config:'[Xe]4f¹⁴5d³6s²' },
-  { z:74, symbol:'W',  name:'Vonfram',   nameEn:'Tungsten',   mass:183.84,  category:'transition', group:6,  period:6, block:'d', state:'solid', electronegativity:2.36, config:'[Xe]4f¹⁴5d⁴6s²' },
-  { z:75, symbol:'Re', name:'Rheni',     nameEn:'Rhenium',    mass:186.21,  category:'transition', group:7,  period:6, block:'d', state:'solid', electronegativity:1.90, config:'[Xe]4f¹⁴5d⁵6s²' },
-  { z:76, symbol:'Os', name:'Osmi',      nameEn:'Osmium',     mass:190.23,  category:'transition', group:8,  period:6, block:'d', state:'solid', electronegativity:2.20, config:'[Xe]4f¹⁴5d⁶6s²' },
-  { z:77, symbol:'Ir', name:'Iridi',     nameEn:'Iridium',    mass:192.22,  category:'transition', group:9,  period:6, block:'d', state:'solid', electronegativity:2.20, config:'[Xe]4f¹⁴5d⁷6s²' },
-  { z:78, symbol:'Pt', name:'Platin',    nameEn:'Platinum',   mass:195.08,  category:'transition', group:10, period:6, block:'d', state:'solid', electronegativity:2.28, config:'[Xe]4f¹⁴5d⁹6s¹' },
-  { z:79, symbol:'Au', name:'Vàng',      nameEn:'Gold',       mass:196.97,  category:'transition', group:11, period:6, block:'d', state:'solid', electronegativity:2.54, config:'[Xe]4f¹⁴5d¹⁰6s¹' },
-  { z:80, symbol:'Hg', name:'Thuỷ ngân', nameEn:'Mercury',    mass:200.59,  category:'transition', group:12, period:6, block:'d', state:'liquid', electronegativity:2.00, config:'[Xe]4f¹⁴5d¹⁰6s²' },
-  { z:81, symbol:'Tl', name:'Tali',      nameEn:'Thallium',   mass:204.38,  category:'post',       group:13, period:6, block:'p', state:'solid', electronegativity:1.62, config:'[Xe]4f¹⁴5d¹⁰6s²6p¹' },
-  { z:82, symbol:'Pb', name:'Chì',       nameEn:'Lead',       mass:207.2,   category:'post',       group:14, period:6, block:'p', state:'solid', electronegativity:1.87, config:'[Xe]4f¹⁴5d¹⁰6s²6p²' },
-  { z:83, symbol:'Bi', name:'Bitmut',    nameEn:'Bismuth',    mass:208.98,  category:'post',       group:15, period:6, block:'p', state:'solid', electronegativity:2.02, config:'[Xe]4f¹⁴5d¹⁰6s²6p³' },
-  { z:84, symbol:'Po', name:'Poloni',    nameEn:'Polonium',   mass:209,     category:'metalloid',  group:16, period:6, block:'p', state:'solid', electronegativity:2.00, config:'[Xe]4f¹⁴5d¹⁰6s²6p⁴' },
-  { z:85, symbol:'At', name:'Astatin',   nameEn:'Astatine',   mass:210,     category:'halogen',    group:17, period:6, block:'p', state:'solid', electronegativity:2.20, config:'[Xe]4f¹⁴5d¹⁰6s²6p⁵' },
-  { z:86, symbol:'Rn', name:'Radon',     nameEn:'Radon',      mass:222,     category:'noble',      group:18, period:6, block:'p', state:'gas',   electronegativity:2.20, config:'[Xe]4f¹⁴5d¹⁰6s²6p⁶' },
-  // Chu kì 7
-  { z:87, symbol:'Fr', name:'Franci',    nameEn:'Francium',   mass:223,     category:'alkali',     group:1,  period:7, block:'s', state:'solid', electronegativity:0.7,  config:'[Rn]7s¹' },
-  { z:88, symbol:'Ra', name:'Radi',      nameEn:'Radium',     mass:226,     category:'alkaline',   group:2,  period:7, block:'s', state:'solid', electronegativity:0.9,  config:'[Rn]7s²' },
-  // Actinides 89-103
-  { z:89, symbol:'Ac', name:'Actini',    nameEn:'Actinium',   mass:227,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.1,  config:'[Rn]6d¹7s²' },
-  { z:90, symbol:'Th', name:'Thori',     nameEn:'Thorium',    mass:232.04,  category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]6d²7s²' },
-  { z:91, symbol:'Pa', name:'Protactini',nameEn:'Protactinium',mass:231.04, category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.5,  config:'[Rn]5f²6d¹7s²' },
-  { z:92, symbol:'U',  name:'Urani',     nameEn:'Uranium',    mass:238.03,  category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.38, config:'[Rn]5f³6d¹7s²' },
-  { z:93, symbol:'Np', name:'Neptuni',   nameEn:'Neptunium',  mass:237,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.36, config:'[Rn]5f⁴6d¹7s²' },
-  { z:94, symbol:'Pu', name:'Plutoni',   nameEn:'Plutonium',  mass:244,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.28, config:'[Rn]5f⁶7s²' },
-  { z:95, symbol:'Am', name:'Americi',   nameEn:'Americium',  mass:243,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]5f⁷7s²' },
-  { z:96, symbol:'Cm', name:'Curi',      nameEn:'Curium',     mass:247,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]5f⁷6d¹7s²' },
-  { z:97, symbol:'Bk', name:'Berkeli',   nameEn:'Berkelium',  mass:247,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]5f⁹7s²' },
-  { z:98, symbol:'Cf', name:'Califoni',  nameEn:'Californium',mass:251,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]5f¹⁰7s²' },
-  { z:99, symbol:'Es', name:'Einsteini', nameEn:'Einsteinium',mass:252,     category:'actinide',   group:null, period:7, block:'f', state:'solid', electronegativity:1.3,  config:'[Rn]5f¹¹7s²' },
-  { z:100,symbol:'Fm', name:'Fermi',     nameEn:'Fermium',    mass:257,     category:'actinide',   group:null, period:7, block:'f', state:'unknown', electronegativity:1.3, config:'[Rn]5f¹²7s²' },
-  { z:101,symbol:'Md', name:'Mendelevi', nameEn:'Mendelevium',mass:258,     category:'actinide',   group:null, period:7, block:'f', state:'unknown', electronegativity:1.3, config:'[Rn]5f¹³7s²' },
-  { z:102,symbol:'No', name:'Nobeli',    nameEn:'Nobelium',   mass:259,     category:'actinide',   group:null, period:7, block:'f', state:'unknown', electronegativity:1.3, config:'[Rn]5f¹⁴7s²' },
-  { z:103,symbol:'Lr', name:'Lawrenci',  nameEn:'Lawrencium', mass:266,     category:'actinide',   group:3,  period:7, block:'d', state:'unknown', electronegativity:1.3, config:'[Rn]5f¹⁴7s²7p¹' },
-  { z:104,symbol:'Rf', name:'Rutherfordi',nameEn:'Rutherfordium',mass:267,  category:'transition', group:4,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d²7s²' },
-  { z:105,symbol:'Db', name:'Dubni',     nameEn:'Dubnium',    mass:268,     category:'transition', group:5,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d³7s²' },
-  { z:106,symbol:'Sg', name:'Seaborgi',  nameEn:'Seaborgium', mass:269,     category:'transition', group:6,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁴7s²' },
-  { z:107,symbol:'Bh', name:'Bohri',     nameEn:'Bohrium',    mass:270,     category:'transition', group:7,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁵7s²' },
-  { z:108,symbol:'Hs', name:'Hassi',     nameEn:'Hassium',    mass:277,     category:'transition', group:8,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁶7s²' },
-  { z:109,symbol:'Mt', name:'Meitneri',  nameEn:'Meitnerium', mass:278,     category:'transition', group:9,  period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁷7s²' },
-  { z:110,symbol:'Ds', name:'Darmstadti',nameEn:'Darmstadtium',mass:281,    category:'transition', group:10, period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁸7s²' },
-  { z:111,symbol:'Rg', name:'Roentgeni', nameEn:'Roentgenium',mass:282,     category:'transition', group:11, period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d⁹7s²' },
-  { z:112,symbol:'Cn', name:'Copernici', nameEn:'Copernicium',mass:285,     category:'transition', group:12, period:7, block:'d', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²' },
-  { z:113,symbol:'Nh', name:'Nihoni',    nameEn:'Nihonium',   mass:286,     category:'post',       group:13, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p¹' },
-  { z:114,symbol:'Fl', name:'Flerovi',   nameEn:'Flerovium',  mass:289,     category:'post',       group:14, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p²' },
-  { z:115,symbol:'Mc', name:'Moscovi',   nameEn:'Moscovium',  mass:290,     category:'post',       group:15, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p³' },
-  { z:116,symbol:'Lv', name:'Livermori', nameEn:'Livermorium',mass:293,     category:'post',       group:16, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p⁴' },
-  { z:117,symbol:'Ts', name:'Tennessi',  nameEn:'Tennessine', mass:294,     category:'halogen',    group:17, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p⁵' },
-  { z:118,symbol:'Og', name:'Oganesson', nameEn:'Oganesson',  mass:294,     category:'noble',      group:18, period:7, block:'p', state:'unknown', electronegativity:null,config:'[Rn]5f¹⁴6d¹⁰7s²7p⁶' },
+  // Period 1
+  { z: 1, symbol: 'H', name: 'Hydrogen', nameVi: 'Hydro', category: 'nonmetal', mass: 1.008, electronConfig: '1s¹', shells: [1], meltK: 14, boilK: 20, density: 0.00009, electronegativity: 2.20, discoveredBy: 'Henry Cavendish (1766)', uses: 'Nhiên liệu, ammonia, năng lượng sạch', period: 1, group: 1 },
+  { z: 2, symbol: 'He', name: 'Helium', nameVi: 'Heli', category: 'noble', mass: 4.003, electronConfig: '1s²', shells: [2], meltK: null, boilK: 4, density: 0.00018, electronegativity: null, discoveredBy: 'Janssen & Lockyer (1868)', uses: 'Bóng bay, MRI, hàn TIG', period: 1, group: 18 },
+  // Period 2
+  { z: 3, symbol: 'Li', name: 'Lithium', nameVi: 'Lithi', category: 'alkali', mass: 6.94, electronConfig: '[He] 2s¹', shells: [2, 1], meltK: 454, boilK: 1603, density: 0.534, electronegativity: 0.98, discoveredBy: 'Arfvedson (1817)', uses: 'Pin Li-ion, hợp kim nhẹ', period: 2, group: 1 },
+  { z: 4, symbol: 'Be', name: 'Beryllium', nameVi: 'Beri', category: 'alkali-earth', mass: 9.012, electronConfig: '[He] 2s²', shells: [2, 2], meltK: 1560, boilK: 2742, density: 1.85, electronegativity: 1.57, discoveredBy: 'Vauquelin (1798)', uses: 'Hợp kim hàng không, X-ray', period: 2, group: 2 },
+  { z: 5, symbol: 'B', name: 'Boron', nameVi: 'Bo', category: 'metalloid', mass: 10.81, electronConfig: '[He] 2s² 2p¹', shells: [2, 3], meltK: 2349, boilK: 4200, density: 2.34, electronegativity: 2.04, discoveredBy: 'Davy, Gay-Lussac (1808)', uses: 'Thủy tinh borosilicate, pyrex', period: 2, group: 13 },
+  { z: 6, symbol: 'C', name: 'Carbon', nameVi: 'Cacbon', category: 'nonmetal', mass: 12.01, electronConfig: '[He] 2s² 2p²', shells: [2, 4], meltK: 3823, boilK: 4098, density: 2.27, electronegativity: 2.55, discoveredBy: 'Cổ đại', uses: 'Cơ sở sự sống, kim cương, graphene', period: 2, group: 14 },
+  { z: 7, symbol: 'N', name: 'Nitrogen', nameVi: 'Nitơ', category: 'nonmetal', mass: 14.01, electronConfig: '[He] 2s² 2p³', shells: [2, 5], meltK: 63, boilK: 77, density: 0.00125, electronegativity: 3.04, discoveredBy: 'Rutherford (1772)', uses: '78% khí quyển, phân bón', period: 2, group: 15 },
+  { z: 8, symbol: 'O', name: 'Oxygen', nameVi: 'Oxy', category: 'nonmetal', mass: 16.00, electronConfig: '[He] 2s² 2p⁴', shells: [2, 6], meltK: 54, boilK: 90, density: 0.00143, electronegativity: 3.44, discoveredBy: 'Priestley & Scheele (1774)', uses: 'Hô hấp, đốt cháy, luyện thép', period: 2, group: 16 },
+  { z: 9, symbol: 'F', name: 'Fluorine', nameVi: 'Flo', category: 'halogen', mass: 19.00, electronConfig: '[He] 2s² 2p⁵', shells: [2, 7], meltK: 53, boilK: 85, density: 0.00170, electronegativity: 3.98, discoveredBy: 'Moissan (1886)', uses: 'Kem đánh răng, Teflon', period: 2, group: 17 },
+  { z: 10, symbol: 'Ne', name: 'Neon', nameVi: 'Neon', category: 'noble', mass: 20.18, electronConfig: '[He] 2s² 2p⁶', shells: [2, 8], meltK: 25, boilK: 27, density: 0.00090, electronegativity: null, discoveredBy: 'Ramsay & Travers (1898)', uses: 'Đèn neon, laser He-Ne', period: 2, group: 18 },
+  // Period 3
+  { z: 11, symbol: 'Na', name: 'Sodium', nameVi: 'Natri', category: 'alkali', mass: 22.99, electronConfig: '[Ne] 3s¹', shells: [2, 8, 1], meltK: 371, boilK: 1156, density: 0.97, electronegativity: 0.93, discoveredBy: 'Davy (1807)', uses: 'Muối ăn (NaCl), xút (NaOH)', period: 3, group: 1 },
+  { z: 12, symbol: 'Mg', name: 'Magnesium', nameVi: 'Magie', category: 'alkali-earth', mass: 24.31, electronConfig: '[Ne] 3s²', shells: [2, 8, 2], meltK: 923, boilK: 1363, density: 1.74, electronegativity: 1.31, discoveredBy: 'Black, Davy (1755)', uses: 'Hợp kim nhẹ, pháo hoa, chlorophyll', period: 3, group: 2 },
+  { z: 13, symbol: 'Al', name: 'Aluminum', nameVi: 'Nhôm', category: 'post-transition', mass: 26.98, electronConfig: '[Ne] 3s² 3p¹', shells: [2, 8, 3], meltK: 933, boilK: 2792, density: 2.70, electronegativity: 1.61, discoveredBy: 'Ørsted (1825)', uses: 'Vỏ máy bay, lon, dây điện', period: 3, group: 13 },
+  { z: 14, symbol: 'Si', name: 'Silicon', nameVi: 'Silic', category: 'metalloid', mass: 28.09, electronConfig: '[Ne] 3s² 3p²', shells: [2, 8, 4], meltK: 1687, boilK: 3538, density: 2.33, electronegativity: 1.90, discoveredBy: 'Berzelius (1824)', uses: 'Chip vi xử lý, pin mặt trời, thủy tinh', period: 3, group: 14 },
+  { z: 15, symbol: 'P', name: 'Phosphorus', nameVi: 'Photpho', category: 'nonmetal', mass: 30.97, electronConfig: '[Ne] 3s² 3p³', shells: [2, 8, 5], meltK: 317, boilK: 553, density: 1.82, electronegativity: 2.19, discoveredBy: 'Brand (1669)', uses: 'DNA/RNA, ATP, phân bón, diêm', period: 3, group: 15 },
+  { z: 16, symbol: 'S', name: 'Sulfur', nameVi: 'Lưu huỳnh', category: 'nonmetal', mass: 32.06, electronConfig: '[Ne] 3s² 3p⁴', shells: [2, 8, 6], meltK: 388, boilK: 717, density: 2.07, electronegativity: 2.58, discoveredBy: 'Cổ đại', uses: 'Axit sulfuric, lưu hoá cao su', period: 3, group: 16 },
+  { z: 17, symbol: 'Cl', name: 'Chlorine', nameVi: 'Clo', category: 'halogen', mass: 35.45, electronConfig: '[Ne] 3s² 3p⁵', shells: [2, 8, 7], meltK: 172, boilK: 239, density: 0.00321, electronegativity: 3.16, discoveredBy: 'Scheele (1774)', uses: 'Khử trùng nước, PVC, muối ăn', period: 3, group: 17 },
+  { z: 18, symbol: 'Ar', name: 'Argon', nameVi: 'Argon', category: 'noble', mass: 39.95, electronConfig: '[Ne] 3s² 3p⁶', shells: [2, 8, 8], meltK: 84, boilK: 87, density: 0.00178, electronegativity: null, discoveredBy: 'Rayleigh & Ramsay (1894)', uses: 'Khí trơ, bóng đèn, laser', period: 3, group: 18 },
+  // Period 4 (selected)
+  { z: 19, symbol: 'K', name: 'Potassium', nameVi: 'Kali', category: 'alkali', mass: 39.10, electronConfig: '[Ar] 4s¹', shells: [2, 8, 8, 1], meltK: 337, boilK: 1032, density: 0.86, electronegativity: 0.82, discoveredBy: 'Davy (1807)', uses: 'Phân bón NPK, sinh học tế bào', period: 4, group: 1 },
+  { z: 20, symbol: 'Ca', name: 'Calcium', nameVi: 'Canxi', category: 'alkali-earth', mass: 40.08, electronConfig: '[Ar] 4s²', shells: [2, 8, 8, 2], meltK: 1115, boilK: 1757, density: 1.55, electronegativity: 1.00, discoveredBy: 'Davy (1808)', uses: 'Xương răng, xi măng, vôi', period: 4, group: 2 },
+  { z: 22, symbol: 'Ti', name: 'Titanium', nameVi: 'Titan', category: 'transition', mass: 47.87, electronConfig: '[Ar] 3d² 4s²', shells: [2, 8, 10, 2], meltK: 1941, boilK: 3560, density: 4.51, electronegativity: 1.54, discoveredBy: 'Gregor (1791)', uses: 'Hàng không vũ trụ, y tế, sơn TiO2', period: 4, group: 4 },
+  { z: 26, symbol: 'Fe', name: 'Iron', nameVi: 'Sắt', category: 'transition', mass: 55.85, electronConfig: '[Ar] 3d⁶ 4s²', shells: [2, 8, 14, 2], meltK: 1811, boilK: 3134, density: 7.87, electronegativity: 1.83, discoveredBy: 'Cổ đại', uses: 'Thép, hemoglobin, lõi Trái Đất', period: 4, group: 8 },
+  { z: 29, symbol: 'Cu', name: 'Copper', nameVi: 'Đồng', category: 'transition', mass: 63.55, electronConfig: '[Ar] 3d¹⁰ 4s¹', shells: [2, 8, 18, 1], meltK: 1358, boilK: 2835, density: 8.96, electronegativity: 1.90, discoveredBy: 'Cổ đại', uses: 'Dây điện, ống nước, đồng tiền', period: 4, group: 11 },
+  { z: 30, symbol: 'Zn', name: 'Zinc', nameVi: 'Kẽm', category: 'transition', mass: 65.38, electronConfig: '[Ar] 3d¹⁰ 4s²', shells: [2, 8, 18, 2], meltK: 693, boilK: 1180, density: 7.14, electronegativity: 1.65, discoveredBy: 'Marggraf (1746)', uses: 'Mạ chống gỉ, pin, brass', period: 4, group: 12 },
+  { z: 35, symbol: 'Br', name: 'Bromine', nameVi: 'Brom', category: 'halogen', mass: 79.90, electronConfig: '[Ar] 3d¹⁰ 4s² 4p⁵', shells: [2, 8, 18, 7], meltK: 266, boilK: 332, density: 3.12, electronegativity: 2.96, discoveredBy: 'Balard (1826)', uses: 'Chống cháy, thuốc nhuộm, AgBr', period: 4, group: 17 },
+  { z: 36, symbol: 'Kr', name: 'Krypton', nameVi: 'Krypton', category: 'noble', mass: 83.80, electronConfig: '[Ar] 3d¹⁰ 4s² 4p⁶', shells: [2, 8, 18, 8], meltK: 116, boilK: 120, density: 0.00375, electronegativity: 3.00, discoveredBy: 'Ramsay & Travers (1898)', uses: 'Đèn flash, laser excimer', period: 4, group: 18 },
+  // Period 5 (selected)
+  { z: 40, symbol: 'Zr', name: 'Zirconium', nameVi: 'Zirconi', category: 'transition', mass: 91.22, electronConfig: '[Kr] 4d² 5s²', shells: [2, 8, 18, 10, 2], meltK: 2128, boilK: 4682, density: 6.51, electronegativity: 1.33, discoveredBy: 'Klaproth (1789)', uses: 'Lò phản ứng hạt nhân, gốm răng, kim hoàn', period: 5, group: 4 },
+  { z: 47, symbol: 'Ag', name: 'Silver', nameVi: 'Bạc', category: 'transition', mass: 107.87, electronConfig: '[Kr] 4d¹⁰ 5s¹', shells: [2, 8, 18, 18, 1], meltK: 1235, boilK: 2435, density: 10.49, electronegativity: 1.93, discoveredBy: 'Cổ đại', uses: 'Trang sức, dẫn điện tốt nhất, phim ảnh', period: 5, group: 11 },
+  { z: 53, symbol: 'I', name: 'Iodine', nameVi: 'Iốt', category: 'halogen', mass: 126.90, electronConfig: '[Kr] 4d¹⁰ 5s² 5p⁵', shells: [2, 8, 18, 18, 7], meltK: 387, boilK: 457, density: 4.93, electronegativity: 2.66, discoveredBy: 'Courtois (1811)', uses: 'Tuyến giáp, khử trùng, muối iốt', period: 5, group: 17 },
+  { z: 54, symbol: 'Xe', name: 'Xenon', nameVi: 'Xenon', category: 'noble', mass: 131.29, electronConfig: '[Kr] 4d¹⁰ 5s² 5p⁶', shells: [2, 8, 18, 18, 8], meltK: 161, boilK: 165, density: 0.00588, electronegativity: 2.60, discoveredBy: 'Ramsay & Travers (1898)', uses: 'Đèn flash, gây mê, ion thruster', period: 5, group: 18 },
+  // Period 6 (selected)
+  { z: 74, symbol: 'W', name: 'Tungsten', nameVi: 'Vonfram', category: 'transition', mass: 183.84, electronConfig: '[Xe] 4f¹⁴ 5d⁴ 6s²', shells: [2, 8, 18, 32, 12, 2], meltK: 3695, boilK: 6203, density: 19.25, electronegativity: 2.36, discoveredBy: 'Elhuyar bros (1783)', uses: 'Dây tóc bóng đèn, mũi khoan', period: 6, group: 6 },
+  { z: 78, symbol: 'Pt', name: 'Platinum', nameVi: 'Bạch kim', category: 'transition', mass: 195.08, electronConfig: '[Xe] 4f¹⁴ 5d⁹ 6s¹', shells: [2, 8, 18, 32, 17, 1], meltK: 2041, boilK: 4098, density: 21.45, electronegativity: 2.28, discoveredBy: 'Ulloa (1735)', uses: 'Trang sức, xúc tác, điện cực', period: 6, group: 10 },
+  { z: 79, symbol: 'Au', name: 'Gold', nameVi: 'Vàng', category: 'transition', mass: 196.97, electronConfig: '[Xe] 4f¹⁴ 5d¹⁰ 6s¹', shells: [2, 8, 18, 32, 18, 1], meltK: 1337, boilK: 3129, density: 19.30, electronegativity: 2.54, discoveredBy: 'Cổ đại', uses: 'Trang sức, dự trữ tiền tệ, điện tử', period: 6, group: 11 },
+  { z: 80, symbol: 'Hg', name: 'Mercury', nameVi: 'Thủy ngân', category: 'transition', mass: 200.59, electronConfig: '[Xe] 4f¹⁴ 5d¹⁰ 6s²', shells: [2, 8, 18, 32, 18, 2], meltK: 234, boilK: 630, density: 13.53, electronegativity: 2.00, discoveredBy: 'Cổ đại', uses: 'Nhiệt kế, đèn huỳnh quang, lỏng', period: 6, group: 12 },
+  { z: 82, symbol: 'Pb', name: 'Lead', nameVi: 'Chì', category: 'post-transition', mass: 207.20, electronConfig: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p²', shells: [2, 8, 18, 32, 18, 4], meltK: 600, boilK: 2022, density: 11.34, electronegativity: 1.87, discoveredBy: 'Cổ đại', uses: 'Pin axit-chì, chắn phóng xạ', period: 6, group: 14 },
+  // Period 7 (selected)
+  { z: 92, symbol: 'U', name: 'Uranium', nameVi: 'Urani', category: 'lanthanide', mass: 238.03, electronConfig: '[Rn] 5f³ 6d¹ 7s²', shells: [2, 8, 18, 32, 21, 9, 2], meltK: 1405, boilK: 4404, density: 19.05, electronegativity: 1.38, discoveredBy: 'Klaproth (1789)', uses: 'Nhiên liệu hạt nhân, đo địa chất', period: 7, group: 0 },
 ]
 
-/* ─── Grid placement (chuẩn IUPAC 18×9 + La/Ac series ô riêng) ── */
-function gridPos(el: Element): { col: number; row: number } {
-  // La/Ac series xếp dưới ở row 8/9, col theo z - 56 / z - 88
-  if (el.category === 'lanthanide' && el.z >= 57 && el.z <= 70) {
-    return { col: el.z - 57 + 3, row: 8 }
-  }
-  if (el.category === 'actinide' && el.z >= 89 && el.z <= 102) {
-    return { col: el.z - 89 + 3, row: 9 }
-  }
-  return { col: el.group || 3, row: el.period }
-}
+// ── 3D Atom Components ──────────────────────────────────────
+// ── OPTIMIZED 3D Components (Solar System sim pattern) ─────────────
+// User: "Aura giả lập thái dương hệ chạy rất mượt. Có thể vận dụng giải pháp đó"
+// CHANGES từ phiên bản v1 (lag) sang v2 (smooth):
+//   - BỎ MeshTransmissionMaterial (4 render passes/frame → 1)
+//   - BỎ Environment "night" preset (HDR 1MB+ IBL → no IBL)
+//   - BỎ acrylic GlassCube (geometry box transparent expensive)
+//   - BỎ reflective floor metal 0.95 (extra shader cost)
+//   - BỎ pointLight TỪNG ELECTRON (Uranium = 92 lights → GPU chết!)
+//     → 1 nucleus pointLight + 1 ambient là đủ
+//   - REDUCE Stars 4000 → 1500 count
+//   - REDUCE shell line segments 96 → 64
+//   - REDUCE sphereGeometry segments 16 → 12 cho electrons
+//   - DPR clamp [1, 1.5] thay vì [1, 2]
+//   - emissive intensity giữ glow look mà không cần pointLight thật
 
-/* ─── Component ───────────────────────────────────────────────── */
-export default function PeriodicTablePage() {
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<Element | null>(null)
-  const [filterCat, setFilterCat] = useState<Category | 'all'>('all')
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return ELEMENTS.filter((e) => {
-      if (filterCat !== 'all' && e.category !== filterCat) return false
-      if (!q) return true
-      return (
-        e.symbol.toLowerCase().includes(q) ||
-        e.name.toLowerCase().includes(q) ||
-        e.nameEn.toLowerCase().includes(q) ||
-        String(e.z) === q
-      )
-    })
-  }, [search, filterCat])
-
-  const filteredIds = new Set(filtered.map((e) => e.z))
-
+function Nucleus({ size, color }: { size: number; color: string }) {
+  const ref = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (ref.current) {
+      const t = clock.getElapsedTime()
+      ref.current.scale.setScalar(1 + Math.sin(t * 2) * 0.04)
+    }
+  })
   return (
-    <div className="min-h-screen bg-[hsl(225,15%,8%)] text-white px-3 py-5 lg:px-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Link
-          to="/dashboard/labtwin"
-          className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> LabTwin
-        </Link>
-        <span className="text-gray-600">/</span>
-        <h1 className="text-base sm:text-lg font-bold flex items-center gap-2">
-          <Atom className="w-5 h-5 text-cyan-400" />
-          Bảng tuần hoàn các nguyên tố hoá học
-        </h1>
-        <span className="ml-auto text-xs text-white/40">{filtered.length}/118 nguyên tố</span>
-      </div>
-
-      {/* Search + filter */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên VI/EN/symbol/Z…"
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm focus:outline-none focus:border-cyan-500/40"
-          />
-        </div>
-        <select
-          value={filterCat}
-          onChange={(e) => setFilterCat(e.target.value as Category | 'all')}
-          className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm focus:outline-none focus:border-cyan-500/40"
-        >
-          <option value="all">Tất cả phân nhóm</option>
-          {Object.entries(CAT_STYLE).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-2 mb-4 text-[10px]">
-        {Object.entries(CAT_STYLE).map(([k, v]) => (
-          <button
-            key={k}
-            onClick={() => setFilterCat(filterCat === k ? 'all' : (k as Category))}
-            className={`px-2 py-1 rounded border ${v.bg} ${v.fg} transition-all ${
-              filterCat === k ? 'ring-2 ring-white/30' : ''
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Grid 18×9 */}
-      <div
-        className="grid gap-[3px] overflow-x-auto pb-3"
-        style={{
-          gridTemplateColumns: 'repeat(18, minmax(42px, 1fr))',
-          gridTemplateRows: 'repeat(9, minmax(48px, auto))',
-        }}
-      >
-        {ELEMENTS.map((el) => {
-          const { col, row } = gridPos(el)
-          const style = CAT_STYLE[el.category]
-          const visible = filteredIds.has(el.z)
-          return (
-            <button
-              key={el.z}
-              onClick={() => setSelected(el)}
-              style={{ gridColumn: col, gridRow: row }}
-              className={`
-                rounded border text-left p-1 transition-all
-                ${style.bg} ${visible ? '' : 'opacity-15'}
-                ${selected?.z === el.z ? 'ring-2 ring-white scale-105' : ''}
-              `}
-              title={`${el.name} (${el.nameEn}) — Z=${el.z}`}
-            >
-              <div className="flex justify-between items-start">
-                <span className="text-[8px] text-white/50">{el.z}</span>
-                <span className="text-[7px] text-white/40 uppercase">{el.block}</span>
-              </div>
-              <div className={`text-base font-bold leading-none ${style.fg}`}>{el.symbol}</div>
-              <div className="text-[8px] text-white/55 truncate leading-tight mt-0.5">{el.name}</div>
-              <div className="text-[7px] text-white/35 leading-none">{el.mass.toFixed(1)}</div>
-            </button>
-          )
-        })}
-
-        {/* La/Ac placeholder ô */}
-        <div
-          style={{ gridColumn: 3, gridRow: 6 }}
-          className="rounded border border-dashed border-pink-500/40 bg-pink-500/5 flex items-center justify-center text-[9px] text-pink-300"
-        >
-          57-71<br/>↓
-        </div>
-        <div
-          style={{ gridColumn: 3, gridRow: 7 }}
-          className="rounded border border-dashed border-fuchsia-500/40 bg-fuchsia-500/5 flex items-center justify-center text-[9px] text-fuchsia-300"
-        >
-          89-103<br/>↓
-        </div>
-      </div>
-
-      {/* Detail modal */}
-      {selected && <DetailModal element={selected} onClose={() => setSelected(null)} />}
-
-      {/* Hint */}
-      <p className="text-[11px] text-white/30 mt-4 text-center">
-        💡 Click nguyên tố để xem chi tiết · Hover hiển thị tên đầy đủ · Filter theo phân nhóm/khối
-      </p>
-    </div>
+    <mesh ref={ref}>
+      <sphereGeometry args={[size, 32, 32]} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={2}
+        roughness={0.3}
+        metalness={0.4}
+        toneMapped={false}
+      />
+      {/* 1 light ở nucleus — đủ illuminate cả scene */}
+      <pointLight color={color} intensity={2.5} distance={12} decay={1.5} />
+    </mesh>
   )
 }
 
-/* ─── Detail Modal ───────────────────────────────────────────── */
-function DetailModal({ element, onClose }: { element: Element; onClose: () => void }) {
-  const style = CAT_STYLE[element.category]
+function ElectronShell({
+  radius, electronCount, tilt, speed, color,
+}: {
+  radius: number; electronCount: number; tilt: number; speed: number; color: string;
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * speed
+      groupRef.current.rotation.x += delta * speed * 0.3
+    }
+  })
+
+  // Pre-compute orbit ring geometry once per radius
+  const orbitCurve = useMemo(() => {
+    const points: THREE.Vector3[] = []
+    const segments = 64  // giảm từ 96
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2
+      points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius))
+    }
+    return new THREE.BufferGeometry().setFromPoints(points)
+  }, [radius])
+
+  // Pre-compute electron positions once
+  const positions = useMemo(() => {
+    const arr: [number, number, number][] = []
+    for (let i = 0; i < electronCount; i++) {
+      const angle = (i / electronCount) * Math.PI * 2
+      arr.push([Math.cos(angle) * radius, 0, Math.sin(angle) * radius])
+    }
+    return arr
+  }, [radius, electronCount])
+
+  return (
+    <group ref={groupRef} rotation={[tilt, 0, tilt * 0.5]}>
+      <line>
+        <primitive object={orbitCurve} attach="geometry" />
+        <lineBasicMaterial color={color} transparent opacity={0.4} />
+      </line>
+      {positions.map((pos, i) => (
+        <mesh key={i} position={pos}>
+          <sphereGeometry args={[0.085, 12, 12]} />
+          {/* emissive + toneMapped:false → glow look mà KHÔNG cần pointLight */}
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={3}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function AtomScene({ element }: { element: Element }) {
+  const meta = CATEGORY_META[element.category]
+  const nucleusSize = useMemo(() => 0.4 + Math.min(element.z / 100, 0.8), [element.z])
+
+  // Memoize shell configs để khi camera xoay không rebuild
+  const shells = useMemo(() =>
+    element.shells.map((electronCount, shellIdx) => ({
+      key: `${element.symbol}-${shellIdx}`,
+      electronCount,
+      radius: 1.5 + shellIdx * 0.95,
+      tilt: (shellIdx * Math.PI) / element.shells.length * 1.2 + shellIdx * 0.3,
+      speed: 1.6 / (shellIdx + 1),
+    })),
+    [element]
+  )
+
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-md bg-[hsl(225,15%,11%)] border border-white/10 rounded-2xl p-5 shadow-2xl">
-        <div className="flex items-start gap-4 mb-4">
-          <div className={`w-20 h-20 rounded-xl border-2 ${style.bg} flex flex-col items-center justify-center shrink-0`}>
-            <span className="text-[9px] text-white/50">{element.z}</span>
-            <span className={`text-3xl font-bold ${style.fg}`}>{element.symbol}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-white">{element.name}</h2>
-            <p className="text-xs text-white/40 italic">{element.nameEn}</p>
-            <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded ${style.bg} ${style.fg} border`}>
-              {style.label}
-            </span>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      {/* Lighting tối giản — Solar System sim pattern */}
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[5, 8, 5]} intensity={0.6} color="#ffffff" />
 
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <Info label="Khối lượng (u)" value={element.mass.toFixed(3)} />
-          <Info label="Chu kì" value={String(element.period)} />
-          <Info label="Nhóm IUPAC" value={element.group ? String(element.group) : '—'} />
-          <Info label="Khối (block)" value={element.block.toUpperCase()} />
-          <Info label="Trạng thái" value={
-            element.state === 'solid' ? 'Rắn' :
-            element.state === 'liquid' ? 'Lỏng' :
-            element.state === 'gas' ? 'Khí' : 'Chưa rõ'
-          } />
-          <Info label="Độ âm điện" value={element.electronegativity != null ? element.electronegativity.toFixed(2) : '—'} />
-        </div>
+      {/* Starfield — count giảm 4000 → 1500 cho mượt */}
+      <Stars radius={80} depth={50} count={1500} factor={3} fade speed={0.5} />
 
-        <div className="mt-4 p-3 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-          <div className="flex items-center gap-1.5 text-[10px] text-white/40 uppercase mb-1">
-            <Layers className="w-3 h-3" /> Cấu hình electron
-          </div>
-          <p className="text-sm font-mono text-cyan-300">{element.config}</p>
-        </div>
-      </div>
+      {/* Nucleus (chứa pointLight chính) */}
+      <Nucleus size={nucleusSize} color={meta.glow} />
+
+      {/* Electron shells */}
+      {shells.map(s => (
+        <ElectronShell
+          key={s.key}
+          radius={s.radius}
+          electronCount={s.electronCount}
+          tilt={s.tilt}
+          speed={s.speed}
+          color={meta.glow}
+        />
+      ))}
     </>
   )
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+// ── 2D Element Card — "Things We Take" inspired (ref image 3, 4) ─────
+function ElementCard({ el, onClick, selected }: { el: Element; onClick: () => void; selected: boolean }) {
+  const meta = CATEGORY_META[el.category]
   return (
-    <div>
-      <div className="text-[10px] text-white/35 uppercase">{label}</div>
-      <div className="text-sm text-white/85 font-medium mt-0.5">{value}</div>
+    <button
+      onClick={onClick}
+      className="relative group transition-all"
+      style={{
+        gridColumn: el.group,
+        gridRow: el.period,
+      }}
+      title={`${el.name} (${el.nameVi})`}
+    >
+      <div
+        className="aspect-square p-1 flex flex-col transition-all"
+        style={{
+          // "Shadow box" frame — minimal museum-style
+          background: selected
+            ? `linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.4))`
+            : 'rgba(255,255,255,0.025)',
+          border: `1px solid ${selected ? meta.color : 'rgba(255,255,255,0.08)'}`,
+          boxShadow: selected
+            ? `0 0 28px ${meta.glow}50, inset 0 0 16px ${meta.glow}20, 0 6px 24px rgba(0,0,0,0.5)`
+            : '0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.3)',
+          transform: selected ? 'translateY(-2px) scale(1.06)' : 'scale(1)',
+          borderRadius: '2px',
+        }}
+      >
+        {/* Top row: mass (left tiny) + atomic # (right big) */}
+        <div className="flex items-start justify-between leading-none">
+          <div className="text-[7px] md:text-[8px] tabular-nums opacity-50" style={{ color: '#fff' }}>
+            {el.mass.toFixed(2)}
+          </div>
+          <div className="text-[10px] md:text-xs font-black tabular-nums" style={{ color: meta.color }}>
+            {el.z}
+          </div>
+        </div>
+
+        {/* Symbol — bold like museum spec */}
+        <div className="flex-1 flex items-center justify-center">
+          <span
+            className="text-lg md:text-2xl font-black leading-none"
+            style={{
+              color: '#ffffff',
+              textShadow: selected ? `0 0 12px ${meta.glow}` : 'none',
+              fontFamily: '"Inter", "Helvetica Neue", sans-serif',
+              letterSpacing: '-0.04em',
+            }}
+          >
+            {el.symbol}
+          </span>
+        </div>
+
+        {/* Bottom: element name */}
+        <div className="text-[7px] md:text-[8px] opacity-70 truncate text-center"
+          style={{ color: '#fff', letterSpacing: '0.04em' }}>
+          {el.name}
+        </div>
+
+        {/* Category color bar (bottom accent) */}
+        <div className="h-0.5 mt-0.5 transition-opacity"
+          style={{
+            background: meta.color,
+            opacity: selected ? 1 : 0.5,
+            boxShadow: selected ? `0 0 6px ${meta.glow}` : 'none',
+          }} />
+      </div>
+    </button>
+  )
+}
+
+// ── Detail Card — "Things We Take" museum-frame style ───────────────
+// ── Subatomic particle constants ─────────────────────────────────
+// Khối lượng tính bằng đơn vị nguyên tử u (1 u = 1.66054 × 10⁻²⁷ kg)
+// Điện tích tính bằng e (1 e = 1.602 × 10⁻¹⁹ C)
+const PARTICLE_INFO = {
+  proton:   { symbol: 'p⁺',  name: 'Proton',   charge: '+1 e',  chargeC: '+1.602 × 10⁻¹⁹ C', mass: '1.007276 u', massKg: '1.6726 × 10⁻²⁷ kg', spin: '1/2', color: '#ef4444', loc: 'Hạt nhân' },
+  neutron:  { symbol: 'n⁰',  name: 'Neutron',  charge: '0',     chargeC: 'Trung hòa',         mass: '1.008665 u', massKg: '1.6749 × 10⁻²⁷ kg', spin: '1/2', color: '#94a3b8', loc: 'Hạt nhân' },
+  electron: { symbol: 'e⁻',  name: 'Electron', charge: '−1 e',  chargeC: '−1.602 × 10⁻¹⁹ C', mass: '0.000549 u', massKg: '9.109 × 10⁻³¹ kg',  spin: '1/2', color: '#22d3ee', loc: 'Vỏ nguyên tử' },
+} as const
+
+// Shell labels theo n (principal quantum number) — chuẩn Bohr/Schrödinger
+const SHELL_LABELS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
+const SHELL_MAX_ELECTRONS = [2, 8, 18, 32, 50, 72, 98]  // 2n²
+// Binding energy approximation (eV) — gần đúng theo công thức hydrogen
+// E_n = −13.6 × Z² / n²  (Z là điện tích hạt nhân hiệu dụng, rough)
+function approxBindingEnergy(Z: number, n: number): string {
+  const Zeff = Math.max(1, Z - (n - 1) * 2)  // rough screening
+  const E = -13.6 * (Zeff * Zeff) / (n * n)
+  return E < -1000 ? `${(E / 1000).toFixed(1)} keV` : `${E.toFixed(0)} eV`
+}
+
+function DetailCard({ element }: { element: Element }) {
+  const meta = CATEGORY_META[element.category]
+  // Tính số neutron: A - Z (A = mass round, Z = atomic number)
+  const neutronCount = Math.max(0, Math.round(element.mass) - element.z)
+  const totalProtons = element.z
+  const totalElectrons = element.shells.reduce((s, n) => s + n, 0)
+  // Total mass (atomic) — chỉ là approximation theo Z, N, e
+  const totalMassU = (
+    totalProtons * 1.007276 +
+    neutronCount * 1.008665 +
+    totalElectrons * 0.000549
+  ).toFixed(3)
+  const netCharge = totalProtons - totalElectrons
+
+  return (
+    <div
+      className="rounded-sm p-5 md:p-6"
+      style={{
+        background: 'linear-gradient(180deg, #0f0f12 0%, #06060a 100%)',
+        border: `1px solid rgba(255,255,255,0.08)`,
+        boxShadow: `
+          0 30px 60px -20px rgba(0,0,0,0.8),
+          0 0 0 1px rgba(255,255,255,0.04),
+          inset 0 0 80px ${meta.glow}10
+        `,
+      }}
+    >
+      {/* Top row: mass (left, small) + atomic # (right, HUGE) */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="text-2xl md:text-3xl font-bold tabular-nums text-white leading-none">
+            {element.mass.toFixed(3)}
+          </div>
+          <div className="flex gap-3 mt-2 text-[10px] tabular-nums text-white/50">
+            <span>
+              <span className="text-white/80">{element.meltK ? element.meltK : '—'}</span>
+              <span className="ml-1 text-white/40">melt</span>
+            </span>
+            <span>
+              <span className="text-white/80">{element.electronegativity != null ? element.electronegativity : '—'}</span>
+              <span className="ml-1 text-white/40">EN</span>
+            </span>
+          </div>
+        </div>
+        <div
+          className="text-5xl md:text-6xl font-black tabular-nums leading-none"
+          style={{
+            color: '#ffffff',
+            letterSpacing: '-0.04em',
+            fontFamily: '"Inter", "Helvetica Neue", sans-serif',
+          }}
+        >
+          {element.z}
+        </div>
+      </div>
+
+      {/* HUGE Symbol */}
+      <div
+        className="text-[8rem] md:text-[10rem] font-black leading-none mb-2"
+        style={{
+          color: '#ffffff',
+          textShadow: `0 0 60px ${meta.glow}60`,
+          letterSpacing: '-0.06em',
+          fontFamily: '"Inter", "Helvetica Neue", sans-serif',
+        }}
+      >
+        {element.symbol}
+      </div>
+
+      {/* Name + category */}
+      <div className="mb-5">
+        <div className="text-2xl md:text-3xl font-bold text-white leading-tight"
+          style={{ letterSpacing: '-0.02em' }}>
+          {element.name}
+        </div>
+        <div className="text-sm text-white/50 mt-0.5">{element.nameVi}</div>
+
+        {/* Category tag bar */}
+        <div className="mt-3 flex items-center gap-2">
+          <div className="h-0.5 flex-1" style={{ background: meta.color, boxShadow: `0 0 8px ${meta.glow}` }} />
+          <div className="text-[10px] uppercase tracking-[0.2em] font-bold" style={{ color: meta.color }}>
+            {meta.label}
+          </div>
+        </div>
+      </div>
+
+      {/* ELEMENT FACTS panel — like "Things We Take" */}
+      <div className="space-y-1 text-[11px] mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-2">
+          Element Facts
+        </div>
+
+        <FactRow label="Electron config" value={element.electronConfig} mono />
+        <FactRow label="Shells (K · L · M ...)" value={`[ ${element.shells.join('  ·  ')} ]`} mono />
+        <FactRow
+          label="Melting point"
+          value={element.meltK ? `${element.meltK} K  /  ${(element.meltK - 273.15).toFixed(0)}°C` : '—'}
+        />
+        <FactRow
+          label="Boiling point"
+          value={element.boilK ? `${element.boilK} K  /  ${(element.boilK - 273.15).toFixed(0)}°C` : '—'}
+        />
+        <FactRow
+          label="Density"
+          value={element.density != null ? `${element.density} g/cm³` : '—'}
+        />
+        <FactRow
+          label="Electronegativity"
+          value={element.electronegativity != null ? `${element.electronegativity} (Pauling)` : '—'}
+        />
+        <FactRow label="Discovered" value={element.discoveredBy} />
+      </div>
+
+      {/* Uses */}
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-2">
+          Common Uses
+        </div>
+        <p className="text-xs text-white/80 leading-relaxed">{element.uses}</p>
+      </div>
+
+      {/* ── HẠT HẠ NGUYÊN TỬ — Proton · Neutron · Electron ── */}
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-3">
+          Hạt hạ nguyên tử · Subatomic particles
+        </div>
+
+        {/* 3 cards p / n / e */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {([
+            { key: 'proton',   count: totalProtons,    accent: 'rose' },
+            { key: 'neutron',  count: neutronCount,    accent: 'slate' },
+            { key: 'electron', count: totalElectrons,  accent: 'cyan' },
+          ] as const).map(({ key, count, accent }) => {
+            const p = PARTICLE_INFO[key]
+            return (
+              <div key={key}
+                className="rounded-md p-2 md:p-2.5 text-center"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${p.color}40`,
+                  boxShadow: `0 0 12px ${p.color}10`,
+                }}>
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <span className="text-base font-black tabular-nums"
+                    style={{ color: p.color, textShadow: `0 0 8px ${p.color}60` }}>
+                    {p.symbol}
+                  </span>
+                  <span className="text-base font-black tabular-nums text-white">×{count}</span>
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-white/50 font-bold">{p.name}</div>
+                <div className="mt-1.5 text-[9px] text-white/40 leading-tight">
+                  {p.loc}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Per-particle properties */}
+        <div className="space-y-1 text-[10px]">
+          <div className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 pb-1 border-b border-white/10 text-white/40 uppercase tracking-wider">
+            <span>Hạt</span>
+            <span className="text-right">Điện tích</span>
+            <span className="text-right">Khối lượng</span>
+            <span className="text-right">Spin</span>
+          </div>
+          {(['proton', 'neutron', 'electron'] as const).map(key => {
+            const p = PARTICLE_INFO[key]
+            return (
+              <div key={key} className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 items-center py-1">
+                <span className="flex items-center gap-1">
+                  <span className="font-bold" style={{ color: p.color }}>{p.symbol}</span>
+                  <span className="text-white/60">{p.name}</span>
+                </span>
+                <span className="text-right text-white/80 font-mono">{p.charge}</span>
+                <span className="text-right text-white/80 font-mono">{p.mass}</span>
+                <span className="text-right text-white/80 font-mono">{p.spin}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Total summary */}
+        <div className="mt-3 p-2 rounded-md flex items-center justify-between text-[11px]"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-white/40">Khối lượng nguyên tử lý thuyết</div>
+            <div className="font-mono font-bold text-white">≈ {totalMassU} u</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] uppercase tracking-wider text-white/40">Điện tích tổng</div>
+            <div className="font-mono font-bold"
+              style={{ color: netCharge === 0 ? '#22c55e' : netCharge > 0 ? '#ef4444' : '#22d3ee' }}>
+              {netCharge === 0 ? '0 (trung hòa)' : netCharge > 0 ? `+${netCharge}` : `${netCharge}`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MỨC NĂNG LƯỢNG · Energy Levels (Bohr) ── */}
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/60 mb-3">
+          Mức năng lượng · Energy levels
+        </div>
+
+        {/* Table với shell info */}
+        <div className="space-y-1">
+          <div className="grid grid-cols-[30px_50px_50px_1fr_1fr] gap-2 pb-1 border-b border-white/10 text-[9px] uppercase tracking-wider text-white/40">
+            <span>Lớp</span>
+            <span className="text-center">n</span>
+            <span className="text-center">e⁻</span>
+            <span className="text-right">Tối đa 2n²</span>
+            <span className="text-right">E (xấp xỉ)</span>
+          </div>
+          {element.shells.map((count, i) => {
+            const n = i + 1
+            const label = SHELL_LABELS[i] || `n${n}`
+            const max = SHELL_MAX_ELECTRONS[i] || (2 * n * n)
+            const energy = approxBindingEnergy(element.z, n)
+            const fillPercent = (count / max) * 100
+            return (
+              <div key={i} className="grid grid-cols-[30px_50px_50px_1fr_1fr] gap-2 items-center py-1.5">
+                <span className="font-black text-sm" style={{ color: meta.color }}>{label}</span>
+                <span className="text-center text-white/70 font-mono">{n}</span>
+                <span className="text-center text-white font-mono font-bold">{count}</span>
+                <span className="text-right">
+                  <span className="text-white/50 text-[10px]">/ {max}</span>
+                </span>
+                <span className="text-right text-white/80 font-mono text-[10px]">{energy}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Visualisation bars */}
+        <div className="mt-3 flex items-end gap-1.5 h-12">
+          {element.shells.map((count, i) => {
+            const max = SHELL_MAX_ELECTRONS[i] || 2 * (i + 1) * (i + 1)
+            const heightPercent = (count / max) * 100
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
+                <div className="text-[9px] font-bold tabular-nums text-white/80">{count}/{max}</div>
+                <div
+                  className="w-full rounded-sm transition-all relative"
+                  style={{
+                    height: `${Math.max(heightPercent, 8)}%`,
+                    background: `linear-gradient(180deg, ${meta.color}, ${meta.color}40)`,
+                    boxShadow: `0 0 8px ${meta.glow}40`,
+                  }}
+                />
+                <div className="text-[10px] uppercase font-black tracking-wider" style={{ color: meta.color }}>
+                  {SHELL_LABELS[i] || `n${i + 1}`}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Formula hint */}
+        <p className="mt-3 text-[9px] text-white/30 italic leading-relaxed">
+          E<sub>n</sub> ≈ −13.6 × Z<sub>eff</sub>² / n² eV (xấp xỉ Bohr · Z<sub>eff</sub> trừ ảnh hưởng chắn)
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function FactRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-3 py-1">
+      <div className="text-[10px] text-white/40 w-32 flex-shrink-0">{label}</div>
+      <div className="flex-1 h-px border-b border-dotted border-white/10" />
+      <div className={`text-[11px] text-white/90 ${mono ? 'font-mono' : ''}`}>{value}</div>
+    </div>
+  )
+}
+
+// ── Main Page ───────────────────────────────────────────────
+export default function PeriodicTable() {
+  const [selected, setSelected] = useState<Element>(ELEMENTS[5]) // Carbon as default
+
+  return (
+    <div className="min-h-screen relative overflow-hidden"
+      style={{
+        background: `
+          radial-gradient(ellipse 80% 60% at 50% 0%, #1a1a2e 0%, transparent 50%),
+          radial-gradient(ellipse 60% 80% at 80% 50%, ${CATEGORY_META[selected.category].color}10 0%, transparent 60%),
+          linear-gradient(180deg, #050507 0%, #000000 100%)
+        `,
+        fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif',
+      }}>
+      {/* Inter font import (already Google-Font ready) */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+
+      <div className="relative max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {/* Header — minimal like Encoding Landscape poster */}
+        <div className="mb-8 flex items-center justify-between flex-wrap gap-3">
+          <Link to="/dashboard/graph-lab"
+            className="inline-flex items-center gap-1.5 text-[10px] text-white/40 hover:text-white/80 transition uppercase tracking-[0.2em]">
+            <ChevronLeft className="w-3 h-3" /> Graph Lab
+          </Link>
+          <div className="text-center">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white"
+              style={{ letterSpacing: '-0.04em' }}>
+              PERIODIC<span className="text-white/30"> · </span>TABLE
+            </h1>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 mt-1">
+              An interactive specimen archive · inphysic.com
+            </p>
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+            {String(selected.z).padStart(3, '0')} / 118
+          </span>
+        </div>
+
+        {/* Category legend — minimalist dotted line */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] uppercase tracking-wider">
+          {Object.entries(CATEGORY_META).map(([key, m]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span className="w-2 h-2"
+                style={{
+                  background: m.color,
+                  boxShadow: `0 0 8px ${m.glow}80`,
+                }} />
+              <span className="text-white/60">{m.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Periodic Table 2D grid — 18 columns × 7 rows */}
+        <div className="grid gap-1 mb-10 overflow-x-auto pb-2"
+          style={{
+            gridTemplateColumns: 'repeat(18, minmax(44px, 1fr))',
+            gridTemplateRows: 'repeat(7, auto)',
+          }}>
+          {ELEMENTS.map(el => (
+            <ElementCard
+              key={el.z}
+              el={el}
+              onClick={() => setSelected(el)}
+              selected={selected.z === el.z}
+            />
+          ))}
+        </div>
+
+        {/* 3D Acrylic specimen + Detail card */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* 3D Atom in Glass Cube — like museum display */}
+          <div className="lg:col-span-3 relative overflow-hidden"
+            style={{
+              background: '#000000',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '2px',
+              minHeight: '520px',
+              boxShadow: `
+                0 30px 60px -20px rgba(0,0,0,0.8),
+                inset 0 0 120px ${CATEGORY_META[selected.category].glow}10
+              `,
+            }}>
+            {/* Header strip — like specimen label */}
+            <div className="absolute top-0 left-0 right-0 z-10 px-5 py-3 flex items-center justify-between"
+              style={{
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.6), transparent)',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}>
+              <div className="flex items-center gap-2 text-[10px] text-white/60 uppercase tracking-[0.2em]">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{
+                    background: CATEGORY_META[selected.category].color,
+                    boxShadow: `0 0 8px ${CATEGORY_META[selected.category].glow}`,
+                  }} />
+                Specimen · {selected.symbol} · {String(selected.z).padStart(3, '0')}
+              </div>
+              <div className="text-[10px] text-white/30 uppercase tracking-wider">
+                R3F Acrylic Display
+              </div>
+            </div>
+
+            {/* Footer hint */}
+            <div className="absolute bottom-3 left-0 right-0 z-10 flex justify-between px-5 text-[9px] text-white/30 uppercase tracking-[0.2em]">
+              <span>Drag · Rotate</span>
+              <span>Scroll · Zoom</span>
+            </div>
+
+            <Suspense fallback={
+              <div className="absolute inset-0 flex items-center justify-center text-white/40 text-xs uppercase tracking-widest">
+                Loading specimen…
+              </div>
+            }>
+              <Canvas
+                camera={{ position: [0, 2, 10], fov: 50 }}
+                gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+                style={{ background: '#000' }}
+                dpr={[1, 1.5]}
+              >
+                <color attach="background" args={['#000000']} />
+                <AtomScene element={selected} />
+                <OrbitControls
+                  enablePan={false}
+                  enableDamping
+                  dampingFactor={0.1}
+                  minDistance={4}
+                  maxDistance={22}
+                  autoRotate
+                  autoRotateSpeed={0.4}
+                />
+              </Canvas>
+            </Suspense>
+          </div>
+
+          {/* Detail Card */}
+          <div className="lg:col-span-2">
+            <DetailCard element={selected} />
+          </div>
+        </div>
+
+        {/* Bottom signature */}
+        <div className="mt-10 pt-6 border-t border-white/5 flex items-center justify-between text-[9px] uppercase tracking-[0.3em] text-white/30">
+          <span>An interactive periodic specimen archive</span>
+          <span className="flex items-center gap-2">
+            <Atom className="w-3 h-3" />
+            inphysic · 2026
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

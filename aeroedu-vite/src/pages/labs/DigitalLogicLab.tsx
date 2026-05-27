@@ -1,5 +1,5 @@
 /**
- * Digital Logic Lab — /dashboard/labtwin/labs/digital-logic-lab
+ * Digital Logic Lab — /dashboard/labtwin/digital-logic-lab
  *
  * Trình mô phỏng cổng logic số chuyên nghiệp, dạng kéo-thả + nối dây + chạy
  * mô phỏng realtime. Dành cho HS THPT học chương "Đại số Boole" + "Mạch số"

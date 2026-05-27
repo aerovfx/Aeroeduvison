@@ -3,13 +3,14 @@
  * Clone từ: app/(dashboard)/(routes)/dashboard/labtwin/page.tsx
  * Dark-first Tailwind — giống hoàn toàn bố cục bản gốc
  */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FlaskConical, Star, Clock, ArrowRight, Sparkles,
   TrendingUp, Award, Zap, ArrowLeft,
   FunctionSquare, Wrench, Wind, QrCode,
 } from 'lucide-react'
-import { QuickScanQr } from '@/components/common/QuickScanQr'
+import { SIMULATIONS, type Simulation } from './PythonLabs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,53 +27,35 @@ interface CategorySummary {
   preview: SimPreview[]
 }
 
-// ─── Static Python simulation category data ───────────────────────────────────
+// ─── LabTwin catalog — đã sắp xếp lại, gộp các category trùng lặp ───────────
+// User: "sắp xếp lại toàn bộ labtwin, xoá các lab trùng lặp"
+//
+// Đã GỘP:
+//   - "Computer Vision" + "Thị giác máy tính" → 1 category "Thị giác máy tính"
+// Đã BỎ:
+//   - "Procedural Generation" (WFC Builder — chưa có FE)
+//   - Category trùng (Computer Vision EN dup)
+// Đã THÊM:
+//   - Toán & Trực quan hoá (Graph Lab + Fourier Epicycles + Periodic Table)
+//   - Periodic Table vào Hoá học
+//   - Video Tracking vào Thị giác máy tính
+// Categories cuối: 8 (vs 11 cũ) — clean hơn
 
-const PYTHON_TOTAL = 38
+const PYTHON_TOTAL = 32
 
 const PYTHON_CATEGORIES: CategorySummary[] = [
   {
-    category: 'Cơ học', count: 12, totalXP: 2670,
+    category: 'Cơ học', count: 8, totalXP: 2100,
     preview: [
-      { name: 'Aerodynamics Simulation', duration: '45 phút', xp: 250 },
-      { name: 'AeroFlow 3D Advanced',    duration: '60 phút', xp: 300 },
-    ],
-  },
-  // 📌 Category "Học qua trò chơi" đã chuyển sang /dashboard/games (Game Hub)
-  // — tách bạch lab khoa học với trò chơi để dễ quản lí.
-  {
-    category: 'Machine Learning', count: 3, totalXP: 880,
-    preview: [
-      { name: 'DataSim AI',             duration: '60 phút', xp: 300 },
-      { name: 'Neural Network Simulator', duration: '65 phút', xp: 300 },
+      { name: 'Physics Motion',          duration: '40 phút', xp: 220 },
+      { name: 'AirflowCFD 3D',           duration: '60 phút', xp: 300 },
     ],
   },
   {
-    category: 'Computer Vision', count: 2, totalXP: 550,
+    category: 'Sóng', count: 4, totalXP: 700,
     preview: [
-      { name: 'Motion Tracking CV',  duration: '50 phút', xp: 250 },
-      { name: 'OCR Grading System',  duration: '55 phút', xp: 300 },
-    ],
-  },
-  {
-    category: 'Thị giác máy tính', count: 2, totalXP: 450,
-    preview: [
-      { name: 'Video Trajectory Tracking', duration: '45 phút', xp: 200 },
-      { name: 'AI Vision & Emotion Hub',   duration: 'Unlimited', xp: 250 },
-    ],
-  },
-  {
-    category: 'Hóa học', count: 3, totalXP: 500,
-    preview: [
-      { name: 'Chemistry Lab Basic',   duration: '25 phút', xp: 120 },
-      { name: 'ChemLab 3D Advanced',   duration: '40 phút', xp: 200 },
-    ],
-  },
-  {
-    category: 'Sóng', count: 3, totalXP: 530,
-    preview: [
+      { name: 'Wave Interference',                 duration: '35 phút', xp: 200 },
       { name: 'Dao động điều hòa - Con lắc lò xo', duration: '30 phút', xp: 180 },
-      { name: 'Con lắc đơn',                       duration: '30 phút', xp: 150 },
     ],
   },
   {
@@ -83,27 +66,44 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
     ],
   },
   {
+    category: 'Toán & Trực quan', count: 3, totalXP: 480,
+    preview: [
+      { name: 'Graph Lab',          duration: '30 phút', xp: 150 },
+      { name: 'Fourier Epicycles',  duration: '20 phút', xp: 180 },
+    ],
+  },
+  {
+    category: 'Hóa học', count: 4, totalXP: 700,
+    preview: [
+      { name: 'Periodic Table 3D',   duration: '30 phút', xp: 200 },
+      { name: 'Chemistry Lab',       duration: '25 phút', xp: 120 },
+    ],
+  },
+  {
     category: 'Sinh học', count: 1, totalXP: 180,
     preview: [
       { name: 'BioGrowth Simulation', duration: '35 phút', xp: 180 },
     ],
   },
   {
-    category: 'Nhiệt học', count: 1, totalXP: 250,
+    category: 'Thị giác máy tính', count: 4, totalXP: 1000,
     preview: [
-      { name: 'ThermoFlow Simulation', duration: '45 phút', xp: 250 },
+      { name: 'Video Trajectory Tracking', duration: '45 phút', xp: 250 },
+      { name: 'Motion Tracking CV',        duration: '50 phút', xp: 250 },
     ],
   },
   {
-    category: 'Procedural Generation', count: 1, totalXP: 350,
+    category: 'Machine Learning', count: 3, totalXP: 880,
     preview: [
-      { name: 'WFC Builder', duration: '75 phút', xp: 350 },
+      { name: 'DataSim AI',               duration: '60 phút', xp: 300 },
+      { name: 'Neural Network Simulator', duration: '65 phút', xp: 300 },
     ],
   },
   {
-    category: 'Điện tử', count: 1, totalXP: 200,
+    category: 'Điện tử & IoT', count: 3, totalXP: 600,
     preview: [
-      { name: 'Electronics Simulator', duration: '30 phút', xp: 200 },
+      { name: 'Circuit Simulator',     duration: '30 phút', xp: 200 },
+      { name: 'Digital Logic Lab',     duration: '40 phút', xp: 200 },
     ],
   },
 ]
@@ -112,54 +112,42 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
 
 const CATEGORY_ICON: Record<string, string> = {
   'Cơ học':                '⚡',
-  'Quang học':             '💡',
-  'Điện từ':               '🔋',
   'Sóng':                  '🌊',
-  'Nhiệt học':             '🔥',
-  'Thị giác máy tính':     '👁️',
-  'Computer Vision':       '📷',
-  'Procedural Generation': '🎲',
-  'Machine Learning':      '🤖',
+  'Quang học':             '💡',
+  'Toán & Trực quan':      '📈',
   'Hóa học':               '🧪',
   'Sinh học':              '🌿',
-  'Học qua trò chơi':      '🎮',
-  'Điện tử':               '🔌',
+  'Thị giác máy tính':     '👁️',
+  'Machine Learning':      '🤖',
+  'Điện tử & IoT':         '🔌',
 }
 
 /* Card gradient per category — light first, dark variant cho dark mode.
    Light: tailwind palette nhạt (100 shade) cho readable text overlay.
    Dark: HSL cosmic dark như cũ — giữ visual identity. */
 const CATEGORY_GRADIENT: Record<string, string> = {
-  'Cơ học':                'from-purple-100 to-fuchsia-100 dark:from-[hsl(280,60%,15%)] dark:to-[hsl(300,55%,18%)]',
-  'Quang học':             'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
-  'Điện từ':               'from-blue-100 to-indigo-100 dark:from-[hsl(210,80%,14%)] dark:to-[hsl(225,80%,17%)]',
-  'Sóng':                  'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
-  'Nhiệt học':             'from-orange-100 to-amber-100 dark:from-[hsl(20,80%,14%)] dark:to-[hsl(35,80%,17%)]',
-  'Thị giác máy tính':     'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
-  'Computer Vision':       'from-emerald-100 to-teal-100 dark:from-[hsl(145,60%,13%)] dark:to-[hsl(160,55%,16%)]',
-  'Procedural Generation': 'from-indigo-100 to-violet-100 dark:from-[hsl(245,70%,14%)] dark:to-[hsl(260,65%,17%)]',
-  'Machine Learning':      'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
-  'Hóa học':               'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
-  'Sinh học':              'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
-  'Học qua trò chơi':      'from-lime-100 to-green-100 dark:from-[hsl(80,55%,13%)] dark:to-[hsl(95,50%,16%)]',
-  'Điện tử':               'from-blue-100 to-indigo-100 dark:from-[hsl(225,70%,14%)] dark:to-[hsl(240,65%,17%)]',
+  'Cơ học':            'from-purple-100 to-fuchsia-100 dark:from-[hsl(280,60%,15%)] dark:to-[hsl(300,55%,18%)]',
+  'Sóng':              'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
+  'Quang học':         'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
+  'Toán & Trực quan':  'from-indigo-100 to-blue-100 dark:from-[hsl(220,70%,14%)] dark:to-[hsl(235,65%,17%)]',
+  'Hóa học':           'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
+  'Sinh học':          'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
+  'Thị giác máy tính': 'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
+  'Machine Learning':  'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
+  'Điện tử & IoT':     'from-blue-100 to-indigo-100 dark:from-[hsl(225,70%,14%)] dark:to-[hsl(240,65%,17%)]',
 }
 const DEFAULT_GRADIENT = 'from-slate-100 to-gray-100 dark:from-[hsl(220,30%,12%)] dark:to-[hsl(230,25%,15%)]'
 
 const CATEGORY_BORDER: Record<string, string> = {
-  'Cơ học':                'border-[hsl(280,60%,35%)]/25',
-  'Quang học':             'border-[hsl(38,80%,40%)]/25',
-  'Điện từ':               'border-[hsl(210,80%,40%)]/25',
-  'Sóng':                  'border-[hsl(185,75%,40%)]/25',
-  'Nhiệt học':             'border-[hsl(20,80%,40%)]/25',
-  'Thị giác máy tính':     'border-[hsl(175,65%,38%)]/25',
-  'Computer Vision':       'border-[hsl(145,60%,38%)]/25',
-  'Procedural Generation': 'border-[hsl(245,70%,40%)]/25',
-  'Machine Learning':      'border-[hsl(262,65%,40%)]/25',
-  'Hóa học':               'border-[hsl(160,60%,38%)]/25',
-  'Sinh học':              'border-[hsl(130,60%,38%)]/25',
-  'Học qua trò chơi':      'border-[hsl(80,55%,38%)]/25',
-  'Điện tử':               'border-[hsl(225,70%,40%)]/25',
+  'Cơ học':            'border-[hsl(280,60%,35%)]/25',
+  'Sóng':              'border-[hsl(185,75%,40%)]/25',
+  'Quang học':         'border-[hsl(38,80%,40%)]/25',
+  'Toán & Trực quan':  'border-[hsl(220,70%,40%)]/25',
+  'Hóa học':           'border-[hsl(160,60%,38%)]/25',
+  'Sinh học':          'border-[hsl(130,60%,38%)]/25',
+  'Thị giác máy tính': 'border-[hsl(175,65%,38%)]/25',
+  'Machine Learning':  'border-[hsl(262,65%,40%)]/25',
+  'Điện tử & IoT':     'border-[hsl(225,70%,40%)]/25',
 }
 
 // ─── Popular labs (hiển thị thẻ QR riêng cho từng thí nghiệm) ────────────────
@@ -170,102 +158,62 @@ interface PopularLab {
   path: string
   desc: string
   accent: 'indigo' | 'cyan' | 'emerald' | 'fuchsia' | 'amber' | 'rose'
+  group: 'physics' | 'math' | 'chemistry' | 'electronics' | 'ai' | 'aero'
 }
 
+// POPULAR_LABS — sắp xếp lại theo nhóm domain, bỏ trùng lặp:
+// - Bỏ Optics Lab duplicate (đã có /labs/optics-lab trong PYTHON_CATEGORIES)
+// - Thêm Periodic Table + Video Tracking (vừa làm mới)
+// - Đổi accent 'pink' không hợp lệ → 'rose'
+// - Group field để có thể filter/section sau này
 const POPULAR_LABS: PopularLab[] = [
-  {
-    name: 'AirflowCFD 3D',
-    emoji: '💨',
-    path: '/dashboard/labtwin/labs/airflow-cfd',
-    desc: 'Dòng không khí qua vật thể 3D',
-    accent: 'fuchsia',
-  },
-  {
-    name: 'Graph Lab',
-    emoji: '📈',
-    path: '/dashboard/labtwin/labs/graph-lab',
-    desc: 'Máy tính đồ thị y = f(x)',
-    accent: 'cyan',
-  },
-  {
-    name: 'Physics Motion',
-    emoji: '🎯',
-    path: '/dashboard/labtwin/labs/physics-motion',
-    desc: 'Chuyển động ném xiên · va chạm',
-    accent: 'rose',
-  },
-  {
-    name: 'Con lắc lò xo',
-    emoji: '🌀',
-    path: '/dashboard/labtwin/labs/spring-pendulum',
-    desc: 'Dao động điều hòa',
-    accent: 'indigo',
-  },
-  {
-    name: 'Con lắc đơn',
-    emoji: '⚖️',
-    path: '/dashboard/labtwin/labs/simple-pendulum',
-    desc: 'Chu kỳ T = 2π√(l/g)',
-    accent: 'emerald',
-  },
-  {
-    name: 'Wave Interference',
-    emoji: '🌊',
-    path: '/dashboard/labtwin/labs/wave-interference',
-    desc: 'Giao thoa sóng',
-    accent: 'cyan',
-  },
-  {
-    name: 'Chemistry Lab',
-    emoji: '🧪',
-    path: '/dashboard/labtwin/labs/chemistry-lab',
-    desc: 'Phản ứng · phương trình',
-    accent: 'emerald',
-  },
-  {
-    name: 'Optics Lab',
-    emoji: '🔬',
-    path: '/dashboard/labtwin/labs/optics-lab',
-    desc: 'Thấu kính · khúc xạ',
-    accent: 'amber',
-  },
-  {
-    name: 'Circuit Simulator',
-    emoji: '🔌',
-    path: '/dashboard/labtwin/labs/circuit-simulator',
-    desc: 'Mạch điện RLC · Ohm · Kirchhoff',
-    accent: 'indigo',
-  },
-  {
-    name: 'Digital Logic Lab',
-    emoji: '⚙️',
-    path: '/dashboard/labtwin/labs/digital-logic-lab',
-    desc: 'Cổng logic số · Boole · bảng chân lý',
-    accent: 'cyan',
-  },
-  {
-    name: 'Arduino Emulator',
-    emoji: '⚡',
-    path: '/dashboard/iot-lab/emulator',
-    desc: 'Viết code C++ → chạy real-time trong browser',
-    accent: 'emerald',
-  },
-  {
-    name: 'Mạch Custom (Wokwi)',
-    emoji: '🔌',
-    path: '/dashboard/iot-lab',
-    desc: 'Thiết kế mạch · 8 template · 💾 Lưu thư viện · Chia sẻ cộng đồng',
-    accent: 'pink',
-  },
-  {
-    name: 'MechaForce',
-    emoji: '🤖',
-    path: '/dashboard/labtwin/labs/mechaforce',
-    desc: 'Lực · động lực học',
-    accent: 'rose',
-  },
+  // ── Vật lý cơ bản (5) ──
+  { name: 'Physics Motion',     emoji: '🎯', path: '/dashboard/labtwin/physics-motion',     desc: 'Ném xiên · va chạm · gia tốc', accent: 'rose',     group: 'physics' },
+  { name: 'Con lắc lò xo',      emoji: '🌀', path: '/dashboard/labtwin/spring-pendulum',    desc: 'Dao động điều hòa F = -kx',     accent: 'indigo',   group: 'physics' },
+  { name: 'Con lắc đơn',        emoji: '⚖️', path: '/dashboard/labtwin/simple-pendulum',    desc: 'Chu kỳ T = 2π√(l/g)',          accent: 'emerald',  group: 'physics' },
+  { name: 'MechaForce',         emoji: '🤖', path: '/dashboard/labtwin/mechaforce',         desc: 'Lực · động lực học Newton',     accent: 'rose',     group: 'physics' },
+  { name: 'Wave Interference',  emoji: '🌊', path: '/dashboard/labtwin/wave-interference',  desc: 'Giao thoa sóng · 2 nguồn',     accent: 'cyan',     group: 'physics' },
+  { name: 'Giao thoa Young',    emoji: '💡', path: '/dashboard/labtwin/young-double-slit',  desc: 'Ánh sáng đơn sắc qua 2 khe hẹp', accent: 'fuchsia',  group: 'physics' },
+  { name: 'Khúc xạ Snell',     emoji: '🔬', path: '/dashboard/labtwin/refraction',         desc: 'n₁sin(i) = n₂sin(r) · TIR',   accent: 'cyan',     group: 'physics' },
+  { name: 'SHM nâng cao',      emoji: '〰️', path: '/dashboard/labtwin/harmonic-motion',    desc: 'Phase plot · Energy · damping', accent: 'fuchsia',  group: 'physics' },
+  { name: 'Archimedes',        emoji: '🛁', path: '/dashboard/labtwin/density-buoyancy',   desc: 'Lực đẩy · 5 chất lỏng phân tầng', accent: 'cyan',  group: 'chemistry' },
+  { name: 'Scratch Kids',      emoji: '🐱', path: '/dashboard/labtwin/scratch-kids',       desc: 'Lập trình kéo thả · vẽ · phát nhạc', accent: 'amber', group: 'ai' },
+  { name: 'CFD Dòng chảy',     emoji: '🌀', path: '/dashboard/labtwin/cfd-flow',           desc: 'Lattice Boltzmann · Karman vortex', accent: 'cyan', group: 'physics' },
+  { name: 'Sóng dừng',         emoji: '〰️', path: '/dashboard/labtwin/standing-waves',     desc: 'Hài âm n · Nốt + Bụng', accent: 'amber', group: 'physics' },
+  { name: 'Thư viện DIY STEM', emoji: '📚', path: '/dashboard/labtwin/stem-diy',           desc: '16 dự án tự làm theo bước', accent: 'emerald', group: 'physics' },
+  { name: 'BioGrowth',         emoji: '🌱', path: '/dashboard/labtwin/biogrowth',          desc: 'Exponential · Logistic · Predator-prey', accent: 'emerald', group: 'physics' },
+  { name: 'Chất khí + Nhiệt',  emoji: '🌡', path: '/dashboard/labtwin/thermal-gas',        desc: 'Boyle · Charles · Gay-Lussac · PV=nRT', accent: 'amber', group: 'chemistry' },
+  { name: 'WFC Builder',       emoji: '🧩', path: '/dashboard/labtwin/wfc-builder',        desc: 'Wave Function Collapse procedural', accent: 'fuchsia', group: 'ai' },
+
+  // ── Toán & Trực quan (3) ──
+  { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
+  { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
+  { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
+  { name: 'Tròn 3D + Helix',   emoji: '🌀', path: '/dashboard/labtwin/circular-motion-3d', desc: 'Helix 3D + chiếu lên XY/XZ/YZ', accent: 'cyan',     group: 'physics' },
+  { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
+  { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
+
+  // ── Game RPG (1) ──
+  { name: 'Pixel Office RPG',   emoji: '🎮', path: '/dashboard/labtwin/pixel-office-rpg', desc: 'AI agent VS Code · top-down pixel + chat', accent: 'fuchsia', group: 'ai' },
+
+  // ── Hoá & Quang (2) ──
+  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
+  { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
+
+  // ── Điện tử & IoT (3) ──
+  { name: 'Circuit Simulator',  emoji: '🔌', path: '/dashboard/labtwin/circuit-simulator',  desc: 'Mạch RLC · Ohm · Kirchhoff',   accent: 'indigo',   group: 'electronics' },
+  { name: 'Digital Logic Lab',  emoji: '⚙️', path: '/dashboard/labtwin/digital-logic-lab',  desc: 'Cổng logic · bảng chân lý',    accent: 'cyan',     group: 'electronics' },
+  { name: 'Arduino Emulator',   emoji: '⚡', path: '/dashboard/iot-lab/emulator',                desc: 'Code C++ real-time browser',   accent: 'emerald',  group: 'electronics' },
+
+  // ── AI & Vision (1 — IoT custom move to IoT lab page) ──
+  { name: 'Video Tracking',     emoji: '🎥', path: '/dashboard/labtwin/video-tracking',     desc: 'Tracking quỹ đạo từ video · NCC', accent: 'fuchsia', group: 'ai' },
+
+  // ── Aero (1) ──
+  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero' },
+
   // 📌 Pixel Agents + Gesture Swarm đã chuyển sang Game Hub
   //    /dashboard/games/pixel-agents · /dashboard/games/gesture-swarm
+  // 📌 Mạch Custom Wokwi đã có entry tại /dashboard/iot-lab — không cần dup ở đây
 ]
 
 // Lấy origin của site — fallback inphysic.com nếu chạy SSR/test
@@ -293,12 +241,90 @@ async function downloadQrImage(src: string, filename: string) {
   }
 }
 
+// ─── QR helpers ──────────────────────────────────────────────────────────────
+// User: "đưa mã QR vào trong các card · Tối ưu không gian của labtwin"
+// QR thumbnail nhỏ inline trong card + click mở modal lớn để in/quét.
+
+function qrThumbnailUrl(url: string, size = 120) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${encodeURIComponent(url)}`
+}
+function qrHiResUrl(url: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(url)}`
+}
+
+interface QrModalState {
+  url: string
+  title: string
+  emoji?: string
+}
+
+function QrModal({ state, onClose, onDownload }: {
+  state: QrModalState
+  onClose: () => void
+  onDownload: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-card border-2 border-indigo-500/40 rounded-2xl p-6 max-w-md w-full shadow-[0_0_60px_rgba(99,102,241,0.3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white/70"
+        >
+          ✕
+        </button>
+        <div className="text-center">
+          {state.emoji && <div className="text-3xl mb-2">{state.emoji}</div>}
+          <h3 className="font-bold text-lg text-foreground mb-3 px-6">{state.title}</h3>
+          <div className="inline-block p-4 bg-white rounded-2xl mb-4 shadow-xl">
+            <img
+              src={qrThumbnailUrl(state.url, 280)}
+              alt={`QR ${state.title}`}
+              className="w-64 h-64 object-contain"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mb-4 px-4 leading-relaxed">
+            📱 Mở Camera điện thoại quét mã · Hoặc nhấn "Tải PNG" để in giấy dán lớp
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onDownload}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm transition-all"
+            >
+              📥 Tải PNG (1024×1024)
+            </button>
+            <a
+              href={state.url}
+              className="flex-1 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-border text-foreground/80 hover:text-foreground font-bold text-sm flex items-center justify-center transition-all"
+            >
+              Mở lab →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LabsIndexPage() {
   const totalExperiments = PYTHON_TOTAL
   const origin = siteOrigin()
   const labsCatalogUrl = `${origin}/dashboard/labtwin/labs`
+  const [qrModal, setQrModal] = useState<QrModalState | null>(null)
+  const openQrModal = (lab: { name: string; emoji: string; path: string }) => {
+    setQrModal({ url: `${origin}${lab.path}`, title: lab.name, emoji: lab.emoji })
+  }
+  const downloadCurrentQr = () => {
+    if (qrModal) downloadQrImage(qrHiResUrl(qrModal.url), `qr-${qrModal.title.toLowerCase().replace(/\s+/g, '-')}.png`)
+  }
 
   const achievements = [
     { icon: '🏆', title: 'Nhà khoa học mới',  desc: 'Hoàn thành 3 thí nghiệm đầu',     xp: 150, locked: true },
@@ -311,31 +337,32 @@ export default function LabsIndexPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* ── Header ── */}
-        <div className="mb-8">
+        <div className="mb-5">
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-4 font-medium transition-colors"
+            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-3 font-medium transition-colors text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             Quay lại Dashboard
           </Link>
 
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-4 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-2xl text-white shadow-xl hover:scale-105 transition-transform">
-              <FlaskConical className="h-12 w-12" />
+          {/* Compact header — inline stats */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="p-2.5 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-xl text-white shadow-lg hover:scale-105 transition-transform">
+              <FlaskConical className="h-7 w-7" />
             </div>
-            <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
                 🧪 LabTwin
               </h1>
-              <p className="text-white/50 mt-1 text-xl">
-                Phòng thí nghiệm ảo siêu cool! Khám phá khoa học như chơi game! 🚀
+              <p className="text-white/50 text-sm">
+                {POPULAR_LABS.length} lab phổ biến + {SIMULATIONS.length} Python labs · Quét QR mở trên điện thoại
               </p>
             </div>
           </div>
 
-          {/* ── Quick Stats ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {/* ── Quick Stats — compact 4-col ── */}
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {[
               { emoji: '🎯', value: totalExperiments, label: 'Thí nghiệm', border: 'border-purple-500/20', bg: 'bg-purple-500/10', text: 'text-purple-400', sub: 'text-purple-700/80 dark:text-purple-300/60' },
               { emoji: '✅', value: 0,                label: 'Hoàn thành', border: 'border-green-500/20',  bg: 'bg-green-500/10',  text: 'text-green-400',  sub: 'text-green-700/80 dark:text-green-300/60' },
@@ -344,141 +371,263 @@ export default function LabsIndexPage() {
             ].map((s) => (
               <div
                 key={s.label}
-                className={`${s.bg} border-2 ${s.border} rounded-2xl p-4 text-center hover:shadow-lg transition-shadow`}
+                className={`${s.bg} border ${s.border} rounded-lg p-2 text-center hover:shadow-md transition-shadow`}
               >
-                <div className="text-3xl mb-2">{s.emoji}</div>
-                <div className={`text-2xl font-bold ${s.text}`}>{s.value}</div>
-                <div className={`text-sm ${s.sub}`}>{s.label}</div>
+                <div className="text-xl mb-0.5">{s.emoji}</div>
+                <div className={`text-base font-bold ${s.text}`}>{s.value}</div>
+                <div className={`text-[10px] ${s.sub} leading-tight`}>{s.label}</div>
               </div>
             ))}
           </div>
 
-          {/* ── QR truy cập nhanh — học sinh quét là vào thẳng LabTwin ── */}
-          <div className="mb-8">
-            <QuickScanQr
-              targetUrl={labsCatalogUrl}
-              accent="indigo"
-              title="Quét QR để mở LabTwin trên điện thoại"
-              description={`Học sinh chỉ cần mở camera, quét mã là vào thẳng danh mục ${PYTHON_TOTAL} thí nghiệm Python — không cần đăng nhập, không cần gõ link.`}
-              downloadName="labtwin-qr.png"
-            />
-          </div>
+          {/* ── 🚀 TẤT CẢ THÍ NGHIỆM — GỘP 3 section thành 1 ──
+              User: "gộp Python Simulations & Labs 32 thí nghiệm... và Quét QR... vào Tất cả thí nghiệm"
+              Cấu trúc mới:
+              1. Header với QR card compact ở góc phải
+              2. Phổ biến: 15 POPULAR_LABS flat grid (icon + name + desc)
+              3. Theo chủ đề: 32 SIMULATIONS grouped by category
+              4. Bottom CTA */}
+          <div className="mb-8 rounded-2xl border-2 border-purple-500/25 bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 dark:from-[hsl(280,45%,9%)] dark:via-[hsl(310,40%,10%)] dark:to-[hsl(20,40%,10%)] overflow-hidden relative">
+            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.05] select-none pointer-events-none leading-none">🧪</div>
 
-          {/* ── Python Simulations — All Categories ──
-              2026-05-20: light mode dùng gradient nhạt indigo→purple→pink,
-              dark mode giữ cosmic deep HSL như cũ. */}
-          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-[hsl(245,50%,10%)] dark:via-[hsl(270,45%,9%)] dark:to-[hsl(290,45%,10%)] overflow-hidden relative">
-            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.06] select-none pointer-events-none leading-none">🐍</div>
-
-            {/* Header */}
-            <div className="relative z-10 px-6 pt-6 pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h2 className="text-3xl font-bold text-indigo-100 flex items-center gap-2">
-                    <Sparkles className="h-8 w-8 text-yellow-400" />
-                    Python Simulations &amp; Labs
+            {/* Header — title + QR compact card */}
+            <div className="relative z-10 px-6 pt-6 pb-3">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
+                    <Sparkles className="h-7 w-7 text-purple-500" />
+                    Tất cả thí nghiệm
                   </h2>
-                  <p className="text-lg mt-2 text-indigo-300/70">
-                    {PYTHON_TOTAL} thí nghiệm được code bằng Python thật! Mỗi danh mục có nhiều labs cool! 🎨
+                  <p className="text-sm text-muted-foreground mt-1.5">
+                    {POPULAR_LABS.length} lab phổ biến + {SIMULATIONS.length} thí nghiệm Python theo chủ đề — bấm là vào thẳng
                   </p>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
+                      ⭐ {POPULAR_LABS.length} phổ biến
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30">
+                      🐍 {SIMULATIONS.length} Python labs
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-pink-100 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-500/30">
+                      {PYTHON_CATEGORIES.length} chủ đề
+                    </span>
+                  </div>
                 </div>
-                <Link
-                  to="/dashboard/labtwin/labs"
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  Xem tất cả
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
+
+                {/* QR card compact — góc phải header */}
+                <div className="shrink-0 rounded-xl border-2 border-indigo-300/50 dark:border-indigo-500/30 bg-white dark:bg-indigo-950/40 p-3 flex items-center gap-3 max-w-xs">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encodeURIComponent(labsCatalogUrl)}`}
+                    alt="QR LabTwin"
+                    className="w-20 h-20 object-contain rounded-md"
+                    loading="lazy"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                      <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Quét QR</span>
+                    </div>
+                    <p className="text-[10.5px] text-muted-foreground leading-snug mb-1.5 line-clamp-2">
+                      Mở LabTwin trên điện thoại — không cần đăng nhập
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadQrImage(
+                          `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(labsCatalogUrl)}`,
+                          'labtwin-qr.png',
+                        )
+                      }
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-500/30 transition-all"
+                    >
+                      Tải PNG
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Category cards grid */}
-            <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {PYTHON_CATEGORIES.map((cat) => {
-                  const emoji = CATEGORY_ICON[cat.category] ?? '🔬'
-                  const gradient = CATEGORY_GRADIENT[cat.category] ?? DEFAULT_GRADIENT
-                  const border = CATEGORY_BORDER[cat.category] ?? 'border-white/10'
-
+            {/* ── ⭐ Phổ biến — 15 POPULAR_LABS flat grid ── */}
+            <div className="relative z-10 px-6 py-3">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">⭐</span>
+                <h3 className="font-bold text-lg text-foreground">Phổ biến nhất</h3>
+                <span className="text-xs text-muted-foreground">— mỗi lab có UI riêng, vào thẳng</span>
+              </div>
+              {/* Compact grid: 6 cols xl · QR inline corner — tối ưu không gian */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 auto-rows-fr">
+                {POPULAR_LABS.map(lab => {
+                  const accentColors: Record<string, string> = {
+                    rose:    'from-rose-500/15 to-pink-500/10 border-rose-300/40 dark:border-rose-500/30 hover:border-rose-500',
+                    indigo:  'from-indigo-500/15 to-blue-500/10 border-indigo-300/40 dark:border-indigo-500/30 hover:border-indigo-500',
+                    emerald: 'from-emerald-500/15 to-teal-500/10 border-emerald-300/40 dark:border-emerald-500/30 hover:border-emerald-500',
+                    cyan:    'from-cyan-500/15 to-sky-500/10 border-cyan-300/40 dark:border-cyan-500/30 hover:border-cyan-500',
+                    amber:   'from-amber-500/15 to-orange-500/10 border-amber-300/40 dark:border-amber-500/30 hover:border-amber-500',
+                    fuchsia: 'from-fuchsia-500/15 to-purple-500/10 border-fuchsia-300/40 dark:border-fuchsia-500/30 hover:border-fuchsia-500',
+                  }
+                  const groupLabel: Record<string, string> = {
+                    physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
+                    electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
+                  }
+                  const labUrl = `${origin}${lab.path}`
                   return (
-                    <Link
-                      key={cat.category}
-                      to={`/dashboard/labtwin/labs?category=${encodeURIComponent(cat.category)}`}
-                      className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${gradient} border-2 ${border} overflow-hidden relative rounded-2xl block`}
-                    >
-                      {/* Decorative circles */}
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-white/[0.04] rounded-full -mr-10 -mt-10" />
-                      <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.04] rounded-full -ml-8 -mb-8" />
-
-                      <div className="p-5 relative z-10">
-                        <div className="text-center mb-4">
-                          <div className="text-6xl mb-3 group-hover:scale-125 transition-transform inline-block">
-                            {emoji}
-                          </div>
-                          <h3 className="font-bold text-xl text-white/90 mb-2">{cat.category}</h3>
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.1] text-white/70 border border-white/10">
-                              {cat.count} labs
-                            </span>
-                            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/25 text-yellow-300">
-                              <Star className="h-3 w-3" />
-                              {cat.totalXP} XP
-                            </span>
-                          </div>
+                    <div key={lab.path} className="relative h-full">
+                      <Link
+                        to={lab.path}
+                        className={`group block relative rounded-xl border bg-gradient-to-br ${accentColors[lab.accent]} p-2.5 flex flex-col items-center text-center transition-all hover:scale-[1.03] hover:shadow-xl h-full`}
+                      >
+                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
+                          {groupLabel[lab.group]}
+                        </span>
+                        <div className="text-3xl md:text-4xl mb-1.5 mt-1 group-hover:scale-125 transition-transform">
+                          {lab.emoji}
                         </div>
-
-                        {/* Preview of first 2 sims */}
-                        <div className="space-y-2 mb-4">
-                          {cat.preview.map((sim, i) => (
-                            <div
-                              key={i}
-                              className="text-xs bg-white/[0.07] rounded-lg p-2 border border-white/[0.08]"
-                            >
-                              <div className="font-semibold text-white/80 line-clamp-1">{sim.name}</div>
-                              <div className="text-white/40 flex items-center gap-2 mt-1">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {sim.duration}
-                                </span>
-                                <span>•</span>
-                                <span>+{sim.xp} XP</span>
-                              </div>
-                            </div>
-                          ))}
-                          {cat.count > 2 && (
-                            <div className="text-xs text-center text-white/40 font-medium">
-                              +{cat.count - 2} thí nghiệm nữa
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 group-hover:from-indigo-500 group-hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                          Khám phá {cat.category}
-                          <ArrowRight className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </Link>
+                        <h3 className="font-bold text-xs md:text-sm text-foreground mb-1 leading-tight line-clamp-1">
+                          {lab.name}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-auto leading-snug">
+                          {lab.desc}
+                        </p>
+                      </Link>
+                      {/* QR thumbnail — bấm để mở modal lớn */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openQrModal(lab) }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-white rounded-md shadow-md hover:scale-110 transition-transform z-10"
+                        title="Quét QR để mở trên điện thoại"
+                      >
+                        <img
+                          src={qrThumbnailUrl(labUrl, 80)}
+                          alt={`QR ${lab.name}`}
+                          className="w-7 h-7 object-contain"
+                          loading="lazy"
+                        />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
+            </div>
 
-              {/* Quick access bar */}
-              <div className="mt-6 p-4 bg-white/[0.04] rounded-xl border-2 border-indigo-500/15">
+            {/* ── 🐍 Theo chủ đề — 32 SIMULATIONS grouped ── */}
+            <div className="relative z-10 px-6 py-3">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🐍</span>
+                <h3 className="font-bold text-lg text-foreground">Theo chủ đề — Python Simulations</h3>
+                <span className="text-xs text-muted-foreground">— {PYTHON_TOTAL} thí nghiệm code bằng Python thật</span>
+              </div>
+              <div className="space-y-5">
+                {(() => {
+                  // Group SIMULATIONS by category
+                  const grouped: Record<string, Simulation[]> = {}
+                  for (const s of SIMULATIONS) {
+                    if (!grouped[s.category]) grouped[s.category] = []
+                    grouped[s.category].push(s)
+                  }
+                  const catOrder = PYTHON_CATEGORIES.map(c => c.category)
+                  const extraCats = Object.keys(grouped).filter(c => !catOrder.includes(c))
+                  const orderedCats = [...catOrder, ...extraCats].filter(c => grouped[c]?.length > 0)
+
+                  return orderedCats.map(catName => {
+                    const emoji = CATEGORY_ICON[catName] ?? '🔬'
+                    const gradient = CATEGORY_GRADIENT[catName] ?? DEFAULT_GRADIENT
+                    const border = CATEGORY_BORDER[catName] ?? 'border-white/10'
+                    const labs = grouped[catName]
+                    return (
+                      <div key={catName}
+                        className={`rounded-2xl border-2 ${border} bg-gradient-to-br ${gradient} p-5`}>
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">{emoji}</span>
+                            <div>
+                              <h4 className="font-bold text-lg text-foreground">{catName}</h4>
+                              <p className="text-xs text-muted-foreground">{labs.length} thí nghiệm</p>
+                            </div>
+                          </div>
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/25 text-yellow-700 dark:text-yellow-300">
+                            <Star className="h-3 w-3" />
+                            {labs.reduce((s, l) => s + l.xp, 0)} XP
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                          {labs.map(lab => {
+                            const href = lab.internal_link ?? `/dashboard/labtwin/${lab.id}`
+                            const labUrl = `${origin}${href}`
+                            const diffColor = lab.difficulty === 'Dễ' ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+                                            : lab.difficulty === 'Trung bình' ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15 border-amber-500/30'
+                                            : 'text-rose-700 dark:text-rose-300 bg-rose-500/15 border-rose-500/30'
+                            return (
+                              <div key={lab.id} className="relative">
+                                {/* QR thumbnail — top-right corner */}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault(); e.stopPropagation()
+                                    openQrModal({ name: lab.name, emoji: '🐍', path: href })
+                                  }}
+                                  className="absolute top-1.5 right-1.5 p-0.5 bg-white rounded shadow-md hover:scale-110 transition-transform z-10"
+                                  title="QR cho thí nghiệm này"
+                                >
+                                  <img
+                                    src={qrThumbnailUrl(labUrl, 60)}
+                                    alt="QR"
+                                    className="w-5 h-5 object-contain"
+                                    loading="lazy"
+                                  />
+                                </button>
+                              <Link to={href}
+                                className="rounded-lg bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/40 border border-border/60 hover:border-foreground/30 p-2.5 pr-8 transition-all hover:scale-[1.02] group flex flex-col">
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <h5 className="font-bold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-purple-600 dark:group-hover:text-yellow-300">
+                                    {lab.name}
+                                  </h5>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-2 flex-1">
+                                  {lab.description}
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap text-[10px] mt-auto">
+                                  <span className={`px-1.5 py-0.5 rounded font-bold border ${diffColor}`}>
+                                    {lab.difficulty}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {lab.duration}
+                                  </span>
+                                  <span className="ml-auto text-yellow-600 dark:text-yellow-300 font-bold">
+                                    +{lab.xp} XP
+                                  </span>
+                                </div>
+                              </Link>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {/* Bottom CTA inside merged section */}
+            <div className="relative z-10 px-6 pb-6 pt-2">
+              <div className="p-4 bg-white/60 dark:bg-white/[0.04] rounded-xl border-2 border-purple-300/40 dark:border-purple-500/15">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div className="text-3xl">🎯</div>
                     <div>
-                      <h4 className="font-bold text-indigo-200">Tất cả Python Simulations</h4>
-                      <p className="text-sm text-indigo-300/60">
-                        Xem danh sách đầy đủ {PYTHON_TOTAL} thí nghiệm Python
+                      <h4 className="font-bold text-foreground">
+                        Hiển thị đầy đủ {POPULAR_LABS.length + SIMULATIONS.length} thí nghiệm
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Đã gộp: ⭐ phổ biến + 🐍 Python labs + 📱 QR vào 1 chỗ — không cần drill
                       </p>
                     </div>
                   </div>
                   <Link
-                    to="/dashboard/labtwin/labs"
-                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all"
+                    to="/dashboard/labtwin"
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-white/[0.06] text-purple-700 dark:text-indigo-300 hover:bg-purple-200 dark:hover:bg-indigo-500/20 border-2 border-purple-300 dark:border-indigo-500/20 rounded-xl font-semibold transition-all"
                   >
-                    Xem tất cả
+                    Tìm kiếm &amp; filter
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
@@ -506,13 +655,13 @@ export default function LabsIndexPage() {
               </div>
             </div>
 
-            {/* Tool cards */}
+            {/* Tool cards — auto-rows-fr + h-full flex flex-col chuẩn hoá chiều cao */}
             <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
                 {/* Graph — featured */}
                 <Link
-                  to="/dashboard/labtwin/labs/graph-lab"
-                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  to="/dashboard/labtwin/graph-lab"
+                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   <div className="absolute inset-0 opacity-[0.12] pointer-events-none">
                     <svg viewBox="0 0 200 120" preserveAspectRatio="none" className="w-full h-full">
@@ -545,7 +694,7 @@ export default function LabsIndexPage() {
                     </svg>
                   </div>
 
-                  <div className="relative z-10 p-5">
+                  <div className="relative z-10 p-5 flex flex-col flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-cyan-500/20 ring-1 ring-cyan-400/40 group-hover:scale-110 transition-transform">
                         <FunctionSquare className="h-7 w-7 text-cyan-300" />
@@ -565,18 +714,18 @@ export default function LabsIndexPage() {
                       Máy tính đồ thị kiểu GeoGebra — nhập phương trình, vẽ trực quan, kéo &amp; zoom, bàn phím toán học tích hợp.
                     </p>
 
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-4 flex-1">
                       {['Đại số', 'Hàm số', 'Lượng giác', 'Mũ & log'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-800 dark:text-cyan-100/80 border border-cyan-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-800 dark:text-cyan-100/80 border border-cyan-400/20 self-start"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
 
-                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 group-hover:from-cyan-400 group-hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 group-hover:from-cyan-400 group-hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-auto">
                       Mở Graph
                       <ArrowRight className="h-4 w-4" />
                     </div>
@@ -585,8 +734,8 @@ export default function LabsIndexPage() {
 
                 {/* AirflowCFD — featured (R3F airflow simulator) */}
                 <Link
-                  to="/dashboard/labtwin/labs/airflow-cfd"
-                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  to="/dashboard/labtwin/airflow-cfd"
+                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col h-full"
                 >
                   {/* Decorative streamlines */}
                   <div className="absolute inset-0 opacity-[0.18] pointer-events-none">
@@ -611,7 +760,7 @@ export default function LabsIndexPage() {
                     </svg>
                   </div>
 
-                  <div className="relative z-10 p-5">
+                  <div className="relative z-10 p-5 flex flex-col flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-fuchsia-500/20 ring-1 ring-fuchsia-400/40 group-hover:scale-110 transition-transform">
                         <Wind className="h-7 w-7 text-fuchsia-300" />
@@ -631,26 +780,26 @@ export default function LabsIndexPage() {
                       Mô phỏng dòng không khí qua 5 vật thể 3D — cánh máy bay, hình cầu, trụ, thân xe, rotor bơm. Có streamlines, áp suất bề mặt, đồ thị hội tụ.
                     </p>
 
-                    <div className="flex flex-wrap gap-1.5 mb-4">
+                    <div className="flex flex-wrap gap-1.5 mb-4 flex-1">
                       {['Reynolds', 'CL/CD', 'AoA', 'Streamlines'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-800 dark:text-fuchsia-100/80 border border-fuchsia-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-800 dark:text-fuchsia-100/80 border border-fuchsia-400/20 self-start"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
 
-                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 group-hover:from-fuchsia-400 group-hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 group-hover:from-fuchsia-400 group-hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-auto">
                       Mở AirflowCFD
                       <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
                 </Link>
 
-                <div className="relative rounded-2xl border-2 border-dashed border-border/60 bg-slate-900/40 overflow-hidden opacity-70">
-                  <div className="p-5 flex flex-col h-full">
+                <div className="relative rounded-2xl border-2 border-dashed border-border/60 bg-slate-900/40 overflow-hidden opacity-70 flex flex-col h-full">
+                  <div className="p-5 flex flex-col h-full flex-1">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="p-2.5 rounded-xl bg-secondary ring-1 ring-slate-700">
                         <Wrench className="h-7 w-7 text-slate-500" />
@@ -691,7 +840,7 @@ export default function LabsIndexPage() {
                   </div>
                 </div>
                 <Link
-                  to="/dashboard/labtwin/labs/graph-lab"
+                  to="/dashboard/labtwin/graph-lab"
                   className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-cyan-300 hover:bg-cyan-500/20 border-2 border-cyan-500/20 rounded-xl font-semibold transition-all"
                 >
                   Thử ngay
@@ -701,10 +850,10 @@ export default function LabsIndexPage() {
             </div>
           </div>
 
-          {/* ── Achievements + Goals ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* ── Achievements + Goals — auto-rows-fr cho cùng chiều cao ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 auto-rows-fr">
             {/* Achievements */}
-            <div className="bg-gradient-to-br from-amber-500/10 to-amber-400/5 border-2 border-amber-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-br from-amber-500/10 to-amber-400/5 border-2 border-amber-500/20 rounded-2xl overflow-hidden flex flex-col">
               <div className="px-6 py-4 border-b border-amber-500/10">
                 <h3 className="flex items-center gap-2 text-amber-200 font-bold text-lg">
                   <Award className="h-6 w-6 text-amber-400" />
@@ -731,7 +880,7 @@ export default function LabsIndexPage() {
             </div>
 
             {/* Weekly goals */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-blue-400/5 border-2 border-blue-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-500/10 to-blue-400/5 border-2 border-blue-500/20 rounded-2xl overflow-hidden flex flex-col">
               <div className="px-6 py-4 border-b border-blue-500/10">
                 <h3 className="flex items-center gap-2 text-blue-200 font-bold text-lg">
                   <TrendingUp className="h-6 w-6 text-blue-400" />
@@ -759,7 +908,7 @@ export default function LabsIndexPage() {
                 </div>
                 <div className="pt-3 border-t border-blue-500/15">
                   <Link
-                    to="/dashboard/labtwin/labs"
+                    to="/dashboard/labtwin"
                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="h-4 w-4" />
@@ -770,103 +919,47 @@ export default function LabsIndexPage() {
             </div>
           </div>
 
-          {/* ── Mã QR cho từng thí nghiệm — tiện in ra dán lớp học ── */}
-          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-[hsl(240,50%,9%)] via-[hsl(260,45%,10%)] to-[hsl(225,45%,10%)] overflow-hidden relative">
-            <div className="absolute top-0 right-0 text-[9rem] opacity-[0.05] select-none pointer-events-none leading-none">📱</div>
+          {/* ── QR section đã được INLINE vào mỗi card (xem nút QR góc trên-phải)
+              User: "đưa mã QR vào trong các card · Tối ưu không gian"
+              → Section riêng đã bỏ để tránh trùng lặp · Click QR thumbnail
+                trong card mở modal lớn để in / tải PNG. */}
 
-            <div className="relative z-10 px-6 pt-6 pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-indigo-100 flex items-center gap-2">
-                    <QrCode className="h-7 w-7 text-indigo-300" />
-                    Mã QR cho từng thí nghiệm
-                  </h2>
-                  <p className="text-base mt-1.5 text-indigo-300/70">
-                    Dành cho giáo viên — nhấn "Tải PNG" rồi in ra dán lớp, học sinh quét là vào thẳng đúng thí nghiệm.
-                  </p>
-                </div>
-                <Link
-                  to="/dashboard/labtwin/labs"
-                  className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all text-sm"
-                >
-                  Xem tất cả labs
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative z-10 px-6 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {POPULAR_LABS.map((lab) => {
-                  const url = `${origin}${lab.path}`
-                  const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(url)}`
-                  const qrHires = `https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&margin=8&data=${encodeURIComponent(url)}`
-                  return (
-                    <div
-                      key={lab.path}
-                      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] transition-all p-4 flex flex-col items-center text-center"
-                    >
-                      <div className="p-2 bg-white rounded-xl mb-3 shadow-[0_0_24px_rgba(99,102,241,0.18)]">
-                        <img src={qrImg} alt={`QR ${lab.name}`} className="w-28 h-28 object-contain" loading="lazy" />
-                      </div>
-                      <div className="text-2xl mb-1">{lab.emoji}</div>
-                      <h4 className="text-sm font-bold text-white/90 mb-0.5 line-clamp-1">{lab.name}</h4>
-                      <p className="text-[11px] text-white/45 leading-snug mb-3 line-clamp-2 min-h-[28px]">
-                        {lab.desc}
-                      </p>
-                      <div className="flex items-center gap-1.5 w-full">
-                        <Link
-                          to={lab.path}
-                          className="flex-1 text-center text-[11px] font-semibold px-2 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-400/30 text-indigo-200 hover:bg-indigo-500/25 transition-all"
-                        >
-                          Mở
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => downloadQrImage(qrHires, `qr-${lab.path.split('/').pop()}.png`)}
-                          className="text-[11px] font-medium px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white/70 hover:bg-white/[0.1] transition-all"
-                          title="Tải QR độ phân giải cao"
-                        >
-                          Tải PNG
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="mt-5 p-3 bg-indigo-500/5 border border-indigo-500/15 rounded-xl flex items-start gap-3">
-                <div className="text-2xl shrink-0">💡</div>
-                <p className="text-xs text-indigo-200/70 leading-relaxed">
-                  <span className="font-semibold text-indigo-100">Mẹo:</span> Tải PNG rồi in khổ A5 dán vào bàn thí nghiệm /
-                  bảng lớp. Học sinh quét bằng app Camera (iOS) hoặc Google Lens (Android) để vào thẳng thí nghiệm mà
-                  không cần đăng nhập. URL được sinh tự động theo domain hiện tại của trang — phù hợp cả staging lẫn production.
-                </p>
-              </div>
-            </div>
+          {/* QR usage tip — compact strip */}
+          <div className="mb-6 p-3 bg-indigo-500/5 border border-indigo-500/15 rounded-xl flex items-start gap-3">
+            <QrCode className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
+            <p className="text-xs text-indigo-200/80 leading-relaxed">
+              <span className="font-semibold text-indigo-100">QR trên mỗi card</span>:
+              Click vào thumbnail QR góc trên-phải để mở modal lớn → "Tải PNG" in khổ A5
+              dán bàn thí nghiệm. HS quét bằng Camera (iOS) hoặc Google Lens (Android) → vào thẳng lab.
+            </p>
           </div>
 
-          {/* ── CTA Banner ── */}
+          {/* ── CTA Banner — compact ── */}
           <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="p-8 text-center">
-              <div className="text-6xl mb-4">🎓✨</div>
-              <h2 className="text-3xl font-bold mb-3">Sẵn sàng khám phá khoa học?</h2>
-              <p className="text-xl mb-6 text-white/90">
-                Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! Mỗi thí nghiệm là một cuộc phiêu lưu mới! 🚀
+            <div className="p-5 md:p-6 text-center">
+              <div className="text-4xl mb-2">🎓✨</div>
+              <h2 className="text-xl md:text-2xl font-bold mb-2">Sẵn sàng khám phá khoa học?</h2>
+              <p className="text-base mb-4 text-white/90">
+                Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! 🚀
               </p>
               <Link
-                to="/dashboard/labtwin/labs"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-white text-purple-600 hover:bg-gray-100 font-bold text-lg rounded-xl shadow-xl transition-all hover:scale-105"
+                to="/dashboard/labtwin"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-purple-600 hover:bg-gray-100 font-bold text-sm rounded-xl shadow-xl transition-all hover:scale-105"
               >
-                <FlaskConical className="h-6 w-6" />
+                <FlaskConical className="h-4 w-4" />
                 Khám phá ngay!
-                <ArrowRight className="h-6 w-6" />
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* QR modal — hiển thị khi click QR thumbnail trong card */}
+      {qrModal && (
+        <QrModal state={qrModal} onClose={() => setQrModal(null)} onDownload={downloadCurrentQr} />
+      )}
     </div>
   )
 }

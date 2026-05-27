@@ -1,6 +1,6 @@
 {
   "name": "@aeroedu/mcp-hub",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "AeroEdu MCP server — Claude/Cursor thao tác trực tiếp với inphysic.com qua Model Context Protocol",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,8 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "pack:release": "bash scripts/pack-release.sh"
   },
   "keywords": [
     "mcp",

@@ -224,7 +224,7 @@ export default function NextJsFallback() {
             ].map(({ slug, label }) => (
               <Link
                 key={slug}
-                to={`/dashboard/labtwin/labs/${slug}`}
+                to={`/dashboard/labtwin/${slug}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   slug === labSlug
                     ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 cursor-default'

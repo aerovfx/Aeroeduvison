@@ -75,7 +75,10 @@ export class AeroEduApiClient {
       401,
     );
 
-    // Exchange API key for JWT
+    // Exchange API key → JWT. Server mint JWT signed bằng JWT_SECRET,
+    // có claims { sub, userId, role, email, src:'api-key', keyId }.
+    // Cache JWT trong this.jwt → các request sau dùng JWT làm Bearer
+    // (vì _akVerify() server-side chỉ accept JWT, KHÔNG accept raw AERO-xxx).
     const url = `${this.baseUrl}/api/auth/validate-key`;
     const { statusCode, body } = await request(url, {
       method: "POST",
@@ -86,15 +89,23 @@ export class AeroEduApiClient {
     });
     const text = await body.text();
     if (statusCode !== 200) {
-      throw new ApiError(`API key không hợp lệ hoặc đã bị thu hồi. Tạo key mới tại https://inphysic.com/teacher/api-keys`, statusCode);
+      throw new ApiError(
+        `API key không hợp lệ hoặc đã bị thu hồi.\n` +
+        `→ Tạo key mới: https://inphysic.com/teacher/api-keys\n` +
+        `→ Update env AEROEDU_API_KEY trong claude_desktop_config.json`,
+        statusCode,
+      );
     }
-    const data = JSON.parse(text) as { ok: boolean; userId?: string };
-    if (!data.ok) throw new ApiError("API key validation failed", 401);
-    // Generate a JWT for this session — server validates key, returns userId/role
-    // We use the raw API key as Bearer (server accepts both JWT and AERO- keys at /api/auth/me)
-    // Simpler: just use API key directly in Authorization header, server handles it
-    this.jwt = this.apiKey; // server's /api/auth/me also accepts AERO- keys after validate
-    return this.apiKey;
+    const data = JSON.parse(text) as { ok: boolean; jwt?: string; userId?: string };
+    if (!data.ok || !data.jwt) {
+      throw new ApiError(
+        "Server xác thực key thành công nhưng không trả JWT. " +
+        "Có thể server đã cũ — admin cần redeploy phiên bản mới.",
+        500,
+      );
+    }
+    this.jwt = data.jwt;  // cache JWT cho mọi request sau (90 ngày TTL)
+    return data.jwt;
   }
 
   async get<T = unknown>(path: string, query?: Record<string, string | number | boolean>): Promise<T> {

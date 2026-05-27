@@ -14,7 +14,7 @@
  */
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 import {
-  Zap, Plus, Trash2, Save, Play, RotateCw, MousePointer,
+  Zap, Plus, Trash2, Save, Play, Pause, RotateCw, MousePointer,
   Cable, FolderOpen, BookOpen, AlertTriangle, CheckCircle2,
   XCircle, Lightbulb, ChevronDown,
   FlaskConical, LineChart,
@@ -1211,6 +1211,15 @@ function AnalogCircuitBuilderInner(
   const [wireStart, setWireStart]   = useState<{ componentId: string; terminal: 'a' | 'b' } | null>(null)
   const [mode, setMode]             = useState<Mode>('select')
   const [simResult, setSimResult]   = useState<SimResult | null>(null)
+  // User: "nút tắt mở giả lập cần hoạt động tốt hơn"
+  // Continuous simulation toggle — khi ON, tự re-simulate mỗi khi mạch đổi
+  const [simRunning, setSimRunning] = useState<boolean>(() => {
+    try { return localStorage.getItem('analogCircuit:simRunning') !== 'false' }
+    catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('analogCircuit:simRunning', String(simRunning)) } catch { /* ignore */ }
+  }, [simRunning])
   const [showTemplates, setShowTemplates] = useState(false)
   const [showSavedDialog, setShowSavedDialog] = useState(false)
   const [savedList, setSavedList]   = useState<SavedCircuit[]>([])
@@ -1501,6 +1510,19 @@ function AnalogCircuitBuilderInner(
     setSimResult(r)
   }
 
+  // Auto re-simulate khi simRunning + mạch thay đổi (debounce 80ms)
+  // → User vừa nối dây hoặc đổi giá trị, kết quả tự cập nhật ngay
+  useEffect(() => {
+    if (!simRunning) return
+    const tid = setTimeout(() => {
+      if (components.length > 0) {
+        const r = simulate(components, wires)
+        setSimResult(r)
+      }
+    }, 80)
+    return () => clearTimeout(tid)
+  }, [components, wires, simRunning])
+
   // ─── Clear all ───────────────────────────────────────────────────
 
   const clearAll = () => {
@@ -1668,12 +1690,50 @@ function AnalogCircuitBuilderInner(
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button
-            onClick={runSim}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:scale-[1.02] transition-transform shadow shadow-emerald-500/30"
-          >
-            <Play className="w-3.5 h-3.5" /> Mô phỏng
-          </button>
+          {/* Sim toggle + manual run — user yêu cầu "nút tắt mở giả lập tốt hơn" */}
+          <div className="inline-flex items-center gap-1">
+            <button
+              onClick={() => {
+                setSimRunning(r => !r)
+                if (!simRunning) runSim()
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-transform hover:scale-[1.02] shadow ${
+                simRunning
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-emerald-500/30'
+                  : 'bg-zinc-700 text-zinc-300 border border-zinc-600'
+              }`}
+              title={simRunning ? 'Đang chạy — bấm để TẮT giả lập' : 'Đang tắt — bấm để BẬT'}>
+              {simRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {simRunning ? 'Đang chạy' : 'Bật giả lập'}
+              {simRunning && (
+                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse" />
+              )}
+            </button>
+            <button
+              onClick={runSim}
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-emerald-200 hover:bg-zinc-700 border border-border transition"
+              title="Chạy lại 1 lần (manual refresh)">
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+            {/* User: "sau khi ghép thủ công xong thì có nút lưu thành 1 mạch cụ thể"
+                Prominent save button — hiện khi đã có components, nổi bật ở top bar */}
+            {components.length > 0 && (
+              <button
+                onClick={saveCircuit}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:scale-[1.02] transition-transform shadow shadow-amber-500/30"
+                title="Lưu mạch hiện tại với tên để tái sử dụng">
+                <Save className="w-3.5 h-3.5" /> Lưu thành mạch
+              </button>
+            )}
+            {components.length > 0 && savedList.length > 0 && (
+              <button
+                onClick={() => setShowSavedDialog(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 text-amber-300 hover:bg-zinc-700 border border-amber-500/30 transition"
+                title={`${savedList.length} mạch đã lưu — click để mở`}>
+                <FolderOpen className="w-3.5 h-3.5" /> {savedList.length}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1810,6 +1870,87 @@ function AnalogCircuitBuilderInner(
                 </g>
               )}
 
+              {/* ── READING LABELS — render BEFORE wires để dây luôn nằm trên
+                   User: "fix lỗi mạch điện các dây nối không hiển thị"
+                   Order: labels (background) → wires → components → terminals
+                   → dây không bao giờ bị che bởi label rectangle */}
+              {simResult?.ok && simResult.current != null && components.map(c => {
+                const g = GEOM[c.type]
+                const I = simResult.current ?? 0
+                const ledState = simResult.ledStates[c.id] ?? 'off'
+                let primary = ''
+                let secondary = ''
+                let labelColor = '#22d3ee'
+                if (c.type === 'resistor' && c.value) {
+                  const Vdrop = I * c.value
+                  primary = `U = ${Vdrop.toFixed(2)} V`
+                  secondary = `I = ${(I * 1000).toFixed(1)} mA · R = ${c.value}Ω`
+                  labelColor = '#fbbf24'
+                } else if (c.type === 'ammeter') {
+                  const meter = simResult.meterReadings?.[c.id] ?? I
+                  primary = `${(meter * 1000).toFixed(1)} mA`
+                  secondary = `${meter.toFixed(4)} A`
+                  labelColor = '#34d399'
+                } else if (c.type === 'voltmeter') {
+                  const V = simResult.meterReadings?.[c.id] ?? 0
+                  primary = `${V.toFixed(2)} V`
+                  secondary = 'Vôn kế'
+                  labelColor = '#a78bfa'
+                } else if (c.type === 'battery_9v' || c.type === 'battery_aa' || c.type === 'emf_cell') {
+                  const emf = c.value ?? 9
+                  primary = `ξ = ${emf} V`
+                  secondary = `I = ${(I * 1000).toFixed(1)} mA`
+                  labelColor = '#f97316'
+                } else if (c.type.startsWith('led_')) {
+                  primary = ledState === 'on' ? `${(I * 1000).toFixed(1)} mA · ON` : ledState === 'burnt' ? '🔥 CHÁY!' : 'OFF'
+                  secondary = ledState === 'burnt' ? 'I > 30 mA' : ledState === 'on' ? 'Sáng' : 'Quá thấp'
+                  labelColor = ledState === 'burnt' ? '#ef4444' : ledState === 'on' ? '#fbbf24' : '#71717a'
+                } else if (c.type === 'switch') {
+                  primary = c.on ? 'ĐÓNG' : 'MỞ'
+                  secondary = c.on ? 'Cho dòng đi qua' : 'Hở mạch'
+                  labelColor = c.on ? '#34d399' : '#ef4444'
+                }
+                if (!primary) return null
+                const labelX = c.x + g.w / 2
+                const labelY = c.y + g.h + 4
+                return (
+                  <g key={`lbl-${c.id}`} style={{ pointerEvents: 'none' }}>
+                    {/* Translucent rect — dây hoặc waypoint sau này render LÊN TRÊN */}
+                    <rect
+                      x={labelX - 50}
+                      y={labelY}
+                      width={100}
+                      height={secondary ? 26 : 14}
+                      rx={3}
+                      fill="rgba(0,0,0,0.65)"
+                      stroke={labelColor}
+                      strokeWidth={0.6}
+                    />
+                    <text
+                      x={labelX}
+                      y={labelY + 10}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontWeight="bold"
+                      fontFamily="ui-monospace, monospace"
+                      fill={labelColor}>
+                      {primary}
+                    </text>
+                    {secondary && (
+                      <text
+                        x={labelX}
+                        y={labelY + 21}
+                        textAnchor="middle"
+                        fontSize={7}
+                        fontFamily="ui-monospace, monospace"
+                        fill="rgba(255,255,255,0.75)">
+                        {secondary}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+
               {/* Wires — Manhattan routing với waypoints draggable */}
               {wires.map(w => {
                 const fromComp = components.find(c => c.id === w.fromId)
@@ -1939,6 +2080,10 @@ function AnalogCircuitBuilderInner(
                         reading={simResult?.meterReadings?.[c.id]}
                       />
                     </g>
+
+                    {/* Inline reading label cho TẤT CẢ component khi simulating
+                        User: "thêm các chỉ số của điện trở, ampe kế..." */}
+                    {/* Reading labels moved to separate pass below — tránh che dây nối */}
 
                     {/* Terminals (in absolute coords so they're not rotated visually) */}
                     {['a', 'b'].map(term => {

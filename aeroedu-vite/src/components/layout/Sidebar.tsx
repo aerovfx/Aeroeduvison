@@ -85,7 +85,7 @@ const studentSections: RouteSection[] = [
     routes: [
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab', badge: 'Mới' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
-      { icon: Atom,           labelKey: 'routePeriodicTable', href: '/dashboard/labtwin/labs/periodic-table', badge: 'Hoá' },
+      { icon: Atom,           labelKey: 'routePeriodicTable', href: '/dashboard/periodic-table', badge: 'Hoá' },
       { icon: Gamepad2,       labelKey: 'routeGames',   href: '/dashboard/games',     badge: 'Game' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
@@ -182,7 +182,7 @@ const teacherSections: RouteSection[] = [
     routes: [
       { icon: FlaskConical,   labelKey: 'routeLabTwin',        href: '/dashboard/labtwin',          badge: 'Lab' },
       { icon: Sparkles,       labelKey: 'routeAura',           href: '/dashboard/aura',             badge: '3D' },
-      { icon: Atom,           labelKey: 'routePeriodicTable',  href: '/dashboard/labtwin/labs/periodic-table', badge: 'Hoá' },
+      { icon: Atom,           labelKey: 'routePeriodicTable',  href: '/dashboard/periodic-table', badge: 'Hoá' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit',        href: '/dashboard/iot-lab',          badge: 'IoT' },
       { icon: FunctionSquare, labelKey: 'routeGraph',          href: '/dashboard/graph-lab' },
       { icon: Zap,            labelKey: 'routeStem',           href: '/dashboard/stem' },

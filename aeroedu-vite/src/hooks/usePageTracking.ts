@@ -31,6 +31,26 @@ function getSessionId(): string {
   return sid
 }
 
+// ── YouTube-style demographics — gửi 1 lần per session để BE log device/browser/lang ──
+// Sau khi BE parse User-Agent + Geo headers + body screen → đủ data cho
+// /admin/analytics/audience phân tích device/OS/browser/country/screen/timezone.
+function getDemographics() {
+  try {
+    return {
+      screen: {
+        w: typeof window !== 'undefined' && window.screen ? window.screen.width  : null,
+        h: typeof window !== 'undefined' && window.screen ? window.screen.height : null,
+      },
+      lang: typeof navigator !== 'undefined' ? navigator.language : null,
+      tz: typeof Intl !== 'undefined'
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : null,
+    }
+  } catch {
+    return {}
+  }
+}
+
 function sendBeacon(payload: Record<string, unknown>) {
   try {
     const body = JSON.stringify(payload)
@@ -87,12 +107,15 @@ export function usePageTracking() {
 
     // 2. Send ENTRY trang mới (qua axios để có Authorization header)
     if (currentPath !== prevPathRef.current) {
+      const demo = getDemographics()
       // Dynamic import api để tránh circular dep với services/api.ts
       import('@/services/api').then(({ api }) => {
         api.post(ENDPOINT_AXIOS, {
           path: currentPath,
           referrer: prevPathRef.current || prevReferrerRef.current,
           sessionId,
+          // YouTube-style demographics — BE parse + lưu vào PageView
+          ...demo,
         }).catch(() => { /* silent — analytics không được fail UX */ })
       }).catch(() => {})
     }
@@ -119,4 +142,56 @@ export function usePageTracking() {
     })
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
+
+  // ── Heartbeat: ping mỗi 30s khi tab visible ─────────────────────
+  // User: "có 2 tài khoản đang login là vietchung và admin nhưng trong
+  // trang phân tích của admin không hiển thị được thông số đó"
+  //
+  // VẤN ĐỀ: PageView chỉ ghi khi navigate. User để tab idle 5 phút sẽ
+  // rớt khỏi cửa sổ realtime → admin thấy 0 dù user vẫn online.
+  //
+  // FIX: ping POST /api/analytics/heartbeat mỗi 30s (chỉ khi tab visible
+  // + đã login). BE insert PageView path='__heartbeat__' (loại khỏi byPath/
+  // recent, chỉ tính vào active count).
+  useEffect(() => {
+    let timerId: number | null = null
+
+    const ping = () => {
+      // Chỉ ping khi tab visible
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const token = sessionStorage.getItem('aeroedu_access_token')
+      // Chỉ ping cho user đã login (anonymous đã có PageView khi navigate)
+      if (!token) return
+      try {
+        fetch('/api/analytics/heartbeat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            sessionId: getSessionId(),
+            path: location.pathname + location.search,
+          }),
+          keepalive: true,
+          credentials: 'include',
+        }).catch(() => { /* silent — analytics không fail UX */ })
+      } catch { /* never throw */ }
+    }
+
+    // Ping ngay khi mount + sau đó mỗi 30s
+    ping()
+    timerId = window.setInterval(ping, 30_000)
+
+    // Ping khi tab visible trở lại (user switch tab về)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVis)
+
+    return () => {
+      if (timerId != null) window.clearInterval(timerId)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [location.pathname, location.search])
 }

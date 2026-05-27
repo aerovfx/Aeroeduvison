@@ -7,7 +7,7 @@ import {
   Loader2, FileText, Timer, Globe, Lock, LogIn,
   BookOpen, CheckCircle2, AlertTriangle, CalendarClock,
   Zap, ChevronDown, ChevronUp, CalendarPlus, Pencil, Save, X,
-  Trophy, Medal, Crown,
+  Trophy, Medal, Crown, RotateCcw, Sparkles,
 } from "lucide-react"
 import toast from "react-hot-toast"
 
@@ -81,6 +81,50 @@ const statusLabel = (s: string) =>
 
 // ── Time-phase helpers (past / ongoing / upcoming) ─────────────
 type TimePhase = 'upcoming' | 'ongoing' | 'past' | 'unscheduled'
+
+// User: "bố trí các đề thi theo các phòng là các khối lớp và phòng thi
+// Tốt nghiệp, Học sinh giỏi" — phân loại room theo mục đích thi.
+type RoomCategory = 'tn' | 'hsg' | 'olympic' | 'midterm' | 'final' | 'practice' | 'other'
+
+const CATEGORY_META: Record<RoomCategory, { label: string; emoji: string; color: string; bg: string; border: string }> = {
+  tn:       { label: 'Tốt nghiệp THPT',  emoji: '🎓', color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
+  hsg:      { label: 'Học sinh giỏi',    emoji: '🏆', color: '#a78bfa', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.35)' },
+  olympic:  { label: 'Olympic / Trại hè', emoji: '⭐', color: '#f472b6', bg: 'rgba(236,72,153,0.12)', border: 'rgba(236,72,153,0.35)' },
+  midterm:  { label: 'Giữa kỳ',          emoji: '📝', color: '#60a5fa', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)' },
+  final:    { label: 'Cuối kỳ',          emoji: '📋', color: '#34d399', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
+  practice: { label: 'Luyện tập',        emoji: '🎯', color: '#22d3ee', bg: 'rgba(6,182,212,0.12)', border: 'rgba(6,182,212,0.35)' },
+  other:    { label: 'Khác',             emoji: '📚', color: '#94a3b8', bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.35)' },
+}
+
+// Detect category từ room name + ExamMatrix.examType (regex Vietnamese-aware)
+function detectRoomCategory(room: ExamRoom): RoomCategory {
+  const text = `${room.name || ''} ${room.description || ''} ${room.ExamMatrix?.name || ''} ${room.ExamMatrix?.examType || ''}`.toLowerCase()
+  // Order matters — most specific first
+  if (/(tốt nghiệp|thpt qg|thptqg|tnthpt|tn thpt|tuyển sinh đại học)/i.test(text)) return 'tn'
+  if (/(học sinh giỏi|hsg|giỏi quốc gia|giỏi cấp tỉnh|giỏi cấp thành|giỏi cấp huyện)/i.test(text)) return 'hsg'
+  if (/(olympic|trại hè|trại đông|đề chọn đội tuyển)/i.test(text)) return 'olympic'
+  if (/(giữa kỳ|giữa kì|giua ky|giữa học kỳ|đề giữa|midterm)/i.test(text)) return 'midterm'
+  if (/(cuối kỳ|cuối kì|cuoi ky|cuối học kỳ|đề cuối|final|hết môn)/i.test(text)) return 'final'
+  if (/(luyện tập|luyen tap|kiểm tra 15 phút|đề ôn|on tap|practice|review)/i.test(text)) return 'practice'
+  return 'other'
+}
+
+// Detect grade — vd "Lớp 11", "Khối 12", "K10", "11A1" → "10"/"11"/"12"
+function detectRoomGrade(room: ExamRoom): string | null {
+  const matrixGrade = room.ExamMatrix?.grade
+  if (matrixGrade) {
+    const m = String(matrixGrade).match(/(\d{1,2})/)
+    if (m) return m[1]
+  }
+  const text = `${room.name || ''} ${room.description || ''}`
+  // Match patterns: "Lớp 11", "Khối 11", "K11", "lớp 11A1"
+  const m = text.match(/(?:lớp|khối|k)\s*(\d{1,2})/i)
+  if (m) return m[1]
+  // Match bare 10/11/12 (chỉ khi đứng riêng)
+  const m2 = text.match(/\b(10|11|12)\b/)
+  if (m2) return m2[1]
+  return null
+}
 
 function getTimePhase(startISO?: string, endISO?: string, now: number = Date.now()): TimePhase {
   if (!startISO || !endISO) return 'unscheduled'
@@ -167,6 +211,10 @@ export default function OnlineExamRoomPage() {
   // Filter theo THỜI GIAN (tính từ startTime/endTime so với now):
   //   'all' | 'upcoming' (sẽ thi) | 'ongoing' (đang thi) | 'past' (đã thi)
   const [phaseFilter, setPhaseFilter] = useState<'all' | TimePhase>('all')
+  // User: "bố trí các đề thi theo các phòng là các khối lớp và phòng thi
+  // Tốt nghiệp, Học sinh giỏi" → tab category + chip grade
+  const [categoryFilter, setCategoryFilter] = useState<RoomCategory | 'all'>('all')
+  const [gradeFilter, setGradeFilter] = useState<string | 'all'>('all')
   // Tick mỗi 30s để countdown trên UI tự cập nhật mà không cần reload
   const [nowTick, setNowTick] = useState(Date.now())
 
@@ -482,6 +530,8 @@ export default function OnlineExamRoomPage() {
     .filter(r => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false
       if (phaseFilter !== "all" && getTimePhase(r.startTime, r.endTime, nowTick) !== phaseFilter) return false
+      if (categoryFilter !== "all" && detectRoomCategory(r) !== categoryFilter) return false
+      if (gradeFilter !== "all" && detectRoomGrade(r) !== gradeFilter) return false
       if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
       return true
     })
@@ -795,6 +845,99 @@ export default function OnlineExamRoomPage() {
           {/* Left col */}
           <div className="col-span-12 lg:col-span-8 space-y-4">
 
+            {/* ── Category tabs (Tốt nghiệp / HSG / Olympic / Giữa kỳ / ...) ── */}
+            <div className="rounded-xl p-2" style={{ background: D.card2, border: `1px solid ${D.border}` }}>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: D.muted }}>
+                  📂 Loại phòng:
+                </span>
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className="text-[11px] px-2.5 py-1 rounded-full font-bold transition-all"
+                  style={{
+                    background: categoryFilter === 'all' ? D.purple : 'transparent',
+                    color: categoryFilter === 'all' ? '#fff' : D.muted,
+                    border: `1px solid ${categoryFilter === 'all' ? D.purple : D.border}`,
+                  }}
+                >
+                  Tất cả ({rooms.length})
+                </button>
+                {(['tn', 'hsg', 'olympic', 'midterm', 'final', 'practice', 'other'] as RoomCategory[]).map(cat => {
+                  const meta = CATEGORY_META[cat]
+                  const count = rooms.filter(r => detectRoomCategory(r) === cat).length
+                  if (count === 0 && categoryFilter !== cat) return null
+                  const sel = categoryFilter === cat
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(sel ? 'all' : cat)}
+                      className="text-[11px] px-2.5 py-1 rounded-full font-bold transition-all flex items-center gap-1"
+                      style={{
+                        background: sel ? meta.bg : 'transparent',
+                        color: sel ? meta.color : D.muted,
+                        border: `1px solid ${sel ? meta.border : D.border}`,
+                      }}
+                    >
+                      <span>{meta.emoji}</span>
+                      {meta.label}
+                      {count > 0 && (
+                        <span className="ml-0.5 px-1 rounded text-[9px] font-bold"
+                          style={{ background: sel ? meta.color + '22' : 'rgba(255,255,255,0.05)' }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Grade chips */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: D.muted }}>
+                  🎒 Khối lớp:
+                </span>
+                <button
+                  onClick={() => setGradeFilter('all')}
+                  className="text-[11px] px-2 py-0.5 rounded-md font-bold"
+                  style={{
+                    background: gradeFilter === 'all' ? D.purple : 'transparent',
+                    color: gradeFilter === 'all' ? '#fff' : D.muted,
+                    border: `1px solid ${gradeFilter === 'all' ? D.purple : D.border}`,
+                  }}
+                >
+                  Tất cả
+                </button>
+                {['6','7','8','9','10','11','12'].map(g => {
+                  const count = rooms.filter(r => detectRoomGrade(r) === g).length
+                  if (count === 0) return null
+                  const sel = gradeFilter === g
+                  return (
+                    <button
+                      key={g}
+                      onClick={() => setGradeFilter(sel ? 'all' : g)}
+                      className="text-[11px] px-2 py-0.5 rounded-md font-bold transition-all"
+                      style={{
+                        background: sel ? 'rgba(124,58,237,0.2)' : 'transparent',
+                        color: sel ? '#c4b5fd' : D.muted,
+                        border: `1px solid ${sel ? D.purple : D.border}`,
+                      }}
+                    >
+                      K{g} <span className="text-[9px] opacity-60">({count})</span>
+                    </button>
+                  )
+                })}
+                {(categoryFilter !== 'all' || gradeFilter !== 'all') && (
+                  <button
+                    onClick={() => { setCategoryFilter('all'); setGradeFilter('all') }}
+                    className="text-[10px] px-2 py-0.5 ml-auto"
+                    style={{ color: D.muted2 }}
+                  >
+                    ✕ Bỏ filter
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* ── Time-phase tabs (Sắp diễn ra / Đang diễn ra / Đã thi) ── */}
             <div className="flex items-center gap-1 flex-wrap rounded-xl p-1"
               style={{ background: D.card2, border: `1px solid ${D.border}` }}>
@@ -940,6 +1083,27 @@ export default function OnlineExamRoomPage() {
                             : <Lock className="w-3.5 h-3.5 shrink-0" style={{ color: '#a78bfa' }} />
                           }
                           <h3 className="font-semibold truncate" style={{ color: D.text }}>{room.name}</h3>
+                          {/* Category + Grade badge — phân loại phòng thi */}
+                          {(() => {
+                            const cat = detectRoomCategory(room)
+                            const grade = detectRoomGrade(room)
+                            const meta = CATEGORY_META[cat]
+                            return (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                  style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                                  <span>{meta.emoji}</span>
+                                  {meta.label}
+                                </span>
+                                {grade && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                    style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.3)' }}>
+                                    K{grade}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          })()}
                           <StatusBadge status={room.status} />
                           {/* Time-phase badge với countdown */}
                           {phase !== 'unscheduled' && (
@@ -1420,9 +1584,398 @@ export default function OnlineExamRoomPage() {
               </div>
             )}
 
+            {/* ── AI Weekly Exams — đề trắc nghiệm tự sinh theo tuần ── */}
+            {selected && <AiWeeklyExamsPanel room={selected} />}
+
+            {/* ── Per-room Leaderboard (vinh danh top thí sinh trong phòng) ── */}
+            {selected && <RoomLeaderboard roomId={selected.id} roomName={selected.name} />}
+
           </div>{/* /right col */}
         </div>{/* /grid */}
       </div>{/* /main */}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// AiWeeklyExamsPanel — đề trắc nghiệm AI tự sinh theo tuần cho phòng thi
+// User: "AI tạo tự động đề thi trắc nghiệm từ các câu hỏi trong ngân hàng
+// theo đúng chủ đề và nội dung tương đương phòng thi theo mỗi tuần.
+// Ngoài các đề thi do giáo viên tạo ra."
+//
+// BE auto-generate mỗi 1h (setInterval), nhưng GV có thể bấm "Tạo ngay"
+// để force generate đề cho tuần hiện tại nếu chưa có.
+// ──────────────────────────────────────────────────────────────────
+interface AiExamItem {
+  id: string
+  title: string
+  description: string
+  subject: string
+  grade: string
+  duration_min: number
+  total_points: number
+  status: string
+  week_tag: string
+  qcount: number
+  created_at: string
+  ai_metadata?: {
+    category?: string
+    sourceQuestionsCount?: number
+    profile?: Record<string, number>
+  }
+}
+
+function AiWeeklyExamsPanel({ room }: { room: ExamRoom }) {
+  const [items, setItems] = useState<AiExamItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<{ items: AiExamItem[] }>(`/teacher/exam-rooms/${room.id}/ai-exams`)
+      .then(r => setItems(r.data.items || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [room.id, refreshKey])
+
+  const handleGenerate = async () => {
+    if (generating) return
+    setGenerating(true)
+    try {
+      const { data } = await api.post<{ ok: boolean; created?: boolean; reason?: string; subject?: string; grade?: string; weekTag?: string }>(
+        `/teacher/exam-rooms/${room.id}/ai-generate-weekly`
+      )
+      if (data.created) {
+        toast.success(`✅ Đã tạo đề AI cho ${data.subject} ${data.grade} · ${data.weekTag}`)
+      } else if (data.reason === 'already_exists') {
+        toast(`Đề AI tuần này đã có sẵn — hiển thị ở dưới`, { icon: 'ℹ️' })
+      } else {
+        toast.error(`Không tạo được đề: ${data.reason}`)
+      }
+      setRefreshKey(k => k + 1)
+    } catch (e) {
+      const msg = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (e as { message?: string })?.message || 'Lỗi'
+      toast.error(`Lỗi tạo đề AI: ${msg}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Auto-fetch thường xuyên hơn nếu chưa có đề tuần này (BE đang generate background)
+  const thisWeekItem = items.find(it => {
+    const now = new Date()
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    const weekNo = Math.ceil((((+d - +yearStart) / 86400000) + 1) / 7)
+    const thisTag = `W${String(weekNo).padStart(2, '0')}-${d.getUTCFullYear()}`
+    return it.week_tag === thisTag
+  })
+
+  return (
+    <div className="rounded-xl p-5 space-y-3"
+      style={{ background: D.card, border: '1px solid rgba(168,85,247,0.4)', borderRadius: 12 }}>
+      <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: '#c084fc' }} />
+          <span className="font-bold text-sm" style={{ color: D.text }}>Đề AI tuần này</span>
+          {items.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc' }}>
+              {items.length} đề
+            </span>
+          )}
+          {thisWeekItem && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>
+              ✓ Có tuần này
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleGenerate() }}
+            disabled={generating}
+            className="px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 disabled:opacity-50"
+            style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)' }}
+            title="Tạo đề AI cho tuần hiện tại"
+          >
+            {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {generating ? 'Đang tạo…' : 'Tạo ngay'}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1) }}
+            className="p-1 rounded hover:bg-white/5"
+            title="Refresh"
+          >
+            <RotateCcw className="w-3 h-3" style={{ color: D.muted }} />
+          </button>
+          {collapsed
+            ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} />
+            : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {!collapsed && (
+        <>
+          <p className="text-[11px]" style={{ color: D.muted2 }}>
+            AI tự sinh đề trắc nghiệm từ Ngân hàng câu hỏi mỗi tuần — theo chủ đề + khối lớp tương đương phòng thi.
+            Đây là đề BỔ SUNG, không thay thế đề do giáo viên tạo.
+          </p>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#c084fc' }} />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-6 px-2 rounded-lg"
+              style={{ background: 'rgba(168,85,247,0.05)', border: '1px dashed rgba(168,85,247,0.3)' }}>
+              <Sparkles className="w-8 h-8 mx-auto mb-2" style={{ color: 'rgba(168,85,247,0.4)' }} />
+              <p className="text-xs font-bold" style={{ color: D.text }}>
+                Chưa có đề AI cho phòng này
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: D.muted2 }}>
+                AI sẽ tự tạo trong vòng 1 giờ — hoặc bấm "Tạo ngay" để có ngay
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {items.map(it => {
+                const isThisWeek = thisWeekItem?.id === it.id
+                return (
+                  <div key={it.id}
+                    className="rounded-lg p-2.5 flex items-start gap-2"
+                    style={{
+                      background: isThisWeek ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${isThisWeek ? 'rgba(168,85,247,0.35)' : D.border}`,
+                    }}>
+                    <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#c084fc' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-bold text-xs truncate" style={{ color: D.text }}>
+                          {it.title}
+                        </p>
+                        {isThisWeek && (
+                          <span className="px-1 py-0.5 rounded text-[8px] font-bold"
+                            style={{ background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>
+                            TUẦN NÀY
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px]" style={{ color: D.muted }}>
+                        <span>📝 {it.qcount} câu</span>
+                        <span>⏱ {it.duration_min}p</span>
+                        <span className="font-mono">{it.week_tag}</span>
+                        {it.ai_metadata?.category && (
+                          <span className="px-1 rounded" style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc' }}>
+                            {it.ai_metadata.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <a
+                      href={`/teacher/exams/${it.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2 py-1 rounded text-[10px] font-bold hover:opacity-80"
+                      style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc' }}
+                    >
+                      Xem
+                    </a>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// RoomLeaderboard — Bảng vinh danh top thí sinh CHO 1 PHÒNG THI
+// User: "tại mỗi phòng đều có bảng vinh danh leadboard riêng cho các vị trí top"
+// ──────────────────────────────────────────────────────────────────
+interface RoomLbEntry {
+  rank: number
+  studentId: string
+  studentName: string
+  studentImage: string | null
+  score: number
+  totalQuestions: number
+  percentage: number
+  durationSec: number | null
+  completedAt: string
+}
+
+function RoomLeaderboard({ roomId, roomName }: { roomId: string; roomName: string }) {
+  const [items, setItems] = useState<RoomLbEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get<{ items: RoomLbEntry[] }>(`/teacher/exam-rooms/${roomId}/leaderboard?limit=20`)
+      .then(r => setItems(r.data.items || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [roomId, refreshKey])
+
+  const top3 = items.slice(0, 3)
+  const rest = items.slice(3, 20)
+
+  const fmtDur = (s: number | null) => {
+    if (!s) return '—'
+    const m = Math.floor(s / 60), ss = s % 60
+    return m === 0 ? `${ss}s` : `${m}p${ss > 0 ? ` ${ss}s` : ''}`
+  }
+
+  return (
+    <div className="rounded-xl p-5 space-y-3"
+      style={{ background: D.card, border: '1px solid rgba(251,191,36,0.4)', borderRadius: 12 }}>
+      <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Crown className="w-4 h-4" style={{ color: '#fbbf24' }} />
+          <span className="font-bold text-sm" style={{ color: D.text }}>Bảng vinh danh phòng</span>
+          {items.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+              {items.length} thí sinh
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); setRefreshKey(k => k + 1) }}
+            className="p-1 rounded hover:bg-white/5"
+            title="Refresh"
+          >
+            <RotateCcw className="w-3 h-3" style={{ color: D.muted }} />
+          </button>
+          {collapsed
+            ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} />
+            : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {!collapsed && (
+        <>
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#fbbf24' }} />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-6">
+              <Crown className="w-8 h-8 mx-auto mb-2" style={{ color: 'rgba(251,191,36,0.3)' }} />
+              <p className="text-xs" style={{ color: D.muted }}>
+                Chưa có thí sinh hoàn thành
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: D.muted2 }}>
+                Bảng sẽ tự cập nhật khi HS submit bài
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Top 3 podium */}
+              {top3.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {top3.map(e => {
+                    const isFirst = e.rank === 1
+                    const podiumBg = e.rank === 1
+                      ? 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.08))'
+                      : e.rank === 2
+                      ? 'linear-gradient(135deg, rgba(203,213,225,0.15), rgba(148,163,184,0.05))'
+                      : 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(234,88,12,0.05))'
+                    const podiumBorder = e.rank === 1 ? 'rgba(251,191,36,0.5)'
+                                       : e.rank === 2 ? 'rgba(203,213,225,0.4)'
+                                       : 'rgba(251,146,60,0.4)'
+                    return (
+                      <div key={e.studentId}
+                        className="rounded-lg p-2.5 text-center"
+                        style={{
+                          background: podiumBg,
+                          border: `1.5px solid ${podiumBorder}`,
+                          transform: isFirst ? 'scale(1.04)' : 'none',
+                        }}
+                      >
+                        <div className="mb-1.5">
+                          {e.rank === 1 && <Crown className="w-5 h-5 mx-auto" style={{ color: '#fbbf24' }} />}
+                          {e.rank === 2 && <Medal className="w-5 h-5 mx-auto" style={{ color: '#cbd5e1' }} />}
+                          {e.rank === 3 && <Medal className="w-5 h-5 mx-auto" style={{ color: '#fb923c' }} />}
+                        </div>
+                        {e.studentImage ? (
+                          <img src={e.studentImage} alt="" className="w-8 h-8 rounded-full mx-auto object-cover mb-1.5" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full mx-auto mb-1.5 flex items-center justify-center text-xs font-bold"
+                            style={{
+                              background: e.rank === 1 ? 'rgba(251,191,36,0.25)' : e.rank === 2 ? 'rgba(203,213,225,0.2)' : 'rgba(251,146,60,0.2)',
+                              color: e.rank === 1 ? '#fbbf24' : e.rank === 2 ? '#cbd5e1' : '#fb923c',
+                            }}>
+                            {e.studentName[0]?.toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <p className="font-bold text-xs truncate" style={{ color: D.text }} title={e.studentName}>
+                          {e.studentName}
+                        </p>
+                        <p className="text-base font-black mt-0.5" style={{
+                          color: e.percentage >= 80 ? '#34d399' : e.percentage >= 50 ? '#60a5fa' : '#f87171'
+                        }}>
+                          {e.percentage}%
+                        </p>
+                        <p className="text-[9px]" style={{ color: D.muted2 }}>
+                          {e.score}/{e.totalQuestions} · {fmtDur(e.durationSec)}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Rest 4-20 */}
+              {rest.length > 0 && (
+                <div className="space-y-0.5 pt-2" style={{ borderTop: `1px solid ${D.border}` }}>
+                  {rest.map(e => (
+                    <div key={e.studentId}
+                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/[0.03] transition-colors">
+                      <span className="text-xs font-bold w-5 text-center" style={{ color: D.muted }}>
+                        #{e.rank}
+                      </span>
+                      {e.studentImage ? (
+                        <img src={e.studentImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>
+                          {e.studentName[0]?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                      <span className="text-xs flex-1 truncate" style={{ color: D.text }}>
+                        {e.studentName}
+                      </span>
+                      <span className="text-xs font-bold"
+                        style={{ color: e.percentage >= 80 ? '#34d399' : e.percentage >= 50 ? '#60a5fa' : '#f87171' }}>
+                        {e.percentage}%
+                      </span>
+                      <span className="text-[10px]" style={{ color: D.muted2, minWidth: 40, textAlign: 'right' }}>
+                        {fmtDur(e.durationSec)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 mt-1 text-center text-[10px]" style={{ color: D.muted2, borderTop: `1px dashed ${D.border}` }}>
+                Sắp xếp theo % đúng → thời gian nhanh → submit sớm · Phòng "{roomName.slice(0, 40)}{roomName.length > 40 ? '…' : ''}"
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

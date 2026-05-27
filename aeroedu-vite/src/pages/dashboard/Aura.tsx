@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, Suspense } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ALL_SIMS } from './r3f'
 import {
   ArrowLeft, Box, Atom, Beaker, Orbit, Waves, Zap,
@@ -14,6 +15,7 @@ import {
   Layers, Wind, Magnet, Globe, Mountain, Boxes,
   Droplets, Dna, Building2, CircleDot, Shirt,
   Footprints, Triangle, Plus, Download, Trash2, Edit3, Save,
+  Home, X, LayoutGrid,
 } from 'lucide-react'
 
 // ─────────────────────────────────────────────
@@ -522,17 +524,33 @@ function UserSandboxEditor({
   onDownload: () => void
   saved: boolean
 }) {
+  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
-      {/* Top bar */}
-      <div className="px-4 py-3 border-b flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to simulations
-        </button>
+      {/* Top bar — prominent navigation */}
+      <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between bg-[#0a0a0f]/95 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 transition-all"
+            title="Quay lại danh sách Aura"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Aura</span>
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 transition-all"
+            title="Về Dashboard chính"
+          >
+            <Home className="h-4 w-4" />
+            <span className="hidden md:inline">Dashboard</span>
+          </button>
+          <span className="h-5 w-px bg-white/10 mx-1" />
+          <span className="text-sm font-semibold text-white">
+            {sandbox.title}
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           {saved && (
             <span className="text-xs text-emerald-400 flex items-center gap-1">
@@ -605,7 +623,11 @@ function UserSandboxEditor({
 // MAIN PAGE COMPONENT
 // ─────────────────────────────────────────────
 export default function AuraPage() {
-  const [activeSim, setActiveSim] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const { simId } = useParams<{ simId: string }>()
+  // User: "thêm route cho các giả lập trong /dashboard/aura"
+  // → Sync activeSim ↔ URL param: /dashboard/aura/:simId
+  const [activeSim, setActiveSim] = useState<string | null>(simId ?? null)
   const [userSandboxes, setUserSandboxes] = useState<UserSandbox[]>([])
   const [editingUserSandbox, setEditingUserSandbox] = useState<UserSandbox | null>(null)
   const [saved, setSaved] = useState(false)
@@ -613,6 +635,45 @@ export default function AuraPage() {
   useEffect(() => {
     setUserSandboxes(loadUserSandboxes())
   }, [])
+
+  // Sync URL → state (khi user vào /dashboard/aura/:simId hoặc back/forward)
+  useEffect(() => {
+    setActiveSim(simId ?? null)
+    // Khi simId thay đổi và là user sandbox → tự load
+    if (simId && simId.startsWith('user-')) {
+      const userSb = loadUserSandboxes().find((s) => s.id === simId)
+      if (userSb) setEditingUserSandbox({ ...userSb, files: userSb.files.map((f) => ({ ...f })) })
+    } else {
+      setEditingUserSandbox(null)
+    }
+  }, [simId])
+
+  // Wrap setActiveSim to also navigate URL (single source of truth = URL)
+  const goSim = useCallback((id: string | null) => {
+    if (id) {
+      navigate(`/dashboard/aura/${id}`)
+    } else {
+      navigate('/dashboard/aura')
+    }
+  }, [navigate])
+
+  // User: "có nút back để dễ dàng trở lại giao diện chính thức khi đang ở trong các mô phỏng"
+  // ESC để thoát mô phỏng nhanh (rất hữu ích khi sim đang fullscreen pointer-locked)
+  useEffect(() => {
+    if (!activeSim) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Nếu sim đang pointer-locked (vd FPV drone) thì ESC sẽ unlock trước
+        // Pressing ESC again sẽ trigger handler này → thoát về catalog
+        if (!document.pointerLockElement) {
+          goSim(null)
+          setEditingUserSandbox(null)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [activeSim])
 
   const createNewSandbox = useCallback(() => {
     const id = `user-${Date.now()}`
@@ -627,13 +688,13 @@ export default function AuraPage() {
     setUserSandboxes(updated)
     saveUserSandboxes(updated)
     setEditingUserSandbox(newSandbox)
-    setActiveSim(id)
-  }, [userSandboxes])
+    goSim(id)
+  }, [userSandboxes, goSim])
 
   const openUserSandbox = useCallback((sandbox: UserSandbox) => {
     setEditingUserSandbox({ ...sandbox, files: sandbox.files.map(f => ({ ...f })) })
-    setActiveSim(sandbox.id)
-  }, [])
+    goSim(sandbox.id)
+  }, [goSim])
 
   const handleSave = useCallback(() => {
     if (!editingUserSandbox) return
@@ -653,9 +714,9 @@ export default function AuraPage() {
   }, [userSandboxes])
 
   const handleBack = useCallback(() => {
-    setActiveSim(null)
+    goSim(null)
     setEditingUserSandbox(null)
-  }, [])
+  }, [goSim])
 
   // ── USER SANDBOX EDITING VIEW ──
   if (editingUserSandbox && activeSim?.startsWith('user-')) {
@@ -675,24 +736,57 @@ export default function AuraPage() {
     const currentSim = SIMULATIONS.find(s => s.id === activeSim)
     if (currentSim) {
       const SimComponent = ALL_SIMS[activeSim]
+      const simColor = CATEGORY_COLORS[currentSim.category]
       return (
-        <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white flex flex-col">
-          <div className="px-4 py-3 border-b shrink-0 flex items-center gap-4">
+        <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white flex flex-col relative">
+          {/* Top bar — prominent navigation */}
+          <div className="px-4 py-2.5 border-b border-white/10 shrink-0 flex items-center gap-2 bg-[#0a0a0f]/95 backdrop-blur-md sticky top-0 z-20">
             <button
-              onClick={() => setActiveSim(null)}
-              className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
+              onClick={() => goSim(null)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 transition-all"
+              title="Quay lại danh sách mô phỏng (ESC)"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to simulations
+              <span className="hidden sm:inline">Mô phỏng</span>
             </button>
-            <span className="text-sm font-medium text-white/60">{currentSim.title}</span>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/40 transition-all"
+              title="Về Dashboard chính"
+            >
+              <Home className="h-4 w-4" />
+              <span className="hidden md:inline">Dashboard</span>
+            </button>
+
+            <div className="h-5 w-px bg-white/10 mx-1" />
+
+            <span className="text-sm font-semibold text-white truncate flex-1 min-w-0">
+              {currentSim.title}
+            </span>
+
             <span
-              className="ml-auto px-2.5 py-0.5 rounded-full text-xs border"
-              style={{ color: CATEGORY_COLORS[currentSim.category], borderColor: `${CATEGORY_COLORS[currentSim.category]}40`, background: `${CATEGORY_COLORS[currentSim.category]}10` }}
+              className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shrink-0"
+              style={{ color: simColor, borderColor: `${simColor}50`, background: `${simColor}15` }}
             >
               {currentSim.category}
             </span>
+
+            <span className="hidden lg:inline text-[10px] text-white/30 uppercase tracking-wider px-2 border border-white/10 rounded-md py-0.5 font-mono shrink-0">
+              ESC để thoát
+            </span>
           </div>
+
+          {/* Floating exit button — ALWAYS visible on bottom-left, ngay cả khi sim fullscreen */}
+          <button
+            onClick={() => goSim(null)}
+            className="fixed bottom-4 left-4 z-50 group flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-white bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400/60 transition-all shadow-lg hover:shadow-cyan-500/20"
+            title="Thoát mô phỏng (ESC)"
+            style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
+          >
+            <X className="h-4 w-4 group-hover:rotate-90 transition-transform" />
+            <span className="hidden group-hover:inline">Thoát mô phỏng</span>
+            <span className="group-hover:hidden text-xs text-white/70">ESC</span>
+          </button>
           <div className="flex-1" style={{ minHeight: 0 }}>
             {SimComponent ? (
               <Suspense fallback={
@@ -721,17 +815,38 @@ export default function AuraPage() {
   return (
     <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
       {/* Header */}
-      <div className="px-6 pt-8 pb-6">
+      <div className="px-6 pt-6 pb-6">
+        {/* Top crumbs — link về Dashboard luôn visible */}
+        <div className="flex items-center gap-2 mb-4 text-[11px] uppercase tracking-wider">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-1 text-white/40 hover:text-cyan-400 transition-colors"
+            title="Về Dashboard chính"
+          >
+            <Home className="h-3 w-3" /> Dashboard
+          </button>
+          <ChevronRight className="h-3 w-3 text-white/20" />
+          <span className="text-white/60 font-semibold">Aura</span>
+        </div>
+
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
             <Box className="h-5 w-5 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-white/90">Aura</h1>
             <p className="text-sm text-white/30">
               Interactive 3D simulations powered by React Three Fiber
             </p>
           </div>
+          {/* Right-side: Dashboard shortcut for visibility */}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 bg-white/5 hover:bg-white/10 hover:text-white border border-white/10 hover:border-purple-500/40 transition-all"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Trở lại Dashboard
+          </button>
         </div>
       </div>
 
@@ -741,7 +856,7 @@ export default function AuraPage() {
           <span>★</span> Featured Sandbox
         </h2>
         <button
-          onClick={() => setActiveSim('fpv-drone-vr')}
+          onClick={() => goSim('fpv-drone-vr')}
           className="group w-full text-left rounded-2xl overflow-hidden relative transition-all duration-300 hover:scale-[1.005]"
           style={{
             background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 50%, rgba(6,182,212,0.18) 100%)',
@@ -873,7 +988,7 @@ export default function AuraPage() {
             return (
               <button
                 key={sim.id}
-                onClick={() => setActiveSim(sim.id)}
+                onClick={() => goSim(sim.id)}
                 className="group text-left p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300"
               >
                 <div className="flex items-start justify-between mb-3">

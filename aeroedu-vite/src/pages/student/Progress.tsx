@@ -281,7 +281,7 @@ function LabsCard({ digitalLogic }: {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {/* Digital Logic Lab */}
-      <Link to="/dashboard/labtwin/labs/digital-logic-lab"
+      <Link to="/dashboard/labtwin/digital-logic-lab"
         className="block rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-600/10 to-blue-600/5 p-4 hover:border-cyan-400/40 transition-colors group">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-2xl">⚙️</span>

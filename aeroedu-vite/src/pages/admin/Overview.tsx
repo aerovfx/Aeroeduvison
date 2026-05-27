@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -6,80 +6,110 @@ import {
 } from 'recharts';
 import {
   Shield, Users, Award, Activity, Cpu, Server,
-  Brain, Settings2, Plus, RefreshCw, Zap,
-  DollarSign, Globe, BookOpen, Video, ChevronRight,
-  Clock, Lock, AlertTriangle, CheckCircle,
-  TrendingUp, TrendingDown, Network, HardDrive,
+  Brain, Settings2, RefreshCw, Zap,
+  DollarSign, Globe, Video, ChevronRight,
+  Lock, AlertTriangle, CheckCircle,
+  TrendingUp, TrendingDown, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { api } from '@/services/api';
+import toast from 'react-hot-toast';
 
-/* ─── Types ──────────────────────────────────────────────── */
-interface Module {
-  id: string; nameVi: string; nameEn: string;
-  descVi: string; descEn: string;
-  icon: React.ElementType; status: 'active' | 'maintenance' | 'inactive';
-  categoryVi: string; categoryEn: string; usage: number;
-}
-
+/* ─── Types matching BE /api/admin/overview/full ─────────── */
 type TimeRange = 'today' | 'week' | 'month';
 
-/* ─── Mock data ──────────────────────────────────────────── */
-const ENROLLMENT_DATA_VI = [
-  { month: 'T1', students: 180 }, { month: 'T2', students: 220 },
-  { month: 'T3', students: 290 }, { month: 'T4', students: 340 },
-  { month: 'T5', students: 410 }, { month: 'T6', students: 520 },
-  { month: 'T7', students: 480 }, { month: 'T8', students: 560 },
-];
-const ENROLLMENT_DATA_EN = [
-  { month: 'Jan', students: 180 }, { month: 'Feb', students: 220 },
-  { month: 'Mar', students: 290 }, { month: 'Apr', students: 340 },
-  { month: 'May', students: 410 }, { month: 'Jun', students: 520 },
-  { month: 'Jul', students: 480 }, { month: 'Aug', students: 560 },
-];
+interface OverviewKpis {
+  activeStudents: number;
+  totalUsers: number;
+  avgMastery: number;
+  attendancePercent: number;
+  systemUptime: number;        // %
+  moduleLoad: number;          // % memory
+  cpuPercent: number;          // %
+  uptimeText: string;
+}
 
-// Deterministic network load bars (no Math.random at render)
-const NETWORK_DATA = Array.from({ length: 30 }, (_, i) => ({
-  i,
-  v: Math.round(20 + Math.abs(Math.sin(i * 0.4 + 1.2) * 60)),
-}));
+interface EnrollmentRow {
+  month: string;               // YYYY-MM
+  students: number;
+}
 
-const SENTIMENT_DATA = [40, 65, 80, 50, 90, 75, 60];
-const SENTIMENT_DAYS_VI = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const SENTIMENT_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+interface SentimentRow {
+  date: string;
+  dayShort: string;
+  positiveRatio: number;       // 0-100
+}
 
-const SECURITY_LOGS = [
-  { tVi: 'Chặn truy cập Firewall', tEn: 'Firewall Breach Blocked',   timeVi: '2 phút trước', timeEn: '2 min ago', level: 'danger' as const },
-  { tVi: 'Đăng nhập Node trái phép', tEn: 'Unauthorized Node Login', timeVi: '5 phút trước', timeEn: '5 min ago', level: 'warn'   as const },
-  { tVi: 'Đã xoay API Key', tEn: 'API Key Rotated',                   timeVi: '14 phút trước', timeEn: '14 min ago', level: 'info'  as const },
-  { tVi: 'Auth Token hết hạn × 3', tEn: 'Auth Token Expired × 3',     timeVi: '22 phút trước', timeEn: '22 min ago', level: 'warn'   as const },
-];
+interface XpVelocityItem {
+  id: string;
+  labelVi: string;
+  labelEn: string;
+  value: number;               // %
+  color: string;
+}
 
-const HEALTH_SERVICES = [
-  { nameVi: 'Cơ sở dữ liệu',   nameEn: 'Database',     status: 'online'   as const },
-  { nameVi: 'Dịch vụ Auth',    nameEn: 'Auth Service', status: 'online'   as const },
-  { nameVi: 'Dịch vụ AI',      nameEn: 'AI Service',   status: 'degraded' as const },
-  { nameVi: 'Dịch vụ Camera',  nameEn: 'Camera Svc',   status: 'online'   as const },
-  { nameVi: 'Cổng IoT',        nameEn: 'IoT Gateway',  status: 'online'   as const },
-];
+interface RevenueData {
+  total: number;
+  last30Days: number;
+  projectedQuarter: number;
+  paidOrders: number;
+  paidUsers: number;
+}
 
-const XP_METRICS_VI = [
-  { l: 'Thành thạo Quiz',  v: 82, color: '#3b82f6' },
-  { l: 'Điểm danh',        v: 94, color: '#22c55e' },
-  { l: 'Tương tác STEM',   v: 46, color: '#f97316' },
-];
-const XP_METRICS_EN = [
-  { l: 'Quiz Mastery',     v: 82, color: '#3b82f6' },
-  { l: 'Attendance',       v: 94, color: '#22c55e' },
-  { l: 'STEM Engagement',  v: 46, color: '#f97316' },
-];
+interface ServiceItem {
+  name: string;
+  icon: string;
+  status: 'up' | 'down' | 'degraded';
+  latencyMs?: number;
+}
 
-const INIT_MODULES: Module[] = [
-  { id: 'users',    nameVi: 'Người dùng', nameEn: 'Users',      descVi: 'Định danh & phân quyền',     descEn: 'Identity & Access Control',  icon: Users,    status: 'active',      categoryVi: 'Lõi',     categoryEn: 'Core',       usage: 95 },
-  { id: 'lms',      nameVi: 'Giáo trình', nameEn: 'Curriculum', descVi: 'Chiến lược nội dung LMS',    descEn: 'LMS Content Strategy',       icon: BookOpen, status: 'active',      categoryVi: 'Lõi',     categoryEn: 'Core',       usage: 82 },
-  { id: 'video',    nameVi: 'Streaming',  nameEn: 'Streaming',  descVi: 'VOD & phát thời gian thực',  descEn: 'VOD & Real-time Delivery',   icon: Video,    status: 'active',      categoryVi: 'Media',   categoryEn: 'Media',      usage: 45 },
-  { id: 'appraise', nameVi: 'Đánh giá',   nameEn: 'Appraisal',  descVi: 'Đánh giá tự động',           descEn: 'Automated Assessment',       icon: Award,    status: 'active',      categoryVi: 'Kiểm tra',categoryEn: 'Assessment', usage: 60 },
-  { id: 'stem',     nameVi: 'Phòng STEM', nameEn: 'STEM Labs',  descVi: 'Môi trường ảo 3D',           descEn: '3D Virtual Environments',    icon: Zap,      status: 'maintenance', categoryVi: 'Nâng cao',categoryEn: 'Advanced',   usage: 12 },
-];
+interface ServicesSummary {
+  up: number;
+  down: number;
+  degraded: number;
+  total: number;
+  uptime: string;
+}
+
+interface NetworkLoadItem {
+  hour: string;
+  requests: number;
+  percent: number;
+}
+
+interface RoleBreakdown {
+  students: number;
+  teachers: number;
+  admins: number;
+  parents: number;
+}
+
+interface SecurityEvent {
+  type?: string;
+  severity?: string;
+  message?: string;
+  timestamp?: string;
+  detail?: string;
+}
+
+interface SecurityEventsResp {
+  events: SecurityEvent[];
+  summary: { totalLast24h: number; totalAll: number };
+}
+
+interface OverviewFullResp {
+  kpis: OverviewKpis;
+  enrollment: EnrollmentRow[];
+  sentiment: SentimentRow[];
+  xpVelocity: XpVelocityItem[];
+  revenue: RevenueData;
+  services: ServiceItem[];
+  servicesSummary: ServicesSummary;
+  networkLoad: NetworkLoadItem[];
+  roleBreakdown: RoleBreakdown;
+  range: string;
+  updatedAt: string;
+}
 
 /* ─── Helpers ────────────────────────────────────────────── */
 function DarkCard({ children, className = '', style, onClick }: {
@@ -127,9 +157,10 @@ function SectionHead({ icon: Icon, label, color = 'text-purple-400' }: {
   );
 }
 
-function KPICard({ label, value, trend, change, icon: Icon, color, borderColor }: {
+function KPICard({ label, value, trend, change, icon: Icon, color, borderColor, subtitle }: {
   label: string; value: string | number; trend: 'up' | 'down' | 'stable';
   change: number; icon: React.ElementType; color: string; borderColor: string;
+  subtitle?: string;
 }) {
   return (
     <DarkCard className="border-l-4" style={{ borderLeftColor: borderColor }}>
@@ -145,11 +176,11 @@ function KPICard({ label, value, trend, change, icon: Icon, color, borderColor }
       </div>
       <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/40 mb-0.5">{label}</p>
       <h3 className="text-2xl font-black text-white/90 leading-tight">{value}</h3>
+      {subtitle && <p className="text-[9px] font-bold text-white/30 mt-0.5">{subtitle}</p>}
     </DarkCard>
   );
 }
 
-/* ─── Custom tooltip for recharts ───────────────────────── */
 function ChartTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -162,36 +193,30 @@ function ChartTip({ active, payload, label }: any) {
   );
 }
 
-/* ─── Module toggle row ─────────────────────────────────── */
-function ModuleRow({ mod, onToggle, VI }: { mod: Module; onToggle: (id: string) => void; VI: boolean }) {
-  const active = mod.status === 'active';
-  return (
-    <div className="group p-2.5 rounded-xl border border-white/[0.05] hover:border-purple-500/20 bg-white/[0.02] transition-all flex items-center justify-between">
-      <div className="flex items-center gap-2.5">
-        <div className={`p-1.5 rounded-lg ${active ? 'bg-purple-500/10 text-purple-300' : 'bg-white/[0.03] text-white/20'}`}>
-          <mod.icon className="w-3.5 h-3.5" />
-        </div>
-        <div>
-          <p className="text-[11px] font-black text-white/80 leading-tight">{VI ? mod.nameVi : mod.nameEn}</p>
-          <p className="text-[9px] text-white/30 uppercase font-bold">{VI ? mod.categoryVi : mod.categoryEn}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2.5">
-        <div className="text-right hidden sm:block">
-          <p className="text-[9px] font-bold text-white/40">{mod.usage}% {VI ? 'TẢI' : 'LOAD'}</p>
-          <div className="w-12 h-0.5 bg-white/[0.05] mt-1 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${mod.usage}%`, background: 'linear-gradient(90deg,#667eea,#764ba2)' }} />
-          </div>
-        </div>
-        {/* Toggle */}
-        <button onClick={() => onToggle(mod.id)}
-          className={`w-9 h-5 rounded-full relative transition-all ${active ? 'bg-purple-600' : 'bg-white/10'}`}>
-          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${active ? 'left-5' : 'left-1'}`} />
-        </button>
-      </div>
-    </div>
-  );
+/* ─── Helpers format ─────────────────────────────────────── */
+const fmtVnd = (n: number) =>
+  n >= 1_000_000_000 ? `${(n / 1_000_000_000).toFixed(1)}B ₫`
+  : n >= 1_000_000   ? `${(n / 1_000_000).toFixed(1)}M ₫`
+  : n >= 1_000       ? `${(n / 1_000).toFixed(0)}K ₫`
+  : `${n} ₫`;
+
+const fmtNum = (n: number) => n.toLocaleString('vi-VN');
+
+function monthLabel(yyyymm: string, vi: boolean): string {
+  const [, mm] = yyyymm.split('-');
+  const m = parseInt(mm, 10);
+  return vi ? `T${m}` : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1] || mm;
+}
+
+function relTime(ts: string, vi: boolean): string {
+  const ms = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return vi ? 'Vừa xong' : 'Just now';
+  if (m < 60) return vi ? `${m} phút trước` : `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return vi ? `${h} giờ trước` : `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return vi ? `${d} ngày trước` : `${d}d ago`;
 }
 
 /* ─── Main Page ──────────────────────────────────────────── */
@@ -200,30 +225,78 @@ export default function Overview() {
   const { language } = useLanguage();
   const VI = language === 'vi';
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [modules, setModules] = useState<Module[]>(INIT_MODULES);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<OverviewFullResp | null>(null);
+  const [secEvents, setSecEvents] = useState<SecurityEvent[]>([]);
 
-  const toggleModule = (id: string) => {
-    setModules(prev => prev.map(m =>
-      m.id === id ? { ...m, status: m.status === 'active' ? 'inactive' : 'active' } : m
-    ));
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    setRefreshing(true);
+    try {
+      const [overviewRes, secRes] = await Promise.all([
+        api.get<OverviewFullResp>(`/admin/overview/full?range=${timeRange}`),
+        api.get<SecurityEventsResp>('/admin/operations/security-events').catch(() => ({ data: { events: [], summary: { totalLast24h: 0, totalAll: 0 } } })),
+      ]);
+      setData(overviewRes.data);
+      setSecEvents(secRes.data.events.slice(0, 5));
+    } catch (err: any) {
+      toast.error(VI ? 'Không tải được dữ liệu' : 'Failed to load data');
+      console.error('[admin:overview]', err.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1200);
-  };
-
-  const activeModules   = modules.filter(m => m.status === 'active').length;
-  const inactiveModules = modules.filter(m => m.status !== 'active').length;
-
-  const ENROLLMENT_DATA = VI ? ENROLLMENT_DATA_VI : ENROLLMENT_DATA_EN;
-  const SENTIMENT_DAYS  = VI ? SENTIMENT_DAYS_VI  : SENTIMENT_DAYS_EN;
-  const XP_METRICS      = VI ? XP_METRICS_VI      : XP_METRICS_EN;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [timeRange]);
+  // Auto-refresh every 30s (silent)
+  useEffect(() => {
+    const t = setInterval(() => load(true), 30_000);
+    return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRange]);
 
   const tRange = (r: TimeRange) =>
     VI ? (r === 'today' ? 'Hôm nay' : r === 'week' ? 'Tuần' : 'Tháng')
        : (r === 'today' ? 'Today'   : r === 'week' ? 'Week' : 'Month');
+
+  if (loading || !data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex items-center gap-3 text-white/60">
+          <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+          <span className="text-sm font-bold">{VI ? 'Đang tải bảng điều khiển…' : 'Loading Command Center…'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const k = data.kpis;
+  const enrollmentChart = data.enrollment.map(e => ({
+    month: monthLabel(e.month, VI),
+    students: e.students,
+  }));
+  const networkChart = data.networkLoad.length > 0
+    ? data.networkLoad
+    : Array.from({ length: 30 }, (_, i) => ({ hour: '', requests: 0, percent: 5 + (i % 7) * 8 }));
+
+  // Module Registry — derive từ services (active = up, inactive = down/degraded)
+  const activeServices = data.services.filter(s => s.status === 'up').length;
+  const inactiveServices = data.services.length - activeServices;
+
+  // System Health label
+  const healthLabel = (s: ServiceItem) => {
+    if (s.status === 'up') return VI ? 'Trực tuyến' : 'Online';
+    if (s.status === 'degraded') return VI ? 'Suy giảm' : 'Degraded';
+    return VI ? 'Ngoại tuyến' : 'Offline';
+  };
+
+  // Sentiment score (avg positiveRatio)
+  const sentimentAvg = data.sentiment.length > 0
+    ? Math.round(data.sentiment.reduce((s, d) => s + d.positiveRatio, 0) / data.sentiment.length)
+    : 0;
 
   return (
     <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-4 md:py-6 relative">
@@ -243,9 +316,15 @@ export default function Overview() {
               style={{ background: 'linear-gradient(135deg,#fff 0%,rgba(255,255,255,0.45) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {VI ? 'Bảng điều khiển' : 'Command Center'}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="success">{VI ? 'Hệ thống ổn định' : 'System Healthy'}</Badge>
-              <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">v4.2.0-Production</span>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant={data.servicesSummary.down === 0 ? 'success' : data.servicesSummary.down <= 2 ? 'warning' : 'danger'}>
+                {data.servicesSummary.down === 0
+                  ? (VI ? 'Hệ thống ổn định' : 'System Healthy')
+                  : (VI ? `${data.servicesSummary.down} service offline` : `${data.servicesSummary.down} services down`)}
+              </Badge>
+              <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">
+                {VI ? `Uptime ${k.uptimeText}` : `Uptime ${k.uptimeText}`}
+              </span>
             </div>
           </div>
         </div>
@@ -262,29 +341,59 @@ export default function Overview() {
               </button>
             ))}
           </div>
-          <button onClick={handleRefresh}
+          <button onClick={() => load()}
+            disabled={refreshing}
+            title={`Updated ${relTime(data.updatedAt, VI)}`}
             className="p-2 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:border-purple-500/30 transition-all">
-            <RefreshCw className={`w-4 h-4 text-white/50 hover:text-purple-300 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-white/50 hover:text-purple-300 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* ── Tier 2: KPI Cards ───────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-        <KPICard label={VI ? 'Học sinh hoạt động' : 'Active Students'} value="1,247"  trend="up"     change={12} icon={Users}    color="#3b82f6" borderColor="#3b82f6" />
-        <KPICard label={VI ? 'Thành thạo TB'      : 'Avg Mastery'}     value="78%"    trend="up"     change={5}  icon={Award}    color="#10b981" borderColor="#10b981" />
-        <KPICard label={VI ? 'Uptime hệ thống'    : 'System Uptime'}   value="99.9%"  trend="stable" change={0}  icon={Activity} color="#6366f1" borderColor="#6366f1" />
-        <KPICard label={VI ? 'Tải Module'         : 'Module Load'}     value="64%"    trend="down"   change={-2} icon={Cpu}      color="#f59e0b" borderColor="#f59e0b" />
-        {/* Agent OS */}
-        <DarkCard className="border-l-4" style={{ borderLeftColor: '#ef4444' }}>
+        <KPICard
+          label={VI ? 'Học sinh hoạt động' : 'Active Students'}
+          value={fmtNum(k.activeStudents)}
+          trend={k.activeStudents > 0 ? 'up' : 'stable'} change={0}
+          icon={Users} color="#3b82f6" borderColor="#3b82f6"
+          subtitle={VI ? `Trong ${timeRange === 'today' ? '24h' : timeRange === 'week' ? '7 ngày' : '30 ngày'}` : `Last ${timeRange === 'today' ? '24h' : timeRange === 'week' ? '7d' : '30d'}`}
+        />
+        <KPICard
+          label={VI ? 'Thành thạo TB' : 'Avg Mastery'}
+          value={`${k.avgMastery}%`}
+          trend={k.avgMastery >= 70 ? 'up' : k.avgMastery >= 50 ? 'stable' : 'down'} change={0}
+          icon={Award} color="#10b981" borderColor="#10b981"
+          subtitle={VI ? 'Avg PracticeExam 30d' : 'Avg PracticeExam 30d'}
+        />
+        <KPICard
+          label={VI ? 'Service Uptime' : 'Service Uptime'}
+          value={`${k.systemUptime}%`}
+          trend={k.systemUptime >= 95 ? 'up' : k.systemUptime >= 75 ? 'stable' : 'down'} change={0}
+          icon={Activity} color="#6366f1" borderColor="#6366f1"
+          subtitle={`${data.servicesSummary.up}/${data.servicesSummary.total} services`}
+        />
+        <KPICard
+          label={VI ? 'Tải bộ nhớ' : 'Memory Load'}
+          value={`${k.moduleLoad}%`}
+          trend={k.moduleLoad < 60 ? 'up' : k.moduleLoad < 80 ? 'stable' : 'down'} change={0}
+          icon={Cpu} color="#f59e0b" borderColor="#f59e0b"
+          subtitle={`CPU ${k.cpuPercent}%`}
+        />
+        {/* Tổng người dùng (thay Agent OS mockup) */}
+        <DarkCard className="border-l-4" style={{ borderLeftColor: '#a78bfa' }}>
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 rounded-xl bg-white/[0.04] text-purple-400">
               <Server className="w-4 h-4" />
             </div>
-            <span className="text-[10px] font-black text-red-400">{VI ? 'NGOẠI TUYẾN' : 'OFFLINE'}</span>
+            <span className="text-[10px] font-black text-purple-400">
+              {fmtNum(data.roleBreakdown.students)} HS · {fmtNum(data.roleBreakdown.teachers)} GV
+            </span>
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/40 mb-0.5">Agent OS</p>
-          <h3 className="text-xl font-black text-white/90 leading-tight">{VI ? 'Không sẵn sàng' : 'Unavailable'}</h3>
+          <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/40 mb-0.5">
+            {VI ? 'Tổng người dùng' : 'Total Users'}
+          </p>
+          <h3 className="text-2xl font-black text-white/90 leading-tight">{fmtNum(k.totalUsers)}</h3>
         </DarkCard>
       </div>
 
@@ -296,137 +405,182 @@ export default function Overview() {
           <SectionHead icon={Brain} label={VI ? 'Phân tích hành động' : 'Actionable Intelligence'} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Critical Alert — spans 2 cols */}
-            <DarkCard className="md:col-span-2 relative overflow-hidden border-red-500/20 hover:border-red-500/35">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-red-500/[0.05] rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+            {/* User breakdown card (thay Critical Alert mockup) */}
+            <DarkCard className="md:col-span-2 relative overflow-hidden border-purple-500/15 hover:border-purple-500/35">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/[0.05] rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant="danger">{VI ? 'Cảnh báo nghiêm trọng' : 'Critical Alert'}</Badge>
-                  <span className="text-[10px] text-white/30">{VI ? 'Vừa xong' : 'Just now'}</span>
+                  <Badge variant="info">{VI ? 'Phân tích người dùng' : 'User Breakdown'}</Badge>
+                  <span className="text-[10px] text-white/30">{VI ? `Cập nhật ${relTime(data.updatedAt, VI)}` : `Updated ${relTime(data.updatedAt, VI)}`}</span>
                 </div>
-                <button className="p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors">
+                <button onClick={() => navigate('/admin/users')} className="p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors">
                   <ChevronRight className="w-4 h-4 text-white/40" />
                 </button>
               </div>
-              <h3 className="text-base font-black text-white/95 mb-1 italic">
-                {VI ? 'Phát hiện rủi ro giữ chân học sinh' : 'Student Retention Risk Detected'}
+              <h3 className="text-base font-black text-white/95 mb-3 italic">
+                {VI ? 'Phân bố vai trò hệ thống' : 'System Role Distribution'}
               </h3>
-              <p className="text-xs text-white/55 mb-3 leading-relaxed">
-                {VI
-                  ? 'AI nhận diện mức tương tác giảm 14% ở Toán Nâng Cao lớp 12. Đề xuất: rà soát chương trình hoặc can thiệp giáo viên ngay.'
-                  : 'AI patterns show a 14% drop in engagement for Grade 12 Advanced Math. Recommended: Immediate curriculum review or teacher intervention.'}
-              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                {[
+                  { label: VI ? 'Học sinh' : 'Students', value: data.roleBreakdown.students, color: '#3b82f6' },
+                  { label: VI ? 'Giáo viên' : 'Teachers', value: data.roleBreakdown.teachers, color: '#10b981' },
+                  { label: VI ? 'Phụ huynh' : 'Parents', value: data.roleBreakdown.parents, color: '#f59e0b' },
+                  { label: VI ? 'Quản trị' : 'Admins', value: data.roleBreakdown.admins, color: '#ef4444' },
+                ].map(r => {
+                  const total = data.roleBreakdown.students + data.roleBreakdown.teachers + data.roleBreakdown.parents + data.roleBreakdown.admins;
+                  const pct = total > 0 ? Math.round((r.value / total) * 100) : 0;
+                  return (
+                    <div key={r.label} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                      <p className="text-[9px] font-black uppercase text-white/40">{r.label}</p>
+                      <p className="text-xl font-black text-white/90 mt-1" style={{ color: r.color }}>{fmtNum(r.value)}</p>
+                      <div className="h-1 bg-white/[0.05] rounded-full mt-2 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: r.color }} />
+                      </div>
+                      <p className="text-[9px] font-bold text-white/30 mt-1">{pct}%</p>
+                    </div>
+                  );
+                })}
+              </div>
               <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="w-7 h-7 rounded-full border-2 border-[hsl(260,30%,8%)] bg-white/10 flex items-center justify-center text-[10px] font-bold text-white">S{i}</div>
-                  ))}
-                </div>
-                <button className="px-4 py-1.5 rounded-xl text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
+                <span className="text-[10px] font-bold text-white/40">
+                  {VI ? 'Tỷ lệ tham gia 7 ngày' : 'Engagement 7d'}: <span className="text-white/70 font-black">{k.attendancePercent}%</span>
+                </span>
+                <button onClick={() => navigate('/admin/users')} className="px-4 py-1.5 rounded-xl text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
                   style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', boxShadow: '0 0 20px rgba(102,126,234,0.3)' }}>
-                  {VI ? 'Phân tích ngay' : 'Initiate Analysis'}
+                  {VI ? 'Quản lý người dùng' : 'Manage Users'}
                 </button>
               </div>
             </DarkCard>
 
-            {/* XP Velocity */}
+            {/* XP Velocity — real data từ BE */}
             <DarkCard className="bg-white/[0.03]">
               <h4 className="text-[10px] font-black text-white/30 uppercase tracking-[.2em] mb-3">
-                {VI ? 'Tốc độ XP' : 'XP Velocity'}
+                {VI ? 'Chỉ số học tập' : 'Learning Metrics'}
               </h4>
               <div className="space-y-3">
-                {XP_METRICS.map((x, i) => (
-                  <div key={i} className="space-y-1">
+                {data.xpVelocity.map(x => (
+                  <div key={x.id} className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold">
-                      <span className="text-white/55">{x.l}</span>
-                      <span style={{ color: x.color }}>{x.v}%</span>
+                      <span className="text-white/55">{VI ? x.labelVi : x.labelEn}</span>
+                      <span style={{ color: x.color }}>{Math.min(100, x.value)}%</span>
                     </div>
                     <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${x.v}%`, background: x.color, boxShadow: `0 0 8px ${x.color}60` }} />
+                        style={{ width: `${Math.min(100, x.value)}%`, background: x.color, boxShadow: `0 0 8px ${x.color}60` }} />
                     </div>
                   </div>
                 ))}
+                {data.xpVelocity.every(x => x.value === 0) && (
+                  <p className="text-[10px] text-white/30 italic pt-2">
+                    {VI ? 'Chưa có dữ liệu — HS làm bài tập sẽ hiện ở đây' : 'No data — students need to take exams'}
+                  </p>
+                )}
               </div>
             </DarkCard>
 
-            {/* Sentiment Map */}
+            {/* Sentiment Map — real từ FaceEmotionSample */}
             <DarkCard className="bg-white/[0.03]">
-              <h4 className="text-[10px] font-black text-white/30 uppercase tracking-[.2em] mb-3">
-                {VI ? 'Bản đồ cảm xúc' : 'Sentiment Map'}
+              <h4 className="text-[10px] font-black text-white/30 uppercase tracking-[.2em] mb-1 flex items-center justify-between">
+                <span>{VI ? 'Bản đồ cảm xúc 7d' : 'Sentiment Map 7d'}</span>
+                <span style={{ color: sentimentAvg >= 60 ? '#22c55e' : sentimentAvg >= 40 ? '#f59e0b' : '#ef4444' }}>
+                  {sentimentAvg}%
+                </span>
               </h4>
+              <p className="text-[9px] text-white/30 mb-2">
+                {VI ? 'Tỷ lệ cảm xúc tích cực mỗi ngày' : 'Daily positive emotion ratio'}
+              </p>
               <div className="flex items-end justify-between h-20 gap-1.5">
-                {SENTIMENT_DATA.map((h, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                {data.sentiment.map(d => (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full rounded-t-md hover:opacity-100 opacity-80 transition-opacity"
-                      style={{ height: `${h}%`, background: 'linear-gradient(180deg,#667eea,rgba(102,126,234,0.25))' }} />
+                      style={{
+                        height: `${Math.max(8, d.positiveRatio)}%`,
+                        background: `linear-gradient(180deg, ${d.positiveRatio >= 60 ? '#22c55e' : d.positiveRatio >= 40 ? '#f59e0b' : '#ef4444'}, rgba(102,126,234,0.25))`,
+                      }}
+                      title={`${d.date}: ${d.positiveRatio}% tích cực`}
+                    />
                   </div>
                 ))}
               </div>
               <div className="flex justify-between mt-2">
-                {SENTIMENT_DAYS.map(d => (
-                  <span key={d} className="text-[8px] font-black text-white/20 uppercase">{d}</span>
+                {data.sentiment.map(d => (
+                  <span key={d.date} className="text-[8px] font-black text-white/20 uppercase">{d.dayShort}</span>
                 ))}
               </div>
             </DarkCard>
           </div>
 
-          {/* Enrollment Chart */}
+          {/* Enrollment Chart — real từ User.createdAt */}
           <DarkCard>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[11px] font-black text-white/70 italic flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-indigo-400" />
-                {VI ? 'Tuyển sinh theo tháng' : 'Monthly Enrollment'}
+                {VI ? 'Tuyển sinh 8 tháng qua' : 'Last 8 Months Enrollment'}
               </h3>
-              <Badge variant="info">
-                {VI
-                  ? (timeRange === 'today' ? 'Hôm nay' : timeRange === 'week' ? 'Tuần này' : 'Năm 2026')
-                  : (timeRange === 'today' ? 'Today'   : timeRange === 'week' ? 'This Week' : 'Year 2026')}
-              </Badge>
+              <Badge variant="info">{enrollmentChart.reduce((s, e) => s + e.students, 0)} {VI ? 'HS mới' : 'new'}</Badge>
             </div>
-            <ResponsiveContainer width="100%" height={150}>
-              <AreaChart data={ENROLLMENT_DATA} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="enrollGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#667eea" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTip />} />
-                <Area type="monotone" dataKey="students" name={VI ? 'Học sinh' : 'Students'} stroke="#667eea" strokeWidth={2} fill="url(#enrollGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {enrollmentChart.length === 0 ? (
+              <p className="text-[10px] text-white/30 italic py-8 text-center">
+                {VI ? 'Chưa có HS đăng ký 8 tháng qua' : 'No enrollment data in last 8 months'}
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height={150}>
+                <AreaChart data={enrollmentChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="enrollGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#667eea" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTip />} />
+                  <Area type="monotone" dataKey="students" name={VI ? 'Học sinh' : 'Students'} stroke="#667eea" strokeWidth={2} fill="url(#enrollGrad)" dot={{ fill: '#667eea', r: 3 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </DarkCard>
         </div>
 
         {/* Right: Infrastructure */}
         <div className="lg:col-span-4 flex flex-col gap-3">
-          <SectionHead icon={Settings2} label={VI ? 'Kiến trúc hệ thống' : 'System Architecture'} />
+          <SectionHead icon={Settings2} label={VI ? 'Hạ tầng hệ thống' : 'System Infrastructure'} />
 
-          {/* Module registry */}
+          {/* Service registry — real services từ services-health */}
           <DarkCard className="flex-1 p-0 overflow-hidden flex flex-col">
             <div className="px-4 py-3 border-b border-white/[0.05]">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black text-white/80 italic">
-                  {VI ? 'Danh mục Node hoạt động' : 'Active Node Registry'}
+                  {VI ? 'Trạng thái dịch vụ' : 'Service Registry'}
                 </span>
                 <span className="text-[10px] font-mono text-purple-400">
-                  {activeModules} {VI ? 'BẬT' : 'ON'} / {inactiveModules} {VI ? 'TẮT' : 'OFF'}
+                  {activeServices} {VI ? 'BẬT' : 'UP'} / {inactiveServices} {VI ? 'TẮT' : 'DOWN'}
                 </span>
               </div>
             </div>
-            <div className="flex-1 p-3 space-y-2 overflow-y-auto">
-              {modules.map(m => (
-                <ModuleRow key={m.id} mod={m} onToggle={toggleModule} VI={VI} />
-              ))}
-              <div className="pt-2 mt-1 border-t border-white/[0.05]">
-                <button className="w-full py-2 rounded-xl border border-dashed border-white/[0.08] text-white/35 text-[10px] font-black uppercase tracking-widest hover:border-purple-500/30 hover:text-white/60 transition-all flex items-center justify-center gap-2">
-                  <Plus className="w-3.5 h-3.5" /> {VI ? 'Triển khai instance mới' : 'Deploy New Instance'}
-                </button>
-              </div>
+            <div className="flex-1 p-3 space-y-2 overflow-y-auto max-h-72">
+              {data.services.map(svc => {
+                const active = svc.status === 'up';
+                const degraded = svc.status === 'degraded';
+                return (
+                  <div key={svc.name} className="group p-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] transition-all flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${active ? 'bg-green-400 shadow-[0_0_6px_#4ade80]' : degraded ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
+                      <div>
+                        <p className="text-[11px] font-black text-white/80 leading-tight">{svc.name}</p>
+                        {svc.latencyMs !== undefined && (
+                          <p className="text-[9px] text-white/30 font-bold">{svc.latencyMs}ms</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full
+                      ${active ? 'text-green-400 bg-green-500/10' : degraded ? 'text-yellow-400 bg-yellow-500/10' : 'text-red-400 bg-red-500/10'}`}>
+                      {healthLabel(svc)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </DarkCard>
 
@@ -435,48 +589,51 @@ export default function Overview() {
             className="bg-gradient-to-br from-[#1a1c2c] to-[#1a1025] border-white/[0.06] hover:border-orange-500/30">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[11px] font-black text-white/80 italic">
-                {VI ? 'Trung tâm Tự phục hồi' : 'Self-Healing Hub'}
+                {VI ? 'Operations Hub' : 'Operations Hub'}
               </h4>
               <Zap className="w-4 h-4 text-orange-400 fill-current" />
             </div>
             <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-2xl font-black text-white leading-none">99%</span>
-              <span className="text-[10px] font-bold text-green-400">{VI ? 'TỐI ƯU' : 'OPTIMIZED'}</span>
+              <span className="text-2xl font-black text-white leading-none">{k.systemUptime}%</span>
+              <span className={`text-[10px] font-bold ${k.systemUptime >= 95 ? 'text-green-400' : k.systemUptime >= 75 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {k.systemUptime >= 95 ? (VI ? 'TỐI ƯU' : 'OPTIMAL') : k.systemUptime >= 75 ? (VI ? 'CHẤP NHẬN' : 'OK') : (VI ? 'CẢNH BÁO' : 'WARNING')}
+              </span>
             </div>
             <p className="text-[10px] font-bold text-white/25 uppercase tracking-[.2em] mb-3">
-              {VI ? 'Quản lý hiệu năng hệ thống' : 'Manage System Velocity'}
+              {VI ? `Uptime ${k.uptimeText}` : `Process up ${k.uptimeText}`}
             </p>
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.05]">
-              <span className="text-[10px] font-black text-white/55">{VI ? 'Đang vá tự động' : 'Active Patching'}</span>
-              <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]" />
+              <span className="text-[10px] font-black text-white/55">{VI ? 'Memory · CPU' : 'Memory · CPU'}</span>
+              <span className="text-[10px] font-bold text-white/80">{k.moduleLoad}% · {k.cpuPercent}%</span>
             </div>
           </DarkCard>
 
-          {/* Billing Hub */}
-          <DarkCard className="bg-[#0f0f0f] border-white/[0.04]">
+          {/* Billing Hub — real từ PaymentOrder */}
+          <DarkCard onClick={() => navigate('/admin/payments')} className="bg-[#0f0f0f] border-white/[0.04] cursor-pointer">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[11px] font-black text-white/80 italic">
-                {VI ? 'Trung tâm Doanh thu' : 'Billing Hub'}
+                {VI ? 'Doanh thu' : 'Revenue Hub'}
               </h4>
               <DollarSign className="w-4 h-4 text-green-400" />
             </div>
             <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-2xl font-black text-white leading-none">$14,502</span>
-              <span className="text-[10px] font-bold text-green-400">+$2.1k</span>
+              <span className="text-2xl font-black text-white leading-none">{fmtVnd(data.revenue.total)}</span>
+              {data.revenue.last30Days > 0 && (
+                <span className="text-[10px] font-bold text-green-400">+{fmtVnd(data.revenue.last30Days)}</span>
+              )}
             </div>
             <p className="text-[10px] font-bold text-white/25 uppercase tracking-[.2em] mb-3">
-              {VI ? 'Doanh thu dự kiến (Q1)' : 'Projected Revenue (Q1)'}
+              {VI ? `Dự kiến quý: ${fmtVnd(data.revenue.projectedQuarter)}` : `Projected Q: ${fmtVnd(data.revenue.projectedQuarter)}`}
             </p>
             <div className="space-y-1.5">
-              {[
-                { label: VI ? 'Gói cao cấp'    : 'Premium Tiers',    value: VI ? '652 người dùng' : '652 Users' },
-                { label: VI ? 'Node doanh nghiệp' : 'Enterprise Nodes', value: VI ? '12 nhóm'        : '12 Teams'  },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between text-[10px] font-bold px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.05] text-white/50">
-                  <span>{row.label}</span>
-                  <span className="text-white/80">{row.value}</span>
-                </div>
-              ))}
+              <div className="flex justify-between text-[10px] font-bold px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.05] text-white/50">
+                <span>{VI ? 'Đơn đã thanh toán' : 'Paid Orders'}</span>
+                <span className="text-white/80">{fmtNum(data.revenue.paidOrders)}</span>
+              </div>
+              <div className="flex justify-between text-[10px] font-bold px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.05] text-white/50">
+                <span>{VI ? 'Người dùng đã mua' : 'Paying Users'}</span>
+                <span className="text-white/80">{fmtNum(data.revenue.paidUsers)}</span>
+              </div>
             </div>
           </DarkCard>
         </div>
@@ -485,75 +642,96 @@ export default function Overview() {
       {/* ── Tier 4: Security + Network ─────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
-        {/* Security Logs */}
+        {/* Security Logs — real từ /api/admin/operations/security-events */}
         <DarkCard>
           <h3 className="text-[11px] font-black text-white/70 italic mb-3 flex items-center gap-2">
             <Lock className="w-4 h-4 text-purple-400" />
             {VI ? 'Nhật ký bảo mật' : 'Security Logs'}
           </h3>
           <div className="space-y-2">
-            {SECURITY_LOGS.map((log, i) => (
-              <div key={i} className="flex gap-2.5 pb-2 border-b border-white/[0.05] last:border-0">
-                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0
-                  ${log.level === 'danger' ? 'bg-red-400 animate-pulse shadow-[0_0_6px_#f87171]'
-                  : log.level === 'warn'   ? 'bg-yellow-400'
-                  : 'bg-blue-400'}`} />
-                <div>
-                  <p className="text-[11px] font-bold text-white/75 leading-tight">{VI ? log.tVi : log.tEn}</p>
-                  <p className="text-[9px] text-white/25 font-black uppercase tracking-widest">{VI ? log.timeVi : log.timeEn}</p>
-                </div>
+            {secEvents.length === 0 ? (
+              <div className="flex items-center gap-2 py-2 text-[10px] text-white/30 italic">
+                <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                {VI ? 'Không có sự kiện bảo mật nào' : 'No security events'}
               </div>
-            ))}
+            ) : secEvents.map((ev, i) => {
+              const sev = (ev.severity || '').toLowerCase();
+              const level = sev === 'critical' || sev === 'high' ? 'danger' : sev === 'medium' || sev === 'warn' ? 'warn' : 'info';
+              return (
+                <div key={i} className="flex gap-2.5 pb-2 border-b border-white/[0.05] last:border-0">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0
+                    ${level === 'danger' ? 'bg-red-400 animate-pulse shadow-[0_0_6px_#f87171]'
+                    : level === 'warn'   ? 'bg-yellow-400'
+                    : 'bg-blue-400'}`} />
+                  <div>
+                    <p className="text-[11px] font-bold text-white/75 leading-tight">
+                      {ev.message || ev.type || (VI ? 'Sự kiện không tên' : 'Unnamed event')}
+                    </p>
+                    <p className="text-[9px] text-white/25 font-black uppercase tracking-widest">
+                      {ev.timestamp ? relTime(ev.timestamp, VI) : '—'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </DarkCard>
 
-        {/* System Health */}
+        {/* System Health — real từ /api/admin/operations/services-health */}
         <DarkCard>
           <h3 className="text-[11px] font-black text-white/70 italic mb-3 flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-green-400" />
             {VI ? 'Sức khoẻ hệ thống' : 'System Health'}
+            <span className="ml-auto text-[10px] font-mono text-white/40">
+              {data.servicesSummary.up}/{data.servicesSummary.total}
+            </span>
           </h3>
           <div className="space-y-1.5">
-            {HEALTH_SERVICES.map(svc => (
-              <div key={svc.nameEn} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.05] transition-colors">
+            {data.services.slice(0, 6).map(svc => (
+              <div key={svc.name} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.05] transition-colors">
                 <div className="flex items-center gap-2">
                   <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0
-                    ${svc.status === 'online' ? 'bg-green-400 shadow-[0_0_6px_#4ade80]' : 'bg-yellow-400 animate-pulse'}`} />
-                  <span className="text-[11px] font-bold text-white/70">{VI ? svc.nameVi : svc.nameEn}</span>
+                    ${svc.status === 'up' ? 'bg-green-400 shadow-[0_0_6px_#4ade80]' : svc.status === 'degraded' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
+                  <span className="text-[11px] font-bold text-white/70">{svc.name}</span>
                 </div>
                 <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full
-                  ${svc.status === 'online' ? 'text-green-400 bg-green-500/10' : 'text-yellow-400 bg-yellow-500/10'}`}>
-                  {svc.status === 'online' ? (VI ? 'Trực tuyến' : 'Online') : (VI ? 'Suy giảm' : 'Degraded')}
+                  ${svc.status === 'up' ? 'text-green-400 bg-green-500/10' : svc.status === 'degraded' ? 'text-yellow-400 bg-yellow-500/10' : 'text-red-400 bg-red-500/10'}`}>
+                  {healthLabel(svc)}
                 </span>
               </div>
             ))}
           </div>
         </DarkCard>
 
-        {/* Network Load */}
+        {/* Network Load — real PageView count last 30h */}
         <DarkCard>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[11px] font-black text-white/70 italic flex items-center gap-2">
               <Globe className="w-4 h-4 text-blue-400" />
-              {VI ? 'Tải mạng toàn cầu' : 'Global Network Load'}
+              {VI ? 'Lưu lượng (30h)' : 'Traffic (30h)'}
             </h3>
-            <div className="flex items-center gap-2 text-[9px] font-black uppercase text-white/30">
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-blue-500" /> {VI ? 'Độ trễ' : 'Latency'}</span>
-              <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-purple-500" /> {VI ? 'Lưu lượng' : 'Traffic'}</span>
-            </div>
+            <span className="text-[10px] font-mono text-white/40">
+              {fmtNum(networkChart.reduce((s, n) => s + (n.requests || 0), 0))} req
+            </span>
           </div>
           <div className="h-20 flex items-end gap-0.5 px-1">
-            {NETWORK_DATA.map((d, i) => (
+            {networkChart.map((d, i) => (
               <div key={i} className="flex-1 rounded-t-sm transition-all group relative"
-                style={{ height: `${d.v}%`, background: i === 15 ? '#3b82f6' : 'rgba(102,126,234,0.25)' }}>
-                {i === 15 && (
+                style={{
+                  height: `${Math.max(3, d.percent)}%`,
+                  background: i === networkChart.length - 1 ? '#3b82f6' : 'rgba(102,126,234,0.25)',
+                }}>
+                {i === networkChart.length - 1 && d.requests > 0 && (
                   <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-blue-500 text-white text-[8px] font-bold whitespace-nowrap">
-                    12ms
+                    {d.requests}
                   </div>
                 )}
               </div>
             ))}
           </div>
+          <p className="text-[9px] text-white/30 mt-2 text-right">
+            {VI ? 'PageView · 30 giờ qua' : 'PageView · Last 30h'}
+          </p>
         </DarkCard>
       </div>
     </div>

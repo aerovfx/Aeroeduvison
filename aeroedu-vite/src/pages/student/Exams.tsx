@@ -211,7 +211,7 @@ function ExamRoomCard({
   room, onJoin,
 }: {
   room: StudentExamRoom
-  onJoin: (id: string) => void
+  onJoin: (room: StudentExamRoom) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const isActive = room.status === 'active'
@@ -315,7 +315,7 @@ function ExamRoomCard({
           </button>
           {canJoin ? (
             <button
-              onClick={() => onJoin(room.id)}
+              onClick={() => onJoin(room)}
               style={{
                 padding: '8px 18px', borderRadius: 10,
                 background: 'linear-gradient(135deg,#10b981,#059669)', border: 'none',
@@ -417,20 +417,30 @@ export default function StudentExamsPage() {
     activeTab === 'active'   ? active   :
     activeTab === 'upcoming' ? upcoming : completed
 
-  const handleJoin = useCallback(async (roomId: string) => {
+  // FIX 2026-05-26: học sinh vào phòng thi "không tìm thấy đề"
+  // Root cause: navigate(`/student/exam/${roomId}`) → ExamModesPage fetch
+  // /api/exams/{roomId} → 404 (vì roomId ≠ examId)
+  // Fix: dùng room.Exam.id (FE đã có), fallback response.examId (BE mới trả)
+  const handleJoin = useCallback(async (room: StudentExamRoom) => {
+    const roomId = room.id
     try {
       const { data } = await api.post('/online-exam-room/join', { roomId })
       const res = data.data ?? data
-      const id = res.room?.id || res.roomId || roomId
+      const examId = room.Exam?.id || res.examId || res.room?.examId
+      if (!examId) {
+        toast.error('Phòng thi này chưa gắn đề — giáo viên cần chọn đề trước')
+        return
+      }
       // RS: track join signal (mạnh hơn click — user thực sự commit làm bài)
       rs.track({
         action: 'click',
         targetType: 'exam_room',
         targetId: roomId,
-        metadata: { alreadyJoined: !!res.alreadyJoined },
+        metadata: { alreadyJoined: !!res.alreadyJoined, examId },
       })
       toast.success(res.alreadyJoined ? 'Tiếp tục bài thi' : 'Đã vào phòng thi!')
-      navigate(`/student/exam/${id}`)
+      // Pass roomId qua query → ExamModes có thể track room participation
+      navigate(`/student/exam/${examId}?roomId=${roomId}`)
     } catch (e: any) {
       toast.error(e.response?.data?.error || e.message || 'Không thể vào phòng')
     }

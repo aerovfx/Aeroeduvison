@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Loader2, Sparkles, Plus, Trash2, CheckCircle2,
   Link, FileText, Youtube, Globe, ChevronLeft, X,
@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast"
 import {
   SUBJECTS, GRADES, QUESTION_TYPES_DISPLAY, DIFFICULTIES_DISPLAY, COGNITIVE_LEVELS,
 } from "@/lib/constants/question-bank"
+import { api } from "@/services/api"
 
 interface Source {
   id: string
@@ -52,6 +53,17 @@ export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateMo
 
   const [previewQuestions, setPreviewQuestions] = useState<GeneratedQuestion[]>([])
   const [savedCount, setSavedCount] = useState(0)
+  // AI quota tracking — chia sẻ chung với /api/ai/generate-questions
+  const [aiQuota, setAiQuota] = useState<{
+    used: number; limit: number | null; remaining: number | null;
+    source: 'admin' | 'paid' | 'free'; unlimited: boolean; resetAt?: string;
+  } | null>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    api.get('/ai/generate-questions/quota')
+      .then(r => setAiQuota(r.data))
+      .catch(() => {})
+  }, [isOpen])
 
   const toggleType = (type: string) =>
     setSelectedTypes((p) => (p.includes(type) ? p.filter((t) => t !== type) : [...p, type]))
@@ -106,21 +118,26 @@ export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateMo
 
     setLoading(true)
     try {
-      const response = await fetch("/api/questions/bulk-generate?preview=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject, grade,
-          count: questionCount,
-          questionTypes: selectedTypes,
-          difficulty: selectedDifficulty,
-          cognitiveLevels: selectedCognitive,
-          sources: sources.map((s) => ({ type: s.type, content: s.content || s.url })),
-          useAI: true,
-        }),
+      // Map FE labels → BE type codes
+      const TYPE_MAP: Record<string, string> = {
+        'TNKQ - Nhiều lựa chọn': 'MCQ',
+        'TNKQ - Đúng/Sai': 'MULTIPLE_TF',
+        'TNKQ - Trả lời ngắn': 'SHORT_ANSWER',
+        'Tự luận': 'ESSAY',
+      }
+      const beTypes = selectedTypes.map(t => TYPE_MAP[t] || t)
+
+      const { data } = await api.post('/questions/bulk-generate', {
+        subject, grade,
+        count: questionCount,
+        questionTypes: beTypes,
+        difficulty: selectedDifficulty,
+        cognitiveLevels: selectedCognitive,
+        sources: sources.map((s) => ({ type: s.type, content: s.content || s.url })),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Không thể sinh câu hỏi")
+
+      // Update quota từ response
+      if ((data as any).quota) setAiQuota((data as any).quota)
 
       const questions: GeneratedQuestion[] = (
         data.data?.questions || data.questions || []
@@ -135,7 +152,17 @@ export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateMo
         setStep(2)
       }
     } catch (error: any) {
-      toast.error(error.message || "Không thể sinh câu hỏi")
+      const status = error?.response?.status
+      const respData = error?.response?.data
+      if (status === 429 && respData?.error === 'quota_exceeded') {
+        toast.error(respData.message, { duration: 6000 })
+        setAiQuota({
+          used: respData.used, limit: respData.limit, remaining: 0,
+          source: 'free', unlimited: false, resetAt: respData.retryAt,
+        })
+      } else {
+        toast.error(respData?.message || error?.message || "Không thể sinh câu hỏi")
+      }
     } finally {
       setLoading(false)
     }
@@ -147,33 +174,12 @@ export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateMo
 
     setSaving(true)
     try {
-      const response = await fetch("/api/questions/bulk-save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, grade, questions: selected }),
-      })
-
-      if (!response.ok) {
-        const fallbackResp = await fetch("/api/questions/bulk-generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subject, grade,
-            sources: sources.map((s) => ({ type: s.type, content: s.content || s.url })),
-            useAI: true,
-          }),
-        })
-        const fallbackData = await fallbackResp.json()
-        setSavedCount(fallbackData.data?.inserted || selected.length)
-        onSuccess?.(fallbackData.data?.totalInBank || 0)
-      } else {
-        const data = await response.json()
-        setSavedCount(data.inserted || selected.length)
-        onSuccess?.(data.totalInBank || 0)
-      }
+      const { data } = await api.post('/questions/bulk-save', { subject, grade, questions: selected })
+      setSavedCount(data.inserted || selected.length)
+      onSuccess?.(data.totalInBank || 0)
       setStep(3)
     } catch (error: any) {
-      toast.error(error.message || "Không thể lưu câu hỏi")
+      toast.error(error?.response?.data?.message || error?.message || "Không thể lưu câu hỏi")
     } finally {
       setSaving(false)
     }
@@ -194,20 +200,65 @@ export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateMo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" style={{ background: '#10111e', border: '1px solid #1e2033' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2033]">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e2033] gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <Sparkles className="w-5 h-5 text-purple-600" />
             <h2 className="text-lg font-bold text-slate-100">Sinh câu hỏi từ nhiều nguồn</h2>
+            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+              style={{
+                background: 'linear-gradient(90deg, rgba(124,58,237,0.25), rgba(6,182,212,0.25))',
+                color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.4)',
+              }}>
+              Claude · DeepSeek
+            </span>
             {step > 1 && (
-              <span className="text-xs text-slate-500 ml-2">Bước {step}/3</span>
+              <span className="text-xs text-slate-500 ml-1">Bước {step}/3</span>
             )}
           </div>
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-[#1e2033] rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {aiQuota && (
+              aiQuota.unlimited ? (
+                <span className="text-[10px] px-2 py-1 rounded-full border bg-purple-500/15 border-purple-500/40 text-purple-300 font-bold">
+                  ∞ {aiQuota.source === 'admin' ? 'Admin' : 'Gói Pro'}
+                </span>
+              ) : (
+                <>
+                  <span
+                    className={`text-[10px] px-2 py-1 rounded-full border font-bold ${
+                      (aiQuota.remaining ?? 0) === 0
+                        ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                        : (aiQuota.remaining ?? 0) <= 3
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                        : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                    }`}
+                    title={aiQuota.resetAt ? `Reset lúc ${new Date(aiQuota.resetAt).toLocaleString('vi-VN')}` : ''}
+                  >
+                    Còn {aiQuota.remaining}/{aiQuota.limit} lượt
+                  </span>
+                  <a
+                    href="/payment?plan=pro&feature=quiz_generate"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] px-2.5 py-1 rounded-full font-bold transition-all hover:scale-105 inline-flex items-center gap-1"
+                    style={{
+                      background: 'linear-gradient(135deg,#fbbf24,#f59e0b)',
+                      color: '#1a1a2e',
+                      boxShadow: '0 2px 8px rgba(245,158,11,0.35)',
+                    }}
+                    title="Nâng cấp gói Pro — sinh câu hỏi không giới hạn"
+                  >
+                    ✨ Đăng ký Pro
+                  </a>
+                </>
+              )
+            )}
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-[#1e2033] rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">

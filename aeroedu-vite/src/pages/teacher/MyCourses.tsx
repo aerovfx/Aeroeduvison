@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, BookOpen, Users, MoreVertical, Edit, Upload, FileText,
   Trash2, Eye, EyeOff, TrendingUp, Search, Filter, ExternalLink,
-  Wallet, Tag, BookMarked, X, Check, Link2,
+  Wallet, Tag, BookMarked, X, Check, Link2, PlayCircle,
 } from 'lucide-react'
 import { instructorService } from '@/services/instructor.service'
 import { cn } from '@/lib/utils'
@@ -115,6 +115,11 @@ function CourseCard({ course }: { course: InstructorCourse }) {
   const enrolCount = course.enrollments?.length ?? 0
   const earnings = (course.regularPrice || 0) * enrolCount
   const publicUrl = `/courses/${course.slug || course.id}`
+  // ── Preview as student ────────────────────────────────────────
+  // User: "giáo viên có thể xem bài giảng mình soạn như học sinh"
+  // → mở CoursePlayer (student view) với param ?preview=teacher để
+  //   FE hiện banner "Bạn đang xem ở chế độ HS" + nút quay lại sửa.
+  const previewUrl = `/learning/course/${course.slug || course.id}/${course.id}?preview=teacher`
 
   const deleteCourse = useMutation({
     mutationFn: () => instructorService.deleteCourse(course.id),
@@ -181,6 +186,9 @@ function CourseCard({ course }: { course: InstructorCourse }) {
               <div className="absolute right-0 top-9 w-52 rounded-lg bg-gray-800 border border-white/10 shadow-xl z-20 py-1">
                 <Link to={`/teacher/course/${course.id}/edit`} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5" onClick={() => setMenuOpen(false)}>
                   <Edit className="w-4 h-4" /> Chỉnh sửa
+                </Link>
+                <Link to={previewUrl} className="flex items-center gap-2 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/10" onClick={() => setMenuOpen(false)}>
+                  <PlayCircle className="w-4 h-4" /> Xem như học sinh
                 </Link>
                 <Link to={`/teacher/course/${course.id}/videos`} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5" onClick={() => setMenuOpen(false)}>
                   <Upload className="w-4 h-4" /> Bài giảng & Video
@@ -261,17 +269,26 @@ function CourseCard({ course }: { course: InstructorCourse }) {
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="flex gap-2 pt-1">
+        {/* Quick actions — Sửa | Xem như HS | Video */}
+        <div className="grid grid-cols-3 gap-2 pt-1">
           <Link
             to={`/teacher/course/${course.id}/edit?step=0`}
-            className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium text-center transition-colors border border-white/10"
+            className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium text-center transition-colors border border-white/10"
+            title="Chỉnh sửa khoá học"
           >
             <Edit className="w-3.5 h-3.5 inline mr-1" />Sửa
           </Link>
           <Link
+            to={previewUrl}
+            className="py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-medium text-center transition-colors border border-emerald-500/30"
+            title="Xem khoá học như học sinh — chế độ preview"
+          >
+            <PlayCircle className="w-3.5 h-3.5 inline mr-1" />Xem
+          </Link>
+          <Link
             to={`/teacher/course/${course.id}/edit?step=2`}
-            className="flex-1 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-medium text-center transition-colors border border-purple-500/30"
+            className="py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-medium text-center transition-colors border border-purple-500/30"
+            title="Upload video bài giảng"
           >
             <Upload className="w-3.5 h-3.5 inline mr-1" />Video
           </Link>

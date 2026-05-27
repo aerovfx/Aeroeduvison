@@ -188,17 +188,116 @@ function NewKeyModal({ result, onClose }: { result: NewKeyResult; onClose: () =>
 
 /* ─────────────────────────── Setup guide ─────────────────────────── */
 
+// Config snippet — Mac/Linux dùng wrapper /bin/aeroedu-mcp
+// (Nếu user build từ source thì thay bằng node + /dist/index.js — xem Cách B Bước 2)
 const CLAUDE_CONFIG_JSON = `{
   "mcpServers": {
     "aeroedu": {
-      "command": "node",
-      "args": ["/path/to/mcp-server/dist/index.js"],
+      "command": "/path/to/aeroedu-mcp/bin/aeroedu-mcp",
       "env": {
         "AEROEDU_API_KEY": "AERO-your-key-here"
       }
     }
   }
 }`
+
+const CLAUDE_CONFIG_JSON_WIN = `{
+  "mcpServers": {
+    "aeroedu": {
+      "command": "C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd",
+      "env": {
+        "AEROEDU_API_KEY": "AERO-your-key-here"
+      }
+    }
+  }
+}`
+
+// ── Multi-client MCP config snippets ──
+// Claude Desktop: Anthropic native, chỉ Claude model
+// Cursor: VS Code fork, support cả Claude + DeepSeek + GPT model
+// Cherry Studio: desktop GUI VN-friendly, multi-provider
+// Cline: VS Code extension, dev tool
+
+type McpClient = 'claude-desktop' | 'cursor' | 'cherry-studio' | 'cline'
+
+const MCP_CLIENT_INFO: Record<McpClient, {
+  name: string; emoji: string;
+  models: string[];
+  download: string;
+  configPath: { mac: string; win: string; linux?: string };
+  configFormat: 'json' | 'cursor-mcp' | 'cherry-mcp';
+}> = {
+  'claude-desktop': {
+    name: 'Claude Desktop',
+    emoji: '🤖',
+    models: ['Claude Sonnet 4.5', 'Claude Opus 4.5'],
+    download: 'https://claude.ai/download',
+    configPath: {
+      mac: '~/Library/Application Support/Claude/claude_desktop_config.json',
+      win: '%APPDATA%\\Claude\\claude_desktop_config.json',
+      linux: '~/.config/Claude/claude_desktop_config.json',
+    },
+    configFormat: 'json',
+  },
+  'cursor': {
+    name: 'Cursor (Claude + DeepSeek)',
+    emoji: '✨',
+    models: ['Claude Sonnet 4.5', 'DeepSeek V3', 'GPT-4o', 'Gemini 2'],
+    download: 'https://cursor.com',
+    configPath: {
+      mac: '~/.cursor/mcp.json',
+      win: '%USERPROFILE%\\.cursor\\mcp.json',
+      linux: '~/.cursor/mcp.json',
+    },
+    configFormat: 'cursor-mcp',
+  },
+  'cherry-studio': {
+    name: 'Cherry Studio (đa provider)',
+    emoji: '🍒',
+    models: ['DeepSeek V3', 'Claude', 'GPT', 'Gemini', 'Local Ollama'],
+    download: 'https://github.com/CherryHQ/cherry-studio/releases',
+    configPath: {
+      mac: 'App → Settings → MCP Servers → Add',
+      win: 'App → Settings → MCP Servers → Add',
+    },
+    configFormat: 'cherry-mcp',
+  },
+  'cline': {
+    name: 'Cline (VS Code)',
+    emoji: '💻',
+    models: ['Claude', 'DeepSeek', 'GPT', 'Gemini', 'OpenRouter'],
+    download: 'VS Code Marketplace → "Cline"',
+    configPath: {
+      mac: 'Cline panel → MCP Servers tab → "Configure MCP Servers"',
+      win: 'Cline panel → MCP Servers tab → "Configure MCP Servers"',
+    },
+    configFormat: 'json',
+  },
+}
+
+function buildConfigSnippet(client: McpClient, isWindows: boolean = false): string {
+  // Wrapper path — đơn giản hơn `node + dist/index.js`
+  const wrapperMac = '/path/to/aeroedu-mcp/bin/aeroedu-mcp'
+  const wrapperWin = 'C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd'
+  const wrapper = isWindows ? wrapperWin : wrapperMac
+
+  if (client === 'cherry-studio') {
+    // Cherry Studio dùng GUI — không phải JSON manual
+    return `Form trong Settings → MCP Servers:
+
+  Name:        aeroedu
+  Type:        STDIO
+  Command:     ${wrapper}
+  Arguments:   (để trống)
+  Env Vars:
+    AEROEDU_API_KEY = AERO-your-key-here
+
+  → Bấm Save → Enable toggle ✓`
+  }
+  // Claude Desktop + Cursor + Cline đều dùng JSON format giống nhau
+  // Mac/Linux: wrapper bash; Windows: wrapper .cmd
+  return isWindows ? CLAUDE_CONFIG_JSON_WIN : CLAUDE_CONFIG_JSON
+}
 
 interface Step {
   icon: React.ReactNode
@@ -208,70 +307,340 @@ interface Step {
 
 function SetupGuide() {
   const [open, setOpen] = useState(false)
+  const [client, setClient] = useState<McpClient>('claude-desktop')
+  // Auto-detect OS từ navigator để default đúng snippet
+  const detectedOs: 'mac' | 'win' | 'linux' = typeof navigator !== 'undefined'
+    ? /Mac/i.test(navigator.platform) ? 'mac'
+      : /Win/i.test(navigator.platform) ? 'win' : 'linux'
+    : 'mac'
+  const [os, setOs] = useState<'mac' | 'win'>(detectedOs === 'win' ? 'win' : 'mac')
+  const info = MCP_CLIENT_INFO[client]
+  const configSnippet = buildConfigSnippet(client, os === 'win')
 
   const steps: Step[] = [
     {
-      icon: <Terminal className="w-4 h-4 text-blue-400" />,
-      title: 'Bước 1 — Tải MCP server',
+      icon: <Key className="w-4 h-4 text-purple-400" />,
+      title: 'Bước 1 — Tạo & sao chép API Key',
       body: (
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Clone hoặc tải bản build từ repository chính thức:</p>
-          <div className="relative">
-            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
-{`git clone https://github.com/aeroedu/mcp-hub.git
-cd mcp-hub && npm install && npm run build`}
-            </pre>
-            <CopyButton
-              text={`git clone https://github.com/aeroedu/mcp-hub.git\ncd mcp-hub && npm install && npm run build`}
-              className="absolute top-2 right-2"
-            />
-          </div>
-          <p className="text-xs">Yêu cầu: Node.js ≥ 18. Sau khi build xong, ghi nhớ đường dẫn tới <code className="font-mono bg-muted/60 px-1 rounded">dist/index.js</code>.</p>
+          <p>
+            Bấm nút <strong className="text-purple-300">"+ Tạo API Key mới"</strong> ở bảng trên →
+            đặt tên gợi nhớ (vd: <em>Claude MacBook</em>) → bấm Tạo.
+            Bảng popup sẽ hiện chuỗi <code className="font-mono bg-muted/60 px-1 rounded text-xs">AERO-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>.
+          </p>
+          <p className="text-rose-400 text-xs">
+            ⚠ Key chỉ hiện 1 LẦN DUY NHẤT — copy ngay trước khi đóng popup.
+            Nếu lỡ mất, xoá key cũ và tạo key mới.
+          </p>
         </div>
       ),
     },
     {
-      icon: <Key className="w-4 h-4 text-purple-400" />,
-      title: 'Bước 2 — Sao chép API Key',
+      icon: <Terminal className="w-4 h-4 text-blue-400" />,
+      title: 'Bước 2 — Tải MCP server (chọn 1 trong 2 cách)',
       body: (
-        <p className="text-sm text-muted-foreground">
-          Tạo key mới (hoặc dùng key có sẵn) ở bảng phía trên. Sao chép toàn bộ chuỗi <code className="font-mono bg-muted/60 px-1 rounded text-xs">AERO-...</code> vào clipboard.
-        </p>
+        <div className="space-y-4 text-sm text-muted-foreground">
+
+          {/* ── CÁCH A: Tải bản đóng gói (KHUYẾN NGHỊ — không cần git/npm) ── */}
+          <div className="rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                KHUYẾN NGHỊ
+              </span>
+              <p className="font-bold text-foreground text-sm">Cách A — Tải bản đóng gói</p>
+            </div>
+            <p className="text-xs">
+              Chỉ cần <strong>Node.js ≥ 18</strong> (tải <a href="https://nodejs.org" target="_blank" rel="noreferrer" className="text-emerald-300 underline">nodejs.org</a>).
+              Không cần git, không cần build.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <a
+                href="https://storage.googleapis.com/aeroedu-media-extreme-lattice-491123-p2/mcp/aeroedu-mcp-v0.5.0-mac.zip"
+                download
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg font-bold text-xs transition-all hover:scale-[1.02]"
+                style={{
+                  background: 'linear-gradient(135deg, #475569, #1e293b)',
+                  color: '#f1f5f9',
+                  border: '1px solid #64748b',
+                }}
+              >
+                <span className="text-base">🍎</span>
+                <div className="flex-1 text-left">
+                  <div>macOS / Linux</div>
+                  <div className="text-[10px] font-normal opacity-60">aeroedu-mcp-v0.5.0-mac.zip · 5.3 MB</div>
+                </div>
+              </a>
+              <a
+                href="https://storage.googleapis.com/aeroedu-media-extreme-lattice-491123-p2/mcp/aeroedu-mcp-v0.5.0-win.zip"
+                download
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg font-bold text-xs transition-all hover:scale-[1.02]"
+                style={{
+                  background: 'linear-gradient(135deg, #0078d4, #005a9e)',
+                  color: '#fff',
+                  border: '1px solid #1e88e5',
+                }}
+              >
+                <span className="text-base">🪟</span>
+                <div className="flex-1 text-left">
+                  <div>Windows</div>
+                  <div className="text-[10px] font-normal opacity-80">aeroedu-mcp-v0.5.0-win.zip · 5.3 MB</div>
+                </div>
+              </a>
+            </div>
+            <div className="rounded-lg bg-muted/40 border border-border p-2.5 mt-2">
+              <p className="text-[11px] font-bold text-foreground mb-1.5">Sau khi tải xong:</p>
+              <ol className="text-[11px] space-y-1 ml-4 list-decimal">
+                <li>Giải nén zip ra ổ đĩa, vd:
+                  <ul className="ml-3 mt-0.5 list-disc text-muted-foreground">
+                    <li>macOS/Linux: <code className="font-mono bg-muted/60 px-1 rounded">~/aeroedu-mcp/</code></li>
+                    <li>Windows: <code className="font-mono bg-muted/60 px-1 rounded">C:\aeroedu-mcp\</code></li>
+                  </ul>
+                </li>
+                <li>Đường dẫn để cấu hình ở Bước 3:
+                  <ul className="ml-3 mt-0.5 list-disc text-muted-foreground">
+                    <li>macOS/Linux: <code className="font-mono bg-muted/60 px-1 rounded text-[10px]">~/aeroedu-mcp/bin/aeroedu-mcp</code></li>
+                    <li>Windows: <code className="font-mono bg-muted/60 px-1 rounded text-[10px]">C:\aeroedu-mcp\bin\aeroedu-mcp.cmd</code></li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          {/* ── CÁCH B: Build từ source (cho dev) ── */}
+          <details className="rounded-xl border border-border bg-card/50 group">
+            <summary className="cursor-pointer flex items-center gap-2 p-3 hover:bg-muted/30 transition-colors">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                CHO DEV
+              </span>
+              <p className="font-bold text-foreground text-sm">Cách B — Build từ source code</p>
+              <ChevronDown className="w-4 h-4 ml-auto group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-3 pt-0 space-y-2">
+              <p className="text-xs">Cần git + Node.js ≥ 18:</p>
+              <div className="relative">
+                <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
+{`git clone https://github.com/aerovfx/MCPaeroedu.git
+cd MCPaeroedu
+npm install && npm run build`}
+                </pre>
+                <CopyButton
+                  text={`git clone https://github.com/aerovfx/MCPaeroedu.git\ncd MCPaeroedu\nnpm install && npm run build`}
+                  className="absolute top-2 right-2"
+                />
+              </div>
+              <p className="text-xs">
+                Sau build xong, đường dẫn cấu hình:{' '}
+                <code className="font-mono bg-muted/60 px-1 rounded">[pwd]/dist/index.js</code>
+                {' · '}Repo riêng:{' '}
+                <a
+                  href="https://github.com/aerovfx/MCPaeroedu"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-300 underline"
+                >github.com/aerovfx/MCPaeroedu</a>
+              </p>
+            </div>
+          </details>
+        </div>
       ),
     },
     {
       icon: <Monitor className="w-4 h-4 text-green-400" />,
-      title: 'Bước 3 — Cấu hình Claude Desktop',
+      title: `Bước 3 — Cấu hình ${info.name}`,
       body: (
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Mở file cấu hình Claude Desktop tại{' '}
-            <code className="font-mono bg-muted/60 px-1 rounded text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</code>{' '}
-            (macOS) hoặc <code className="font-mono bg-muted/60 px-1 rounded text-xs">%APPDATA%\Claude\claude_desktop_config.json</code> (Windows), rồi thêm đoạn JSON sau:
+        <div className="space-y-3 text-sm text-muted-foreground">
+          {/* Client selector tabs */}
+          <div className="flex gap-1 p-1 rounded-lg bg-muted/40 border border-border">
+            {(Object.keys(MCP_CLIENT_INFO) as McpClient[]).map(c => {
+              const cInfo = MCP_CLIENT_INFO[c]
+              return (
+                <button
+                  key={c}
+                  onClick={() => setClient(c)}
+                  className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                    client === c
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  title={cInfo.name}
+                >
+                  {cInfo.emoji} {cInfo.name.split(' ')[0]}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Info box per client */}
+          <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-2.5 text-xs space-y-1">
+            <p className="font-bold text-purple-300">{info.emoji} {info.name}</p>
+            <p>
+              <strong>Models hỗ trợ:</strong> {info.models.join(' · ')}
+            </p>
+            <p>
+              <strong>Tải xuống:</strong>{' '}
+              {info.download.startsWith('http')
+                ? <a href={info.download} target="_blank" rel="noreferrer" className="text-purple-300 underline">{info.download}</a>
+                : <code className="font-mono bg-muted/60 px-1 rounded">{info.download}</code>}
+            </p>
+          </div>
+
+          {/* Config path */}
+          <div>
+            <p className="font-medium text-foreground mb-1.5 text-xs uppercase tracking-wider">Vị trí file/setting:</p>
+            <ul className="text-xs space-y-1 ml-4 list-disc">
+              <li><strong>macOS:</strong> <code className="font-mono bg-muted/60 px-1 rounded text-[11px]">{info.configPath.mac}</code></li>
+              <li><strong>Windows:</strong> <code className="font-mono bg-muted/60 px-1 rounded text-[11px]">{info.configPath.win}</code></li>
+              {info.configPath.linux && (
+                <li><strong>Linux:</strong> <code className="font-mono bg-muted/60 px-1 rounded text-[11px]">{info.configPath.linux}</code></li>
+              )}
+            </ul>
+          </div>
+
+          <p className="text-xs">
+            {info.configFormat === 'cherry-mcp'
+              ? 'Cherry Studio dùng GUI — không phải JSON. Mở Settings → MCP Servers → Add new:'
+              : 'Thêm đoạn JSON sau (nếu file đã có mcpServers, chỉ cần thêm key aeroedu bên trong):'}
           </p>
+
+          {/* OS toggle — quyết định path style (wrapper bash vs .cmd) */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Hệ điều hành:</span>
+            <div className="flex gap-1 p-0.5 rounded-md bg-muted/40 border border-border">
+              <button
+                onClick={() => setOs('mac')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                  os === 'mac'
+                    ? 'bg-foreground/15 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🍎 macOS / Linux
+              </button>
+              <button
+                onClick={() => setOs('win')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                  os === 'win'
+                    ? 'bg-foreground/15 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🪟 Windows
+              </button>
+            </div>
+            <span className="text-[10px] text-muted-foreground/60">
+              (auto detect: {detectedOs === 'win' ? '🪟 Windows' : detectedOs === 'mac' ? '🍎 macOS' : '🐧 Linux'})
+            </span>
+          </div>
+
+          {/* Config snippet — copy-paste */}
           <div className="relative">
             <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-words">
-              {CLAUDE_CONFIG_JSON}
+              {configSnippet}
             </pre>
-            <CopyButton text={CLAUDE_CONFIG_JSON} className="absolute top-2 right-2" />
+            <CopyButton text={configSnippet} className="absolute top-2 right-2" />
           </div>
-          <p className="text-xs">Thay <code className="font-mono bg-muted/60 px-1 rounded">/path/to/mcp-server/dist/index.js</code> bằng đường dẫn thực và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key của bạn.</p>
+
+          <p className="text-xs">
+            Thay <code className="font-mono bg-muted/60 px-1 rounded">{os === 'win' ? 'C:\\\\path\\\\to\\\\aeroedu-mcp\\\\bin\\\\aeroedu-mcp.cmd' : '/path/to/aeroedu-mcp/bin/aeroedu-mcp'}</code> bằng đường dẫn THỰC tới folder vừa giải nén ở Bước 2,
+            và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key từ Bước 1.
+          </p>
+          <p className="text-[11px] text-muted-foreground/70">
+            💡 Nếu build từ source (Cách B), thay bằng <code className="font-mono bg-muted/60 px-1 rounded">{`"command": "node", "args": ["/path/to/mcp-server/dist/index.js"]`}</code>
+          </p>
+
+          {/* DeepSeek-specific note */}
+          {(client === 'cursor' || client === 'cherry-studio' || client === 'cline') && (
+            <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-2.5 text-xs space-y-1">
+              <p className="font-bold text-cyan-300">🧠 Chọn model DeepSeek trong {info.name}:</p>
+              <ol className="ml-4 list-decimal space-y-0.5">
+                {client === 'cursor' && (
+                  <>
+                    <li>Vào <strong>Cursor Settings → Models</strong></li>
+                    <li>Bật <strong>"Use Custom OpenAI Endpoint"</strong></li>
+                    <li>Base URL: <code className="font-mono bg-muted/60 px-1 rounded">https://api.deepseek.com/v1</code></li>
+                    <li>API Key: lấy từ <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="text-cyan-300 underline">platform.deepseek.com/api_keys</a></li>
+                    <li>Model: <code className="font-mono bg-muted/60 px-1 rounded">deepseek-chat</code> (v3) hoặc <code className="font-mono bg-muted/60 px-1 rounded">deepseek-reasoner</code> (R1)</li>
+                  </>
+                )}
+                {client === 'cherry-studio' && (
+                  <>
+                    <li>Vào <strong>Settings → Model Providers</strong></li>
+                    <li>Chọn <strong>"DeepSeek"</strong> trong list</li>
+                    <li>Paste API Key từ <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="text-cyan-300 underline">platform.deepseek.com</a></li>
+                    <li>Bật toggle Enable</li>
+                    <li>Trong chat, chọn DeepSeek-Chat hoặc DeepSeek-Reasoner</li>
+                  </>
+                )}
+                {client === 'cline' && (
+                  <>
+                    <li>Trong Cline panel → ⚙ Settings</li>
+                    <li>API Provider: chọn <strong>"DeepSeek"</strong></li>
+                    <li>Paste API Key</li>
+                    <li>Model: chọn <code className="font-mono bg-muted/60 px-1 rounded">deepseek-chat</code></li>
+                  </>
+                )}
+              </ol>
+              <p className="pt-1 text-cyan-200/70">
+                💰 DeepSeek pricing: $0.14/M input + $0.28/M output — RẺ hơn Claude ~50×.
+                Top-up ~$5 USD đủ dùng vài tháng cho cá nhân.
+              </p>
+            </div>
+          )}
         </div>
       ),
     },
     {
       icon: <Zap className="w-4 h-4 text-amber-400" />,
-      title: 'Bước 4 — Khởi động & kiểm tra',
+      title: `Bước 4 — Khởi động lại ${info.name} & test`,
       body: (
         <div className="text-sm text-muted-foreground space-y-2">
-          <p>Khởi động lại Claude Desktop. Trong cửa sổ chat mới, gõ:</p>
+          {client === 'claude-desktop' && (
+            <p>
+              <strong>Quit hoàn toàn</strong> Claude Desktop (Cmd+Q trên macOS) rồi mở lại.
+              Trong cửa sổ chat mới, bấm biểu tượng 🔌 ở góc dưới — sẽ thấy <strong>"aeroedu" 24 tools</strong>.
+            </p>
+          )}
+          {client === 'cursor' && (
+            <p>
+              Restart Cursor (Cmd+Shift+P → "Reload Window"). Mở chat AI (Cmd+L) → chọn model DeepSeek/Claude →
+              dấu 🛠 sẽ hiện <strong>"aeroedu" 24 tools</strong>.
+            </p>
+          )}
+          {client === 'cherry-studio' && (
+            <p>
+              Sau khi Save MCP server → bật toggle Enable. Mở chat mới → chọn model DeepSeek hoặc Claude →
+              dưới ô nhập prompt, bấm icon 🔌 → tick chọn <strong>"aeroedu"</strong> → 24 tools sẵn sàng.
+            </p>
+          )}
+          {client === 'cline' && (
+            <p>
+              Cline tự reload khi config thay đổi. Tab "MCP Servers" sẽ hiện <strong>"aeroedu"</strong> với
+              indicator xanh + 24 tools listed.
+            </p>
+          )}
+          <p>Test bằng prompt:</p>
           <div className="relative">
-            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground">
-              {`/tools list`}
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground whitespace-pre-wrap">
+              {`Liệt kê 5 khoá học gần nhất của tôi trên inphysic.com (dùng tool aeroedu_course_list)`}
             </pre>
-            <CopyButton text="/tools list" className="absolute top-2 right-2" />
+            <CopyButton
+              text="Liệt kê 5 khoá học gần nhất của tôi trên inphysic.com (dùng tool aeroedu_course_list)"
+              className="absolute top-2 right-2"
+            />
           </div>
-          <p>Bạn sẽ thấy danh sách 24 MCP tools của AeroEdu (aeroedu_course_list, aeroedu_kg_query, …). Nếu không thấy, kiểm tra lại đường dẫn và API key.</p>
+          <p className="text-xs">
+            Model (DeepSeek/Claude) sẽ gọi tool, MCP exchange API key → JWT (cache 90 ngày), trả về data thật từ inphysic.com.
+          </p>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
+            <p className="font-medium text-amber-300 mb-1">Troubleshooting nhanh:</p>
+            <ul className="space-y-0.5 ml-3 list-disc text-amber-200/80">
+              <li>Không thấy "aeroedu" → kiểm tra JSON syntax (dấu phẩy thừa?) qua jsonlint.com</li>
+              <li>Tool báo "401 unauthorized" → key revoke/sai → tạo key mới ở /teacher/api-keys</li>
+              <li>"Cannot find module" → đường dẫn dist/index.js sai → check lại <code className="font-mono bg-muted/60 px-1 rounded">pwd</code></li>
+              <li>"DeepSeek 503 Insufficient Balance" → vào platform.deepseek.com top-up</li>
+              <li>"DeepSeek/Claude không gọi tools" → model chưa hỗ trợ function calling → đổi model</li>
+            </ul>
+          </div>
         </div>
       ),
     },
@@ -288,8 +657,8 @@ cd mcp-hub && npm install && npm run build`}
             <Terminal className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-left">
-            <p className="font-medium text-foreground text-sm">Hướng dẫn cài đặt MCP</p>
-            <p className="text-xs text-muted-foreground">Kết nối Claude Desktop / Cursor với AeroEdu (4 bước)</p>
+            <p className="font-medium text-foreground text-sm">Hướng dẫn cài đặt MCP (DeepSeek · Claude · GPT)</p>
+            <p className="text-xs text-muted-foreground">Kết nối Claude Desktop · Cursor · Cherry Studio · Cline (4 bước)</p>
           </div>
         </div>
         {open ? (

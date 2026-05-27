@@ -5,6 +5,7 @@ import {
   ArrowRight, Menu, X, Cpu, FlaskConical, BookOpen,
   BarChart3, Shield, Zap, Users, Star, ChevronRight,
   Play, Sparkles, Globe, Activity, Eye, Layers, MapPin,
+  Plug, Terminal, Key, Download, Bot,
 } from 'lucide-react'
 import WorldMonitorGlobe from '@/components/world-monitor/WorldMonitorGlobe'
 import IntelDashboard from '@/components/world-monitor/IntelDashboard'
@@ -222,6 +223,7 @@ export default function Landing() {
             <a href="#features" className="land-nav-link">Tính năng</a>
             <a href="#platform" className="land-nav-link">Nền tảng</a>
             <a href="#ai"       className="land-nav-link">AI & Labs</a>
+            <a href="#mcp"      className="land-nav-link" style={{ color: '#c4b5fd' }}>MCP 🔌</a>
             <Link to="/docs" className="land-nav-link">Tài liệu</Link>
             <Link to="/news" className="land-nav-link">Tin tức</Link>
             <a href="#testimonials" className="land-nav-link">Phản hồi</a>
@@ -751,6 +753,223 @@ export default function Landing() {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* ══ MCP INTEGRATION — Connect your LLM ══ */}
+      <section id="mcp" style={{
+        position: 'relative', overflow: 'hidden',
+        background: `linear-gradient(180deg, ${C.bg0} 0%, rgba(124,58,237,0.04) 50%, ${C.bg0} 100%)`,
+        borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`,
+        padding: '96px 0',
+      }}>
+        {/* Ambient blobs */}
+        <div style={{ position: 'absolute', top: '20%', left: '-100px', width: 400, height: 400, background: 'radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '10%', right: '-100px', width: 400, height: 400, background: 'radial-gradient(circle, rgba(6,182,212,0.12), transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px', position: 'relative' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '6px 18px', borderRadius: 99,
+              background: 'linear-gradient(90deg, rgba(139,92,246,0.15), rgba(6,182,212,0.15))',
+              border: '1px solid rgba(139,92,246,0.4)',
+              fontSize: 12, fontWeight: 700, color: '#c4b5fd', marginBottom: 16,
+            }}>
+              <Plug size={13} /> MCP — Model Context Protocol
+            </div>
+            <h2 style={{ fontSize: 'clamp(26px, 4vw, 44px)', fontWeight: 900, marginBottom: 16, color: '#fff' }}>
+              Kết nối Claude · DeepSeek · GPT trực tiếp với inphysic.com
+            </h2>
+            <p style={{ color: C.muted, fontSize: 15, maxWidth: 720, margin: '0 auto', lineHeight: 1.6 }}>
+              Dùng <strong style={{ color: C.purpleL }}>AI bạn yêu thích</strong> để thao tác dữ liệu giảng dạy:
+              tạo khoá học, sinh đề thi, phân tích KG, chấm bài — tất cả qua prompt tự nhiên,
+              KHÔNG cần code, KHÔNG cần copy-paste qua nhiều tab.
+            </p>
+          </div>
+
+          {/* LLM logos row */}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12,
+            marginBottom: 56,
+          }}>
+            {[
+              { name: 'Claude', sub: 'Anthropic', emoji: '🤖', color: '#d97706' },
+              { name: 'DeepSeek', sub: 'V3 · R1', emoji: '🧠', color: '#06b6d4' },
+              { name: 'GPT', sub: 'OpenAI', emoji: '✨', color: '#10a37f' },
+              { name: 'Codex', sub: 'OpenAI', emoji: '💻', color: '#10b981' },
+              { name: 'Gemini', sub: 'Google', emoji: '💎', color: '#4285f4' },
+              { name: 'Llama', sub: 'Meta', emoji: '🦙', color: '#1877f2' },
+              { name: 'Qwen', sub: 'Alibaba', emoji: '🐲', color: '#ff6a00' },
+            ].map(p => (
+              <div key={p.name} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 18px', borderRadius: 99,
+                background: C.card, border: `1px solid ${C.border}`,
+                transition: 'all .2s', cursor: 'default',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = p.color; e.currentTarget.style.transform = 'translateY(-2px)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = 'translateY(0)' }}>
+                <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.1 }}>{p.name}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, lineHeight: 1.1 }}>{p.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 3 capability cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 48 }}>
+            {[
+              {
+                icon: Bot,
+                color: '#a78bfa',
+                bg: 'rgba(139,92,246,0.08)',
+                border: 'rgba(139,92,246,0.3)',
+                title: '24 Tools sẵn sàng',
+                desc: 'Course / KG / Block / Exam / Question / Student / Report — gọi qua prompt tự nhiên trong Claude Desktop, Cursor, Cherry Studio, Cline.',
+                tags: ['aeroedu_course_*', 'aeroedu_kg_*', 'aeroedu_exam_*'],
+              },
+              {
+                icon: Key,
+                color: '#06b6d4',
+                bg: 'rgba(6,182,212,0.08)',
+                border: 'rgba(6,182,212,0.3)',
+                title: 'API Key đơn giản',
+                desc: 'Tạo key AERO-xxx ở /teacher/api-keys → paste vào config → AI tự xác thực + thao tác dữ liệu của bạn an toàn (JWT cache 90 ngày).',
+                tags: ['Bcrypt hashed', 'Auto-rotate', 'Per-user audit'],
+              },
+              {
+                icon: Download,
+                color: '#10b981',
+                bg: 'rgba(16,185,129,0.08)',
+                border: 'rgba(16,185,129,0.3)',
+                title: 'Bản đóng gói sẵn',
+                desc: 'Tải zip 5.3MB cho macOS hoặc Windows → giải nén → cấu hình → done. Không cần git, không cần build.',
+                tags: ['macOS · Linux', 'Windows', 'Node ≥ 18'],
+              },
+            ].map((card, i) => {
+              const Icon = card.icon
+              return (
+                <div key={i} style={{
+                  background: C.card, border: `1px solid ${card.border}`, borderRadius: 20,
+                  padding: 28, position: 'relative', overflow: 'hidden',
+                  transition: 'all .25s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = card.color }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = card.border }}>
+                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${card.bg}, transparent 60%)`, pointerEvents: 'none' }} />
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 12,
+                      background: card.bg, border: `1px solid ${card.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      marginBottom: 16,
+                    }}>
+                      <Icon size={22} style={{ color: card.color }} />
+                    </div>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{card.title}</h3>
+                    <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65, marginBottom: 14 }}>{card.desc}</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {card.tags.map(t => (
+                        <span key={t} style={{
+                          padding: '3px 9px', borderRadius: 99,
+                          background: card.bg, border: `1px solid ${card.border}`,
+                          fontSize: 10, fontWeight: 700, color: card.color, fontFamily: 'monospace',
+                        }}>{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Demo prompt + CTA */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24,
+            alignItems: 'center',
+            padding: 28, borderRadius: 20,
+            background: `linear-gradient(135deg, rgba(139,92,246,0.06), rgba(6,182,212,0.06))`,
+            border: `1px solid rgba(139,92,246,0.25)`,
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Terminal size={16} style={{ color: '#a78bfa' }} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                  Ví dụ prompt
+                </span>
+              </div>
+              <div style={{
+                background: '#0a0a18', border: `1px solid ${C.border}`, borderRadius: 12,
+                padding: 16, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.7,
+                color: '#c4b5fd',
+              }}>
+                <div style={{ color: '#64748b', marginBottom: 6 }}>// Trong Claude / Cursor / Cherry Studio:</div>
+                <div>"Tạo cho tôi 1 đề thi Vật lí 11 chương Dao động</div>
+                <div>cơ — 10 câu MCQ, độ khó trung bình, có lời giải"</div>
+                <div style={{ color: '#10b981', marginTop: 8 }}>→ AI gọi <span style={{ color: '#fbbf24' }}>aeroedu_exam_publish</span></div>
+                <div style={{ color: '#10b981' }}>→ Đề mới xuất hiện trong /teacher/exams ✓</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <h3 style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.25 }}>
+                Cài đặt trong{' '}
+                <span style={{ background: 'linear-gradient(90deg,#a78bfa,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  3 phút
+                </span>
+              </h3>
+              <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+                Tải gói đóng gói → tạo API key → paste config vào client AI bạn yêu thích →
+                xong. Hỗ trợ <strong style={{ color: '#fff' }}>Claude Desktop · Cursor · Cherry Studio · Cline</strong>.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <Link to="/teacher/api-keys" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '12px 22px', borderRadius: 99,
+                  background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
+                  color: '#fff', fontSize: 13, fontWeight: 800,
+                  textDecoration: 'none', boxShadow: '0 8px 24px rgba(139,92,246,0.4)',
+                  transition: 'transform .15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                  <Key size={15} /> Bắt đầu cài MCP
+                  <ArrowRight size={14} />
+                </Link>
+                <a
+                  href="https://github.com/aerovfx/MCPaeroedu/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 22px', borderRadius: 99,
+                    background: '#10b981',
+                    color: '#fff', fontSize: 13, fontWeight: 700,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
+                  }}>
+                  <Download size={14} /> Tải bản đóng gói
+                </a>
+                <a
+                  href="https://github.com/aerovfx/MCPaeroedu"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 22px', borderRadius: 99,
+                    background: 'transparent',
+                    color: '#fff', fontSize: 13, fontWeight: 700,
+                    textDecoration: 'none',
+                    border: `1px solid ${C.border}`,
+                  }}>
+                  <Terminal size={14} /> Source code
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

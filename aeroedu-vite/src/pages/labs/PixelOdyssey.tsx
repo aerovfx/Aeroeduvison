@@ -1,6 +1,6 @@
 /**
  * Pixel Odyssey — Hành Trình Ánh Sao Lạc
- * /dashboard/labtwin/labs/pixel-odyssey
+ * /dashboard/labtwin/pixel-odyssey
  *
  * RPG pixel adventure 2D dựa trên kịch bản gốc của user về thế giới Aetheria:
  * những Ngôi Sao Ký Ức biến mất sau "Đêm Mất Sao", chỉ thiếu niên còn nhìn

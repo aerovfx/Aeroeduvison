@@ -218,17 +218,18 @@ function parse(src: string): Node {
   return n
 }
 
-function evalNode(n: Node, x: number): number {
+function evalNode(n: Node, x: number, y: number = 0): number {
   switch (n.k) {
     case 'num': return n.v
     case 'var':
       if (n.v === 'x') return x
+      if (n.v === 'y') return y
       if (n.v in CONSTANTS) return CONSTANTS[n.v]
       throw new Error(`Biến không biết: ${n.v}`)
-    case 'neg': return -evalNode(n.a, x)
-    case 'abs': return Math.abs(evalNode(n.a, x))
+    case 'neg': return -evalNode(n.a, x, y)
+    case 'abs': return Math.abs(evalNode(n.a, x, y))
     case 'bin': {
-      const a = evalNode(n.l, x), b = evalNode(n.r, x)
+      const a = evalNode(n.l, x, y), b = evalNode(n.r, x, y)
       switch (n.op) {
         case '+': return a + b
         case '-': return a - b
@@ -241,15 +242,28 @@ function evalNode(n: Node, x: number): number {
     case 'call': {
       const f = FUNCTIONS[n.name]
       if (!f) throw new Error(`Hàm không hỗ trợ: ${n.name}`)
-      return f(...n.args.map((a) => evalNode(a, x)))
+      return f(...n.args.map((a) => evalNode(a, x, y)))
     }
+  }
+}
+
+// Kiểm tra cây AST có sử dụng biến `y` không (để biết bất phương trình 1D hay 2D)
+function usesVarY(n: Node): boolean {
+  switch (n.k) {
+    case 'num': return false
+    case 'var': return n.v === 'y'
+    case 'neg':
+    case 'abs': return usesVarY(n.a)
+    case 'bin': return usesVarY(n.l) || usesVarY(n.r)
+    case 'call': return n.args.some(usesVarY)
   }
 }
 
 function compileFunction(src: string): { ok: true; eval: (x: number) => number } | { ok: false; err: string } {
   try {
-    // Normalize: strip leading "y =" or "f(x) ="
-    let s = src.trim()
+    // Normalize Unicode math symbols (cho user dùng được ký tự từ bàn phím khoa học)
+    let s = normalizeMathSrc(src.trim())
+    // Strip leading "y =" or "f(x) ="
     s = s.replace(/^\s*y\s*=\s*/i, '').replace(/^\s*f\s*\(\s*x\s*\)\s*=\s*/i, '')
     if (!s) return { ok: false, err: 'Biểu thức rỗng' }
     const node = parse(s)
@@ -262,6 +276,86 @@ function compileFunction(src: string): { ok: true; eval: (x: number) => number }
   } catch (e) {
     return { ok: false, err: (e as Error).message }
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Inequality parser & compiler
+// Hỗ trợ: 3x < 2, y > x^2, x^2 + y^2 <= 4, y < sin(x), etc.
+// Cũng nhận dạng Unicode từ bàn phím khoa học: ≤ ≥ (U+2264, U+2265)
+// Output diff(x,y) = lhs(x,y) - rhs(x,y) → so sánh với 0 theo op.
+// ─────────────────────────────────────────────────────────────
+
+type IneqOp = '<' | '<=' | '>' | '>='
+
+// Normalize Unicode math symbols → ASCII trước khi parse.
+// User: "Ký tự không hợp lệ: '≤'" — bàn phím khoa học gửi U+2264.
+function normalizeMathSrc(src: string): string {
+  return src
+    .replace(/≤/g, '<=')        // U+2264 less-than or equal
+    .replace(/≥/g, '>=')        // U+2265 greater-than or equal
+    .replace(/⩽/g, '<=')        // U+2A7D variants
+    .replace(/⩾/g, '>=')        // U+2A7E variants
+    .replace(/≠/g, '!=')        // U+2260 not equal (chưa hỗ trợ nhưng map an toàn)
+}
+
+// Detect operator vị trí đầu tiên (longest-match: '<=' trước '<')
+// Source đã được normalizeMathSrc → chỉ cần check ASCII variants.
+function findIneqOp(src: string): { op: IneqOp; pos: number } | null {
+  const candidates: { op: IneqOp; len: number }[] = [
+    { op: '<=', len: 2 }, { op: '>=', len: 2 },
+    { op: '<',  len: 1 }, { op: '>',  len: 1 },
+  ]
+  let best: { op: IneqOp; pos: number } | null = null
+  for (const c of candidates) {
+    const idx = src.indexOf(c.op)
+    if (idx === -1) continue
+    if (best === null || idx < best.pos) best = { op: c.op, pos: idx }
+  }
+  return best
+}
+
+type CompiledInequality = {
+  op: IneqOp
+  diff: (x: number, y: number) => number
+  hasY: boolean
+  isStrict: boolean  // < và > → boundary dashed
+}
+
+function compileInequality(src: string):
+  { ok: true; ineq: CompiledInequality } | { ok: false; err: string } {
+  try {
+    // Normalize Unicode (≤ → <=, ≥ → >=) trước khi tìm operator
+    let s = normalizeMathSrc(src.trim())
+    // Strip leading "y =" hoặc "f(x) =" (không áp dụng — vì có thể nhầm với <=)
+    const found = findIneqOp(s)
+    if (!found) return { ok: false, err: 'Không tìm thấy toán tử bất đẳng thức' }
+    const lhsSrc = s.slice(0, found.pos).trim()
+    const rhsSrc = s.slice(found.pos + found.op.length).trim()
+    if (!lhsSrc || !rhsSrc) return { ok: false, err: 'Thiếu vế trái hoặc phải' }
+    const lhsNode = parse(lhsSrc)
+    const rhsNode = parse(rhsSrc)
+    const hasY = usesVarY(lhsNode) || usesVarY(rhsNode)
+    return {
+      ok: true,
+      ineq: {
+        op: found.op,
+        diff: (x: number, y: number) => {
+          try { return evalNode(lhsNode, x, y) - evalNode(rhsNode, x, y) }
+          catch { return NaN }
+        },
+        hasY,
+        isStrict: found.op === '<' || found.op === '>',
+      },
+    }
+  } catch (e) {
+    return { ok: false, err: (e as Error).message }
+  }
+}
+
+// Detect bất phương trình — chấp nhận cả ASCII (<, >, <=, >=) và Unicode
+// (≤ U+2264, ≥ U+2265, ⩽ U+2A7D, ⩾ U+2A7E) từ bàn phím khoa học.
+function isInequalitySrc(src: string): boolean {
+  return /<=?|>=?|[≤≥⩽⩾]/.test(src)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -282,6 +376,16 @@ const COLORS = [
 ]
 
 const PRESETS: { label: string; src: string }[] = [
+  // ── Bất phương trình ĐẶC TRƯNG — demo dùng ký tự ≤ ≥ Unicode ──
+  // (Test parser nhận diện ký tự từ bàn phím khoa học)
+  { label: '2x + y ≤ 2', src: '2x + y ≤ 2' },            // nửa mặt phẳng tuyến tính
+  { label: 'x² + y² ≤ 9', src: 'x^2 + y^2 ≤ 9' },        // hình tròn đặc
+  // ── Các bất phương trình khác ──
+  { label: '3x < 2', src: '3x < 2' },
+  { label: 'y < x²', src: 'y < x^2' },
+  { label: 'y ≥ |x|', src: 'y ≥ abs(x)' },
+  { label: 'y > sin(x)', src: 'y > sin(x)' },
+  // ── Hàm số y = f(x) ──
   { label: 'x²', src: 'x^2' },
   { label: 'x³', src: 'x^3' },
   { label: 'sin(x)', src: 'sin(x)' },
@@ -302,8 +406,11 @@ const PRESETS: { label: string; src: string }[] = [
 
 type Compiled = {
   row: EquationRow
+  // function mode (y = f(x))
   fn: (x: number) => number
   err: string | null
+  // inequality mode — set khi src chứa <, <=, >, >=
+  ineq?: CompiledInequality
 }
 
 function niceStep(range: number, targetTicks = 10): number {
@@ -373,10 +480,127 @@ function Plot({
   const minorTicksY: number[] = []
   for (let v = Math.ceil(yMin / minorY) * minorY; v <= yMax + 1e-9; v += minorY) minorTicksY.push(v)
 
+  // ─── Inequality regions (shaded) + boundary curves ───
+  // For each inequality, sample N_x columns. At each x:
+  //   - If hasY: scan y from yMin..yMax, find sign transitions of diff(x,y),
+  //     mark intervals where (op === '<' || '<=') ? diff<0 : diff>0 is true
+  //   - Else (1D): diff(x,*) constant in y → either entire column in or out
+  // Draw filled rect for each "in" interval. Boundary points (sign flip) →
+  // collect into a path with strokeDasharray (strict) hoặc solid.
+  const ineqRender = useMemo(() => {
+    const inequalities = compiled.filter((c) => c.row.visible && !c.err && c.ineq)
+    if (inequalities.length === 0) return { fills: [], boundaries: [] }
+    const Nx = 180  // số cột x (đủ chi tiết, không quá nặng)
+    const Ny = 120  // số dòng y mỗi cột
+    const fills: { x: number; y: number; w: number; h: number; color: string; key: string }[] = []
+    const boundaries: { d: string; color: string; isStrict: boolean; key: string }[] = []
+
+    for (const c of inequalities) {
+      const { op, diff, hasY, isStrict } = c.ineq!
+      const color = c.row.color
+      const colW = w / Nx
+      // For 1D (no y): mỗi cột chỉ cần 1 lần evaluate
+      if (!hasY) {
+        let prevSign: number | null = null
+        let prevPx = 0
+        const boundaryPts: { px: number; py?: number }[] = []
+        for (let i = 0; i <= Nx; i++) {
+          const x = xMin + ((xMax - xMin) * i) / Nx
+          const d = diff(x, 0)
+          if (!Number.isFinite(d)) { prevSign = null; continue }
+          const inside = (op === '<' || op === '<=') ? d < 0 : d > 0
+          const sign = d < 0 ? -1 : d > 0 ? 1 : 0
+          const px = xS(x)
+          // Sign change → boundary
+          if (prevSign !== null && sign !== 0 && sign !== prevSign) {
+            // Interpolate: boundary px ~ between prevPx and px
+            boundaryPts.push({ px: (prevPx + px) / 2 })
+          }
+          if (inside) {
+            fills.push({
+              x: px - colW / 2, y: 0, w: colW + 0.5, h,
+              color, key: `${c.row.id}-${i}`,
+            })
+          }
+          prevSign = sign
+          prevPx = px
+        }
+        // Vertical line boundary at each bp
+        for (const bp of boundaryPts) {
+          boundaries.push({
+            d: `M${bp.px.toFixed(2)},0 L${bp.px.toFixed(2)},${h}`,
+            color, isStrict, key: `${c.row.id}-bnd-${bp.px.toFixed(2)}`,
+          })
+        }
+        continue
+      }
+
+      // 2D: scan each x column, find y intervals where inside=true
+      // Collect boundary points by detecting sign transitions in each column
+      const dy = (yMax - yMin) / Ny
+      const boundaryByCol: { px: number; py: number }[] = []
+      for (let i = 0; i <= Nx; i++) {
+        const x = xMin + ((xMax - xMin) * i) / Nx
+        const px = xS(x)
+        // Sample diff at Ny+1 y values
+        const samples: number[] = new Array(Ny + 1)
+        for (let j = 0; j <= Ny; j++) {
+          const y = yMin + dy * j
+          samples[j] = diff(x, y)
+        }
+        // Walk through samples, build intervals where "inside" is true
+        let intervalStart: number | null = null
+        for (let j = 0; j <= Ny; j++) {
+          const d = samples[j]
+          const inside = Number.isFinite(d) && ((op === '<' || op === '<=') ? d < 0 : d > 0)
+          if (inside && intervalStart === null) intervalStart = j
+          if ((!inside || j === Ny) && intervalStart !== null) {
+            const yStart = yMin + dy * intervalStart
+            const yEnd = yMin + dy * (inside ? j : j - 1)
+            const pyTop = yS(Math.max(yStart, yEnd))
+            const pyBot = yS(Math.min(yStart, yEnd))
+            fills.push({
+              x: px - colW / 2, y: pyTop, w: colW + 0.5, h: Math.max(0.5, pyBot - pyTop),
+              color, key: `${c.row.id}-${i}-${intervalStart}`,
+            })
+            intervalStart = null
+          }
+          // Detect boundary: sign flip between samples[j-1] and samples[j]
+          if (j > 0) {
+            const a = samples[j - 1], b = samples[j]
+            if (Number.isFinite(a) && Number.isFinite(b) && a * b < 0) {
+              // Linear interp for the zero crossing
+              const t = a / (a - b)
+              const yZero = (yMin + dy * (j - 1)) + dy * t
+              boundaryByCol.push({ px, py: yS(yZero) })
+            }
+          }
+        }
+      }
+      // Connect boundary points across columns into smooth path(s)
+      // Sort by px, but multiple py per px possible → group nearest
+      if (boundaryByCol.length > 1) {
+        // Simple: just connect consecutive points
+        let d = ''
+        let lastPx = -Infinity
+        for (const pt of boundaryByCol) {
+          if (pt.px - lastPx > colW * 3) {
+            d += `M${pt.px.toFixed(2)},${pt.py.toFixed(2)} `
+          } else {
+            d += `L${pt.px.toFixed(2)},${pt.py.toFixed(2)} `
+          }
+          lastPx = pt.px
+        }
+        boundaries.push({ d: d.trim(), color, isStrict, key: `${c.row.id}-bnd` })
+      }
+    }
+    return { fills, boundaries }
+  }, [compiled, xMin, xMax, yMin, yMax, w, h])
+
   // Compute paths for each function. Break path on NaN / discontinuities.
   const paths = useMemo(() => {
     const N = Math.max(400, Math.min(1500, Math.floor(w * 1.5)))
-    return compiled.filter((c) => c.row.visible && !c.err).map((c) => {
+    return compiled.filter((c) => c.row.visible && !c.err && !c.ineq).map((c) => {
       const segments: string[] = []
       let current: string | null = null
       let prevY: number | null = null
@@ -517,6 +741,19 @@ function Plot({
                 textAnchor="end" fontFamily="monospace">0</text>
         )}
 
+        {/* Inequality regions — vẽ TRƯỚC function paths để không che curves */}
+        {ineqRender.fills.map((f) => (
+          <rect key={f.key} x={f.x} y={f.y} width={f.w} height={f.h}
+                fill={f.color} fillOpacity={0.18} stroke="none" />
+        ))}
+        {/* Inequality boundaries: dashed (strict <,>) hoặc solid (<=,>=) */}
+        {ineqRender.boundaries.map((b) => (
+          <path key={b.key} d={b.d} fill="none"
+                stroke={b.color} strokeWidth={2.2}
+                strokeDasharray={b.isStrict ? '6 4' : undefined}
+                strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+
         {/* Function paths */}
         {paths.map((p) => (
           <path key={p.id} d={p.d} fill="none"
@@ -531,7 +768,7 @@ function Plot({
                   stroke="#475569" strokeWidth={0.6} strokeDasharray="3 3" />
             <line x1={0} y1={yS(cursor.y)} x2={w} y2={yS(cursor.y)}
                   stroke="#475569" strokeWidth={0.6} strokeDasharray="3 3" />
-            {compiled.filter((c) => c.row.visible && !c.err).map((c) => {
+            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).map((c) => {
               let y: number
               try { y = c.fn(cursor.x) } catch { y = NaN }
               if (!Number.isFinite(y)) return null
@@ -699,9 +936,12 @@ let nextId = 1
 const mkId = () => `fn-${nextId++}`
 
 export default function GraphLab() {
+  // Demo mặc định: 1 hàm số + 2 bất phương trình đặc trưng dùng Unicode ≤
+  // Cover 3 dạng: y = f(x), tuyến tính nửa mặt phẳng, hình tròn đặc.
   const [rows, setRows] = useState<EquationRow[]>([
-    { id: mkId(), src: 'x^2', color: COLORS[0], visible: true },
-    { id: mkId(), src: 'sin(x)', color: COLORS[1], visible: true },
+    { id: mkId(), src: 'x^2',          color: COLORS[0], visible: true },
+    { id: mkId(), src: '2x + y ≤ 2',   color: COLORS[3], visible: true },  // pink
+    { id: mkId(), src: 'x^2 + y^2 ≤ 9', color: COLORS[7], visible: true }, // red
   ])
   const [activeId, setActiveId] = useState<string>(rows[0]?.id ?? '')
   const [kbMode, setKbMode] = useState<KbMode>('fx')
@@ -710,6 +950,15 @@ export default function GraphLab() {
 
   const compiled: Compiled[] = useMemo(
     () => rows.map((row) => {
+      // Detect inequality (chứa <, <=, >, >=) → compile inequality mode
+      if (isInequalitySrc(row.src)) {
+        const ir = compileInequality(row.src)
+        if (ir.ok) {
+          return { row, fn: () => NaN, err: null, ineq: ir.ineq }
+        }
+        return { row, fn: () => NaN, err: ir.err }
+      }
+      // Function mode (y = f(x))
       const r = compileFunction(row.src)
       return r.ok
         ? { row, fn: r.eval, err: null }
@@ -804,7 +1053,7 @@ export default function GraphLab() {
           <div className="flex-1 min-w-0">
             <div className="text-lg font-bold text-white">Graph Lab</div>
             <div className="text-xs text-slate-400">
-              Vẽ đồ thị toán học — nhập phương trình <span className="font-mono text-cyan-300">y = f(x)</span>, kéo thả để pan, lăn chuột để zoom.
+              Vẽ đồ thị toán học — nhập phương trình <span className="font-mono text-cyan-300">y = f(x)</span> hoặc bất phương trình <span className="font-mono text-rose-300">y &lt; x²</span> · <span className="font-mono text-rose-300">3x &lt; 2</span> · <span className="font-mono text-rose-300">x²+y² ≤ 4</span>. Kéo thả để pan, lăn chuột để zoom.
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -885,7 +1134,7 @@ export default function GraphLab() {
                         value={row.src}
                         onChange={(e) => updateSrc(row.id, e.target.value)}
                         onFocus={() => setActiveId(row.id)}
-                        placeholder="ví dụ: x^2 + 3x - 2"
+                        placeholder="ví dụ: x^2 + 3x − 2  hoặc  y < x^2"
                         spellCheck={false}
                         className={`mt-1.5 w-full bg-transparent px-1 py-1 font-mono text-sm outline-none ${
                           comp?.err ? 'text-rose-300' : 'text-foreground'

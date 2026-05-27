@@ -23,11 +23,14 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   Users, Brain, AlertTriangle,
   BarChart3, Heart, Activity,
   Settings, Search, Bell, Trophy,
+  GraduationCap, FileText, BookOpen, Database, Zap,
+  Plus, Upload, Download, ArrowRight, Sparkles,
+  CheckCircle2, Clock, ChevronRight,
 } from 'lucide-react'
 
 import { api } from '@/services/api'
@@ -38,6 +41,15 @@ import AICoTeacherPanel  from '@/components/teacher/AICoTeacherPanel'
 import EngagementHeatmap from '@/components/teacher/EngagementHeatmap'
 import EmotionTimeline   from '@/components/teacher/EmotionTimeline'
 import QuickActions      from '@/components/teacher/QuickActions'
+
+// ── Command Center types ───────────────────────────────────────
+interface CommandCenterData {
+  classes: Array<{ id: string; name: string; grade?: string; studentCount: number; createdAt: string }>
+  exams: Array<{ id: string; title: string; status: string; subject?: string; createdAt: string; updatedAt: string; question_count?: number }>
+  lessonPlans: Array<{ id: string; title: string; subject?: string; grade?: string; wordCount: number; updatedAt: string }>
+  questionCount: number
+  recoItems: Array<{ type: string; id: string; title: string; subtitle?: string; description?: string; link: string; cta?: string }>
+}
 
 // ── Types ──────────────────────────────────────────────────────
 interface RosterStudent {
@@ -387,6 +399,16 @@ export default function AiDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
 
+      {/* ── Command Center — Tổng quan công việc cần quản lý ─── */}
+      <CommandCenter />
+
+      {/* ── Divider ─────────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-6 mt-6 mb-2 flex items-center gap-3">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3">📊 Phân tích chi tiết HS</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+      </div>
+
       {/* ── Top Bar ─────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -674,6 +696,258 @@ export default function AiDashboard() {
         </div>
       </div>
       )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// CommandCenter — Trung tâm điều khiển cho GV
+// Tổng hợp 6 vấn đề quan trọng GV cần quản lý hàng ngày:
+//   1. Metric overview (Lớp / HS / Đề thi / Giáo án / Câu hỏi / Cần xử lý)
+//   2. Sprint AI alerts (top 3 items từ /api/reco/feed)
+//   3. Quick Actions (5 nút tạo nhanh)
+//   4. Lớp gần đây (top 4 với student count)
+//   5. Đề thi gần đây (top 5 với status badge)
+//   6. Giáo án gần đây (top 3 với word count)
+// ════════════════════════════════════════════════════════════════
+function CommandCenter() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [data, setData] = useState<CommandCenterData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [classesRes, examsRes, plansRes, qbRes, recoRes] = await Promise.all([
+          api.get<{ classes: any[] }>('/classes').catch(() => ({ data: { classes: [] } })),
+          api.get<{ exams: any[] }>('/exams').catch(() => ({ data: { exams: [] } })),
+          api.get<{ plans: any[] }>('/teacher/lesson-plans').catch(() => ({ data: { plans: [] } })),
+          api.get<{ total: number }>('/question-bank').catch(() => ({ data: { total: 0 } })),
+          api.get<{ items: any[] }>('/reco/feed?audience=teacher&limit=10').catch(() => ({ data: { items: [] } })),
+        ])
+        setData({
+          classes: (classesRes.data?.classes || []).slice(0, 4),
+          exams: (examsRes.data?.exams || []).slice(0, 5),
+          lessonPlans: (plansRes.data?.plans || []).slice(0, 3),
+          questionCount: (qbRes.data as any)?.total || (qbRes.data as any)?.questions?.length || 0,
+          recoItems: (recoRes.data?.items || []).slice(0, 3),
+        })
+      } finally { setLoading(false) }
+    })()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex items-center gap-3 text-gray-500">
+          <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Đang tổng hợp dữ liệu quản lý...</span>
+        </div>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  const metrics = [
+    { icon: GraduationCap, label: 'Lớp',          value: data.classes.length,      sub: 'Quản lý lớp học',  link: '/teacher/classes',         color: 'from-blue-500 to-cyan-500',    bg: 'bg-blue-50',    text: 'text-blue-700' },
+    { icon: Users,         label: 'Học sinh',     value: data.classes.reduce((s, c) => s + (c.studentCount || 0), 0), sub: 'Tổng các lớp', link: '/teacher/classes',  color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    { icon: FileText,      label: 'Đề thi',       value: data.exams.length,        sub: 'Đã tạo',           link: '/teacher/exams',           color: 'from-purple-500 to-pink-500',  bg: 'bg-purple-50',  text: 'text-purple-700' },
+    { icon: BookOpen,      label: 'Giáo án',      value: data.lessonPlans.length,  sub: 'Trong soạn thảo',  link: '/teacher/lesson-plans',    color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50',   text: 'text-amber-700' },
+    { icon: Database,      label: 'Câu hỏi',      value: data.questionCount,       sub: 'Ngân hàng',        link: '/teacher/question-bank',   color: 'from-indigo-500 to-blue-500',  bg: 'bg-indigo-50',  text: 'text-indigo-700' },
+    { icon: AlertTriangle, label: 'Cần xử lý',    value: data.recoItems.length,    sub: 'Sprint AI',        link: '/teacher/sprint',          color: 'from-rose-500 to-red-500',     bg: 'bg-rose-50',    text: 'text-rose-700' },
+  ]
+
+  const quickActions = [
+    { icon: Plus,     label: 'Tạo lớp',    link: '/teacher/classes',        color: 'bg-blue-600 hover:bg-blue-700' },
+    { icon: FileText, label: 'Tạo đề',     link: '/teacher/taodethi',       color: 'bg-purple-600 hover:bg-purple-700' },
+    { icon: BookOpen, label: 'Tạo giáo án',link: '/teacher/lesson-plans',   color: 'bg-amber-600 hover:bg-amber-700' },
+    { icon: Upload,   label: 'Import HS',  link: '/teacher/classes',        color: 'bg-emerald-600 hover:bg-emerald-700' },
+    { icon: Database, label: 'Câu hỏi',    link: '/teacher/question-bank',  color: 'bg-indigo-600 hover:bg-indigo-700' },
+  ]
+
+  const totalToManage = data.classes.length + data.exams.length + data.lessonPlans.length + data.recoItems.length
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      {/* Hero card */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white p-6 shadow-lg">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+        <div className="relative flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider opacity-90 mb-1">
+              <Sparkles className="w-4 h-4" /> Trung tâm điều khiển
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1">
+              Chào {user?.name?.split(' ').pop() || 'thầy/cô'} 👋
+            </h1>
+            <p className="text-sm text-white/85">
+              Có <strong>{totalToManage}</strong> hạng mục đang quản lý ·{' '}
+              <strong>{data.recoItems.length}</strong> việc Sprint AI gợi ý xử lý hôm nay
+            </p>
+          </div>
+          <Link to="/teacher/sprint" className="inline-flex items-center gap-2 bg-white/15 hover:bg-white/25 px-4 py-2 rounded-lg text-sm font-semibold backdrop-blur transition-colors">
+            <Zap className="w-4 h-4" /> Mở Sprint AI <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Metric cards — 6 ô tổng quan */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {metrics.map(m => (
+          <Link key={m.label} to={m.link}
+            className={`group relative overflow-hidden rounded-xl p-4 bg-white border border-gray-200 hover:border-transparent hover:shadow-lg transition-all`}>
+            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.color}`} />
+            <div className={`w-10 h-10 ${m.bg} ${m.text} rounded-lg flex items-center justify-center mb-3`}>
+              <m.icon className="w-5 h-5" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{m.value}</div>
+            <div className="text-xs font-medium text-gray-700">{m.label}</div>
+            <div className="text-[10px] text-gray-500 mt-1 group-hover:text-purple-600 transition-colors flex items-center gap-0.5">
+              {m.sub} <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Quick Actions row */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500" /> Tạo nhanh
+          </h3>
+          <span className="text-xs text-gray-500">Bấm để bắt đầu</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {quickActions.map(a => (
+            <button key={a.label} onClick={() => navigate(a.link)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 ${a.color} text-white rounded-lg text-xs font-semibold transition-colors shadow-sm`}>
+              <a.icon className="w-3.5 h-3.5" /> {a.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3-col grid: Sprint AI alerts | Đề gần đây | Giáo án + Lớp */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Sprint AI alerts */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-rose-50 to-pink-50 border-b border-rose-100 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600" /> Cần xử lý ngay
+            </h3>
+            <Link to="/teacher/sprint" className="text-xs text-rose-600 hover:underline">Xem tất cả →</Link>
+          </div>
+          <div className="p-3 space-y-2">
+            {data.recoItems.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-xs">
+                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+                Không có việc nào cần xử lý 🎉
+              </div>
+            ) : data.recoItems.map(it => (
+              <Link key={it.id} to={it.link}
+                className="block p-3 rounded-lg bg-rose-50/50 hover:bg-rose-50 border border-rose-100 transition-colors">
+                <div className="text-xs font-semibold text-gray-900 line-clamp-1">{it.title}</div>
+                {it.subtitle && <div className="text-[10px] text-gray-600 mt-0.5 line-clamp-1">{it.subtitle}</div>}
+                {it.cta && <div className="text-[10px] text-rose-600 mt-1 font-medium flex items-center gap-0.5">{it.cta} <ArrowRight className="w-3 h-3" /></div>}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Đề thi gần đây */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-purple-600" /> Đề thi gần đây
+            </h3>
+            <Link to="/teacher/exams" className="text-xs text-purple-600 hover:underline">Xem tất cả →</Link>
+          </div>
+          <div className="p-3 space-y-2">
+            {data.exams.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-xs">
+                Chưa có đề thi nào<br/>
+                <button onClick={() => navigate('/teacher/taodethi')} className="mt-2 text-purple-600 hover:underline">+ Tạo đề mới</button>
+              </div>
+            ) : data.exams.map(e => (
+              <Link key={e.id} to={`/teacher/exams`}
+                className="block p-3 rounded-lg hover:bg-purple-50 border border-gray-100 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-gray-900 line-clamp-1">{e.title}</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      {e.subject && `${e.subject} · `}{e.question_count ?? 0} câu hỏi
+                    </div>
+                  </div>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${
+                    e.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
+                    e.status === 'archived'  ? 'bg-gray-100 text-gray-600' :
+                    'bg-amber-100 text-amber-700'
+                  }`}>
+                    {e.status === 'published' ? 'Đã xuất bản' : e.status === 'archived' ? 'Lưu trữ' : 'Nháp'}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Giáo án + Lớp combined */}
+        <div className="space-y-4">
+          {/* Giáo án gần đây */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-amber-600" /> Giáo án
+              </h3>
+              <Link to="/teacher/lesson-plans" className="text-xs text-amber-600 hover:underline">Xem →</Link>
+            </div>
+            <div className="p-3 space-y-2">
+              {data.lessonPlans.length === 0 ? (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  Chưa có giáo án
+                </div>
+              ) : data.lessonPlans.map(p => (
+                <Link key={p.id} to={`/teacher/lesson-plans`}
+                  className="block p-2 rounded-lg hover:bg-amber-50 border border-gray-100 transition-colors">
+                  <div className="text-xs font-semibold text-gray-900 line-clamp-1">{p.title}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-2">
+                    <Clock className="w-3 h-3" />
+                    {p.wordCount || 0} từ {p.grade && `· ${p.grade}`}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Lớp gần đây */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-blue-600" /> Lớp đang dạy
+              </h3>
+              <Link to="/teacher/classes" className="text-xs text-blue-600 hover:underline">Xem →</Link>
+            </div>
+            <div className="p-3 space-y-2">
+              {data.classes.length === 0 ? (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  Chưa có lớp nào<br/>
+                  <button onClick={() => navigate('/teacher/classes')} className="mt-1 text-blue-600 hover:underline">+ Tạo lớp đầu tiên</button>
+                </div>
+              ) : data.classes.map(c => (
+                <Link key={c.id} to={`/teacher/classes/${c.id}`}
+                  className="block p-2 rounded-lg hover:bg-blue-50 border border-gray-100 transition-colors flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-gray-900">{c.name}</div>
+                    <div className="text-[10px] text-gray-500">{c.grade || ''}</div>
+                  </div>
+                  <div className="text-xs font-bold text-blue-600">{c.studentCount} HS</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

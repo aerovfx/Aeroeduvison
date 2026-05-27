@@ -420,7 +420,8 @@ function downloadClassImportTemplate(opts?: {
     [],                                                                     // row 6 (blank)
     [
       'STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Ngày sinh', 'Giới tính',
-      'ĐĐGtx', null, null, null, null, 'ĐĐGgk', 'ĐĐGck',                    // row 7
+      'ĐĐGtx', null, null, null, null, 'ĐĐGgk', 'ĐĐGck',
+      'ĐTBmhk1', 'ĐTBmhk2', 'ĐTBmcn',                                       // row 7
     ],
     [null, null, null, null, null, 1, 2, 3, 4, 5],                          // row 8 (sub-header)
     // Sample students (xoá đi điền lại):
@@ -430,26 +431,29 @@ function downloadClassImportTemplate(opts?: {
   ]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
 
-  // Column widths để dễ nhìn khi mở Excel
+  // Column widths để dễ nhìn khi mở Excel — 15 cột chuẩn TT58 sửa đổi C23/22
   ws['!cols'] = [
-    { wch: 5  },  // STT
-    { wch: 18 },  // Mã định danh
-    { wch: 28 },  // Họ và tên
-    { wch: 12 },  // Ngày sinh
-    { wch: 9  },  // Giới tính
-    { wch: 6  }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },  // ĐĐGtx 1-5
-    { wch: 7  },  // ĐĐGgk
-    { wch: 7  },  // ĐĐGck
+    { wch: 5  },  // A: STT
+    { wch: 18 },  // B: Mã định danh
+    { wch: 28 },  // C: Họ và tên
+    { wch: 12 },  // D: Ngày sinh
+    { wch: 9  },  // E: Giới tính
+    { wch: 6  }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },  // F-J: ĐĐGtx 1-5
+    { wch: 7  },  // K: ĐĐGgk
+    { wch: 7  },  // L: ĐĐGck
+    { wch: 9  },  // M: ĐTBmhk1
+    { wch: 9  },  // N: ĐTBmhk2
+    { wch: 9  },  // O: ĐTBmcn
   ]
 
-  // Merge cells cho 4 dòng tiêu đề trên (cosmetic — span 12 cột)
+  // Merge cells cho 5 dòng tiêu đề trên (cosmetic — span 15 cột)
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 11 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: 11 } },
-    { s: { r: 4, c: 0 }, e: { r: 4, c: 11 } },
-    { s: { r: 6, c: 5 }, e: { r: 6, c: 9 } },   // "ĐĐGtx" merge 5 cột
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 14 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 14 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 14 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 14 } },
+    { s: { r: 6, c: 5 }, e: { r: 6, c: 9 } },   // "ĐĐGtx" merge 5 cột (F-J)
   ]
 
   // Sheet name dùng làm class name khi import → đặt theo "<Lớp> <Môn>"
@@ -481,6 +485,98 @@ function downloadClassImportTemplate(opts?: {
   // Trigger download
   const fileName = `mau-import-lop-${cls}.xlsx`
   XLSX.writeFile(wb, fileName)
+}
+
+// ── Export bảng điểm thực tế của lớp (TT58/22 sửa đổi C23) ──────────
+// Khác với template ở trên: function này fetch DS HS thực + sinh file
+// có sẵn STT/Mã định danh/Họ tên/Ngày sinh/Giới tính cho GV chỉ cần
+// điền các cột điểm. File output có cấu trúc 100% như mẫu Bộ GD&ĐT.
+async function exportClassGradebookTT58(opts: {
+  classId: string
+  className: string
+  grade?: string
+  subject?: string
+  schoolName?: string
+  schoolYear?: string
+  semester?: string
+  teacherName?: string
+}) {
+  // Fetch students từ DB
+  type StudentRow = { stt: number | null; hoTen: string; maDinhDanh: string; ngaySinh: string; gioiTinh: string }
+  const res = await api.get<{ students: StudentRow[] }>(`/classes/${opts.classId}/students`)
+  const students = res.data?.students || []
+
+  const subject  = (opts.subject || 'VẬT LÍ').toUpperCase()
+  const school   = opts.schoolName  || 'TRƯỜNG THPT ___________'
+  const year     = opts.schoolYear  || '2025-2026'
+  const semester = opts.semester    || 'II'
+  const teacher  = opts.teacherName || '___________'
+
+  const aoa: (string | number | null)[][] = [
+    ['SỞ GIÁO DỤC VÀ ĐÀO TẠO THÀNH PHỐ HỒ CHÍ MINH'],                       // row 1
+    [school],                                                                // row 2
+    ['BẢNG ĐIỂM HỌC KỲ'],                                                    // row 3
+    [`Năm học: ${year} - Học kỳ: ${semester}`],                              // row 4
+    [`Môn học: ${subject} - GV: ${teacher}`],                                // row 5
+    [],                                                                      // row 6
+    ['STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Ngày sinh', 'Giới tính',
+     'ĐĐGtx', null, null, null, null, 'ĐĐGgk', 'ĐĐGck',
+     'ĐTBmhk1', 'ĐTBmhk2', 'ĐTBmcn'],                                       // row 7
+    [null, null, null, null, null, 1, 2, 3, 4, 5],                          // row 8
+  ]
+  // Fill student rows
+  students.forEach((s, i) => {
+    aoa.push([
+      s.stt ?? (i + 1),
+      s.maDinhDanh || '',
+      s.hoTen || '',
+      s.ngaySinh || '',
+      s.gioiTinh || '',
+      // 10 cột điểm để trống — GV điền
+      null, null, null, null, null,  // ĐĐGtx 1-5
+      null,                           // ĐĐGgk
+      null,                           // ĐĐGck
+      null, null, null,               // ĐTBmhk1, hk2, cn
+    ])
+  })
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [
+    { wch: 5  }, { wch: 18 }, { wch: 28 }, { wch: 12 }, { wch: 9  },
+    { wch: 6  }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
+    { wch: 7  }, { wch: 7  },
+    { wch: 9  }, { wch: 9  }, { wch: 9  },
+  ]
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 14 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 14 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 14 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 14 } },
+    { s: { r: 6, c: 5 }, e: { r: 6, c: 9 } },
+  ]
+
+  // Sheet name: "<Lớp> <Môn>" (vd "10A6 Vat li") — match parser logic khi import lại
+  const subjectShort = subject
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 20)
+  const classCode = opts.className.replace(/^Lớp\s+/i, '').trim()
+  const sheetName = `${classCode} ${subjectShort}`.slice(0, 31)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+
+  // Trigger download — tên file kèm ngày
+  const today = new Date().toISOString().slice(0, 10)
+  const fileName = `bang-diem-${classCode}-${subjectShort.replace(/\s+/g, '-')}-${today}.xlsx`
+  XLSX.writeFile(wb, fileName)
+
+  return { count: students.length, fileName }
 }
 
 // ── Excel parser ─────────────────────────────────────────────
@@ -1121,6 +1217,31 @@ export default function ClassesPage() {
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   Thêm HS
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const t = toast.loading('Đang xuất bảng điểm...')
+                      const r = await exportClassGradebookTT58({
+                        classId: cls.id,
+                        className: cls.name,
+                        grade: cls.grade,
+                        subject: undefined,
+                        schoolName: cls.institution_name || undefined,
+                        schoolYear: cls.schoolYear,
+                        semester: 'II',
+                        teacherName: undefined,
+                      })
+                      toast.dismiss(t)
+                      toast.success(`Đã xuất ${r.count} HS → ${r.fileName}`)
+                    } catch (e: any) {
+                      toast.error('Lỗi xuất bảng điểm: ' + (e?.message || ''))
+                    }
+                  }}
+                  title="Xuất bảng điểm Excel chuẩn TT58"
+                  className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => navigate(`/teacher/classes/${cls.id}`)}

@@ -36,6 +36,7 @@ import {
   type Milestone,
 } from './stemStore'
 import StemScrumBoard from '../../components/stem/StemScrumBoard'
+import StemScrumPanel from '../../components/stem/StemScrumPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ export default function StemDetail() {
   const [loading, setLoading] = useState(true)
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'milestones' | 'feedback'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'scrum' | 'milestones' | 'feedback'>('overview')
 
   useEffect(() => {
     const projects = loadProjects()
@@ -308,18 +309,31 @@ export default function StemDetail() {
 
       {/* ── Tab bar ── */}
       <div className="border-b border-white/[0.06]">
-        <div className="max-w-7xl mx-auto px-6 flex gap-1">
-          {(['overview', 'milestones', 'feedback'] as const).map((tab) => (
+        <div className="max-w-7xl mx-auto px-6 flex gap-1 overflow-x-auto">
+          {(['overview', 'scrum', 'milestones', 'feedback'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === tab
                   ? 'border-blue-500 text-blue-300'
                   : 'border-transparent text-white/50 hover:text-white/70'
               }`}
             >
-              {tab === 'overview' ? 'Tổng quan' : tab === 'milestones' ? `Giai đoạn (${project.milestones.length})` : `Phản hồi (${project.feedback.length})`}
+              {tab === 'overview' && <>Tổng quan</>}
+              {tab === 'scrum' && (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  Agile Scrum
+                  {project.sprints && project.sprints.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300">
+                      {project.sprints.length}
+                    </span>
+                  )}
+                </>
+              )}
+              {tab === 'milestones' && <>Giai đoạn ({project.milestones.length})</>}
+              {tab === 'feedback' && <>Phản hồi ({project.feedback.length})</>}
             </button>
           ))}
         </div>
@@ -395,6 +409,11 @@ export default function StemDetail() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* Tab: Agile Scrum — sprints + burndown + standup + retro */}
+          {activeTab === 'scrum' && (
+            <StemScrumPanel project={project} onChange={setProject} />
           )}
 
           {/* Tab: Milestones */}

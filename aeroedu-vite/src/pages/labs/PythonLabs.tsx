@@ -8,7 +8,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Simulation {
+export interface Simulation {
   id: string
   name: string
   description: string
@@ -60,7 +60,7 @@ const CATEGORY_ICON: Record<string, string> = {
 
 // ─── Static Simulations Data (38 labs) ───────────────────────────────────────
 
-const SIMULATIONS: Simulation[] = [
+export const SIMULATIONS: Simulation[] = [
   {
     id: 'aerodynamics',
     name: 'Aerodynamics Simulation',
@@ -372,7 +372,7 @@ const SIMULATIONS: Simulation[] = [
   // - roll-call-wheel                  → /dashboard/games/roll-call-wheel
   // - pixel-agents                     → /dashboard/games/pixel-agents
   // Mục "Học qua trò chơi" đã bỏ khỏi LabTwin để tách bạch lab khoa học
-  // với trò chơi. Routes cũ /dashboard/labtwin/labs/<game> vẫn redirect
+  // với trò chơi. Routes cũ /dashboard/labtwin/<game> vẫn redirect
   // sang /dashboard/games/* cho link cũ không bị broken.
   // ──────────────────────────────────────────────────────────────
   {
@@ -384,7 +384,7 @@ const SIMULATIONS: Simulation[] = [
     features: ['Kéo thả linh kiện điện tử (ESP32, Arduino, LED, cảm biến)', 'Vẽ dây nối giữa các chân linh kiện', 'Code editor với 5 sketch Arduino mẫu', 'Serial Monitor mô phỏng', 'Mô phỏng LED nhấp nháy, servo quay, cảm biến'],
     learning_objectives: ['Hiểu cách kết nối linh kiện điện tử', 'Lập trình Arduino/ESP32 cơ bản', 'Sử dụng cảm biến và actuator', 'Thiết kế mạch IoT đơn giản'],
     tags: ['điện tử', 'ESP32', 'Arduino', 'IoT', 'mạch', 'LED', 'cảm biến', 'Wokwi'],
-    internal_link: '/dashboard/labtwin/labs/wokwi-sim',
+    internal_link: '/dashboard/labtwin/wokwi-sim',
   },
 ]
 
@@ -537,7 +537,7 @@ export default function PythonLabsPage() {
 
                   {/* CTA */}
                   <Link
-                    to={sim.internal_link ?? `/dashboard/labtwin/labs/${sim.id}`}
+                    to={sim.internal_link ?? `/dashboard/labtwin/${sim.id}`}
                     onClick={() => setSelectedSim(null)}
                     className={`flex items-center justify-center gap-2 w-full py-4 px-4 rounded-xl font-semibold text-base transition-all bg-gradient-to-r ${style.btn} text-white shadow-lg hover:shadow-xl hover:scale-[1.02]`}
                   >
@@ -742,7 +742,7 @@ export default function PythonLabsPage() {
                     {/* Buttons */}
                     <div className="flex gap-2">
                       <Link
-                        to={sim.internal_link ?? `/dashboard/labtwin/labs/${sim.id}`}
+                        to={sim.internal_link ?? `/dashboard/labtwin/${sim.id}`}
                         className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg hover:scale-105 bg-gradient-to-r ${style.btn} text-white border-0`}
                       >
                         🚀 Bắt đầu
