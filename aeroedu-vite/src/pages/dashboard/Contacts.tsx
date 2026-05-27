@@ -1,7 +1,8 @@
 /**
  * Contacts — /dashboard/contacts
  * Danh bạ bạn học: kết bạn, nhóm học, tìm kiếm học sinh.
- * Dữ liệu demo (không cần backend).
+ * Realtime chat: click "Nhắn tin" hoặc card nhóm để mở chat drawer
+ * (qua /api/broker WebSocket — topic chat:dm hoặc chat:group).
  */
 import { useState, useMemo } from 'react'
 import {
@@ -10,6 +11,7 @@ import {
   Globe, MoreHorizontal, Check, X, Filter, ChevronDown,
   GraduationCap, Flame,
 } from 'lucide-react'
+import ChatPanel, { type ChatTarget } from '@/components/chat/ChatPanel'
 
 // ─────────────────────────────────────────────────────────────────
 // Types & Data
@@ -207,8 +209,34 @@ export default function ContactsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('friends')
   const [search, setSearch]       = useState('')
   const [filterSubject, setFilterSubject] = useState('all')
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null)
+
+  const openChatWith = (s: Student) => {
+    setChatTarget({
+      kind: 'dm',
+      userId: s.id,
+      name: s.name,
+      avatar: s.avatar,
+      avatarColor: s.avatarColor,
+      online: s.online,
+    })
+  }
+
+  const openGroupChat = (g: (typeof GROUPS)[number]) => {
+    setChatTarget({
+      kind: 'group',
+      groupId: g.id,
+      name: g.name,
+      icon: g.icon,
+    })
+  }
 
   const handleAction = (id: string, action: 'add' | 'cancel' | 'accept' | 'reject' | 'message') => {
+    if (action === 'message') {
+      const s = students.find((x) => x.id === id)
+      if (s) openChatWith(s)
+      return
+    }
     setStudents(prev => prev.map(s => {
       if (s.id !== id) return s
       if (action === 'add')    return { ...s, status: 'pending_sent' }
@@ -331,6 +359,15 @@ export default function ContactsPage() {
                   <p className="text-sm font-semibold text-white/85 truncate">{g.name}</p>
                   <p className="text-xs text-white/35 mt-0.5">{g.members} thành viên · {g.subject}</p>
                 </div>
+                {g.joined && (
+                  <button
+                    onClick={() => openGroupChat(g)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-violet-500/15 border border-violet-500/25 text-violet-300 hover:bg-violet-500/25 transition-colors"
+                    title="Mở chat nhóm"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" /> Chat
+                  </button>
+                )}
                 <button
                   onClick={() => toggleGroup(g.id)}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all ${g.joined ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400' : 'bg-white/[0.05] border border-white/[0.10] text-white/60 hover:bg-white/[0.08]'}`}
@@ -343,6 +380,13 @@ export default function ContactsPage() {
         )}
 
       </div>
+
+      {/* Realtime chat drawer */}
+      <ChatPanel
+        open={!!chatTarget}
+        onClose={() => setChatTarget(null)}
+        target={chatTarget}
+      />
     </div>
   )
 }

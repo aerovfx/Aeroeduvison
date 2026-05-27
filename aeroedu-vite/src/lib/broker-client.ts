@@ -19,6 +19,7 @@
  *   - Local event emitter cho `msg`, `welcome`, `error`, `open`, `close`
  *   - Heartbeat ping mỗi 25s để giữ kết nối qua Cloud Run idle timeout (60s)
  */
+import { useEffect, useRef } from 'react'
 
 export interface BrokerMsg<T = unknown> {
   type: 'msg'
@@ -230,18 +231,15 @@ export function useBroker(
     onClose?: () => void
   } = {},
 ): { publish: BrokerClient['publish']; isOpen: () => boolean } {
-  // Lazy import to avoid pulling React into the bundle unless used
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const React = require('react') as typeof import('react')
-  const clientRef = React.useRef<BrokerClient | null>(null)
-  const handlersRef = React.useRef(handlers)
+  const clientRef = useRef<BrokerClient | null>(null)
+  const handlersRef = useRef(handlers)
   handlersRef.current = handlers
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!token) return
     const b = connectBroker({ token })
     clientRef.current = b
-    b.subscribe(topics)
+    if (topics.length > 0) b.subscribe(topics)
 
     const offs: Array<() => void> = []
     offs.push(b.on('msg', (m) => handlersRef.current.onMsg?.(m as BrokerMsg)))
