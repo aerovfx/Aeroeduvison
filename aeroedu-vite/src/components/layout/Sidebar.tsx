@@ -129,7 +129,7 @@ const teacherSections: RouteSection[] = [
     titleKey: 'sectionExam',
     routes: [
       { icon: Wand2,     labelKey: 'routeTaodethi',       href: '/teacher/taodethi',         isHighlighted: true },
-      { icon: Sparkles,  labelKey: 'routeExamGenerator',  href: '/teacher/exam-generator',   badge: 'AI' },
+      // /teacher/exam-generator REMOVED 2026-05-27 — GV dùng /teacher/taodethi (AI Composer)
       { icon: Grid3x3,   labelKey: 'routeExamMatrix',     href: '/teacher/exam-matrix' },
       { icon: HelpCircle,labelKey: 'routeQuestionBank',   href: '/teacher/question-bank' },
       { icon: FileText,  labelKey: 'routeExams',          href: '/teacher/exams',            badge: 'AI' },

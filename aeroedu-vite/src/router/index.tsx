@@ -197,7 +197,9 @@ const TeacherCalendarPage      = lazy(() => import('@/pages/teacher/Calendar'))
 const TeacherAssignmentsPage   = lazy(() => import('@/pages/teacher/Assignments'))
 const MeetingNotesPage         = lazy(() => import('@/pages/teacher/MeetingNotes'))
 const InteractionCenterPage    = lazy(() => import('@/pages/teacher/InteractionCenter'))
-const ExamGeneratorPage        = lazy(() => import('@/pages/teacher/ExamGenerator'))
+// ExamGeneratorPage REMOVED 2026-05-27 — route /teacher/exam-generator
+// redirect → /teacher/taodethi (AI Composer chuẩn). File ExamGenerator.tsx
+// có thể xoá ở commit cleanup sau.
 const AgentsPage               = lazy(() => import('@/pages/teacher/Agents'))
 const StudentInsightPage       = lazy(() => import('@/pages/teacher/StudentInsight'))
 const ExamReportsPage          = lazy(() => import('@/pages/teacher/ExamReports'))
@@ -655,7 +657,7 @@ export function AppRouter() {
               <Route path="/teacher/emotion-map"                   element={<EmotionMapPage />} />
               <Route path="/teacher/environment-monitoring"        element={<EnvironmentMonitoringPage />} />
               <Route path="/teacher/exam-edit/:examId/:questionId" element={<PageFallback />} />
-              <Route path="/teacher/exam-generator"                element={<ExamGeneratorPage />} />
+              <Route path="/teacher/exam-generator"                element={<Navigate to="/teacher/taodethi" replace />} />
               <Route path="/teacher/exam-matrix/create"            element={<ExamMatrixCreatePage />} />
               <Route path="/teacher/exam-matrix/:id"               element={<ExamMatrixDetailPage />} />
               <Route path="/teacher/exam-matrix/:id/edit"          element={<ExamMatrixCreatePage />} />
