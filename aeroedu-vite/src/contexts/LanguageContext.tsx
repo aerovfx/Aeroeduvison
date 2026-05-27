@@ -100,6 +100,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeInteraction:   'Tương tác lớp',
     routeMeetingNotes:  'Biên bản họp',
     routePeriodicTable: 'Bảng tuần hoàn',
+    routeStemProjects:  'Dự án STEM',
 
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Lộ trình hôm nay',
@@ -449,6 +450,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeInteraction:   'Class Interaction',
     routeMeetingNotes:  'Meeting Notes',
     routePeriodicTable: 'Periodic Table',
+    routeStemProjects:  'STEM Projects',
 
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Today\'s Plan',
