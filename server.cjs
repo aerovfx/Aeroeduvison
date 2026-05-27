@@ -5600,6 +5600,189 @@ if (USE_NODEJS_QUESTIONS) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// AI GENERATE QUESTIONS — /api/ai/generate-questions
+// Used by:
+//   - aeroedu-vite/src/components/question-bank/BulkGenerateModal.tsx
+//   - aeroedu-vite/src/components/latex-editor/AiSectionWizardDialog.tsx
+// Endpoints:
+//   GET  /api/ai/generate-questions/quota   — quota stub (free tier)
+//   POST /api/ai/generate-questions         — sinh câu hỏi qua DeepSeek/Anthropic
+// ══════════════════════════════════════════════════════════════
+{
+  // ── GET /api/ai/generate-questions/quota ────────────────────
+  // FE expect shape: { used, limit, remaining, source, unlimited, resetAt? }
+  // Stub: trả unlimited:true để bỏ progress bar quota (đơn giản, không track per-user)
+  app.get('/api/ai/generate-questions/quota', async (req, res) => {
+    try {
+      const auth = req.headers.authorization || '';
+      const isPro = !!auth; // Bearer token = logged-in (free tier OK cho demo)
+      // Reset 00:00 ngày mai
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return res.json({
+        used: 0,
+        limit: isPro ? null : 50,
+        remaining: isPro ? null : 50,
+        source: isPro ? 'paid' : 'free',
+        unlimited: !!isPro,
+        resetAt: tomorrow.toISOString(),
+      });
+    } catch (err) {
+      console.error('[ai:gen-quota]', err.message);
+      return res.json({ used: 0, limit: null, remaining: null, source: 'free', unlimited: true });
+    }
+  });
+
+  // ── POST /api/ai/generate-questions ─────────────────────────
+  // Body: { topic, count, subject, grade, difficulty, types: string[] }
+  // Response: { questions: any[], count: number, provider: 'deepseek'|'anthropic' }
+  app.post('/api/ai/generate-questions', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+      const body = req.body || {};
+      const topic = (body.topic || '').toString().trim();
+      const count = Math.min(Math.max(parseInt(body.count, 10) || 5, 1), 30);
+      const subject = (body.subject || 'Vật lí').toString();
+      const grade = (body.grade || '12').toString();
+      const difficulty = (body.difficulty || 'medium').toString();
+      const types = Array.isArray(body.types) && body.types.length > 0 ? body.types : ['mcq'];
+
+      if (!topic) {
+        return res.status(400).json({ error: 'missing_topic', message: 'Cần topic' });
+      }
+
+      const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
+      const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+      if (!hasDeepseek && !hasAnthropic) {
+        return res.status(503).json({
+          error: 'ai_unavailable',
+          message: 'Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY',
+        });
+      }
+
+      // Prompt builder — yêu cầu AI trả JSON array đúng format Question Bank
+      const sysPrompt = [
+        'Bạn là chuyên gia ra đề THPT Việt Nam theo CT GDPT 2018 + TT22/2021.',
+        'Trả về CHÍNH XÁC một JSON array hợp lệ (không có markdown ```json```, không có giải thích).',
+        'Mỗi phần tử là 1 câu hỏi với schema:',
+        '{',
+        '  "type": "mcq" | "true_false" | "short_answer" | "essay",',
+        '  "subject": "vatly" | "toan" | "hoa" | "sinh" | "...",',
+        '  "grade": "10"|"11"|"12",',
+        '  "topic": "...",',
+        '  "difficulty": "easy"|"medium"|"hard",',
+        '  "question": "Nội dung câu hỏi (LaTeX inline $...$)",',
+        '  "options": ["A", "B", "C", "D"]  // chỉ cho mcq',
+        '  "answer": "A"  // mcq: A/B/C/D; short_answer: số; essay: lời giải mẫu',
+        '  "statements": [{"text":"...","answer":true|false}]  // chỉ true_false',
+        '  "explanation": "Giải thích đáp án"',
+        '}',
+        'Quy tắc:',
+        '- Bám sát CT GDPT 2018 + SGK',
+        '- LaTeX công thức: $v = u + at$, $E = mc^2$',
+        '- Đơn vị SI viết bằng \\si{m/s}, \\si{kg}, ... khi cần',
+        '- Đáp án phải chính xác, có thể kiểm chứng',
+        '- Không bịa thông tin / số liệu',
+      ].join('\n');
+      const userPrompt = `Sinh ${count} câu hỏi loại [${types.join(', ')}] về chủ đề "${topic}" cho môn ${subject} lớp ${grade}, độ khó ${difficulty}. Output: JSON array.`;
+
+      const callDeepseek = async () => {
+        const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+            messages: [
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            max_tokens: 4000,
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+          }),
+        });
+        if (!resp.ok) {
+          const t = await resp.text().catch(() => '');
+          throw new Error(`DeepSeek HTTP ${resp.status}: ${t.slice(0, 200)}`);
+        }
+        const json = await resp.json();
+        return json.choices?.[0]?.message?.content || '';
+      };
+
+      const callAnthropic = async () => {
+        const Anthropic = require('@anthropic-ai/sdk');
+        const Ctor = Anthropic.default || Anthropic.Anthropic || Anthropic;
+        const client = new Ctor({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const completion = await client.messages.create({
+          model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
+          max_tokens: 4000,
+          system: sysPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        let text = '';
+        for (const block of completion.content || []) {
+          if (block.type === 'text') text += block.text;
+        }
+        return text;
+      };
+
+      let raw = '';
+      let provider = 'deepseek';
+      try {
+        if (hasDeepseek) {
+          raw = await callDeepseek();
+        } else {
+          provider = 'anthropic';
+          raw = await callAnthropic();
+        }
+      } catch (e) {
+        console.warn('[ai:gen-q] primary fail:', e.message);
+        if (hasAnthropic && provider === 'deepseek') {
+          provider = 'anthropic';
+          raw = await callAnthropic();
+        } else {
+          throw e;
+        }
+      }
+
+      // Parse JSON từ raw response — chấp nhận: array thuần / { questions: [...] } / object có { data: [...] }
+      let parsed;
+      try {
+        const cleaned = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        console.warn('[ai:gen-q] JSON parse fail, raw:', raw.slice(0, 300));
+        return res.status(502).json({
+          error: 'parse_fail',
+          message: 'AI trả về dữ liệu không phải JSON hợp lệ — thử lại',
+        });
+      }
+
+      let questions = [];
+      if (Array.isArray(parsed)) questions = parsed;
+      else if (Array.isArray(parsed.questions)) questions = parsed.questions;
+      else if (Array.isArray(parsed.data)) questions = parsed.data;
+      else {
+        return res.status(502).json({
+          error: 'no_questions',
+          message: 'AI không trả về danh sách câu hỏi',
+        });
+      }
+
+      console.log(`[ai:gen-q] ok provider=${provider} topic="${topic.slice(0, 40)}" count=${questions.length} latency=${Date.now() - startedAt}ms`);
+      return res.json({ questions, count: questions.length, provider });
+    } catch (err) {
+      console.error('[ai:gen-q]', err.message);
+      return res.status(500).json({ error: 'internal', message: err.message });
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 // LEARNING HISTORY — per-student per-course timeline
 // Endpoints:
 //   POST /api/learning/events                          — append event
