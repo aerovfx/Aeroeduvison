@@ -86,10 +86,40 @@ body {
     flex-wrap: wrap;
   }
 
-  /* ── 2.6 Heading size — bump cho mobile readability ── */
-  h1:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1.5rem; line-height: 1.25; }
-  h2:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1.25rem; line-height: 1.3; }
-  h3:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1.125rem; line-height: 1.35; }
+  /* ── 2.6 Heading size — compact cho mobile (user: thu nhỏ tiêu đề) ── */
+  /* Default heading sizes (no Tailwind class override) */
+  h1:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1.25rem; line-height: 1.25; }
+  h2:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1.1rem;  line-height: 1.3; }
+  h3:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 1rem;    line-height: 1.35; }
+  h4:not([class*="text-"]):not([class*="sm:text-"]) { font-size: 0.95rem; line-height: 1.4; }
+
+  /* Tailwind text-XL+ classes — downsize 1 level on mobile */
+  /* User: "thu nhỏ chữ tiêu đề cho phù hợp màn hình nhỏ" */
+  .text-4xl:not(.keep-mobile) { font-size: 1.5rem !important; line-height: 1.2; }
+  .text-3xl:not(.keep-mobile) { font-size: 1.375rem !important; line-height: 1.25; }
+  .text-2xl:not(.keep-mobile) { font-size: 1.125rem !important; line-height: 1.3; }
+  .text-xl:not(.keep-mobile)  { font-size: 1rem !important; line-height: 1.35; }
+  .text-lg:not(.keep-mobile)  { font-size: 0.9375rem !important; line-height: 1.4; }
+
+  /* ── 2.6b Icon size — shrink Lucide icons trên mobile ── */
+  /* User: "thu nhỏ các biểu tượng" — Tailwind w-N h-N → giảm 1 step */
+  .w-10:not(.keep-mobile) { width: 2rem !important; }   /* 40→32 */
+  .h-10:not(.keep-mobile) { height: 2rem !important; }
+  .w-8:not(.keep-mobile)  { width: 1.75rem !important; } /* 32→28 */
+  .h-8:not(.keep-mobile)  { height: 1.75rem !important; }
+  .w-7:not(.keep-mobile)  { width: 1.5rem !important; }  /* 28→24 */
+  .h-7:not(.keep-mobile)  { height: 1.5rem !important; }
+  .w-6:not(.keep-mobile)  { width: 1.25rem !important; } /* 24→20 */
+  .h-6:not(.keep-mobile)  { height: 1.25rem !important; }
+  .w-5:not(.keep-mobile)  { width: 1.125rem !important; }/* 20→18 */
+  .h-5:not(.keep-mobile)  { height: 1.125rem !important; }
+  /* Avatar / large badge w-14+ — giảm nhẹ */
+  .w-16:not(.keep-mobile) { width: 3rem !important; }   /* 64→48 */
+  .h-16:not(.keep-mobile) { height: 3rem !important; }
+  .w-14:not(.keep-mobile) { width: 2.5rem !important; } /* 56→40 */
+  .h-14:not(.keep-mobile) { height: 2.5rem !important; }
+  .w-12:not(.keep-mobile) { width: 2.25rem !important; }/* 48→36 */
+  .h-12:not(.keep-mobile) { height: 2.25rem !important; }
 
   /* ── 2.7 Modal/dialog — full screen on mobile ─────── */
   /* Tailwind dialog/modal containers fixed-size → become full-screen */
@@ -169,6 +199,72 @@ body {
   [data-page-header] {
     padding: 1rem !important;
   }
+
+  /* ── 2.18 Gap & padding tighter ────────────────────── */
+  /* User yêu cầu density cao hơn để mọi thứ vừa màn nhỏ */
+  .gap-6:not(.keep-mobile) { gap: 0.75rem !important; }
+  .gap-5:not(.keep-mobile) { gap: 0.625rem !important; }
+  .gap-4:not(.keep-mobile) { gap: 0.5rem !important; }
+  .p-5:not(.keep-mobile)   { padding: 0.875rem !important; }
+  .p-4:not(.keep-mobile)   { padding: 0.75rem !important; }
+  .py-8:not(.keep-mobile)  { padding-top: 1.25rem !important; padding-bottom: 1.25rem !important; }
+  .py-6:not(.keep-mobile)  { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  .mb-8:not(.keep-mobile)  { margin-bottom: 1.25rem !important; }
+  .mb-6:not(.keep-mobile)  { margin-bottom: 1rem !important; }
+
+  /* ── 2.19 Navbar / topbar density ──────────────────── */
+  /* Compact navbar height + smaller buttons */
+  nav[data-navbar],
+  header[data-navbar],
+  header.sticky {
+    padding: 0.5rem 0.75rem !important;
+    min-height: 48px !important;
+  }
+  nav[data-navbar] button,
+  header[data-navbar] button {
+    padding: 0.375rem !important;
+  }
+
+  /* ── 2.20 Card title / heading inside cards ──────── */
+  .rounded-2xl > h1,
+  .rounded-2xl > h2,
+  .rounded-xl > h1,
+  .rounded-xl > h2,
+  [class*="bg-card"] > h1,
+  [class*="bg-card"] > h2 {
+    font-size: 1rem !important;
+  }
+
+  /* ── 2.21 Badge / pill smaller ─────────────────────── */
+  .text-xs:not(.keep-mobile) { font-size: 0.7rem !important; }
+  .text-\[10px\]:not(.keep-mobile),
+  .text-\[11px\]:not(.keep-mobile) { font-size: 0.65rem !important; }
+
+  /* ── 2.22 SVG icons inside small buttons ──────────── */
+  /* Lucide icons nested in button — ensure they fit */
+  button > svg {
+    flex-shrink: 0;
+  }
+
+  /* ── 2.23 Dialog/Modal heading compact ─────────────── */
+  [role="dialog"] h1,
+  [role="dialog"] h2,
+  [role="dialog"] .text-xl,
+  [role="dialog"] .text-2xl {
+    font-size: 1.125rem !important;
+  }
+
+  /* ── 2.24 Sidebar items shrink khi mobile drawer mở ── */
+  /* (sidebar đã có own mobile mode, nhưng chữ + icon cần fit) */
+  aside[data-sidebar="main"] {
+    font-size: 0.875rem;
+  }
+  aside[data-sidebar="main"] svg {
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+  }
+
+  /* (grid-cols-2 stacking moved to ULTRA-SMALL block below) */
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -222,19 +318,36 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────
- * 5. ULTRA-SMALL ≤ 380px (iPhone SE, foldable closed)
+ * 5. ULTRA-SMALL ≤ 414px (iPhone SE, mini, foldable closed)
+ *    Stack grid 2-cols → 1-col, shrink heading hơn nữa
  * ───────────────────────────────────────────────────────── */
-@media (max-width: 380px) {
+@media (max-width: 414px) {
 
   /* Reduce more aggressively */
-  .text-xl { font-size: 1.0625rem !important; }
-  .text-2xl { font-size: 1.25rem !important; }
-  .text-3xl { font-size: 1.5rem !important; }
+  .text-xl:not(.keep-mobile)  { font-size: 0.9375rem !important; }
+  .text-2xl:not(.keep-mobile) { font-size: 1rem !important; }
+  .text-3xl:not(.keep-mobile) { font-size: 1.125rem !important; }
+  .text-4xl:not(.keep-mobile) { font-size: 1.25rem !important; }
 
   /* Tighter padding */
-  .p-4 { padding: 0.75rem !important; }
-  .gap-4 { gap: 0.75rem !important; }
-  .gap-6 { gap: 1rem !important; }
+  .p-4:not(.keep-mobile) { padding: 0.625rem !important; }
+  .gap-4:not(.keep-mobile) { gap: 0.5rem !important; }
+  .gap-6:not(.keep-mobile) { gap: 0.625rem !important; }
+
+  /* Grid 2 cols → 1 col (iPhone SE / mini) */
+  .grid-cols-2:not(.keep-mobile) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Icons w-8 → w-6 trên màn cực nhỏ */
+  .w-8:not(.keep-mobile)  { width: 1.5rem !important; }
+  .h-8:not(.keep-mobile)  { height: 1.5rem !important; }
+  .w-10:not(.keep-mobile) { width: 1.75rem !important; }
+  .h-10:not(.keep-mobile) { height: 1.75rem !important; }
+  .w-12:not(.keep-mobile) { width: 2rem !important; }
+  .h-12:not(.keep-mobile) { height: 2rem !important; }
+  .w-14:not(.keep-mobile) { width: 2.25rem !important; }
+  .h-14:not(.keep-mobile) { height: 2.25rem !important; }
 
   /* Hide tertiary buttons that have data-priority="low" */
   [data-mobile-hide="true"] {
