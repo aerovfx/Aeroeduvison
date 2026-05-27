@@ -11568,6 +11568,103 @@ function _examListWhere(scope) {
   if (scope === 'public') return `visibility = 'public' AND NOT (teacher_id = ANY($1::text[]))`;
   return `teacher_id = ANY($1::text[]) OR visibility = 'public'`;
 }
+// /api/exams/community-stats — FE Exams.tsx loadCommunity()
+// Shape: { mostAttempted[], topTeachers[], summary{}, updatedAt }
+// Phải đăng ký TRƯỚC /api/exams/:id để tránh ':id' = 'community-stats'
+app.get('/api/exams/community-stats', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+  const emptyShape = {
+    mostAttempted: [], topTeachers: [],
+    summary: {
+      total_exams: 0, public_exams: 0, contributing_teachers: 0,
+      total_attempts: 0, active_students: 0, avg_score: 0,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    const pool = _getPool();
+    // 1. Most attempted (rank theo số lượt thi public, sort attempts desc)
+    const mostAttemptedRes = await pool.query(`
+      SELECT
+        e.id, e.title, e.subject, e.grade,
+        (e.question_ids IS NOT NULL)::int::int * COALESCE(jsonb_array_length(e.question_ids), 0) AS "questionCount",
+        COALESCE((SELECT COUNT(*)::int FROM "PracticeExam" pe WHERE pe.exam_id = e.id), 0) AS attempts,
+        COALESCE((SELECT COUNT(DISTINCT pe.user_id)::int FROM "PracticeExam" pe WHERE pe.exam_id = e.id), 0) AS "uniqueStudents",
+        COALESCE((SELECT AVG(pe.score)::numeric(5,2) FROM "PracticeExam" pe WHERE pe.exam_id = e.id), 0) AS "avgScore",
+        u.id AS teacher_id, u.name AS teacher_name, u.image AS teacher_image
+      FROM "Exam" e
+      LEFT JOIN "User" u ON u.id = e.teacher_id
+      WHERE e.visibility = 'public'
+      ORDER BY attempts DESC, e.created_at DESC
+      LIMIT $1
+    `, [limit]).catch(() => ({ rows: [] }));
+
+    const mostAttempted = mostAttemptedRes.rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      subject: r.subject,
+      grade: r.grade,
+      questionCount: r.questionCount || 0,
+      attempts: r.attempts || 0,
+      uniqueStudents: r.uniqueStudents || 0,
+      avgScore: parseFloat(r.avgScore) || 0,
+      teacher: r.teacher_id ? {
+        id: r.teacher_id, name: r.teacher_name || 'GV', image: r.teacher_image,
+      } : null,
+    }));
+
+    // 2. Top teachers (sort theo số đề public + total attempts)
+    const topTeachersRes = await pool.query(`
+      SELECT u.id, u.name, u.email, u.image,
+        COUNT(DISTINCT e.id)::int AS "examCount",
+        COALESCE(SUM((SELECT COUNT(*)::int FROM "PracticeExam" pe WHERE pe.exam_id = e.id)), 0)::int AS "totalAttempts",
+        COALESCE(AVG((SELECT AVG(pe.score) FROM "PracticeExam" pe WHERE pe.exam_id = e.id)), 0)::numeric(5,2) AS "avgScore"
+      FROM "User" u
+      JOIN "Exam" e ON e.teacher_id = u.id AND e.visibility = 'public'
+      WHERE u.role IN ('TEACHER','ADMIN')
+      GROUP BY u.id, u.name, u.email, u.image
+      ORDER BY "totalAttempts" DESC, "examCount" DESC
+      LIMIT $1
+    `, [limit]).catch(() => ({ rows: [] }));
+
+    const topTeachers = topTeachersRes.rows.map(r => ({
+      id: r.id, name: r.name || 'GV', email: r.email || '', image: r.image,
+      examCount: r.examCount || 0,
+      totalAttempts: r.totalAttempts || 0,
+      avgScore: parseFloat(r.avgScore) || 0,
+    }));
+
+    // 3. Summary aggregate
+    const summaryRes = await pool.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM "Exam") AS total_exams,
+        (SELECT COUNT(*)::int FROM "Exam" WHERE visibility = 'public') AS public_exams,
+        (SELECT COUNT(DISTINCT teacher_id)::int FROM "Exam" WHERE visibility = 'public') AS contributing_teachers,
+        (SELECT COUNT(*)::int FROM "PracticeExam") AS total_attempts,
+        (SELECT COUNT(DISTINCT user_id)::int FROM "PracticeExam") AS active_students,
+        (SELECT AVG(score)::numeric(5,2) FROM "PracticeExam") AS avg_score
+    `).catch(() => ({ rows: [{}] }));
+    const sr = summaryRes.rows[0] || {};
+
+    return res.json({
+      mostAttempted,
+      topTeachers,
+      summary: {
+        total_exams: sr.total_exams || 0,
+        public_exams: sr.public_exams || 0,
+        contributing_teachers: sr.contributing_teachers || 0,
+        total_attempts: sr.total_attempts || 0,
+        active_students: sr.active_students || 0,
+        avg_score: parseFloat(sr.avg_score) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[exams:community-stats]', err.message);
+    return res.json(emptyShape); // fail soft
+  }
+});
+
 app.get('/api/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
