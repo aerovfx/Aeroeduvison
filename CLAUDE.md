@@ -15,6 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `ba9dbda` (revision pixiai-00608-ten, 2026-05-27 — Batch 10: GraphLab snap giao điểm + nhãn toạ độ + Quizzes redirect + Subject normalize "Vật lý"→"Vật lí" + My Courses theo khối + Lesson plans library + Openfang DeepSeek + IoT 200 + LaTeX compact + community-stats + bỏ exam-generator route)
+- Last deployed commit: `e426fa7` (revision pixiai-00607-hod, 2026-05-27 — Batch 5: LaTeX editor compact + IoT classroom 200 + Openfang AI agents → DeepSeek + Thư viện giáo án chia sẻ + My Courses sắp xếp theo khối lớp 1-12+ĐH)
+- Last deployed commit: `4df4f80` (revision pixiai-00605-dap, 2026-05-27 — Batch 5: LaTeX/JSON skill + Mobile RWD shrink + /api/ai/generate-questions + remove /dashboard/stem (redirect) + /api/teacher/dashboard/full DB query)
+- Last deployed commit: `41a24b8` (revision pixiai-00603-xec, 2026-05-27 — Trợ lý AeroEdu skills knowledge base: 13 skill modules + RAG-lite keyword retrieval + DocsIndex CTA card; CFD optimize; LED bidirectional fix; wire markers visual)
 - Last deployed commit: `a40ce4e` (revision pixiai-00601-nux, 2026-05-27 — Trợ lý AeroEdu live: /api/ark-bot/chat SSE + DeepSeek primary + Anthropic Haiku 4.5 fallback. Role-aware system prompt STUDENT/TEACHER/ADMIN)
 - Last deployed commit: `798fc6f` (revision pixiai-00598-rat, 2026-05-27 — Cập nhật base aeroedu: tracker + KG sidebar fix GV không thấy KG HS nữa)
 - Last deployed commit: `7e70862` (revision pixiai-00597-fit, 2026-05-27 — STEM sync /dashboard/stem unified: 2 tabs joined/owned + HS create/delete own project + owner_role discriminator + sidebar bỏ duplicate. Stem.tsx 2000→600 dòng)
