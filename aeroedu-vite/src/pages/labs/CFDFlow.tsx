@@ -24,7 +24,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Play, Pause, RotateCcw, Eraser,
-  Wind, Info, Activity, Eye,
+  Wind, Info, Activity, Eye, Camera, Download, Copy, X, FileText, Check,
 } from 'lucide-react'
 
 // ─── LBM constants — D2Q9 ────────────────────────────────────────
@@ -592,6 +592,208 @@ function clearObstacles(s: LBMState) {
   s.solid.fill(0)
 }
 
+// ─── Snapshot report — phân tích dòng chảy + lực + diễn giải Re regime ──
+//
+// Output cho FE render báo cáo. Tính tại thời điểm gọi (sim state hiện tại).
+//
+// Drag/lift dùng Momentum Exchange Method (MEM) — Mohamad 2011 §4.6:
+//   Force_on_solid = Σ_{fluid cell i, direction q: i+e_q in solid}  2 · e_q · f_q(i)
+// Đây là momentum bị bounce-back tại boundary. Đơn vị lattice (lu).
+// Hệ số:  Cd = 2 · F_x / (ρ_∞ · U² · D)
+//        Cl = 2 · F_y / (ρ_∞ · U² · D)
+// với D = chiều dài đặc trưng (ước lượng từ bounding box).
+//
+// Viscosity:  ν = (τ - 0.5) / 3 = (1/ω - 0.5) / 3   (lu²/ts)
+// Reynolds:   Re = U · D / ν
+
+export interface CFDReport {
+  timestamp: string
+  grid:    { NX: number; NY: number; totalCells: number }
+  sim:     { U: number; omega: number; tau: number; nu: number; step: number; colorMode: string }
+  obstacle:{ solidCount: number; bbox: { x0: number; y0: number; x1: number; y1: number } | null; D: number; coverage: number; hasObstacle: boolean }
+  flow:    { maxSpeed: number; avgSpeed: number; wakeAvg: number; maxVort: number; maxP: number; minP: number }
+  forces:  { Fx: number; Fy: number; Cd: number; Cl: number }
+  Re:      number
+  regime:  string
+  interpretation: string
+  benchmark: string  // so sánh với giá trị chuẩn (vd Cd cylinder Re=100 ≈ 1.2)
+}
+
+function computeReport(s: LBMState, U: number, omega: number, step: number, colorMode: string): CFDReport {
+  const tau = 1 / omega
+  const nu = (tau - 0.5) / 3
+
+  // ─ Obstacle bbox + solid count ─
+  let x0 = NX, x1 = -1, y0 = NY, y1 = -1, solidCount = 0
+  for (let y = 0; y < NY; y++) {
+    for (let x = 0; x < NX; x++) {
+      if (s.solid[idx(x, y)]) {
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
+        solidCount++
+      }
+    }
+  }
+  const hasObstacle = solidCount > 0
+  const bbox = hasObstacle ? { x0, y0, x1, y1 } : null
+  // Chiều dài đặc trưng: max(width, height) — phù hợp cylinder/sphere.
+  // Nếu obstacle elongated dọc flow (vd airfoil), giá trị này phản ánh chord.
+  const D = hasObstacle ? Math.max(x1 - x0, y1 - y0) + 1 : 20
+  const Re = (U * D) / nu
+
+  // ─ Flow stats ─
+  let maxSpeed = 0, totalSpeed = 0, fluidCount = 0
+  let maxVort = 0, maxP = -Infinity, minP = Infinity
+  let wakeSum = 0, wakeN = 0
+  // Wake region: dải dọc obstacle, từ trailing edge đến tray 30 cells về phía xuôi dòng
+  const wakeX0 = hasObstacle ? x1 + 2 : -1
+  const wakeX1 = hasObstacle ? Math.min(NX - 2, x1 + 32) : -1
+  const wakeY0 = hasObstacle ? Math.max(1, y0 - 5) : -1
+  const wakeY1 = hasObstacle ? Math.min(NY - 2, y1 + 5) : -1
+  for (let y = 1; y < NY - 1; y++) {
+    for (let x = 1; x < NX - 1; x++) {
+      const i = idx(x, y)
+      if (s.solid[i]) continue
+      const ux = s.ux[i], uy = s.uy[i]
+      const spd = Math.sqrt(ux * ux + uy * uy)
+      if (spd > maxSpeed) maxSpeed = spd
+      totalSpeed += spd
+      fluidCount++
+      // Vorticity (curl) — central difference
+      const duydx = s.uy[idx(x + 1, y)] - s.uy[idx(x - 1, y)]
+      const duxdy = s.ux[idx(x, y + 1)] - s.ux[idx(x, y - 1)]
+      const vort = Math.abs((duydx - duxdy) * 0.5)
+      if (vort > maxVort) maxVort = vort
+      const p = s.rho[i] - 1  // pressure deviation
+      if (p > maxP) maxP = p
+      if (p < minP) minP = p
+      if (hasObstacle && x >= wakeX0 && x <= wakeX1 && y >= wakeY0 && y <= wakeY1) {
+        wakeSum += spd
+        wakeN += 1
+      }
+    }
+  }
+  const avgSpeed = fluidCount > 0 ? totalSpeed / fluidCount : 0
+  const wakeAvg = wakeN > 0 ? wakeSum / wakeN : 0
+
+  // ─ Drag / lift via Momentum Exchange Method ─
+  // Lưới EX/EY cho 9 directions — duplicated cho hot loop (no array lookup)
+  let Fx = 0, Fy = 0
+  if (hasObstacle) {
+    // Velocity vectors per direction
+    const EX_ = EX, EY_ = EY  // alias top-level arrays
+    for (let y = 1; y < NY - 1; y++) {
+      for (let x = 1; x < NX - 1; x++) {
+        const i = idx(x, y)
+        if (s.solid[i]) continue
+        const base = i * 9
+        // Loop 8 non-rest directions
+        for (let q = 1; q < 9; q++) {
+          const nx = x + EX_[q], ny = y + EY_[q]
+          if (nx >= 0 && nx < NX && ny >= 0 && ny < NY && s.solid[idx(nx, ny)]) {
+            const w = 2 * s.f[base + q]
+            Fx += EX_[q] * w
+            Fy += EY_[q] * w
+          }
+        }
+      }
+    }
+  }
+  const denom = U * U * D  // ρ_∞ = 1 trong LBM normalized
+  const Cd = denom > 0 ? Fx / denom : 0
+  const Cl = denom > 0 ? Fy / denom : 0
+
+  // ─ Re regime interpretation (cylinder benchmark) ─
+  let regime: string, interpretation: string, benchmark: string
+  if (Re < 1) {
+    regime = 'Stokes flow (Re < 1)'
+    interpretation = 'Dòng nhớt thuần — chảy đối xứng quanh vật, không có wake. Quán tính không đáng kể, lực cản chủ yếu do nhớt.'
+    benchmark = 'Cd ∝ 1/Re. Cylinder Stokes: Cd ≈ 8π/(Re·ln(7.4/Re)). Sphere: Cd = 24/Re.'
+  } else if (Re < 40) {
+    regime = 'Steady symmetric wake (1 ≤ Re < 40)'
+    interpretation = 'Cặp xoáy đứng yên (twin attached vortices) phía sau vật cản, đối xứng. Chưa có shedding.'
+    benchmark = 'Cylinder Re=20: Cd ≈ 2.05. Re=40: Cd ≈ 1.55.'
+  } else if (Re < 200) {
+    regime = 'Karman vortex street (40 ≤ Re < 200, laminar shedding)'
+    interpretation = 'Chuỗi xoáy CW-CCW shed luân phiên (von Karman). Số Strouhal St ≈ 0.20 → tần số shedding f = St·U/D.'
+    benchmark = `Cylinder Re=100: Cd ≈ 1.4, St ≈ 0.16. Strouhal f ≈ ${(0.2 * U / D).toFixed(4)} lu/ts.`
+  } else if (Re < 1000) {
+    regime = 'Transitional wake (200 ≤ Re < 10³)'
+    interpretation = 'Wake bắt đầu nhiễu loạn 3D (chỉ mô phỏng 2D ở đây). Vortex shedding vẫn rõ nhưng có nhiễu nhỏ.'
+    benchmark = 'Cylinder Re=500: Cd ≈ 1.2, St ≈ 0.21.'
+  } else if (Re < 2e5) {
+    regime = 'Sub-critical turbulent wake (10³ ≤ Re < 2·10⁵)'
+    interpretation = 'Boundary layer laminar, wake turbulent. Cd gần như hằng số.'
+    benchmark = 'Cylinder Re ≈ 10⁴–10⁵: Cd ≈ 1.0–1.2.'
+  } else {
+    regime = 'Super-critical (Re ≥ 2·10⁵, drag crisis)'
+    interpretation = 'Boundary layer chuyển turbulent → trễ separation → Cd giảm đột ngột (drag crisis).'
+    benchmark = 'Cylinder Re > 3·10⁵: Cd có thể giảm tới 0.3.'
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    grid: { NX, NY, totalCells: NX * NY },
+    sim:  { U, omega, tau, nu, step, colorMode },
+    obstacle: { solidCount, bbox, D, coverage: solidCount / (NX * NY), hasObstacle },
+    flow: { maxSpeed, avgSpeed, wakeAvg, maxVort, maxP, minP },
+    forces: { Fx, Fy, Cd, Cl },
+    Re, regime, interpretation, benchmark,
+  }
+}
+
+// Markdown export — paste-friendly cho báo cáo Word/Notion/Google Doc
+function reportToMarkdown(r: CFDReport): string {
+  const d = new Date(r.timestamp).toLocaleString('vi-VN')
+  const lines = [
+    `# Báo cáo mô phỏng CFD — ${d}`,
+    `Sinh bởi inphysic.com · /dashboard/labtwin/cfd-flow · Lattice Boltzmann D2Q9`,
+    '',
+    '## Thông số mô phỏng',
+    `- Lưới: **${r.grid.NX} × ${r.grid.NY}** = ${r.grid.totalCells.toLocaleString()} ô`,
+    `- Vận tốc đầu vào U: **${r.sim.U.toFixed(3)}** lu/ts`,
+    `- Hệ số ω: **${r.sim.omega.toFixed(2)}** → τ = ${r.sim.tau.toFixed(3)}, ν = ${r.sim.nu.toFixed(4)} lu²/ts`,
+    `- **Reynolds Re = ${r.Re.toFixed(1)}**`,
+    `- Bước thời gian đã chạy: ${r.sim.step.toLocaleString()}`,
+    `- Chế độ hiển thị: ${r.sim.colorMode}`,
+    '',
+    '## Vật cản',
+    r.obstacle.hasObstacle
+      ? `- Tổng ô solid: **${r.obstacle.solidCount}** (${(r.obstacle.coverage * 100).toFixed(2)}% lưới)`
+      : '- **Không có vật cản** (dòng tự do)',
+    r.obstacle.bbox
+      ? `- Bounding box: (${r.obstacle.bbox.x0}, ${r.obstacle.bbox.y0}) → (${r.obstacle.bbox.x1}, ${r.obstacle.bbox.y1}), kích thước ${r.obstacle.bbox.x1 - r.obstacle.bbox.x0 + 1} × ${r.obstacle.bbox.y1 - r.obstacle.bbox.y0 + 1}`
+      : '',
+    `- Chiều dài đặc trưng D: **${r.obstacle.D}** cell`,
+    '',
+    '## Đặc trưng dòng chảy',
+    `- Vận tốc cực đại: **${r.flow.maxSpeed.toFixed(4)}** lu/ts (${((r.flow.maxSpeed / r.sim.U) * 100 - 100).toFixed(0)}% so với U inflow)`,
+    `- Vận tốc trung bình (toàn miền fluid): ${r.flow.avgSpeed.toFixed(4)} lu/ts`,
+    r.obstacle.hasObstacle
+      ? `- Vận tốc trung bình wake (downstream 30 cell): **${r.flow.wakeAvg.toFixed(4)}** lu/ts → ${(100 - (r.flow.wakeAvg / r.sim.U) * 100).toFixed(0)}% defect so với inflow`
+      : '',
+    `- Xoáy cực đại |∇×u|: ${r.flow.maxVort.toFixed(4)} lu/ts`,
+    `- Áp suất chênh lệch (ρ − 1): ${r.flow.minP.toFixed(5)} ↔ ${r.flow.maxP.toFixed(5)}`,
+    '',
+    '## Lực tác dụng (Momentum Exchange Method)',
+    `- Lực cản F_x: ${r.forces.Fx.toFixed(4)} lu`,
+    `- Lực nâng F_y: ${r.forces.Fy.toFixed(4)} lu ${Math.abs(r.forces.Cl) < 0.05 ? '(≈ 0 — đối xứng)' : ''}`,
+    `- **Hệ số cản C_d = ${r.forces.Cd.toFixed(3)}**`,
+    `- **Hệ số nâng C_l = ${r.forces.Cl.toFixed(3)}**`,
+    '',
+    `## Chế độ dòng chảy: ${r.regime}`,
+    r.interpretation,
+    '',
+    '**So sánh chuẩn:** ' + r.benchmark,
+    '',
+    '---',
+    '*Lưu ý: số liệu lattice unit (lu/ts). Để chuyển sang SI cần biết hệ số quy đổi (chiều dài, vận tốc, thời gian) của bài toán thực.*',
+  ]
+  return lines.filter(l => l !== undefined).join('\n')
+}
+
 // ─── Shape catalog ──────────────────────────────────────────────
 // Mỗi shape có:
 //   id       — định danh
@@ -775,6 +977,12 @@ export default function CFDFlow() {
   const stepCounterRef = useRef(0)
   const dyeRef = useRef<DyeParticle[]>([])
   const dyeHueRef = useRef(0)  // cycling hue for rainbow injection
+  // ─ Snapshot & báo cáo ─
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSnapshot, setReportSnapshot] = useState<{
+    pngUrl: string; annotatedUrl: string; report: CFDReport
+  } | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle')
 
   runningRef.current = running
   inflowURef.current = inflowU
@@ -1133,6 +1341,115 @@ export default function CFDFlow() {
     setPolygonVersion(v => v + 1)
   }
 
+  // ─── Snapshot capture + báo cáo ──────────────────────────────
+  // Pipeline:
+  //   1) Capture canvas hiện tại → PNG dataURL (raw)
+  //   2) Vẽ thêm annotation (bbox + Re/Cd label) → annotated PNG
+  //   3) computeReport(state) → CFDReport object
+  //   4) Mở modal hiển thị 2 image + stats + diễn giải
+  const captureReport = () => {
+    const canvas = canvasRef.current
+    const s = stateRef.current
+    if (!canvas || !s) return
+    // 1) Raw PNG
+    const pngUrl = canvas.toDataURL('image/png')
+    // 2) Compute report stats
+    const report = computeReport(s, inflowU, omega, stepCounterRef.current, colorMode)
+    // 3) Annotated version — re-paint vào offscreen canvas + overlay
+    const annotated = document.createElement('canvas')
+    annotated.width = canvas.width
+    annotated.height = canvas.height
+    const actx = annotated.getContext('2d')!
+    actx.drawImage(canvas, 0, 0)
+    const scaleX = canvas.width / NX
+    const scaleY = canvas.height / NY
+    if (report.obstacle.bbox) {
+      const { x0, y0, x1, y1 } = report.obstacle.bbox
+      // Dashed bounding box
+      actx.strokeStyle = 'rgba(252, 211, 77, 0.9)'  // amber-300
+      actx.lineWidth = 1.5
+      actx.setLineDash([5, 3])
+      actx.strokeRect(x0 * scaleX, y0 * scaleY, (x1 - x0 + 1) * scaleX, (y1 - y0 + 1) * scaleY)
+      actx.setLineDash([])
+      // "D" arrow & label — chỉ chiều dài đặc trưng
+      actx.fillStyle = 'rgba(252, 211, 77, 0.95)'
+      actx.font = 'bold 10px monospace'
+      const labelX = x0 * scaleX
+      const labelY = Math.max(12, y0 * scaleY - 4)
+      actx.fillText(`D≈${report.obstacle.D}`, labelX, labelY)
+      // Mũi tên flow direction (góc trái-trên)
+      actx.strokeStyle = '#22d3ee'
+      actx.fillStyle = '#22d3ee'
+      actx.lineWidth = 2
+      actx.beginPath()
+      actx.moveTo(10, canvas.height - 22)
+      actx.lineTo(50, canvas.height - 22)
+      actx.stroke()
+      actx.beginPath()
+      actx.moveTo(50, canvas.height - 22)
+      actx.lineTo(44, canvas.height - 25)
+      actx.lineTo(44, canvas.height - 19)
+      actx.closePath()
+      actx.fill()
+      actx.font = 'bold 10px monospace'
+      actx.fillText('Flow', 10, canvas.height - 26)
+    }
+    // Re / Cd badge góc phải-trên
+    const badgeW = 120, badgeH = 48
+    actx.fillStyle = 'rgba(0, 0, 0, 0.72)'
+    actx.fillRect(canvas.width - badgeW - 6, 6, badgeW, badgeH)
+    actx.strokeStyle = 'rgba(34, 211, 238, 0.6)'  // cyan-400
+    actx.lineWidth = 1
+    actx.strokeRect(canvas.width - badgeW - 6, 6, badgeW, badgeH)
+    actx.font = 'bold 12px monospace'
+    actx.fillStyle = '#22d3ee'
+    actx.fillText(`Re = ${report.Re < 10 ? report.Re.toFixed(2) : report.Re.toFixed(0)}`, canvas.width - badgeW + 2, 22)
+    actx.font = '11px monospace'
+    actx.fillStyle = '#fbbf24'
+    actx.fillText(`Cd = ${report.forces.Cd.toFixed(2)}`, canvas.width - badgeW + 2, 36)
+    actx.fillStyle = '#a78bfa'
+    actx.fillText(`Cl = ${report.forces.Cl.toFixed(2)}`, canvas.width - badgeW + 2, 48)
+    // Step counter góc trái-trên (nhỏ)
+    actx.font = '9px monospace'
+    actx.fillStyle = 'rgba(255,255,255,0.7)'
+    actx.fillText(`step ${report.sim.step.toLocaleString()}`, 6, 14)
+    const annotatedUrl = annotated.toDataURL('image/png')
+    setReportSnapshot({ pngUrl, annotatedUrl, report })
+    setReportOpen(true)
+    setCopyStatus('idle')
+  }
+
+  const downloadImage = (dataUrl: string, suffix: string) => {
+    if (!reportSnapshot) return
+    const ts = new Date(reportSnapshot.report.timestamp).toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const a = document.createElement('a')
+    a.href = dataUrl
+    a.download = `cfd-${suffix}-Re${reportSnapshot.report.Re.toFixed(0)}-${ts}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const copyMarkdown = async () => {
+    if (!reportSnapshot) return
+    const md = reportToMarkdown(reportSnapshot.report)
+    try {
+      await navigator.clipboard.writeText(md)
+      setCopyStatus('copied')
+      setTimeout(() => setCopyStatus('idle'), 2000)
+    } catch {
+      // Fallback: tạo textarea + selectionStart
+      const ta = document.createElement('textarea')
+      ta.value = md
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopyStatus('copied')
+      setTimeout(() => setCopyStatus('idle'), 2000)
+    }
+  }
+
   const applyPreset = (preset: ShapeId) => {
     const s = stateRef.current
     if (!s) return
@@ -1180,6 +1497,11 @@ export default function CFDFlow() {
             <button onClick={resetFlow}
               className="px-3 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] font-bold flex items-center gap-1.5 text-sm">
               <RotateCcw className="w-4 h-4" /> Reset
+            </button>
+            <button onClick={captureReport}
+              title="Chụp snapshot + báo cáo chi tiết (Re, Cd, Cl, vortex...)"
+              className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 font-bold flex items-center gap-1.5 text-sm text-white shadow-lg shadow-violet-500/25">
+              <Camera className="w-4 h-4" /> Chụp & báo cáo
             </button>
           </div>
         </div>
@@ -1469,6 +1791,164 @@ export default function CFDFlow() {
           </div>
         </div>
       </div>
+
+      {/* ─── Snapshot Report Modal ─── */}
+      {reportOpen && reportSnapshot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+             onClick={() => setReportOpen(false)}>
+          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-6xl w-full max-h-[92vh] overflow-y-auto shadow-2xl"
+               onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-slate-900 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-violet-500/20 border border-violet-500/40 flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-violet-300" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-white">Báo cáo mô phỏng CFD</h2>
+                  <p className="text-[11px] text-white/50">
+                    {new Date(reportSnapshot.report.timestamp).toLocaleString('vi-VN')} · LBM D2Q9
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setReportOpen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition" aria-label="Đóng">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+              {/* Image column */}
+              <div className="lg:col-span-3 space-y-3">
+                <div className="rounded-xl border border-white/10 bg-slate-950 p-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-300/80 mb-1.5 px-1">
+                    🎯 Snapshot có ghi chú (bbox + Re/Cd badge)
+                  </div>
+                  <img src={reportSnapshot.annotatedUrl} alt="CFD snapshot annotated"
+                       className="w-full h-auto rounded-lg" />
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950 p-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-300/80 mb-1.5 px-1">
+                    📷 Ảnh gốc (raw)
+                  </div>
+                  <img src={reportSnapshot.pngUrl} alt="CFD snapshot raw"
+                       className="w-full h-auto rounded-lg" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => downloadImage(reportSnapshot.annotatedUrl, 'annotated')}
+                    className="px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
+                    <Download className="w-3.5 h-3.5" /> Tải PNG có ghi chú
+                  </button>
+                  <button onClick={() => downloadImage(reportSnapshot.pngUrl, 'raw')}
+                    className="px-3 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-200 text-xs font-bold flex items-center gap-1.5 transition">
+                    <Download className="w-3.5 h-3.5" /> Tải PNG gốc
+                  </button>
+                  <button onClick={copyMarkdown}
+                    className={`px-3 py-2 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition ${
+                      copyStatus === 'copied'
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200'
+                        : 'bg-violet-500/15 border-violet-500/30 hover:bg-violet-500/25 text-violet-200'
+                    }`}>
+                    {copyStatus === 'copied' ? (
+                      <><Check className="w-3.5 h-3.5" /> Đã copy</>
+                    ) : (
+                      <><Copy className="w-3.5 h-3.5" /> Copy báo cáo Markdown</>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats column */}
+              <div className="lg:col-span-2 space-y-3 text-sm">
+                {/* Hero Re + regime */}
+                <div className="rounded-xl bg-gradient-to-br from-violet-500/15 to-cyan-500/15 border border-violet-500/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-violet-200/70 font-bold">Reynolds Number</div>
+                  <div className="text-3xl font-bold font-mono bg-gradient-to-r from-violet-300 to-cyan-300 bg-clip-text text-transparent leading-tight my-1">
+                    Re = {reportSnapshot.report.Re < 10 ? reportSnapshot.report.Re.toFixed(2) : reportSnapshot.report.Re.toFixed(0)}
+                  </div>
+                  <div className="text-[11px] font-bold text-cyan-200 mt-1">{reportSnapshot.report.regime}</div>
+                </div>
+
+                {/* Forces */}
+                <div className="rounded-xl bg-slate-950 border border-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-300/80 font-bold mb-2 flex items-center gap-1">
+                    <Activity className="w-3 h-3" /> Lực tác dụng (MEM)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[12px] font-mono">
+                    <Stat label="C_d (drag)" value={reportSnapshot.report.forces.Cd.toFixed(3)} color="text-amber-300" />
+                    <Stat label="C_l (lift)" value={reportSnapshot.report.forces.Cl.toFixed(3)} color="text-violet-300" />
+                    <Stat label="F_x" value={reportSnapshot.report.forces.Fx.toFixed(4)} color="text-white/80" />
+                    <Stat label="F_y" value={reportSnapshot.report.forces.Fy.toFixed(4)} color="text-white/80" />
+                  </div>
+                </div>
+
+                {/* Flow */}
+                <div className="rounded-xl bg-slate-950 border border-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-bold mb-2 flex items-center gap-1">
+                    <Wind className="w-3 h-3" /> Đặc trưng dòng chảy
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    <Row label="|u|_max" value={`${reportSnapshot.report.flow.maxSpeed.toFixed(4)} lu/ts`} />
+                    <Row label="|u|_avg" value={`${reportSnapshot.report.flow.avgSpeed.toFixed(4)} lu/ts`} />
+                    {reportSnapshot.report.obstacle.hasObstacle && (
+                      <Row label="|u|_wake" value={`${reportSnapshot.report.flow.wakeAvg.toFixed(4)} lu/ts (${(100 - (reportSnapshot.report.flow.wakeAvg / reportSnapshot.report.sim.U) * 100).toFixed(0)}% defect)`} />
+                    )}
+                    <Row label="|ω|_max" value={`${reportSnapshot.report.flow.maxVort.toFixed(4)} lu/ts`} />
+                    <Row label="Δp range" value={`${reportSnapshot.report.flow.minP.toFixed(4)} → ${reportSnapshot.report.flow.maxP.toFixed(4)}`} />
+                  </div>
+                </div>
+
+                {/* Parameters */}
+                <div className="rounded-xl bg-slate-950 border border-white/10 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-300/80 font-bold mb-2 flex items-center gap-1">
+                    <Eye className="w-3 h-3" /> Thông số sim
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    <Row label="Lưới" value={`${reportSnapshot.report.grid.NX}×${reportSnapshot.report.grid.NY}`} />
+                    <Row label="U inflow" value={reportSnapshot.report.sim.U.toFixed(3)} />
+                    <Row label="ω (1/τ)" value={`${reportSnapshot.report.sim.omega.toFixed(2)} (τ=${reportSnapshot.report.sim.tau.toFixed(3)})`} />
+                    <Row label="ν" value={`${reportSnapshot.report.sim.nu.toFixed(4)} lu²/ts`} />
+                    <Row label="D (đặc trưng)" value={`${reportSnapshot.report.obstacle.D} cell`} />
+                    <Row label="Steps" value={reportSnapshot.report.sim.step.toLocaleString()} />
+                    {reportSnapshot.report.obstacle.hasObstacle && (
+                      <Row label="Obstacle" value={`${reportSnapshot.report.obstacle.solidCount} cell (${(reportSnapshot.report.obstacle.coverage * 100).toFixed(2)}%)`} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Interpretation */}
+                <div className="rounded-xl bg-gradient-to-br from-cyan-500/[0.06] to-violet-500/[0.06] border border-cyan-500/25 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-bold mb-2 flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> Diễn giải vật lý
+                  </div>
+                  <p className="text-[11.5px] text-white/85 leading-relaxed">{reportSnapshot.report.interpretation}</p>
+                  <p className="text-[10.5px] text-cyan-200/85 mt-2 leading-relaxed border-t border-white/10 pt-2">
+                    <strong className="text-cyan-200">📚 So sánh chuẩn:</strong> {reportSnapshot.report.benchmark}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Inline small stat components
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="bg-white/[0.04] rounded-lg p-2">
+      <div className="text-[9px] text-white/50 uppercase tracking-wide font-bold">{label}</div>
+      <div className={`text-base font-mono font-bold leading-tight mt-0.5 ${color}`}>{value}</div>
+    </div>
+  )
+}
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-white/55">{label}</span>
+      <span className="font-mono text-white/85 text-[11px]">{value}</span>
     </div>
   )
 }
