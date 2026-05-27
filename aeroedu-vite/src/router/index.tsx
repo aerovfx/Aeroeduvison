@@ -418,7 +418,10 @@ export function AppRouter() {
             <Route path="/dashboard/notifications"         element={<PageFallback />} />
             <Route path="/dashboard/profile"               element={<PageFallback />} />
             <Route path="/dashboard/quiz/:quizId"          element={<PageFallback />} />
-            <Route path="/dashboard/quizzes"               element={<PageFallback />} />
+            {/* /dashboard/quizzes → /student/exam-prep (Flashcard SRS + Quiz + Mock test)
+                user 2026-05-27: Home.tsx có quick action trỏ /dashboard/quizzes
+                nhưng route cũ là PageFallback placeholder → redirect về hub thật. */}
+            <Route path="/dashboard/quizzes"               element={<Navigate to="/student/exam-prep" replace />} />
             <Route path="/dashboard/scrumboard"            element={<ScrumboardPage />} />
             <Route path="/dashboard/knowledge-graph"        element={<KnowledgeGraphPage />} />
             <Route path="/dashboard/settings"              element={<SettingsPage />} />

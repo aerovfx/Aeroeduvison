@@ -553,7 +553,7 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {[
                   { label: 'Hoàn thành bài toán khó', href: '/dashboard/assignments', icon: CheckCircle, iconColor: 'text-emerald-400', bgColor: 'hover:bg-emerald-500/[0.06]' },
-                  { label: 'Làm 3 bài quiz Vật lý', href: '/dashboard/quizzes', icon: Clock, iconColor: 'text-amber-400', bgColor: 'hover:bg-amber-500/[0.06]' },
+                  { label: 'Làm 3 bài quiz Vật lí', href: '/student/exam-prep', icon: Clock, iconColor: 'text-amber-400', bgColor: 'hover:bg-amber-500/[0.06]' },
                   { label: 'Thí nghiệm LabTwin', href: '/dashboard/labtwin', icon: Play, iconColor: 'text-violet-400', bgColor: 'hover:bg-violet-500/[0.06]' },
                 ].map((task, i) => (
                   <Link key={i} to={task.href} className="block">
