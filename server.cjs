@@ -2820,11 +2820,16 @@ app.get('/api/teachers/all', async (req, res) => {
           difficulty  TEXT NOT NULL DEFAULT 'medium',
           tags        TEXT[],
           due_date    TIMESTAMPTZ,
+          owner_role  TEXT NOT NULL DEFAULT 'teacher',
           created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
       `);
+      // Idempotent: thêm cột owner_role cho bảng đã tồn tại (lazy migration)
+      await pool.query(`ALTER TABLE "StemProject" ADD COLUMN IF NOT EXISTS owner_role TEXT NOT NULL DEFAULT 'teacher';`)
+        .catch(() => {});
       await pool.query(`CREATE INDEX IF NOT EXISTS "StemProject_teacher_idx" ON "StemProject"(teacher_id);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StemProject_owner_role_idx" ON "StemProject"(owner_role);`);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS "StemMember" (
@@ -2947,6 +2952,7 @@ app.get('/api/teachers/all', async (req, res) => {
       difficulty: row.difficulty,
       tags: row.tags || [],
       due_date: row.due_date,
+      owner_role: row.owner_role || 'teacher',
       created_at: row.created_at,
       updated_at: row.updated_at,
       ...extras,
@@ -3072,7 +3078,7 @@ app.get('/api/teachers/all', async (req, res) => {
           (SELECT COUNT(*)::int FROM "StemMember" m WHERE m.project_id=p.id) AS member_count,
           (SELECT COUNT(*)::int FROM "StemInvite" i WHERE i.project_id=p.id AND i.revoked_at IS NULL) AS invite_count
         FROM "StemProject" p
-        WHERE p.teacher_id=$1
+        WHERE p.teacher_id=$1 AND p.owner_role='teacher'
         ORDER BY p.created_at DESC
       `, [userId]);
       return res.json({ projects: rows.map(r => mapStemProject(r, {
@@ -3588,27 +3594,148 @@ app.get('/api/teachers/all', async (req, res) => {
   });
 
   // ── GET /api/student/stem-projects ──────────────────────────
+  // Trả về CẢ 2 loại:
+  //   - joined: dự án HS đã tham gia qua /stem/join/:token (member của GV)
+  //   - owned:  dự án HS tự khởi xướng (teacher_id = userId của HS)
+  // Có discriminator origin field để FE phân loại tab
   app.get('/api/student/stem-projects', async (req, res) => {
     try {
       const userId = getStemUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const pool = getSPool();
       await ensureStemTables(pool);
-      const { rows } = await pool.query(`
+
+      // 1) Joined teacher projects (qua StemMember)
+      const joinedQ = pool.query(`
         SELECT p.*, m.joined_at, m.role AS member_role,
+               u.name AS teacher_name, u.image AS teacher_image,
           (SELECT COUNT(*)::int FROM "StemMember" m2 WHERE m2.project_id=p.id) AS member_count
         FROM "StemProject" p
         JOIN "StemMember" m ON m.project_id=p.id
+        LEFT JOIN "User" u ON u.id = p.teacher_id
         WHERE m.student_id=$1 AND m.status='active'
         ORDER BY m.joined_at DESC
       `, [userId]);
-      return res.json({ projects: rows.map(r => ({
+
+      // 2) Self-owned projects (HS làm teacher_id của project mình tự khởi xướng)
+      // Chỉ lấy project có owner_role='student' để không trùng dự án GV (nếu GV vừa là HS edge case)
+      const ownedQ = pool.query(`
+        SELECT p.*,
+          (SELECT COUNT(*)::int FROM "StemMember" m2 WHERE m2.project_id=p.id) AS member_count
+        FROM "StemProject" p
+        WHERE p.teacher_id=$1 AND p.owner_role='student'
+        ORDER BY p.created_at DESC
+      `, [userId]);
+
+      const [joined, owned] = await Promise.all([joinedQ, ownedQ]);
+
+      const joinedList = joined.rows.map(r => ({
         ...mapStemProject(r, { member_count: r.member_count }),
+        origin: 'joined',
         joined_at: r.joined_at,
         member_role: r.member_role,
-      })) });
+        teacher_name: r.teacher_name || null,
+        teacher_image: r.teacher_image || null,
+      }));
+      const ownedList = owned.rows.map(r => ({
+        ...mapStemProject(r, { member_count: r.member_count }),
+        origin: 'owned',
+      }));
+
+      return res.json({
+        projects: [...joinedList, ...ownedList],
+        joined: joinedList,
+        owned: ownedList,
+        counts: { joined: joinedList.length, owned: ownedList.length },
+      });
     } catch (err) {
       console.error('[stem:student:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/student/stem-projects ─────────────────────────
+  // HS tự khởi xướng dự án STEM — teacher_id = HS userId, owner_role='student'
+  app.post('/api/student/stem-projects', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      await ensureStemTables(pool);
+      const { title, description, category, subject, grade, difficulty, tags, due_date } = req.body || {};
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ error: 'Tiêu đề không được trống' });
+      }
+      const id = stemUUID();
+      const now = new Date();
+      const { rows } = await pool.query(`
+        INSERT INTO "StemProject" (id, teacher_id, title, description, category, status,
+          subject, grade, difficulty, tags, due_date, owner_role, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'student', $12, $12)
+        RETURNING *
+      `, [
+        id, userId, title.trim(), description || null,
+        category || 'Science', 'draft',
+        subject || null, grade || null, difficulty || 'medium',
+        Array.isArray(tags) ? tags : null,
+        due_date || null, now,
+      ]);
+      console.log(`[stem:student:create] ✅ ${id} by HS ${userId}`);
+      return res.json({ ...mapStemProject(rows[0]), origin: 'owned' });
+    } catch (err) {
+      console.error('[stem:student:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/student/stem-projects/:id ────────────────────
+  // Chỉ HS owner mới update được project của mình
+  app.patch('/api/student/stem-projects/:id', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      const { rows: chk } = await pool.query(
+        `SELECT 1 FROM "StemProject" WHERE id=$1 AND teacher_id=$2 AND owner_role='student' LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!chk[0]) return res.status(403).json({ error: 'Forbidden' });
+      const allowed = ['title', 'description', 'category', 'status', 'subject', 'grade', 'difficulty', 'tags', 'due_date'];
+      const sets = []; const vals = []; let idx = 1;
+      for (const k of allowed) {
+        if (k in req.body) {
+          sets.push(`${k} = $${idx++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+      sets.push(`updated_at = NOW()`);
+      vals.push(req.params.id);
+      const { rows } = await pool.query(
+        `UPDATE "StemProject" SET ${sets.join(', ')} WHERE id=$${idx} RETURNING *`,
+        vals
+      );
+      return res.json({ ...mapStemProject(rows[0]), origin: 'owned' });
+    } catch (err) {
+      console.error('[stem:student:update]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/student/stem-projects/:id ───────────────────
+  app.delete('/api/student/stem-projects/:id', async (req, res) => {
+    try {
+      const userId = getStemUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getSPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "StemProject" WHERE id=$1 AND teacher_id=$2 AND owner_role='student'`,
+        [req.params.id, userId]
+      );
+      if (!rowCount) return res.status(403).json({ error: 'Forbidden hoặc dự án không tồn tại' });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:student:delete]', err.message);
       return res.status(500).json({ error: err.message });
     }
   });

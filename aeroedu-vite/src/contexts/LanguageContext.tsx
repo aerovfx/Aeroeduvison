@@ -59,7 +59,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeLabTwin:       'LabTwin',
     routeAura:          'Aura',
     routeCircuit:       'IoT',
-    routeStem:          'STEM Projects',
+    routeStem:          'Dự án STEM',
     routeNotes:         'Ghi chú',
     routeScrum:         'Scrum Board',
     routeContacts:      'Danh bạ',
