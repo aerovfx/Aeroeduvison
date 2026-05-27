@@ -14195,7 +14195,40 @@ app.get('/api/exam-xp/me', (_req, res) => res.json({
 })();
 
 // ── Stubs cho IoT/Camera (chưa có service thực) — tránh 503 spam ──
-app.get('/api/iot/classroom/:id', (_req, res) => res.status(404).json({ error: 'IoT service offline — dùng mock data' }));
+// /api/iot/classroom/:id — FE EnvironmentMonitoring.tsx fetch endpoint này
+// Shape ClassroomEnvironment: { class_id, class_name, temperature?, humidity?,
+//   light_level?, noise_level?, air_quality?, motion_detected, occupancy_count?,
+//   camera_status, devices[], last_updated }
+// Trả 200 với class_name từ DB + sensor values null (chưa có hardware IoT).
+// FE đã có fallback mockEnvData nếu null → page render được.
+app.get('/api/iot/classroom/:id', async (req, res) => {
+  let className = 'Lớp học';
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT name FROM "Class" WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    ).catch(() => ({ rows: [] }));
+    if (rows[0]?.name) className = rows[0].name;
+  } catch { /* DB error — dùng default */ }
+
+  // Trả shape đầy đủ với sensor values null (FE hiển thị "Chưa có dữ liệu IoT")
+  return res.json({
+    class_id: req.params.id,
+    class_name: className,
+    temperature: null,
+    humidity: null,
+    light_level: null,
+    noise_level: null,
+    air_quality: null,
+    motion_detected: false,
+    occupancy_count: 0,
+    camera_status: 'offline',
+    devices: [], // chưa có IoT device pair với class
+    last_updated: new Date().toISOString(),
+    _note: 'Hardware IoT chưa kết nối — hiển thị giá trị mặc định. Pair sensor qua /admin/iot-management để có data thật.',
+  });
+});
 app.get('/api/camera/recording', (_req, res) => res.json({ recordings: [], total: 0 }));
 app.post('/api/camera/recording', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
 app.post('/api/camera/recording/:id/stop', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
