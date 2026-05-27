@@ -73,7 +73,7 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
     ],
   },
   {
-    category: 'Hóa học', count: 4, totalXP: 700,
+    category: 'Hoá học', count: 4, totalXP: 700,
     preview: [
       { name: 'Periodic Table 3D',   duration: '30 phút', xp: 200 },
       { name: 'Chemistry Lab',       duration: '25 phút', xp: 120 },
@@ -115,7 +115,7 @@ const CATEGORY_ICON: Record<string, string> = {
   'Sóng':                  '🌊',
   'Quang học':             '💡',
   'Toán & Trực quan':      '📈',
-  'Hóa học':               '🧪',
+  'Hoá học':               '🧪',
   'Sinh học':              '🌿',
   'Thị giác máy tính':     '👁️',
   'Machine Learning':      '🤖',
@@ -130,7 +130,7 @@ const CATEGORY_GRADIENT: Record<string, string> = {
   'Sóng':              'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
   'Quang học':         'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
   'Toán & Trực quan':  'from-indigo-100 to-blue-100 dark:from-[hsl(220,70%,14%)] dark:to-[hsl(235,65%,17%)]',
-  'Hóa học':           'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
+  'Hoá học':           'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
   'Sinh học':          'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
   'Thị giác máy tính': 'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
   'Machine Learning':  'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
@@ -143,7 +143,7 @@ const CATEGORY_BORDER: Record<string, string> = {
   'Sóng':              'border-[hsl(185,75%,40%)]/25',
   'Quang học':         'border-[hsl(38,80%,40%)]/25',
   'Toán & Trực quan':  'border-[hsl(220,70%,40%)]/25',
-  'Hóa học':           'border-[hsl(160,60%,38%)]/25',
+  'Hoá học':           'border-[hsl(160,60%,38%)]/25',
   'Sinh học':          'border-[hsl(130,60%,38%)]/25',
   'Thị giác máy tính': 'border-[hsl(175,65%,38%)]/25',
   'Machine Learning':  'border-[hsl(262,65%,40%)]/25',
@@ -390,41 +390,44 @@ export default function LabsIndexPage() {
           <div className="mb-8 rounded-2xl border-2 border-purple-500/25 bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 dark:from-[hsl(280,45%,9%)] dark:via-[hsl(310,40%,10%)] dark:to-[hsl(20,40%,10%)] overflow-hidden relative">
             <div className="absolute top-0 right-0 text-[9rem] opacity-[0.05] select-none pointer-events-none leading-none">🧪</div>
 
-            {/* Header — title + QR compact card */}
-            <div className="relative z-10 px-6 pt-6 pb-3">
-              <div className="flex items-start justify-between flex-wrap gap-4">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
-                    <Sparkles className="h-7 w-7 text-purple-500" />
-                    Tất cả thí nghiệm
+            {/* Header — title + QR compact card.
+                Mobile (< sm): stack DỌC, title FULL width trên, QR ngang dưới.
+                Desktop (≥ sm): side-by-side, QR góc phải.
+                Bỏ flex-wrap (gây overlap khi QR width = 320 + title min-content) */}
+            <div className="relative z-10 px-4 sm:px-6 pt-5 sm:pt-6 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                <div className="flex-1 min-w-0 w-full">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 text-foreground">
+                    <Sparkles className="h-6 w-6 sm:h-7 sm:w-7 text-purple-500 shrink-0" />
+                    <span className="truncate">Tất cả thí nghiệm</span>
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1.5">
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-snug">
                     {POPULAR_LABS.length} lab phổ biến + {SIMULATIONS.length} thí nghiệm Python theo chủ đề — bấm là vào thẳng
                   </p>
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mt-2.5 sm:mt-3 flex-wrap">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
                       ⭐ {POPULAR_LABS.length} phổ biến
                     </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30">
                       🐍 {SIMULATIONS.length} Python labs
                     </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-pink-100 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-500/30">
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-pink-100 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-500/30">
                       {PYTHON_CATEGORIES.length} chủ đề
                     </span>
                   </div>
                 </div>
 
-                {/* QR card compact — góc phải header */}
-                <div className="shrink-0 rounded-xl border-2 border-indigo-300/50 dark:border-indigo-500/30 bg-white dark:bg-indigo-950/40 p-3 flex items-center gap-3 max-w-xs">
+                {/* QR card — mobile: full width strip · desktop: góc phải shrink-0 */}
+                <div className="w-full sm:w-auto sm:shrink-0 rounded-xl border-2 border-indigo-300/50 dark:border-indigo-500/30 bg-white dark:bg-indigo-950/40 p-2.5 sm:p-3 flex items-center gap-3 sm:max-w-xs">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encodeURIComponent(labsCatalogUrl)}`}
                     alt="QR LabTwin"
-                    className="w-20 h-20 object-contain rounded-md"
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-md shrink-0"
                     loading="lazy"
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                      <QrCode className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
                       <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Quét QR</span>
                     </div>
                     <p className="text-[10.5px] text-muted-foreground leading-snug mb-1.5 line-clamp-2">
@@ -466,7 +469,7 @@ export default function LabsIndexPage() {
                     fuchsia: 'from-fuchsia-500/15 to-purple-500/10 border-fuchsia-300/40 dark:border-fuchsia-500/30 hover:border-fuchsia-500',
                   }
                   const groupLabel: Record<string, string> = {
-                    physics: 'Vật lý', math: 'Toán', chemistry: 'Hoá',
+                    physics: 'Vật lí', math: 'Toán', chemistry: 'Hoá',
                     electronics: 'Điện tử', ai: 'AI', aero: 'Aero',
                   }
                   const labUrl = `${origin}${lab.path}`

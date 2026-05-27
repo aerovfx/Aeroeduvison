@@ -51,17 +51,20 @@ interface SubjectCategory {
   description: string
 }
 
+// Tên môn dùng chuẩn CT GDPT 2018 + đã thống nhất qua lib/subject-normalize.cjs:
+//   "Vật lí" (không phải "Vật lý"), "Hoá học" (không phải "Hóa học"),
+//   "Địa lí" (không phải "Địa lý"), "Toán" (không phải "Toán học").
 const SUBJECT_CATEGORIES: SubjectCategory[] = [
-  { id: "toan", name: "Toán học", dbValue: "Toán học", description: "Đại số, Hình học, Giải tích" },
-  { id: "vat-ly", name: "Vật lý", dbValue: "Vật lý", description: "Cơ học, Điện học, Quang học" },
-  { id: "hoa-hoc", name: "Hóa học", dbValue: "Hóa học", description: "Hóa vô cơ, Hóa hữu cơ" },
+  { id: "toan", name: "Toán", dbValue: "Toán", description: "Đại số, Hình học, Giải tích" },
+  { id: "vat-ly", name: "Vật lí", dbValue: "Vật lí", description: "Cơ học, Điện học, Quang học" },
+  { id: "hoa-hoc", name: "Hoá học", dbValue: "Hoá học", description: "Hoá vô cơ, Hoá hữu cơ" },
   { id: "sinh-hoc", name: "Sinh học", dbValue: "Sinh học", description: "Tế bào, Di truyền, Sinh thái" },
   { id: "ngu-van", name: "Ngữ văn", dbValue: "Ngữ văn", description: "Văn học, Tiếng Việt" },
   { id: "tieng-viet", name: "Tiếng Việt", dbValue: "Tiếng Việt", description: "Vần, Chính tả, Tập đọc" },
   { id: "tieng-anh", name: "Tiếng Anh", dbValue: "Tiếng Anh", description: "Grammar, Vocabulary, Reading" },
   { id: "lich-su", name: "Lịch sử", dbValue: "Lịch sử", description: "Sử Việt Nam, Sử Thế giới" },
-  { id: "dia-ly", name: "Địa lý", dbValue: "Địa lý", description: "Địa lý tự nhiên, Kinh tế" },
-  { id: "lich-su-dia-ly", name: "LS & Địa lý", dbValue: "Lịch sử và Địa lý", description: "Lịch sử, Địa lý tiểu học" },
+  { id: "dia-ly", name: "Địa lí", dbValue: "Địa lí", description: "Địa lí tự nhiên, Kinh tế" },
+  { id: "lich-su-dia-ly", name: "LS & Địa lí", dbValue: "Lịch sử và Địa lí", description: "Lịch sử, Địa lí tiểu học" },
   { id: "gdcd", name: "GDCD", dbValue: "GDCD", description: "Giáo dục công dân" },
   { id: "dao-duc", name: "Đạo đức", dbValue: "Đạo đức", description: "Đạo đức tiểu học" },
   { id: "tin-hoc", name: "Tin học", dbValue: "Tin học", description: "Lập trình, Ứng dụng" },
