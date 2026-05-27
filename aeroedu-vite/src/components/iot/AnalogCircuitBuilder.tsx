@@ -727,6 +727,16 @@ function simulate(
     adj.get(a)!.push({ to: b, R, vDrop, compId })
     adj.get(b)!.push({ to: a, R, vDrop: -vDrop, compId })
   }
+  // For diodes / LEDs: only allow forward direction (a → b = anode → cathode).
+  // Reverse direction is OPEN (no edge added) — reverse-biased diode blocks current.
+  // FIX (2026-05-27): trước đó addEdge cả 2 chiều với vDrop sign-flip → BFS đi ngược
+  // qua LED ăn -Vf vào pathV → effectiveV = V - (-Vf) = V + Vf (sai vật lý).
+  const addDirectedEdge = (a: string, b: string, R: number, vDrop: number, compId: string) => {
+    if (!adj.has(a)) adj.set(a, [])
+    if (!adj.has(b)) adj.set(b, [])
+    adj.get(a)!.push({ to: b, R, vDrop, compId })
+    // KHÔNG add reverse edge — diode/LED chiều ngược OPEN
+  }
 
   // Wires: zero-resistance edges
   for (const w of wires) {
@@ -775,9 +785,10 @@ function simulate(
       case 'led_red':
       case 'led_blue':
       case 'led_green':
-        // LED is non-linear; we treat it as Vf drop + small dynamic R (~5Ω) in forward direction.
+        // LED is non-linear; treat as Vf drop + small dynamic R (~5Ω) in forward direction ONLY.
         // Convention: forward from a → b (anode → cathode).
-        addEdge(a, b, 5, LED_VF[c.type], c.id)
+        // Reverse direction: OPEN (no edge) — reverse-biased diode blocks current.
+        addDirectedEdge(a, b, 5, LED_VF[c.type], c.id)
         break
     }
   }
@@ -835,6 +846,16 @@ function simulate(
       return {
         ok: false,
         message: '🔘 Mạch hở — có công tắc đang MỞ. Click vào công tắc để đóng.',
+        level: 'warn', ledStates, meterReadings,
+      }
+    }
+    // Check if there's a LED in the components — possible reverse-bias
+    // (BFS-with-LED-as-unidirectional-edge sẽ fail nếu LED ngược chiều dòng)
+    const hasLEDinCircuit = components.some(c => c.type.startsWith('led_'))
+    if (hasLEDinCircuit) {
+      return {
+        ok: false,
+        message: '🔌 LED có thể đang lắp NGƯỢC CỰC — kiểm tra chiều anode (+) phải nối phía + của nguồn. Hoặc dây chưa nối kín.',
         level: 'warn', ledStates, meterReadings,
       }
     }
