@@ -5366,6 +5366,215 @@ if (USE_NODEJS_QUESTIONS) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// ARK ASSISTANT — /api/ark-bot/chat (Trợ lý AeroEdu SSE streaming)
+// Used by: aeroedu-vite/src/components/ai/ArkAssistant.tsx
+// Format: OpenAI-compatible SSE chunks (`data: {choices:[{delta:{content}}]}`)
+// Provider routing:
+//   1. DEEPSEEK_API_KEY (default — rẻ + nhanh)
+//   2. ANTHROPIC_API_KEY (fallback — Claude)
+//   3. 503 nếu không có key nào
+// ══════════════════════════════════════════════════════════════
+{
+  const ARK_MAX_TOKENS = parseInt(process.env.ARK_MAX_TOKENS || '1200', 10);
+
+  function buildArkSystemPrompt(role) {
+    const roleUpper = (role || 'STUDENT').toUpperCase();
+    const common =
+      'Bạn là "Trợ lý AeroEdu" — chatbot AI thân thiện của nền tảng giáo dục ' +
+      'AeroEdu / inPhysic. Trả lời ngắn gọn, thân thiện, dùng tiếng Việt chuẩn. ' +
+      'Format markdown nhẹ: dùng **bold** cho ý chính, gạch đầu dòng cho list. ' +
+      'Khi giải toán/lý/hoá: viết công thức bằng LaTeX trong $...$ (inline) hoặc ' +
+      '$$...$$ (block). Không bịa thông tin — nếu không chắc nói "Tôi không chắc".';
+    if (roleUpper === 'TEACHER') {
+      return common + '\n\nNgười dùng là GIÁO VIÊN. Hỗ trợ:\n' +
+        '- Tư vấn phương pháp giảng dạy theo CT GDPT 2018\n' +
+        '- Gợi ý soạn giáo án, đề thi, ma trận\n' +
+        '- Phân tích kết quả học sinh, đề xuất can thiệp\n' +
+        '- Hướng dẫn dùng tính năng AeroEdu (/teacher/lesson-plans, taodethi, ...).';
+    }
+    if (roleUpper === 'ADMIN') {
+      return common + '\n\nNgười dùng là QUẢN TRỊ. Hỗ trợ:\n' +
+        '- Quản lý hệ thống, giáo viên, học sinh, lớp\n' +
+        '- Phân tích báo cáo, KPI giáo dục\n' +
+        '- Workflow vận hành + cấu hình tính năng.';
+    }
+    return common + '\n\nNgười dùng là HỌC SINH. Hỗ trợ:\n' +
+      '- Giải bài tập step-by-step (đề → dữ kiện → phương pháp → lời giải → kiểm tra)\n' +
+      '- Giải thích kiến thức + ví dụ trực quan\n' +
+      '- Gợi ý lộ trình học, tư vấn nghề nghiệp\n' +
+      '- Khuyến khích tư duy phản biện, không làm bài thay khi thi cử.';
+  }
+
+  function normaliseArkMessages(input) {
+    if (!Array.isArray(input)) return [];
+    const out = [];
+    for (const m of input) {
+      if (!m || typeof m !== 'object') continue;
+      const role = m.role === 'assistant' ? 'assistant' : m.role === 'user' ? 'user' : null;
+      const content = typeof m.content === 'string' ? m.content.trim() : '';
+      if (!role || !content) continue;
+      out.push({ role, content });
+    }
+    while (out.length && out[0].role !== 'user') out.shift();
+    return out.slice(-10);
+  }
+
+  app.post('/api/ark-bot/chat', async (req, res) => {
+    const startedAt = Date.now();
+    try {
+      const body = req.body || {};
+      const messages = normaliseArkMessages(body.messages);
+      const stream = body.stream !== false; // default true
+      const roleStr = typeof body.role === 'string' ? body.role : 'STUDENT';
+      if (messages.length === 0) {
+        return res.status(400).json({ error: 'no_messages', message: 'Cần ít nhất 1 tin nhắn người dùng' });
+      }
+
+      const systemPrompt = buildArkSystemPrompt(roleStr);
+      const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
+      const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+
+      if (!hasDeepseek && !hasAnthropic) {
+        return res.status(503).json({
+          error: 'ai_unavailable',
+          message: 'Trợ lý AeroEdu chưa cấu hình API key (cần DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY)',
+        });
+      }
+
+      // SSE headers
+      if (stream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+        res.flushHeaders?.();
+      }
+
+      // ── Provider 1: DeepSeek (OpenAI-compatible SSE) ──
+      if (hasDeepseek) {
+        try {
+          const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: dsModel,
+              messages: [{ role: 'system', content: systemPrompt }, ...messages],
+              max_tokens: ARK_MAX_TOKENS,
+              temperature: 0.7,
+              stream,
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 200)}`);
+          }
+
+          if (stream) {
+            // Pipe SSE chunks → client (Deepseek format matches frontend)
+            const reader = dsResp.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              res.write(chunk);
+            }
+            res.write('data: [DONE]\n\n');
+            res.end();
+            console.log(`[ark-bot] ok provider=deepseek stream=true latency=${Date.now() - startedAt}ms`);
+            return;
+          } else {
+            const dsJson = await dsResp.json();
+            const content = dsJson.choices?.[0]?.message?.content || '';
+            console.log(`[ark-bot] ok provider=deepseek latency=${Date.now() - startedAt}ms`);
+            return res.json({ content, provider: 'deepseek', model: dsModel });
+          }
+        } catch (e) {
+          console.error('[ark-bot:deepseek]', e.message);
+          // Fallback to Anthropic only if SSE chưa start
+          if (!hasAnthropic || (stream && res.headersSent)) {
+            if (stream) {
+              res.write(`data: ${JSON.stringify({ error: 'deepseek_failed', message: e.message })}\n\n`);
+              res.write('data: [DONE]\n\n');
+              return res.end();
+            }
+            return res.status(503).json({ error: 'ai_unavailable', message: e.message });
+          }
+          // Fall through to Anthropic
+        }
+      }
+
+      // ── Provider 2: Anthropic Claude (fallback or primary if no DS) ──
+      try {
+        const Anthropic = require('@anthropic-ai/sdk');
+        const Ctor = Anthropic.default || Anthropic.Anthropic || Anthropic;
+        const client = new Ctor({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+
+        if (stream) {
+          // Anthropic streaming → convert to OpenAI-compatible SSE
+          const anthropicStream = await client.messages.stream({
+            model,
+            max_tokens: ARK_MAX_TOKENS,
+            system: systemPrompt,
+            messages,
+          });
+          for await (const event of anthropicStream) {
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              const text = event.delta.text || '';
+              if (text) {
+                res.write(`data: ${JSON.stringify({
+                  choices: [{ delta: { content: text } }],
+                })}\n\n`);
+              }
+            }
+          }
+          res.write('data: [DONE]\n\n');
+          res.end();
+          console.log(`[ark-bot] ok provider=anthropic stream=true latency=${Date.now() - startedAt}ms`);
+          return;
+        } else {
+          const completion = await client.messages.create({
+            model,
+            max_tokens: ARK_MAX_TOKENS,
+            system: systemPrompt,
+            messages,
+          });
+          let content = '';
+          for (const block of completion.content || []) {
+            if (block.type === 'text') content += block.text;
+          }
+          console.log(`[ark-bot] ok provider=anthropic latency=${Date.now() - startedAt}ms`);
+          return res.json({ content, provider: 'anthropic', model });
+        }
+      } catch (e) {
+        console.error('[ark-bot:anthropic]', e.message);
+        if (stream && !res.headersSent) {
+          return res.status(503).json({ error: 'ai_unavailable', message: e.message });
+        }
+        if (stream) {
+          res.write(`data: ${JSON.stringify({ error: 'anthropic_failed', message: e.message })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
+        return res.status(503).json({ error: 'ai_unavailable', message: e.message });
+      }
+    } catch (err) {
+      console.error('[ark-bot] fatal', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'internal', message: err.message });
+      } else {
+        res.end();
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 // LEARNING HISTORY — per-student per-course timeline
 // Endpoints:
 //   POST /api/learning/events                          — append event
