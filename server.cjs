@@ -5916,9 +5916,73 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ── Robust JSON extractor ───────────────────────────────────
+  // AI thường trả: ```json {...} ```, hoặc preamble text + {...}, hoặc
+  // LaTeX backslash chưa escape (\dfrac → invalid JSON). Hàm này thử 5 chiến
+  // lược theo thứ tự từ nhẹ → mạnh, trả về object/array đầu tiên parse OK.
+  const extractJsonFromAI = (raw) => {
+    if (!raw || typeof raw !== 'string') return null;
+    const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+
+    // 1) Direct parse
+    let p = tryParse(raw.trim());
+    if (p) return p;
+
+    // 2) Strip markdown fences ```json ... ``` (anywhere in text)
+    const fenceMatch = raw.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      p = tryParse(fenceMatch[1].trim());
+      if (p) return p;
+    }
+
+    // 3) Find largest JSON substring — first { to last } OR first [ to last ]
+    const candidates = [];
+    const firstBrace = raw.indexOf('{');
+    const lastBrace = raw.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      candidates.push(raw.slice(firstBrace, lastBrace + 1));
+    }
+    const firstBracket = raw.indexOf('[');
+    const lastBracket = raw.lastIndexOf(']');
+    if (firstBracket >= 0 && lastBracket > firstBracket) {
+      candidates.push(raw.slice(firstBracket, lastBracket + 1));
+    }
+    for (const c of candidates) {
+      p = tryParse(c);
+      if (p) return p;
+    }
+
+    // 4) Repair common LaTeX backslash issue: \dfrac → \\dfrac, \sqrt → \\sqrt
+    //    Valid JSON escapes: \" \\ \/ \b \f \n \r \t \uXXXX
+    //    Anything else after backslash (vd \d, \s, \p, \m, \(, \{) → escape.
+    const repairBackslash = (s) =>
+      s.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+
+    for (const c of [raw, ...candidates]) {
+      p = tryParse(repairBackslash(c));
+      if (p) return p;
+    }
+
+    // 5) Repair backslash + escape raw control chars (newline/tab/CR
+    //    inside JSON string is invalid per spec — must be \n / \t / \r).
+    const escapeCtrl = (s) =>
+      s.replace(/[\x00-\x1f]/g, (ch) => {
+        if (ch === '\n') return '\\n';
+        if (ch === '\r') return '\\r';
+        if (ch === '\t') return '\\t';
+        return ' ';
+      });
+    for (const c of [raw, ...candidates]) {
+      p = tryParse(escapeCtrl(repairBackslash(c)));
+      if (p) return p;
+    }
+
+    return null;
+  };
+
   // ── POST /api/ai/generate-questions ─────────────────────────
   // Body: { topic, count, subject, grade, difficulty, types: string[] }
-  // Response: { questions: any[], count: number, provider: 'deepseek'|'anthropic' }
+  // Response: { questions, json, count, provider, model }
   app.post('/api/ai/generate-questions', async (req, res) => {
     const startedAt = Date.now();
     try {
@@ -5928,7 +5992,21 @@ if (USE_NODEJS_QUESTIONS) {
       const subject = (body.subject || 'Vật lí').toString();
       const grade = (body.grade || '12').toString();
       const difficulty = (body.difficulty || 'medium').toString();
-      const types = Array.isArray(body.types) && body.types.length > 0 ? body.types : ['mcq'];
+      const typesRaw = Array.isArray(body.types) && body.types.length > 0 ? body.types : ['MCQ'];
+      // Normalize loại câu — accept cả lowercase + canonical schema
+      const typeMap = {
+        'mcq': 'MCQ',
+        'multiple_choice': 'MCQ',
+        'true_false': 'MULTIPLE_TF',
+        'multiple_tf': 'MULTIPLE_TF',
+        'đúng/sai': 'MULTIPLE_TF',
+        'đúng_sai': 'MULTIPLE_TF',
+        'short_answer': 'SHORT_ANSWER',
+        'trả lời ngắn': 'SHORT_ANSWER',
+        'essay': 'ESSAY',
+        'tự luận': 'ESSAY',
+      };
+      const types = typesRaw.map(t => typeMap[t.toLowerCase()] || t.toUpperCase());
 
       if (!topic) {
         return res.status(400).json({ error: 'missing_topic', message: 'Cần topic' });
@@ -5943,33 +6021,50 @@ if (USE_NODEJS_QUESTIONS) {
         });
       }
 
-      // Prompt builder — yêu cầu AI trả JSON array đúng format Question Bank
+      // Prompt — yêu cầu schema KHỚP với mau-cau-hoi.json (content/correctAnswer/...)
+      // Đây là format mà importer của FE đã hỗ trợ sẵn → 1 click import OK.
       const sysPrompt = [
         'Bạn là chuyên gia ra đề THPT Việt Nam theo CT GDPT 2018 + TT22/2021.',
-        'Trả về CHÍNH XÁC một JSON array hợp lệ (không có markdown ```json```, không có giải thích).',
-        'Mỗi phần tử là 1 câu hỏi với schema:',
+        '',
+        'Trả về CHÍNH XÁC một JSON object hợp lệ với schema:',
         '{',
-        '  "type": "mcq" | "true_false" | "short_answer" | "essay",',
-        '  "subject": "vatly" | "toan" | "hoa" | "sinh" | "...",',
-        '  "grade": "10"|"11"|"12",',
-        '  "topic": "...",',
-        '  "difficulty": "easy"|"medium"|"hard",',
-        '  "question": "Nội dung câu hỏi (LaTeX inline $...$)",',
-        '  "options": ["A", "B", "C", "D"]  // chỉ cho mcq',
-        '  "answer": "A"  // mcq: A/B/C/D; short_answer: số; essay: lời giải mẫu',
-        '  "statements": [{"text":"...","answer":true|false}]  // chỉ true_false',
-        '  "explanation": "Giải thích đáp án"',
+        '  "questions": [',
+        '    {',
+        '      "questionType": "MCQ" | "MULTIPLE_TF" | "SHORT_ANSWER" | "TRUE_FALSE" | "ESSAY",',
+        '      "content": "Nội dung câu hỏi (LaTeX inline $...$)",',
+        '      "options": ["A", "B", "C", "D"],     // MCQ: 4 đáp án; MULTIPLE_TF: 4 phát biểu; khác: []',
+        '      "correctAnswer": "A",                 // MCQ: "A"/"B"/"C"/"D"; MULTIPLE_TF: "Đúng,Sai,Đúng,Đúng"; SHORT_ANSWER: số; ESSAY: lời giải mẫu',
+        '      "subject": "Vật lí",                  // tên môn tiếng Việt đầy đủ',
+        '      "grade": "Khối 10",                   // "Khối 10" / "Khối 11" / "Khối 12"',
+        '      "difficulty": "easy" | "medium" | "hard",',
+        '      "topic": "Chủ đề con",',
+        '      "explanation": "Lời giải/giải thích (LaTeX)"',
+        '    }',
+        '  ]',
         '}',
-        'Quy tắc:',
-        '- Bám sát CT GDPT 2018 + SGK',
-        '- LaTeX công thức: $v = u + at$, $E = mc^2$',
-        '- Đơn vị SI viết bằng \\si{m/s}, \\si{kg}, ... khi cần',
-        '- Đáp án phải chính xác, có thể kiểm chứng',
-        '- Không bịa thông tin / số liệu',
+        '',
+        'QUY TẮC NGHIÊM NGẶT:',
+        '1. CHỈ trả JSON, KHÔNG markdown fence, KHÔNG giải thích ngoài JSON.',
+        '2. LaTeX: dùng dấu $ inline. TRONG JSON, mọi dấu \\\\ phải escape thành \\\\\\\\.',
+        '   Ví dụ: $\\\\dfrac{a}{b}$, $\\\\sqrt{2}$, $\\\\mathbb{R}$, $\\\\Omega$',
+        '3. Đáp án CHÍNH XÁC, kiểm chứng được. Không bịa số liệu.',
+        '4. Bám sát SGK GDPT 2018 + TT22/2021.',
+        '5. MULTIPLE_TF: 4 phát biểu a/b/c/d trong options + correctAnswer="Đúng,Sai,Đúng,Đúng" (đúng theo thứ tự).',
+        '6. correctAnswer của MCQ là CHỮ CÁI "A"/"B"/"C"/"D" — KHÔNG phải nội dung đáp án.',
       ].join('\n');
-      const userPrompt = `Sinh ${count} câu hỏi loại [${types.join(', ')}] về chủ đề "${topic}" cho môn ${subject} lớp ${grade}, độ khó ${difficulty}. Output: JSON array.`;
+
+      const userPrompt = [
+        `Sinh ${count} câu hỏi loại [${types.join(', ')}] cho:`,
+        `- Môn: ${subject}`,
+        `- ${grade.match(/^\d+$/) ? `Khối ${grade}` : grade}`,
+        `- Chủ đề: ${topic}`,
+        `- Độ khó: ${difficulty === 'mixed' ? 'đa dạng (mix easy/medium/hard)' : difficulty}`,
+        '',
+        'Output: JSON object { "questions": [...] } theo schema đã cho.',
+      ].join('\n');
 
       const callDeepseek = async () => {
+        const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
         const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -5977,13 +6072,13 @@ if (USE_NODEJS_QUESTIONS) {
             'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           },
           body: JSON.stringify({
-            model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+            model,
             messages: [
               { role: 'system', content: sysPrompt },
               { role: 'user', content: userPrompt },
             ],
             max_tokens: 4000,
-            temperature: 0.7,
+            temperature: 0.6,
             response_format: { type: 'json_object' },
           }),
         });
@@ -5992,15 +6087,16 @@ if (USE_NODEJS_QUESTIONS) {
           throw new Error(`DeepSeek HTTP ${resp.status}: ${t.slice(0, 200)}`);
         }
         const json = await resp.json();
-        return json.choices?.[0]?.message?.content || '';
+        return { text: json.choices?.[0]?.message?.content || '', model };
       };
 
       const callAnthropic = async () => {
         const Anthropic = require('@anthropic-ai/sdk');
         const Ctor = Anthropic.default || Anthropic.Anthropic || Anthropic;
         const client = new Ctor({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
         const completion = await client.messages.create({
-          model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
+          model,
           max_tokens: 4000,
           system: sysPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -6009,54 +6105,71 @@ if (USE_NODEJS_QUESTIONS) {
         for (const block of completion.content || []) {
           if (block.type === 'text') text += block.text;
         }
-        return text;
+        return { text, model };
       };
 
-      let raw = '';
-      let provider = 'deepseek';
-      try {
-        if (hasDeepseek) {
-          raw = await callDeepseek();
-        } else {
-          provider = 'anthropic';
-          raw = await callAnthropic();
+      // Try primary → fallback. Nếu primary parse fail, vẫn try fallback (vì có thể
+      // provider khác trả JSON sạch hơn).
+      const attempts = [];
+      const tryProvider = async (name, fn) => {
+        try {
+          const { text, model } = await fn();
+          const parsed = extractJsonFromAI(text);
+          attempts.push({ provider: name, ok: !!parsed, rawSample: text.slice(0, 200) });
+          return parsed ? { parsed, provider: name, model, raw: text } : null;
+        } catch (e) {
+          attempts.push({ provider: name, ok: false, error: e.message });
+          return null;
         }
-      } catch (e) {
-        console.warn('[ai:gen-q] primary fail:', e.message);
-        if (hasAnthropic && provider === 'deepseek') {
-          provider = 'anthropic';
-          raw = await callAnthropic();
-        } else {
-          throw e;
-        }
-      }
+      };
 
-      // Parse JSON từ raw response — chấp nhận: array thuần / { questions: [...] } / object có { data: [...] }
-      let parsed;
-      try {
-        const cleaned = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-        parsed = JSON.parse(cleaned);
-      } catch (e) {
-        console.warn('[ai:gen-q] JSON parse fail, raw:', raw.slice(0, 300));
+      let result = null;
+      if (hasDeepseek) result = await tryProvider('deepseek', callDeepseek);
+      if (!result && hasAnthropic) result = await tryProvider('anthropic', callAnthropic);
+
+      if (!result) {
+        const lastSample = attempts[attempts.length - 1]?.rawSample || attempts[attempts.length - 1]?.error || '';
+        console.warn('[ai:gen-q] all providers failed', JSON.stringify(attempts));
         return res.status(502).json({
           error: 'parse_fail',
-          message: 'AI trả về dữ liệu không phải JSON hợp lệ — thử lại',
+          message: 'AI trả về dữ liệu không phải JSON hợp lệ — thử lại với chủ đề rõ ràng hơn',
+          rawSample: lastSample.slice(0, 200),
+          attempts: attempts.map(a => ({ provider: a.provider, ok: a.ok })),
         });
       }
 
+      // Normalize: questions có thể ở root (array) hoặc { questions: [...] } / { data: [...] }
       let questions = [];
-      if (Array.isArray(parsed)) questions = parsed;
-      else if (Array.isArray(parsed.questions)) questions = parsed.questions;
-      else if (Array.isArray(parsed.data)) questions = parsed.data;
+      const p = result.parsed;
+      if (Array.isArray(p)) questions = p;
+      else if (Array.isArray(p.questions)) questions = p.questions;
+      else if (Array.isArray(p.data)) questions = p.data;
+      else if (Array.isArray(p.items)) questions = p.items;
       else {
         return res.status(502).json({
           error: 'no_questions',
-          message: 'AI không trả về danh sách câu hỏi',
+          message: 'AI không trả về danh sách câu hỏi (thiếu field "questions")',
         });
       }
 
-      console.log(`[ai:gen-q] ok provider=${provider} topic="${topic.slice(0, 40)}" count=${questions.length} latency=${Date.now() - startedAt}ms`);
-      return res.json({ questions, count: questions.length, provider });
+      if (questions.length === 0) {
+        return res.status(502).json({
+          error: 'empty',
+          message: 'AI trả về danh sách rỗng — thử lại với chủ đề cụ thể hơn',
+        });
+      }
+
+      // Build JSON string (pretty) để FE fill vào textarea
+      const jsonOut = JSON.stringify({ questions }, null, 2);
+
+      console.log(`[ai:gen-q] ok provider=${result.provider} model=${result.model} topic="${topic.slice(0, 40)}" count=${questions.length} latency=${Date.now() - startedAt}ms`);
+      return res.json({
+        questions,
+        json: jsonOut,
+        count: questions.length,
+        provider: result.provider,
+        model: result.model,
+      });
     } catch (err) {
       console.error('[ai:gen-q]', err.message);
       return res.status(500).json({ error: 'internal', message: err.message });
