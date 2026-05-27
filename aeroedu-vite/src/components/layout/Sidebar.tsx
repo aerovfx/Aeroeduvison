@@ -89,7 +89,9 @@ const studentSections: RouteSection[] = [
       { icon: Gamepad2,       labelKey: 'routeGames',   href: '/dashboard/games',     badge: 'Game' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
-      { icon: Zap,            labelKey: 'routeStem',           href: '/dashboard/stem',        badge: 'STEM' },
+      // /dashboard/stem REMOVED 2026-05-27 — HS dùng /student/stem-projects
+      // (unified joined + owned tabs)
+      { icon: Zap,            labelKey: 'routeStemProjects',   href: '/student/stem-projects', badge: 'STEM' },
       { icon: StickyNote,     labelKey: 'routeNotes',   href: '/dashboard/notes' },
       { icon: Kanban,         labelKey: 'routeScrum',   href: '/dashboard/scrumboard' },
       { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/dashboard/knowledge-graph', badge: 'AI' },
@@ -185,7 +187,7 @@ const teacherSections: RouteSection[] = [
       { icon: Atom,           labelKey: 'routePeriodicTable',  href: '/dashboard/periodic-table', badge: 'Hoá' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit',        href: '/dashboard/iot-lab',          badge: 'IoT' },
       { icon: FunctionSquare, labelKey: 'routeGraph',          href: '/dashboard/graph-lab' },
-      { icon: Zap,            labelKey: 'routeStem',           href: '/dashboard/stem' },
+      // /dashboard/stem REMOVED 2026-05-27 — GV dùng /teacher/stem-projects (Agile Scrum đầy đủ)
       { icon: Zap,            labelKey: 'routeStemProjects',   href: '/teacher/stem-projects',      badge: 'STEM' },
       { icon: Gamepad2,       labelKey: 'routeGames',          href: '/dashboard/games',            badge: 'Game' },
       // KG HS (/dashboard/knowledge-graph) đã bỏ — GV dùng "Cây tri thức GV"

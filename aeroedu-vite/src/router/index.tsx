@@ -70,7 +70,8 @@ const AiTutorPage      = lazy(() => import('@/pages/dashboard/AiTutor'))
 const ChatPage         = lazy(() => import('@/pages/dashboard/Chat'))
 const EmotionPage      = lazy(() => import('@/pages/dashboard/Emotion'))
 const AuraPage         = lazy(() => import('@/pages/dashboard/Aura'))
-const StemPage         = lazy(() => import('@/pages/dashboard/Stem'))
+// StemPage removed 2026-05-27 — /dashboard/stem redirected to /student/stem-projects.
+// File aeroedu-vite/src/pages/dashboard/Stem.tsx có thể xoá ở commit cleanup sau.
 const NotesPage        = lazy(() => import('@/pages/dashboard/Notes'))
 const ScrumboardPage   = lazy(() => import('@/pages/dashboard/Scrumboard'))
 const KnowledgeGraphPage = lazy(() => import('@/pages/dashboard/KnowledgeGraph'))
@@ -290,6 +291,12 @@ function LegacyLabSlugRedirect() {
   return <Navigate to={`/dashboard/labtwin/${labSlug ?? ''}`} replace />
 }
 
+// 2026-05-27: HS dashboard cũ /dashboard/stem/:id → /student/stem-projects/:id
+function StemRedirect() {
+  const { id } = useParams<{ id: string }>()
+  return <Navigate to={`/student/stem-projects/${id ?? ''}`} replace />
+}
+
 function PageTracker() {
   usePageTracking()
   return null
@@ -413,12 +420,16 @@ export function AppRouter() {
             <Route path="/dashboard/scrumboard"            element={<ScrumboardPage />} />
             <Route path="/dashboard/knowledge-graph"        element={<KnowledgeGraphPage />} />
             <Route path="/dashboard/settings"              element={<SettingsPage />} />
-            <Route path="/dashboard/stem"                  element={<StemPage />} />
-            <Route path="/dashboard/stem/create"           element={<StemCreatePage />} />
-            <Route path="/dashboard/stem/templates"        element={<StemTemplatesPage />} />
-            <Route path="/dashboard/stem/:id"              element={<StemDetailPage />} />
-            <Route path="/dashboard/stem/:id/edit"         element={<StemEditPage />} />
-            <Route path="/dashboard/stem/:id/timeline"     element={<StemTimelinePage />} />
+            {/* 2026-05-27 user request: REMOVE /dashboard/stem (HS dashboard cũ).
+                HS giờ dùng /student/stem-projects (unified joined + owned).
+                Redirect tất cả /dashboard/stem/* → /student/stem-projects/* để
+                backward-compat link cũ + bookmark vẫn hoạt động. */}
+            <Route path="/dashboard/stem"                  element={<Navigate to="/student/stem-projects" replace />} />
+            <Route path="/dashboard/stem/create"           element={<Navigate to="/student/stem-projects" replace />} />
+            <Route path="/dashboard/stem/templates"        element={<Navigate to="/student/stem-projects" replace />} />
+            <Route path="/dashboard/stem/:id"              element={<StemRedirect />} />
+            <Route path="/dashboard/stem/:id/edit"         element={<StemRedirect />} />
+            <Route path="/dashboard/stem/:id/timeline"     element={<StemRedirect />} />
             <Route path="/dashboard/study-dashboard"       element={<PageFallback />} />
             <Route path="/dashboard/study-group-map"       element={<PageFallback />} />
             <Route path="/dashboard/theme"                 element={<PageFallback />} />
