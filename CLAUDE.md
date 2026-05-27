@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `7e70862` (revision pixiai-00597-fit, 2026-05-27 — STEM sync /dashboard/stem unified: 2 tabs joined/owned + HS create/delete own project + owner_role discriminator + sidebar bỏ duplicate. Stem.tsx 2000→600 dòng)
 - Last deployed commit: `6836a9a` (revision pixiai-00596-how, 2026-05-27 — HOTFIX: move STEM block lên TRƯỚC /api/teacher proxy → fix 503 ECONNREFUSED trên /api/teacher/stem-projects/*. 880 lines moved)
 - Last deployed commit: `252ff2a` (revision pixiai-00595-soh, 2026-05-27 — STEM backend module: 17 endpoints + 7 bảng StemProject/Member/Invite/Task/Log/Feedback/Milestone)
 - Last deployed commit: `7297225` (revision pixiai-00594-goq, 2026-05-27 — Sidebar routeStemProjects bị mất khi merge — restore /teacher/stem-projects + /student/stem-projects)
