@@ -32,6 +32,7 @@ import {
 const NX = 240
 const NY = 96
 const Q = 9
+const N = NX * NY
 
 // Velocity vectors e_i = (ex[i], ey[i])
 const EX = [0,  1,  0, -1,  0,  1, -1, -1,  1]
@@ -40,6 +41,24 @@ const EY = [0,  0,  1,  0, -1,  1,  1, -1, -1]
 const W = [4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36]
 // Opposite indices (for bounce-back)
 const OPP = [0, 3, 4, 1, 2, 7, 8, 5, 6]
+
+// ── Precomputed streaming source index table ──
+// streamSrc[targetCell*Q + q] = source cell of f_q before streaming
+// Saves NX*NY*Q*2 modulo ops per step (~415K ops eliminated)
+const STREAM_SRC = new Int32Array(N * Q)
+;(function precomputeStreaming() {
+  for (let y = 0; y < NY; y++) {
+    for (let x = 0; x < NX; x++) {
+      const target = y * NX + x
+      for (let q = 0; q < Q; q++) {
+        // Source cell: x - EX[q], y - EY[q] (where f came from before streaming)
+        const xs = (x - EX[q] + NX) % NX
+        const ys = (y - EY[q] + NY) % NY
+        STREAM_SRC[target * Q + q] = (ys * NX + xs) * Q + q
+      }
+    }
+  }
+})()
 
 const CANVAS_DISPLAY_W = 720
 const CANVAS_DISPLAY_H = Math.round(CANVAS_DISPLAY_W * (NY / NX))  // ≈ 288
@@ -54,7 +73,6 @@ interface LBMState {
 }
 
 function createLBM(): LBMState {
-  const N = NX * NY
   return {
     f: new Float32Array(N * Q),
     fNew: new Float32Array(N * Q),
@@ -66,134 +84,184 @@ function createLBM(): LBMState {
 }
 
 function idx(x: number, y: number) { return y * NX + x }
-function idxF(x: number, y: number, q: number) { return (y * NX + x) * Q + q }
 
-// Equilibrium distribution
-function feq(rho: number, ux: number, uy: number, q: number): number {
-  const eu = EX[q] * ux + EY[q] * uy
-  const u2 = ux * ux + uy * uy
-  return W[q] * rho * (1 + 3 * eu + 4.5 * eu * eu - 1.5 * u2)
-}
-
-// Initialize uniform flow with small noise
+// Initialize uniform flow with small noise — inline feq for speed
 function initLBM(state: LBMState, inflowU: number) {
+  const f = state.f, rho = state.rho, ux = state.ux, uy = state.uy
   for (let y = 0; y < NY; y++) {
     for (let x = 0; x < NX; x++) {
-      const i = idx(x, y)
-      state.rho[i] = 1
-      state.ux[i] = inflowU + (Math.random() - 0.5) * 0.01
-      state.uy[i] = (Math.random() - 0.5) * 0.01
-      for (let q = 0; q < Q; q++) {
-        state.f[idxF(x, y, q)] = feq(state.rho[i], state.ux[i], state.uy[i], q)
-      }
+      const i = y * NX + x
+      const rhoI = 1
+      const uxI = inflowU + (Math.random() - 0.5) * 0.01
+      const uyI = (Math.random() - 0.5) * 0.01
+      rho[i] = rhoI; ux[i] = uxI; uy[i] = uyI
+      const u2_15 = (uxI * uxI + uyI * uyI) * 1.5
+      const base = i * 9
+      // Inline 9 velocity directions — hard-coded EX/EY/W avoids array lookup
+      f[base + 0] = (4/9) * rhoI * (1 - u2_15)
+      f[base + 1] = (1/9) * rhoI * (1 + 3*uxI + 4.5*uxI*uxI - u2_15)
+      f[base + 2] = (1/9) * rhoI * (1 + 3*uyI + 4.5*uyI*uyI - u2_15)
+      f[base + 3] = (1/9) * rhoI * (1 - 3*uxI + 4.5*uxI*uxI - u2_15)
+      f[base + 4] = (1/9) * rhoI * (1 - 3*uyI + 4.5*uyI*uyI - u2_15)
+      const e5 = uxI + uyI
+      f[base + 5] = (1/36) * rhoI * (1 + 3*e5 + 4.5*e5*e5 - u2_15)
+      const e6 = -uxI + uyI
+      f[base + 6] = (1/36) * rhoI * (1 + 3*e6 + 4.5*e6*e6 - u2_15)
+      const e7 = -uxI - uyI
+      f[base + 7] = (1/36) * rhoI * (1 + 3*e7 + 4.5*e7*e7 - u2_15)
+      const e8 = uxI - uyI
+      f[base + 8] = (1/36) * rhoI * (1 + 3*e8 + 4.5*e8*e8 - u2_15)
     }
   }
 }
 
-// LBM step: streaming + collision (BGK)
+/**
+ * LBM step: streaming + collision (BGK)
+ * Optimizations vs naive version:
+ *   - Precomputed STREAM_SRC table eliminates 2× modulo per cell per step
+ *   - Inlined feq() into collision loop (no fn call overhead × 9 × 23K = 207K calls saved)
+ *   - Hard-coded EX/EY/W constants per direction (no array index lookup in hot loop)
+ *   - Inlined idx() (no fn call × 23K cells × multiple sites)
+ *   - Manual swap (no destructuring tmp array allocation per step)
+ *   - Local f/rho/ux/uy aliases avoid property access in tight loop
+ */
 function stepLBM(s: LBMState, omega: number, inflowU: number) {
-  // ─── Streaming ───
-  // f_i(x + e_i, t+1) = f_i(x, t) before collision
-  // Use fNew buffer
-  for (let y = 0; y < NY; y++) {
-    for (let x = 0; x < NX; x++) {
-      const iCell = idx(x, y) * Q
-      for (let q = 0; q < Q; q++) {
-        const xS = (x + EX[q] + NX) % NX
-        const yS = (y + EY[q] + NY) % NY
-        s.fNew[idxF(xS, yS, q)] = s.f[iCell + q]
-      }
-    }
+  let f = s.f, fNew = s.fNew
+  const solid = s.solid, rho = s.rho, ux = s.ux, uy = s.uy
+
+  // ─── Streaming (pull scheme using precomputed source indices) ───
+  // f_q[target] = f_q[source] where source = STREAM_SRC[target*Q + q]
+  for (let i = 0; i < N; i++) {
+    const base = i * 9
+    fNew[base + 0] = f[STREAM_SRC[base + 0]]
+    fNew[base + 1] = f[STREAM_SRC[base + 1]]
+    fNew[base + 2] = f[STREAM_SRC[base + 2]]
+    fNew[base + 3] = f[STREAM_SRC[base + 3]]
+    fNew[base + 4] = f[STREAM_SRC[base + 4]]
+    fNew[base + 5] = f[STREAM_SRC[base + 5]]
+    fNew[base + 6] = f[STREAM_SRC[base + 6]]
+    fNew[base + 7] = f[STREAM_SRC[base + 7]]
+    fNew[base + 8] = f[STREAM_SRC[base + 8]]
   }
-  // Swap
-  ;[s.f, s.fNew] = [s.fNew, s.f]
+  // Manual swap — avoid destructuring temp array
+  const tmp = s.f; s.f = s.fNew; s.fNew = tmp
+  f = s.f; fNew = s.fNew
 
   // ─── Boundary conditions ───
-  // Inflow left (x = 0): set ux = inflowU, rho = 1
+  // Inflow left (x = 0): set ux = inflowU, rho = 1, regenerate feq
+  // Pre-compute feq for inflow (constant) once outside y loop
+  const _u2_15 = inflowU * inflowU * 1.5
+  const fin0 = (4/9) * (1 - _u2_15)
+  const fin1 = (1/9) * (1 + 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
+  const fin2 = (1/9) * (1 - _u2_15)
+  const fin3 = (1/9) * (1 - 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
+  const fin4 = (1/9) * (1 - _u2_15)
+  const fin5 = (1/36) * (1 + 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
+  const fin6 = (1/36) * (1 - 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
+  const fin7 = (1/36) * (1 - 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
+  const fin8 = (1/36) * (1 + 3*inflowU + 4.5*inflowU*inflowU - _u2_15)
   for (let y = 1; y < NY - 1; y++) {
-    const i = idx(0, y)
-    s.ux[i] = inflowU
-    s.uy[i] = 0
-    s.rho[i] = 1
-    for (let q = 0; q < Q; q++) {
-      s.f[idxF(0, y, q)] = feq(1, inflowU, 0, q)
-    }
+    const i = y * NX
+    ux[i] = inflowU; uy[i] = 0; rho[i] = 1
+    const base = i * 9
+    f[base + 0] = fin0; f[base + 1] = fin1; f[base + 2] = fin2
+    f[base + 3] = fin3; f[base + 4] = fin4; f[base + 5] = fin5
+    f[base + 6] = fin6; f[base + 7] = fin7; f[base + 8] = fin8
   }
   // Outflow right (x = NX-1): zero-gradient (copy from x = NX-2)
   for (let y = 1; y < NY - 1; y++) {
-    for (let q = 0; q < Q; q++) {
-      s.f[idxF(NX - 1, y, q)] = s.f[idxF(NX - 2, y, q)]
-    }
+    const iR = y * NX + (NX - 1)
+    const iL = y * NX + (NX - 2)
+    const baseR = iR * 9, baseL = iL * 9
+    f[baseR + 0] = f[baseL + 0]; f[baseR + 1] = f[baseL + 1]
+    f[baseR + 2] = f[baseL + 2]; f[baseR + 3] = f[baseL + 3]
+    f[baseR + 4] = f[baseL + 4]; f[baseR + 5] = f[baseL + 5]
+    f[baseR + 6] = f[baseL + 6]; f[baseR + 7] = f[baseL + 7]
+    f[baseR + 8] = f[baseL + 8]
   }
-  // Top/bottom walls (y = 0 and y = NY-1): bounce-back
+  // Top/bottom walls: bounce-back (swap with opposite direction)
+  // Top wall y=0: incoming downward EY<0 (dirs 4=down, 7,8 = up-corners actually
+  // EY[4]=-1,EY[7]=-1,EY[8]=-1) → bounce to upward dirs
   for (let x = 0; x < NX; x++) {
-    for (let q = 0; q < Q; q++) {
-      // Top wall y = 0
-      if (EY[q] < 0) {
-        s.f[idxF(x, 0, q)] = s.f[idxF(x, 0, OPP[q])]
-      }
-      // Bottom wall y = NY-1
-      if (EY[q] > 0) {
-        s.f[idxF(x, NY - 1, q)] = s.f[idxF(x, NY - 1, OPP[q])]
-      }
-    }
+    const topBase = x * 9
+    const botBase = ((NY - 1) * NX + x) * 9
+    // Top wall: EY[q] < 0 means f points down (came from above wall)
+    // Need to flip: f[q] = f[OPP[q]]
+    // q=4 (EY=-1) ↔ OPP=2 (EY=1)
+    // q=7 (EY=-1) ↔ OPP=5 (EY=1)
+    // q=8 (EY=-1) ↔ OPP=6 (EY=1)
+    f[topBase + 4] = f[topBase + 2]
+    f[topBase + 7] = f[topBase + 5]
+    f[topBase + 8] = f[topBase + 6]
+    // Bottom wall: EY[q] > 0 — q=2 (EY=1), q=5 (EY=1), q=6 (EY=1)
+    f[botBase + 2] = f[botBase + 4]
+    f[botBase + 5] = f[botBase + 7]
+    f[botBase + 6] = f[botBase + 8]
   }
-  // Solid obstacles: bounce-back all directions
-  for (let y = 0; y < NY; y++) {
-    for (let x = 0; x < NX; x++) {
-      const i = idx(x, y)
-      if (s.solid[i]) {
-        // Swap f_q with f_OPP[q]
-        for (let q = 1; q < Q; q++) {
-          if (q < OPP[q]) {
-            const a = s.f[idxF(x, y, q)]
-            s.f[idxF(x, y, q)] = s.f[idxF(x, y, OPP[q])]
-            s.f[idxF(x, y, OPP[q])] = a
-          }
-        }
-      }
+  // Solid obstacles: bounce-back (swap pairs once)
+  for (let i = 0; i < N; i++) {
+    if (solid[i]) {
+      const base = i * 9
+      // Swap pairs: (1,3), (2,4), (5,7), (6,8)
+      let t
+      t = f[base + 1]; f[base + 1] = f[base + 3]; f[base + 3] = t
+      t = f[base + 2]; f[base + 2] = f[base + 4]; f[base + 4] = t
+      t = f[base + 5]; f[base + 5] = f[base + 7]; f[base + 7] = t
+      t = f[base + 6]; f[base + 6] = f[base + 8]; f[base + 8] = t
     }
   }
 
-  // ─── Macroscopic quantities + Collision (BGK) ───
-  for (let y = 0; y < NY; y++) {
-    for (let x = 0; x < NX; x++) {
-      const i = idx(x, y)
-      if (s.solid[i]) {
-        s.rho[i] = 1
-        s.ux[i] = 0
-        s.uy[i] = 0
-        continue
-      }
-      let rho = 0, ux = 0, uy = 0
-      const base = i * Q
-      for (let q = 0; q < Q; q++) {
-        const fi = s.f[base + q]
-        rho += fi
-        ux += fi * EX[q]
-        uy += fi * EY[q]
-      }
-      if (rho > 0.001) {
-        ux /= rho
-        uy /= rho
-      }
-      s.rho[i] = rho
-      s.ux[i] = ux
-      s.uy[i] = uy
-      // Collision: f_i = f_i - omega * (f_i - feq_i)
-      for (let q = 0; q < Q; q++) {
-        const eq = feq(rho, ux, uy, q)
-        s.f[base + q] += omega * (eq - s.f[base + q])
-      }
+  // ─── Macroscopic quantities + Collision (BGK) — fused loop ───
+  for (let i = 0; i < N; i++) {
+    if (solid[i]) {
+      rho[i] = 1; ux[i] = 0; uy[i] = 0
+      continue
     }
+    const base = i * 9
+    const f0 = f[base + 0], f1 = f[base + 1], f2 = f[base + 2], f3 = f[base + 3]
+    const f4 = f[base + 4], f5 = f[base + 5], f6 = f[base + 6], f7 = f[base + 7]
+    const f8 = f[base + 8]
+    const r = f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8
+    // EX = [0, 1, 0, -1, 0, 1, -1, -1, 1]
+    // EY = [0, 0, 1, 0, -1, 1, 1, -1, -1]
+    const uxI = (f1 - f3 + f5 - f6 - f7 + f8) / (r > 0.001 ? r : 1)
+    const uyI = (f2 - f4 + f5 + f6 - f7 - f8) / (r > 0.001 ? r : 1)
+    rho[i] = r; ux[i] = uxI; uy[i] = uyI
+
+    // Inlined feq for 9 directions + collision (BGK): f += omega * (feq - f)
+    const u2_15 = (uxI * uxI + uyI * uyI) * 1.5
+    const omneg = 1 - omega
+    // q=0: e·u=0
+    f[base + 0] = omneg * f0 + omega * (4/9) * r * (1 - u2_15)
+    // q=1: EX=1, EY=0  → eu=uxI
+    f[base + 1] = omneg * f1 + omega * (1/9) * r * (1 + 3*uxI + 4.5*uxI*uxI - u2_15)
+    // q=2: EX=0, EY=1
+    f[base + 2] = omneg * f2 + omega * (1/9) * r * (1 + 3*uyI + 4.5*uyI*uyI - u2_15)
+    // q=3: EX=-1, EY=0
+    f[base + 3] = omneg * f3 + omega * (1/9) * r * (1 - 3*uxI + 4.5*uxI*uxI - u2_15)
+    // q=4: EX=0, EY=-1
+    f[base + 4] = omneg * f4 + omega * (1/9) * r * (1 - 3*uyI + 4.5*uyI*uyI - u2_15)
+    // q=5: EX=1, EY=1   → eu=uxI+uyI
+    const e5 = uxI + uyI
+    f[base + 5] = omneg * f5 + omega * (1/36) * r * (1 + 3*e5 + 4.5*e5*e5 - u2_15)
+    // q=6: EX=-1, EY=1  → eu=-uxI+uyI
+    const e6 = -uxI + uyI
+    f[base + 6] = omneg * f6 + omega * (1/36) * r * (1 + 3*e6 + 4.5*e6*e6 - u2_15)
+    // q=7: EX=-1, EY=-1 → eu=-uxI-uyI
+    const e7 = -uxI - uyI
+    f[base + 7] = omneg * f7 + omega * (1/36) * r * (1 + 3*e7 + 4.5*e7*e7 - u2_15)
+    // q=8: EX=1, EY=-1  → eu=uxI-uyI
+    const e8 = uxI - uyI
+    f[base + 8] = omneg * f8 + omega * (1/36) * r * (1 + 3*e8 + 4.5*e8*e8 - u2_15)
   }
 }
 
 // Compute vorticity (curl) at cell (x, y) using central differences
 function vorticity(s: LBMState, x: number, y: number): number {
   if (x <= 0 || x >= NX - 1 || y <= 0 || y >= NY - 1) return 0
-  const duydx = s.uy[idx(x + 1, y)] - s.uy[idx(x - 1, y)]
-  const duxdy = s.ux[idx(x, y + 1)] - s.ux[idx(x, y - 1)]
+  const base = y * NX
+  const duydx = s.uy[base + (x + 1)] - s.uy[base + (x - 1)]
+  const duxdy = s.ux[(y + 1) * NX + x] - s.ux[(y - 1) * NX + x]
   return (duydx - duxdy) * 0.5
 }
 
@@ -350,6 +418,12 @@ export default function CFDFlow() {
     let raf = 0
     let lastFps = performance.now()
     let frameCount = 0
+    // Adaptive steps-per-frame: tăng/giảm theo FPS thực để giữ 60fps
+    // 3 step/frame = ~6Hz simulation @ 60fps; nếu chậm < 30fps → drop về 1
+    let stepsPerFrame = 3
+    // Uint32 view của ImageData.data (RGBA → 1 uint32 per pixel)
+    // Tiết kiệm 3 ops set color per pixel × NX*NY = 70K ops/frame
+    const data32 = new Uint32Array(imageDataRef.current!.data.buffer)
 
     const loop = () => {
       const s = stateRef.current
@@ -358,9 +432,8 @@ export default function CFDFlow() {
       const offCanvas = offCanvasRef.current
       if (s && img && canvas && offCanvas) {
         if (runningRef.current) {
-          // Run multiple LBM steps per frame for speed
-          const STEPS_PER_FRAME = 3
-          for (let k = 0; k < STEPS_PER_FRAME; k++) {
+          // Run adaptive LBM steps per frame
+          for (let k = 0; k < stepsPerFrame; k++) {
             stepLBM(s, omegaRef.current, inflowURef.current)
             stepCounterRef.current += 1
           }
@@ -425,38 +498,44 @@ export default function CFDFlow() {
           }
         }
 
-        // Render to ImageData
-        const data = img.data
+        // Render to ImageData — sử dụng Uint32 view: 1 write per pixel
+        // Format: 0xAABBGGRR (little-endian) — alpha lúc nào cũng 0xFF
         const mode = colorModeRef.current
         let maxV = 0.001
         if (mode === 'vorticity') maxV = 0.05
         else if (mode === 'speed') maxV = inflowURef.current * 1.5
-        for (let y = 0; y < NY; y++) {
-          for (let x = 0; x < NX; x++) {
-            const i = idx(x, y)
-            const base = (y * NX + x) * 4
-            if (s.solid[i]) {
-              // Solid: dark gray
-              data[base + 0] = 60
-              data[base + 1] = 70
-              data[base + 2] = 80
-              data[base + 3] = 255
-              continue
+        const solid = s.solid, sux = s.ux, suy = s.uy, srho = s.rho
+        const SOLID_COLOR = 0xFF503C3C  // dark gray (R=60 G=70 B=80 A=255)
+        if (mode === 'speed') {
+          for (let i = 0; i < N; i++) {
+            if (solid[i]) { data32[i] = SOLID_COLOR; continue }
+            const speed = Math.sqrt(sux[i] * sux[i] + suy[i] * suy[i])
+            const [r, g, b] = speedColor(speed, maxV)
+            data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r
+          }
+        } else if (mode === 'vorticity') {
+          // Inline vorticity computation to avoid fn call × 23K cells
+          for (let y = 0; y < NY; y++) {
+            const yBase = y * NX
+            for (let x = 0; x < NX; x++) {
+              const i = yBase + x
+              if (solid[i]) { data32[i] = SOLID_COLOR; continue }
+              let curl = 0
+              if (x > 0 && x < NX - 1 && y > 0 && y < NY - 1) {
+                const duydx = suy[yBase + (x + 1)] - suy[yBase + (x - 1)]
+                const duxdy = sux[(y + 1) * NX + x] - sux[(y - 1) * NX + x]
+                curl = (duydx - duxdy) * 0.5
+              }
+              const [r, g, b] = vorticityColor(curl, maxV)
+              data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r
             }
-            let r = 0, g = 0, b = 0
-            if (mode === 'speed') {
-              const speed = Math.sqrt(s.ux[i] * s.ux[i] + s.uy[i] * s.uy[i])
-              ;[r, g, b] = speedColor(speed, maxV)
-            } else if (mode === 'vorticity') {
-              const c = vorticity(s, x, y)
-              ;[r, g, b] = vorticityColor(c, maxV)
-            } else {
-              ;[r, g, b] = pressureColor(s.rho[i])
-            }
-            data[base + 0] = r
-            data[base + 1] = g
-            data[base + 2] = b
-            data[base + 3] = 255
+          }
+        } else {
+          // pressure
+          for (let i = 0; i < N; i++) {
+            if (solid[i]) { data32[i] = SOLID_COLOR; continue }
+            const [r, g, b] = pressureColor(srho[i])
+            data32[i] = (0xFF << 24) | (b << 16) | (g << 8) | r
           }
         }
         const offCtx = offCanvas.getContext('2d')!
@@ -573,8 +652,16 @@ export default function CFDFlow() {
       frameCount += 1
       const now = performance.now()
       if (now - lastFps > 500) {
-        setFps(Math.round((frameCount * 1000) / (now - lastFps)))
+        const measuredFps = Math.round((frameCount * 1000) / (now - lastFps))
+        setFps(measuredFps)
         setStep(stepCounterRef.current)
+        // Adaptive stepsPerFrame:
+        //   < 30fps → giảm xuống 1 step để giữ UI responsive
+        //   30-50fps → 2 steps (cân bằng)
+        //   > 50fps → 3 steps (max speed)
+        if (measuredFps < 30) stepsPerFrame = 1
+        else if (measuredFps < 50) stepsPerFrame = 2
+        else stepsPerFrame = 3
         frameCount = 0
         lastFps = now
       }
