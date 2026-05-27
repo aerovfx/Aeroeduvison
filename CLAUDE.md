@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `776bf60` (revision pixiai-00609-xir, 2026-05-28 — HOTFIX: /api/ai/generate-questions "không phải JSON hợp lệ" — robust 5-strategy extractor + schema khớp mau-cau-hoi.json + retry DeepSeek→Anthropic + return `json` field cho textarea)
 - Last deployed commit: `ba9dbda` (revision pixiai-00608-ten, 2026-05-27 — Batch 10: GraphLab snap giao điểm + nhãn toạ độ + Quizzes redirect + Subject normalize "Vật lý"→"Vật lí" + My Courses theo khối + Lesson plans library + Openfang DeepSeek + IoT 200 + LaTeX compact + community-stats + bỏ exam-generator route)
 - Last deployed commit: `e426fa7` (revision pixiai-00607-hod, 2026-05-27 — Batch 5: LaTeX editor compact + IoT classroom 200 + Openfang AI agents → DeepSeek + Thư viện giáo án chia sẻ + My Courses sắp xếp theo khối lớp 1-12+ĐH)
 - Last deployed commit: `4df4f80` (revision pixiai-00605-dap, 2026-05-27 — Batch 5: LaTeX/JSON skill + Mobile RWD shrink + /api/ai/generate-questions + remove /dashboard/stem (redirect) + /api/teacher/dashboard/full DB query)
