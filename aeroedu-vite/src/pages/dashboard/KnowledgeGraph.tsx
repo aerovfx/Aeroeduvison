@@ -675,20 +675,27 @@ export default function KnowledgeGraph() {
    * Trước đây: mọi wheel event đều zoom → user drag trackpad bị "zoom phá"
    * Giờ: chỉ pinch/ctrl mới zoom, drag/scroll thì PAN (chuẩn Figma/Miro).
    */
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    if (e.ctrlKey || e.metaKey) {
-      // PINCH-ZOOM (trackpad) hoặc Ctrl+wheel (mouse)
-      const factor = e.deltaY < 0 ? 1.04 : 0.96  // gentler than 1.1/0.9
-      setZoom(z => Math.max(0.3, Math.min(3, z * factor)))
-    } else {
-      // 2-FINGER DRAG (trackpad) hoặc scroll wheel → PAN canvas
-      setPan(p => ({
-        x: p.x - e.deltaX / zoom,
-        y: p.y - e.deltaY / zoom,
-      }))
+  // Native non-passive wheel listener — React onWheel mặc định passive nên
+  // e.preventDefault() bị bỏ qua + cảnh báo console. Attach trực tiếp lên
+  // SVG element qua addEventListener({ passive: false }) để chặn scroll page.
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      if (e.ctrlKey || e.metaKey) {
+        const factor = e.deltaY < 0 ? 1.04 : 0.96
+        setZoom(z => Math.max(0.3, Math.min(3, z * factor)))
+      } else {
+        setPan(p => ({
+          x: p.x - e.deltaX / zoom,
+          y: p.y - e.deltaY / zoom,
+        }))
+      }
     }
-  }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [zoom])
 
   const expandFromSelected = async () => {
     if (!selectedNode) return
@@ -1422,7 +1429,7 @@ export default function KnowledgeGraph() {
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseUp}
-            onWheel={onWheel}
+            /* wheel handled via native non-passive listener in useEffect */
             style={{ cursor: dragStateRef.current.type === 'pan' ? 'grabbing' : 'default' }}
           >
             <defs>

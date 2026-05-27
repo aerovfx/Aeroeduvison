@@ -744,19 +744,28 @@ function Plot({
   const onMouseUp = () => setDragging(null)
   const onMouseLeave = () => { setDragging(null); setCursor(null) }
 
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    const r = ref.current!.getBoundingClientRect()
-    const px = e.clientX - r.left, py = e.clientY - r.top
-    const cx = xInv(px), cy = yInv(py)
-    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15
-    onViewportChange({
-      xMin: cx - (cx - xMin) * factor,
-      xMax: cx + (xMax - cx) * factor,
-      yMin: cy - (cy - yMin) * factor,
-      yMax: cy + (yMax - cy) * factor,
-    })
-  }
+  // Native non-passive wheel listener — React onWheel mặc định passive
+  // → e.preventDefault() bị bỏ qua + cảnh báo console. Phải attach qua
+  // addEventListener({ passive: false }) để zoom không scroll page.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      const px = e.clientX - r.left, py = e.clientY - r.top
+      const cx = xInv(px), cy = yInv(py)
+      const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15
+      onViewportChange({
+        xMin: cx - (cx - xMin) * factor,
+        xMax: cx + (xMax - cx) * factor,
+        yMin: cy - (cy - yMin) * factor,
+        yMax: cy + (yMax - cy) * factor,
+      })
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [xMin, xMax, yMin, yMax, xInv, yInv, onViewportChange])
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-border bg-[#0a0f1a]">
@@ -770,7 +779,7 @@ function Plot({
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
-        onWheel={onWheel}
+        /* wheel handled via native non-passive listener in useEffect */
       >
         {/* Minor gridlines */}
         {minorTicksX.map((t, i) => (

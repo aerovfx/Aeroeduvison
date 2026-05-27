@@ -1127,20 +1127,29 @@ export default function ProfessionalKG() {
     if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
   }
 
-  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault()
-    const rect = canvasRef.current!.getBoundingClientRect()
-    const mx = e.clientX - rect.left
-    const my = e.clientY - rect.top
-    const delta = e.deltaY < 0 ? 1.12 : 0.9
-    const newZoom = Math.min(3.0, Math.max(0.4, zoomRef.current * delta))
-    // Zoom toward mouse
-    panRef.current = {
-      x: mx - (mx - panRef.current.x) * (newZoom / zoomRef.current),
-      y: my - (my - panRef.current.y) * (newZoom / zoomRef.current),
+  // Native non-passive wheel listener — React onWheel mặc định passive từ
+  // v17+ nên e.preventDefault() bị Chrome bỏ qua + cảnh báo console. Phải
+  // attach qua addEventListener với { passive: false } để chặn scroll page.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = canvas.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const delta = e.deltaY < 0 ? 1.12 : 0.9
+      const newZoom = Math.min(3.0, Math.max(0.4, zoomRef.current * delta))
+      // Zoom toward mouse
+      panRef.current = {
+        x: mx - (mx - panRef.current.x) * (newZoom / zoomRef.current),
+        y: my - (my - panRef.current.y) * (newZoom / zoomRef.current),
+      }
+      zoomRef.current = newZoom
     }
-    zoomRef.current = newZoom
-  }
+    canvas.addEventListener('wheel', handler, { passive: false })
+    return () => canvas.removeEventListener('wheel', handler)
+  }, [])
 
   // ── Right panel data ──
   const panelData = useMemo(() => {
@@ -1462,7 +1471,7 @@ export default function ProfessionalKG() {
                   dragRef.current = { nodeId: null, panStart: null, mouseStart: null }
                   if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
                 }}
-                onWheel={onWheel}
+                /* onWheel handled via native non-passive listener in useEffect */
               />
               {/* Legend overlay */}
               <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur rounded-xl px-3 py-2 text-[10px] text-slate-400 space-y-1">
