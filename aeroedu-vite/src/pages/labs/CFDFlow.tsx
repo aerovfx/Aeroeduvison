@@ -23,7 +23,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowLeft, Play, Pause, RotateCcw, Eraser, Square, Circle as CircleIcon,
+  ArrowLeft, Play, Pause, RotateCcw, Eraser,
   Wind, Info, Activity, Eye,
 } from 'lucide-react'
 
@@ -305,9 +305,390 @@ function presetSquare(s: LBMState, cx: number, cy: number, half: number) {
   }
 }
 
+// ─── Extended shape library ──────────────────────────────────────
+// Tất cả shape function nhận (state, cx, cy, ...) và set solid[i] = 1 cho
+// các cell nằm trong shape. Không clear trước → cho phép composite multiple
+// shapes (vd Sphere-on-stick = circle + plate).
+
+// Ellipse (trục lớn `a` ngang, trục bé `b` dọc, xoay góc `theta` rad)
+function presetEllipse(s: LBMState, cx: number, cy: number, a: number, b: number, theta = 0) {
+  const c = Math.cos(theta), si = Math.sin(theta)
+  // Loop bounding box
+  const R = Math.max(a, b) + 1
+  for (let y = Math.max(0, cy - R); y <= Math.min(NY - 1, cy + R); y++) {
+    for (let x = Math.max(0, cx - R); x <= Math.min(NX - 1, cx + R); x++) {
+      const dx = x - cx, dy = y - cy
+      // Rotate point into ellipse-aligned coords
+      const rx = c * dx + si * dy
+      const ry = -si * dx + c * dy
+      if ((rx * rx) / (a * a) + (ry * ry) / (b * b) < 1) {
+        s.solid[idx(x, y)] = 1
+      }
+    }
+  }
+}
+
+// Triangle (dir: 'left' = mũi nhọn quay TRÁI đối diện dòng → wedge cản;
+//            'right' = mũi nhọn quay PHẢI cùng chiều dòng → mũi tên thuận chiều)
+function presetTriangle(s: LBMState, cx: number, cy: number, size: number, dir: 'left' | 'right' = 'left') {
+  // Forward (left): vertex pointing into flow → wedge dạng cản
+  // Reverse (right): vertex trailing flow → mũi tên streamlined
+  for (let y = cy - size; y <= cy + size; y++) {
+    if (y < 0 || y >= NY) continue
+    const dy = y - cy
+    // Width at this y: tapers linearly with |dy|
+    const widthAtY = size - Math.abs(dy)
+    if (widthAtY <= 0) continue
+    for (let x = -widthAtY; x <= widthAtY; x++) {
+      const X = dir === 'left' ? cx + x : cx - x
+      if (X >= 0 && X < NX) s.solid[idx(X, y)] = 1
+    }
+  }
+}
+
+// Diamond (rotated square 45°)
+function presetDiamond(s: LBMState, cx: number, cy: number, half: number) {
+  for (let y = cy - half; y <= cy + half; y++) {
+    if (y < 0 || y >= NY) continue
+    const dy = Math.abs(y - cy)
+    const widthAtY = half - dy
+    if (widthAtY < 0) continue
+    for (let x = cx - widthAtY; x <= cx + widthAtY; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+}
+
+// Half-circle dome (flat side trên/dưới/trái/phải)
+function presetHalfCircle(s: LBMState, cx: number, cy: number, r: number, flat: 'top' | 'bottom' | 'left' | 'right' = 'bottom') {
+  for (let y = cy - r; y <= cy + r; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx - r; x <= cx + r; x++) {
+      if (x < 0 || x >= NX) continue
+      const dx = x - cx, dy = y - cy
+      if (dx * dx + dy * dy < r * r) {
+        const keep = flat === 'bottom' ? dy <= 0
+                   : flat === 'top'    ? dy >= 0
+                   : flat === 'left'   ? dx >= 0
+                   :                     dx <= 0  // 'right'
+        if (keep) s.solid[idx(x, y)] = 1
+      }
+    }
+  }
+}
+
+// Flat plate (vertical default — perpendicular to flow)
+function presetPlate(s: LBMState, cx: number, cy: number, height: number, thickness = 2, angle = 0) {
+  const c = Math.cos(angle), si = Math.sin(angle)
+  const halfH = height / 2, halfT = thickness / 2
+  // Loop bounding box of rotated plate
+  const R = Math.ceil(Math.sqrt(halfH * halfH + halfT * halfT)) + 1
+  for (let y = Math.max(0, cy - R); y <= Math.min(NY - 1, cy + R); y++) {
+    for (let x = Math.max(0, cx - R); x <= Math.min(NX - 1, cx + R); x++) {
+      const dx = x - cx, dy = y - cy
+      // Rotate into plate-aligned coords
+      const rx = c * dx + si * dy
+      const ry = -si * dx + c * dy
+      if (Math.abs(rx) <= halfT && Math.abs(ry) <= halfH) {
+        s.solid[idx(x, y)] = 1
+      }
+    }
+  }
+}
+
+// Cross / plus sign
+function presetCross(s: LBMState, cx: number, cy: number, size: number, thick: number) {
+  presetPlate(s, cx, cy, size * 2, thick, 0)            // horizontal bar
+  presetPlate(s, cx, cy, size * 2, thick, Math.PI / 2)  // vertical bar
+}
+
+// Cylinder array — grid của n×m circles
+function presetCylinderArray(s: LBMState, cx: number, cy: number, nCol: number, nRow: number, spacing: number, r: number) {
+  const totalW = (nCol - 1) * spacing
+  const totalH = (nRow - 1) * spacing
+  const x0 = cx - totalW / 2
+  const y0 = cy - totalH / 2
+  for (let row = 0; row < nRow; row++) {
+    for (let col = 0; col < nCol; col++) {
+      presetCylinder(s, x0 + col * spacing, y0 + row * spacing, r)
+    }
+  }
+}
+
+// Teardrop (streamlined body) — tròn đầu, nhọn đuôi
+function presetTeardrop(s: LBMState, cx: number, cy: number, len: number, thick: number) {
+  for (let y = cy - thick; y <= cy + thick; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx - len; x <= cx + len; x++) {
+      if (x < 0 || x >= NX) continue
+      const t = (x - cx + len) / (2 * len)  // 0 at nose (left), 1 at tail (right)
+      // Profile: half-circle nose + tapering linear tail
+      let halfH
+      if (t < 0.3) {
+        // Tròn đầu: circular
+        const localX = (0.3 - t) * 2 * len  // distance from nose tip
+        const r = thick * 0.6
+        halfH = Math.sqrt(Math.max(0, r * r - localX * localX))
+      } else {
+        // Đuôi: tapering từ thick → 0
+        halfH = thick * (1 - (t - 0.3) / 0.7)
+      }
+      if (Math.abs(y - cy) < halfH) s.solid[idx(x, y)] = 1
+    }
+  }
+}
+
+// Wedge (góc nhọn forward, đáy phẳng phía sau)
+function presetWedge(s: LBMState, cx: number, cy: number, len: number, halfBase: number) {
+  // Vertex bên trái (cx-len), đáy bên phải (cx+0)
+  for (let x = cx - len; x <= cx; x++) {
+    if (x < 0 || x >= NX) continue
+    const t = (x - (cx - len)) / len  // 0 at vertex, 1 at base
+    const halfH = halfBase * t
+    for (let y = cy - halfH; y <= cy + halfH; y++) {
+      if (y >= 0 && y < NY) s.solid[idx(x, Math.round(y))] = 1
+    }
+  }
+}
+
+// Hai trụ song song (tandem) — wake interference demo
+function presetTandem(s: LBMState, cx: number, cy: number, r: number, gap: number) {
+  presetCylinder(s, cx - gap / 2, cy, r)
+  presetCylinder(s, cx + gap / 2, cy, r)
+}
+
+// 2 trụ side-by-side (parallel, vuông góc với dòng)
+function presetSideBySide(s: LBMState, cx: number, cy: number, r: number, gap: number) {
+  presetCylinder(s, cx, cy - gap / 2, r)
+  presetCylinder(s, cx, cy + gap / 2, r)
+}
+
+// U-channel (hình chữ U mở ra phía dòng, like a bluff body)
+function presetUChannel(s: LBMState, cx: number, cy: number, w: number, h: number, t: number) {
+  // Bottom bar
+  for (let y = cy + h - t; y <= cy + h; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx - w; x <= cx + w; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+  // Left wall
+  for (let y = cy - h; y <= cy + h; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx - w; x <= cx - w + t; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+  // Right wall
+  for (let y = cy - h; y <= cy + h; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx + w - t; x <= cx + w; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+}
+
+// Heart shape (parametric) — fun shape, không có giá trị CFD đặc biệt
+function presetHeart(s: LBMState, cx: number, cy: number, size: number) {
+  // Heart eq: (x² + y² − 1)³ − x² y³ < 0, scale to size
+  for (let y = cy - size; y <= cy + size; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx - size; x <= cx + size; x++) {
+      if (x < 0 || x >= NX) continue
+      const X = (x - cx) / size
+      const Y = -(y - cy) / size  // flip Y axis
+      const f = (X * X + Y * Y - 1)
+      if (f * f * f - X * X * Y * Y * Y < 0) {
+        s.solid[idx(x, y)] = 1
+      }
+    }
+  }
+}
+
+// Car silhouette (low-poly side view facing left — flow comes from left)
+function presetCar(s: LBMState, cx: number, cy: number, scale: number) {
+  // Body: rectangle low + roof rectangle higher
+  // Wheels: 2 circles
+  const bodyW = scale * 2.5, bodyH = scale * 0.6
+  const roofW = scale * 1.2, roofH = scale * 0.6
+  const wheelR = scale * 0.35
+  // Body (rectangle)
+  for (let y = cy; y <= cy + bodyH; y++) {
+    for (let x = cx - bodyW; x <= cx + bodyW; x++) {
+      if (x >= 0 && x < NX && y >= 0 && y < NY) s.solid[idx(x, Math.round(y))] = 1
+    }
+  }
+  // Roof — front slanted (windshield), rear vertical
+  for (let y = cy - roofH; y <= cy; y++) {
+    if (y < 0 || y >= NY) continue
+    const t = (cy - y) / roofH  // 0 at body, 1 at top
+    // Front edge slopes back (windshield)
+    const xL = cx - roofW + t * roofW * 0.4
+    const xR = cx + roofW
+    for (let x = xL; x <= xR; x++) {
+      const xi = Math.round(x)
+      if (xi >= 0 && xi < NX) s.solid[idx(xi, Math.round(y))] = 1
+    }
+  }
+  // Wheels
+  presetCylinder(s, cx - bodyW * 0.6, cy + bodyH, wheelR)
+  presetCylinder(s, cx + bodyW * 0.6, cy + bodyH, wheelR)
+}
+
+// L-shape (góc 90° như góc tường) — corner separation demo
+function presetLShape(s: LBMState, cx: number, cy: number, size: number, t: number) {
+  // Vertical leg
+  for (let y = cy - size; y <= cy + size; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx; x <= cx + t; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+  // Horizontal leg
+  for (let y = cy + size - t; y <= cy + size; y++) {
+    if (y < 0 || y >= NY) continue
+    for (let x = cx; x <= cx + size; x++) {
+      if (x >= 0 && x < NX) s.solid[idx(x, y)] = 1
+    }
+  }
+}
+
+// Polygon fill — chấp nhận array vertices [x, y] trong lattice coords,
+// dùng ray-casting để fill interior. Dùng cho free-draw shape tool.
+function fillPolygon(s: LBMState, verts: [number, number][]) {
+  if (verts.length < 3) return
+  // Bounding box
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const [x, y] of verts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  minX = Math.max(0, Math.floor(minX))
+  minY = Math.max(0, Math.floor(minY))
+  maxX = Math.min(NX - 1, Math.ceil(maxX))
+  maxY = Math.min(NY - 1, Math.ceil(maxY))
+
+  const inside = (px: number, py: number) => {
+    let inside = false
+    for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+      const [xi, yi] = verts[i]
+      const [xj, yj] = verts[j]
+      if (((yi > py) !== (yj > py)) && (px < ((xj - xi) * (py - yi)) / (yj - yi) + xi)) {
+        inside = !inside
+      }
+    }
+    return inside
+  }
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (inside(x + 0.5, y + 0.5)) s.solid[idx(x, y)] = 1
+    }
+  }
+}
+
 function clearObstacles(s: LBMState) {
   s.solid.fill(0)
 }
+
+// ─── Shape catalog ──────────────────────────────────────────────
+// Mỗi shape có:
+//   id       — định danh
+//   label    — tiếng Việt UI
+//   icon     — emoji preview
+//   category — grouping cho UI ('basic' | 'aero' | 'array' | 'fun')
+//   build(state, cx, cy) — apply mask
+//   re       — Reynolds range gợi ý ('low'|'medium'|'high'|'any')
+type ShapeId =
+  | 'cylinder' | 'square' | 'diamond' | 'triangleL' | 'triangleR'
+  | 'ellipseH' | 'ellipseV' | 'plateV' | 'plateInclined' | 'dome' | 'cross'
+  | 'airfoil' | 'teardrop' | 'wedge'
+  | 'tandem' | 'sideBySide' | 'cylArr23'
+  | 'car' | 'lShape' | 'uChannel' | 'heart'
+
+interface ShapeDef {
+  id: ShapeId
+  label: string
+  icon: string
+  category: 'basic' | 'aero' | 'array' | 'fun'
+  re: 'low' | 'medium' | 'high' | 'any'
+  build: (s: LBMState, cx: number, cy: number) => void
+  desc?: string
+}
+
+const SHAPES: ShapeDef[] = [
+  // Basic — hình cơ bản, dùng cho dạy lý thuyết
+  { id: 'cylinder', label: 'Trụ tròn', icon: '⬤', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetCylinder(s, cx, cy, 10),
+    desc: 'Karman vortex street Re≥100' },
+  { id: 'square', label: 'Vuông', icon: '■', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetSquare(s, cx, cy, 8),
+    desc: 'Sharp corner separation' },
+  { id: 'diamond', label: 'Thoi (45°)', icon: '◆', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetDiamond(s, cx, cy, 11),
+    desc: 'Vortex từ đỉnh trên-dưới' },
+  { id: 'triangleL', label: 'Tam giác cản', icon: '◀', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetTriangle(s, cx, cy, 11, 'left'),
+    desc: 'Mũi nhọn đón dòng' },
+  { id: 'triangleR', label: 'Tam giác thuận', icon: '▶', category: 'basic', re: 'low',
+    build: (s, cx, cy) => presetTriangle(s, cx, cy, 11, 'right'),
+    desc: 'Mặt phẳng đón dòng, đuôi nhọn' },
+  { id: 'ellipseH', label: 'Elip ngang', icon: '⬭', category: 'basic', re: 'low',
+    build: (s, cx, cy) => presetEllipse(s, cx, cy, 16, 7),
+    desc: 'Streamlined ngang' },
+  { id: 'ellipseV', label: 'Elip dứng', icon: '⏺', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetEllipse(s, cx, cy, 7, 16),
+    desc: 'Tiết diện đứng — cản lớn' },
+  { id: 'plateV', label: 'Tấm phẳng đứng', icon: '┃', category: 'basic', re: 'high',
+    build: (s, cx, cy) => presetPlate(s, cx, cy, 28, 3, 0),
+    desc: 'Bluff body cản tối đa' },
+  { id: 'plateInclined', label: 'Tấm nghiêng 30°', icon: '╲', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetPlate(s, cx, cy, 28, 3, Math.PI / 6),
+    desc: 'Lift + drag combined' },
+  { id: 'dome', label: 'Nửa cầu', icon: '◐', category: 'basic', re: 'medium',
+    build: (s, cx, cy) => presetHalfCircle(s, cx, cy, 12, 'bottom'),
+    desc: 'Flat dưới — separation' },
+  { id: 'cross', label: 'Chữ thập', icon: '✚', category: 'basic', re: 'high',
+    build: (s, cx, cy) => presetCross(s, cx, cy, 12, 4),
+    desc: 'Wake phức tạp' },
+
+  // Aerodynamic — body streamlined để dạy lực nâng/cản
+  { id: 'airfoil', label: 'Cánh máy bay', icon: '✈', category: 'aero', re: 'low',
+    build: (s, cx, cy) => presetAirfoil(s, cx, cy, 20, 8),
+    desc: 'NACA-like wing' },
+  { id: 'teardrop', label: 'Giọt nước', icon: '💧', category: 'aero', re: 'low',
+    build: (s, cx, cy) => presetTeardrop(s, cx, cy, 18, 8),
+    desc: 'Tròn đầu — nhọn đuôi, ít wake' },
+  { id: 'wedge', label: 'Nêm', icon: '⊿', category: 'aero', re: 'medium',
+    build: (s, cx, cy) => presetWedge(s, cx, cy, 18, 8),
+    desc: 'Supersonic shock cone' },
+
+  // Array — nhiều vật cản tương tác
+  { id: 'tandem', label: '2 trụ song song', icon: '⬤⬤', category: 'array', re: 'medium',
+    build: (s, cx, cy) => presetTandem(s, cx, cy, 7, 26),
+    desc: 'Wake interference' },
+  { id: 'sideBySide', label: '2 trụ thẳng đứng', icon: '⫶', category: 'array', re: 'medium',
+    build: (s, cx, cy) => presetSideBySide(s, cx, cy, 7, 28),
+    desc: 'Coupled vortex shedding' },
+  { id: 'cylArr23', label: 'Lưới 2×3 trụ', icon: '▦', category: 'array', re: 'medium',
+    build: (s, cx, cy) => presetCylinderArray(s, cx, cy, 3, 2, 18, 5),
+    desc: 'Tube bundle heat exchanger' },
+
+  // Fun shapes — engagement HS
+  { id: 'car', label: 'Xe hơi', icon: '🚗', category: 'fun', re: 'medium',
+    build: (s, cx, cy) => presetCar(s, cx, cy - 6, 10),
+    desc: 'Khí động xe hơi (side view)' },
+  { id: 'lShape', label: 'Góc L', icon: '⌐', category: 'fun', re: 'medium',
+    build: (s, cx, cy) => presetLShape(s, cx, cy, 18, 4),
+    desc: 'Corner separation' },
+  { id: 'uChannel', label: 'Máng chữ U', icon: '⊔', category: 'fun', re: 'medium',
+    build: (s, cx, cy) => presetUChannel(s, cx, cy, 14, 10, 3),
+    desc: 'Cavity flow' },
+  { id: 'heart', label: 'Trái tim', icon: '❤', category: 'fun', re: 'medium',
+    build: (s, cx, cy) => presetHeart(s, cx, cy, 14),
+    desc: 'Fun shape' },
+]
 
 // ─── Color maps ──────────────────────────────────────────────────
 
@@ -354,7 +735,7 @@ function pressureColor(rho: number): [number, number, number] {
 // ─── Component ───────────────────────────────────────────────────
 
 type ColorMode = 'speed' | 'vorticity' | 'pressure'
-type DrawMode = 'add' | 'erase'
+type DrawMode = 'add' | 'erase' | 'polygon'
 
 // Dye particle for ink/smoke injection visualization
 // Reference: "engineering CFD video" — colored streaks following flow
@@ -418,9 +799,9 @@ export default function CFDFlow() {
     let raf = 0
     let lastFps = performance.now()
     let frameCount = 0
-    // Adaptive steps-per-frame: tăng/giảm theo FPS thực để giữ 60fps
-    // 3 step/frame = ~6Hz simulation @ 60fps; nếu chậm < 30fps → drop về 1
-    let stepsPerFrame = 3
+    // Adaptive steps-per-frame: start ở 2 (an toàn), AdaptiveLogic dưới sẽ
+    // tăng lên 3-4 nếu đủ headroom hoặc giảm về 1 nếu lag.
+    let stepsPerFrame = 2
     // Uint32 view của ImageData.data (RGBA → 1 uint32 per pixel)
     // Tiết kiệm 3 ops set color per pixel × NX*NY = 70K ops/frame
     const data32 = new Uint32Array(imageDataRef.current!.data.buffer)
@@ -491,8 +872,9 @@ export default function CFDFlow() {
                 p.alive = false
               }
             }
-            // Compact: drop dead particles when array too large
-            if (particles.length > 6000) {
+            // Compact: drop dead particles khi array quá lớn. Cap 3000 thay 6000
+            // → ít stroke calls hơn × 2 → ~3ms tiết kiệm trên frame nặng.
+            if (particles.length > 3000) {
               dyeRef.current = particles.filter((p) => p.alive)
             }
           }
@@ -542,8 +924,11 @@ export default function CFDFlow() {
         offCtx.putImageData(img, 0, 0)
         // Draw scaled up to display canvas — dim if dye visible để dye nổi bật
         const ctx = canvas.getContext('2d')!
+        // imageSmoothingQuality 'high' is bicubic (5-10ms/frame at 3× scale).
+        // 'medium' is bilinear, looks identical for vorticity/speed fields but
+        // 2-3× faster → mở khoá 60 FPS consistent.
         ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'high'
+        ctx.imageSmoothingQuality = 'medium'
         // Khi showDye: vẽ field mờ hơn để particle ribbons nổi bật như video CFD eng
         if (showDye) {
           ctx.fillStyle = '#020410'
@@ -562,20 +947,29 @@ export default function CFDFlow() {
           const particles = dyeRef.current
           ctx.lineCap = 'round'
           ctx.lineJoin = 'round'
+          ctx.lineWidth = 2.2
+          // 2-pass split: non-glow (fast) first, then short glow pass only
+          // for newest particles. Tránh shadowBlur on/off toggle 3000 lần/frame.
+          ctx.shadowBlur = 0
           for (let i = 0; i < particles.length; i++) {
             const p = particles[i]
-            if (!p.alive) continue
+            if (!p.alive || p.age < 30) continue
             const alpha = Math.max(0, 1 - p.age / 600) * 0.85
-            const hue = p.hue
-            ctx.strokeStyle = `hsla(${hue}, 100%, 65%, ${alpha})`
-            ctx.lineWidth = 2.2
-            // Glow effect for first few segments
-            if (p.age < 60) {
-              ctx.shadowColor = `hsl(${hue}, 100%, 70%)`
-              ctx.shadowBlur = 6
-            } else {
-              ctx.shadowBlur = 0
-            }
+            ctx.strokeStyle = `hsla(${p.hue}, 100%, 65%, ${alpha})`
+            ctx.beginPath()
+            ctx.moveTo(p.prevX * scaleX, p.prevY * scaleY)
+            ctx.lineTo(p.x * scaleX, p.y * scaleY)
+            ctx.stroke()
+          }
+          // Glow pass: only youngest particles (age < 30, ~5% của total),
+          // giảm từ 60→30 frame window để cắt 50% glow strokes.
+          ctx.shadowBlur = 5
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i]
+            if (!p.alive || p.age >= 30) continue
+            const alpha = 0.85
+            ctx.strokeStyle = `hsla(${p.hue}, 100%, 65%, ${alpha})`
+            ctx.shadowColor = `hsl(${p.hue}, 100%, 70%)`
             ctx.beginPath()
             ctx.moveTo(p.prevX * scaleX, p.prevY * scaleY)
             ctx.lineTo(p.x * scaleX, p.y * scaleY)
@@ -655,13 +1049,14 @@ export default function CFDFlow() {
         const measuredFps = Math.round((frameCount * 1000) / (now - lastFps))
         setFps(measuredFps)
         setStep(stepCounterRef.current)
-        // Adaptive stepsPerFrame:
-        //   < 30fps → giảm xuống 1 step để giữ UI responsive
-        //   30-50fps → 2 steps (cân bằng)
-        //   > 50fps → 3 steps (max speed)
-        if (measuredFps < 30) stepsPerFrame = 1
-        else if (measuredFps < 50) stepsPerFrame = 2
-        else stepsPerFrame = 3
+        // Adaptive stepsPerFrame — target 58-62 FPS (just under V-sync 60Hz).
+        // Tăng/giảm 1 unit mỗi 0.5s, hysteresis dải ±3 FPS quanh target tránh
+        // dao động liên tục giữa 2 và 3 step.
+        if (measuredFps < 55 && stepsPerFrame > 1) {
+          stepsPerFrame -= 1  // tụt < 55 FPS → giảm sim work để render kịp
+        } else if (measuredFps >= 60 && stepsPerFrame < 4) {
+          stepsPerFrame += 1  // ổn định ≥60 FPS → tăng sim quality
+        }
         frameCount = 0
         lastFps = now
       }
@@ -672,36 +1067,78 @@ export default function CFDFlow() {
     return () => cancelAnimationFrame(raf)
   }, [showStreamlines, showDye, showVectors, dyeIntensity, numStreams])
 
-  // Mouse drawing on canvas
+  // Mouse drawing on canvas — brush mode (add/erase)
   const drawingRef = useRef(false)
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!drawingRef.current) return
+  // Polygon mode: tích luỹ vertices trên mỗi click, double-click hoặc close button → fill
+  const polygonRef = useRef<[number, number][]>([])
+  const [polygonVersion, setPolygonVersion] = useState(0)  // re-render preview
+
+  const mouseToLattice = (e: React.MouseEvent<HTMLCanvasElement>): [number, number] | null => {
     const canvas = canvasRef.current
-    const s = stateRef.current
-    if (!canvas || !s) return
+    if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
     const mx = (e.clientX - rect.left) / rect.width
     const my = (e.clientY - rect.top) / rect.height
-    const cx = Math.round(mx * NX)
-    const cy = Math.round(my * NY)
+    return [Math.round(mx * NX), Math.round(my * NY)]
+  }
+
+  const paintBrush = (cx: number, cy: number, add: boolean) => {
+    const s = stateRef.current
+    if (!s) return
     const r = brushSize
     for (let y = cy - r; y <= cy + r; y++) {
       for (let x = cx - r; x <= cx + r; x++) {
         const dx = x - cx, dy = y - cy
         if (dx * dx + dy * dy <= r * r && x >= 0 && x < NX && y >= 0 && y < NY) {
-          s.solid[idx(x, y)] = drawMode === 'add' ? 1 : 0
+          s.solid[idx(x, y)] = add ? 1 : 0
         }
       }
     }
   }
 
-  const applyPreset = (preset: 'cylinder' | 'airfoil' | 'square' | 'clear') => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (drawMode === 'polygon') return  // polygon: chỉ react click
+    if (!drawingRef.current) return
+    const pos = mouseToLattice(e)
+    if (!pos) return
+    paintBrush(pos[0], pos[1], drawMode === 'add')
+  }
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (drawMode !== 'polygon') return
+    const pos = mouseToLattice(e)
+    if (!pos) return
+    polygonRef.current.push(pos)
+    setPolygonVersion(v => v + 1)
+  }
+
+  const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (drawMode !== 'polygon') return
+    e.preventDefault()
+    closePolygon()
+  }
+
+  const closePolygon = () => {
+    const s = stateRef.current
+    if (!s) return
+    if (polygonRef.current.length >= 3) {
+      fillPolygon(s, polygonRef.current)
+    }
+    polygonRef.current = []
+    setPolygonVersion(v => v + 1)
+  }
+
+  const cancelPolygon = () => {
+    polygonRef.current = []
+    setPolygonVersion(v => v + 1)
+  }
+
+  const applyPreset = (preset: ShapeId) => {
     const s = stateRef.current
     if (!s) return
     clearObstacles(s)
-    if (preset === 'cylinder') presetCylinder(s, 50, NY / 2, 10)
-    else if (preset === 'airfoil') presetAirfoil(s, 60, NY / 2, 20, 8)
-    else if (preset === 'square') presetSquare(s, 50, NY / 2, 8)
+    const c = SHAPES.find(sh => sh.id === preset)
+    if (c) c.build(s, Math.round(NX * 0.25), Math.round(NY * 0.5))
   }
 
   const resetFlow = () => {
@@ -832,52 +1269,82 @@ export default function CFDFlow() {
             {/* Obstacle drawing */}
             <div className="rounded-2xl bg-slate-900/60 border border-white/[0.08] p-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-white/55 mb-2">
-                ✏️ Vẽ vật cản
+                ✏️ Công cụ vẽ
+                <span className="ml-1 text-[9px] text-white/30 font-normal">({polygonVersion >= 0 ? 'sẵn sàng' : ''})</span>
               </h3>
-              <div className="flex gap-1 mb-2">
-                <button onClick={() => setDrawMode('add')}
-                  className={`flex-1 px-2 py-1.5 rounded text-xs font-bold transition ${
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                <button onClick={() => { setDrawMode('add'); cancelPolygon() }}
+                  className={`px-1 py-1.5 rounded text-[10.5px] font-bold transition ${
                     drawMode === 'add' ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-100' : 'bg-white/[0.04] border border-white/[0.08] text-white/55'
                   }`}>
-                  ➕ Thêm
+                  🖌 Bút
                 </button>
-                <button onClick={() => setDrawMode('erase')}
-                  className={`flex-1 px-2 py-1.5 rounded text-xs font-bold transition ${
+                <button onClick={() => { setDrawMode('polygon'); cancelPolygon() }}
+                  className={`px-1 py-1.5 rounded text-[10.5px] font-bold transition ${
+                    drawMode === 'polygon' ? 'bg-pink-500/20 border border-pink-500/40 text-pink-100' : 'bg-white/[0.04] border border-white/[0.08] text-white/55'
+                  }`}>
+                  🖋 Polygon
+                </button>
+                <button onClick={() => { setDrawMode('erase'); cancelPolygon() }}
+                  className={`px-1 py-1.5 rounded text-[10.5px] font-bold transition ${
                     drawMode === 'erase' ? 'bg-rose-500/20 border border-rose-500/40 text-rose-100' : 'bg-white/[0.04] border border-white/[0.08] text-white/55'
                   }`}>
-                  <Eraser className="w-3 h-3 inline mr-1" /> Xoá
+                  <Eraser className="w-3 h-3 inline" /> Xoá
                 </button>
               </div>
-              <Slider label="Kích cỡ bút" value={brushSize} min={1} max={10} step={1}
-                suffix="px" onChange={(v) => setBrushSize(Math.round(v))} />
-              <div className="text-[10px] text-white/45 italic mt-1">
-                Bấm + kéo trên màn hình để thêm/xoá vật cản
+              {drawMode !== 'polygon' && (
+                <Slider label="Kích cỡ bút" value={brushSize} min={1} max={10} step={1}
+                  suffix="px" onChange={(v) => setBrushSize(Math.round(v))} />
+              )}
+              <div className="text-[10px] text-white/50 italic mt-1 leading-snug">
+                {drawMode === 'polygon'
+                  ? '🖋 Click trên canvas để thêm đỉnh. Double-click hoặc nút ✓ Đóng để fill polygon.'
+                  : drawMode === 'erase'
+                  ? '🧽 Bấm + kéo để xoá vật cản.'
+                  : '🖌 Bấm + kéo để vẽ vật cản bằng bút tròn.'}
               </div>
             </div>
 
-            {/* Presets */}
+            {/* Shape library */}
             <div className="rounded-2xl bg-slate-900/60 border border-white/[0.08] p-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-white/55 mb-2">
-                🎯 Vật cản preset
+                🎯 Thư viện hình ({SHAPES.length})
               </h3>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button onClick={() => applyPreset('cylinder')}
-                  className="px-2 py-2 rounded text-xs font-bold bg-blue-500/15 border border-blue-500/30 hover:bg-blue-500/25 text-blue-200 flex items-center gap-1.5 transition">
-                  <CircleIcon className="w-3.5 h-3.5" /> Trụ tròn
-                </button>
-                <button onClick={() => applyPreset('airfoil')}
-                  className="px-2 py-2 rounded text-xs font-bold bg-violet-500/15 border border-violet-500/30 hover:bg-violet-500/25 text-violet-200 flex items-center gap-1.5 transition">
-                  ✈️ Cánh máy bay
-                </button>
-                <button onClick={() => applyPreset('square')}
-                  className="px-2 py-2 rounded text-xs font-bold bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-200 flex items-center gap-1.5 transition">
-                  <Square className="w-3.5 h-3.5" /> Vuông
-                </button>
-                <button onClick={() => applyPreset('clear')}
-                  className="px-2 py-2 rounded text-xs font-bold bg-white/[0.05] border border-white/[0.1] hover:bg-white/[0.1] text-white/65 flex items-center gap-1.5 transition">
-                  <Eraser className="w-3.5 h-3.5" /> Trống
-                </button>
-              </div>
+              {(['basic', 'aero', 'array', 'fun'] as const).map((cat) => {
+                const items = SHAPES.filter(sh => sh.category === cat)
+                if (items.length === 0) return null
+                const catLabel = {
+                  basic: '◾ Cơ bản',
+                  aero: '✈ Khí động',
+                  array: '▦ Mảng',
+                  fun: '✨ Vui',
+                }[cat]
+                const catColor = {
+                  basic: 'text-cyan-300/80',
+                  aero: 'text-violet-300/80',
+                  array: 'text-amber-300/80',
+                  fun: 'text-pink-300/80',
+                }[cat]
+                return (
+                  <div key={cat} className="mb-2">
+                    <div className={`text-[9.5px] font-bold uppercase tracking-wider mb-1 ${catColor}`}>{catLabel}</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {items.map((sh) => (
+                        <button key={sh.id} onClick={() => applyPreset(sh.id)}
+                          title={sh.desc}
+                          className="px-1.5 py-1 rounded text-[10.5px] font-semibold bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.1] hover:border-white/20 text-white/80 flex items-center gap-1 transition">
+                          <span className="text-[14px] leading-none">{sh.icon}</span>
+                          <span className="truncate">{sh.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+              <button onClick={() => { const s = stateRef.current; if (s) clearObstacles(s); cancelPolygon() }}
+                className="w-full mt-2 px-2 py-1.5 rounded text-[11px] font-bold bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-rose-200 flex items-center justify-center gap-1.5 transition">
+                <Eraser className="w-3 h-3" /> Xoá tất cả vật cản
+              </button>
             </div>
           </div>
 
@@ -890,14 +1357,71 @@ export default function CFDFlow() {
                 </span>
                 <span className="font-mono text-emerald-300">{fps} FPS</span>
               </div>
-              <canvas ref={canvasRef}
-                width={CANVAS_DISPLAY_W} height={CANVAS_DISPLAY_H}
-                className="w-full h-auto rounded-lg cursor-crosshair"
-                onMouseDown={(e) => { drawingRef.current = true; handleMouseMove(e) }}
-                onMouseUp={() => { drawingRef.current = false }}
-                onMouseLeave={() => { drawingRef.current = false }}
-                onMouseMove={handleMouseMove}
-              />
+              <div className="relative">
+                <canvas ref={canvasRef}
+                  width={CANVAS_DISPLAY_W} height={CANVAS_DISPLAY_H}
+                  className="w-full h-auto rounded-lg cursor-crosshair"
+                  onMouseDown={(e) => {
+                    if (drawMode === 'polygon') return  // click handled separately
+                    drawingRef.current = true
+                    handleMouseMove(e)
+                  }}
+                  onMouseUp={() => { drawingRef.current = false }}
+                  onMouseLeave={() => { drawingRef.current = false }}
+                  onMouseMove={handleMouseMove}
+                  onClick={handleCanvasClick}
+                  onDoubleClick={handleCanvasDoubleClick}
+                />
+                {/* Polygon preview overlay (SVG) — pointer-events none */}
+                {drawMode === 'polygon' && polygonRef.current.length > 0 && (
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none"
+                       viewBox={`0 0 ${NX} ${NY}`} preserveAspectRatio="none">
+                    {/* Lines connecting vertices */}
+                    {polygonRef.current.length > 1 && (
+                      <polyline
+                        points={polygonRef.current.map(([x, y]) => `${x},${y}`).join(' ')}
+                        fill="none" stroke="rgba(244,114,182,0.85)" strokeWidth={0.5}
+                        strokeDasharray="1.5 1" vectorEffect="non-scaling-stroke" />
+                    )}
+                    {/* Close-loop dashed preview */}
+                    {polygonRef.current.length >= 3 && (
+                      <line
+                        x1={polygonRef.current[polygonRef.current.length - 1][0]}
+                        y1={polygonRef.current[polygonRef.current.length - 1][1]}
+                        x2={polygonRef.current[0][0]}
+                        y2={polygonRef.current[0][1]}
+                        stroke="rgba(244,114,182,0.45)" strokeWidth={0.4}
+                        strokeDasharray="1 1" vectorEffect="non-scaling-stroke" />
+                    )}
+                    {/* Vertex dots */}
+                    {polygonRef.current.map(([x, y], i) => (
+                      <circle key={i} cx={x} cy={y} r={1.2}
+                              fill={i === 0 ? '#fde047' : '#f472b6'}
+                              stroke="#000" strokeWidth={0.3}
+                              vectorEffect="non-scaling-stroke" />
+                    ))}
+                  </svg>
+                )}
+                {drawMode === 'polygon' && (
+                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-2 pointer-events-none">
+                    <div className="text-[10.5px] font-mono bg-slate-900/80 border border-pink-500/40 text-pink-200 rounded px-2 py-1 pointer-events-auto">
+                      🖋 Polygon: {polygonRef.current.length} điểm — click thêm · double-click hoặc nút bên dưới để đóng
+                    </div>
+                    {polygonRef.current.length > 0 && (
+                      <div className="flex gap-1 pointer-events-auto">
+                        <button onClick={closePolygon}
+                          className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white">
+                          ✓ Đóng ({polygonRef.current.length})
+                        </button>
+                        <button onClick={cancelPolygon}
+                          className="px-2 py-1 rounded text-[10px] font-bold bg-rose-500/80 hover:bg-rose-500 text-white">
+                          ✕ Huỷ
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Theory */}
