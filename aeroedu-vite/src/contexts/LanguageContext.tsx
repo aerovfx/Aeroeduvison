@@ -99,6 +99,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeExamGenerator: 'Tạo đề AI',
     routeInteraction:   'Tương tác lớp',
     routeMeetingNotes:  'Biên bản họp',
+    routePeriodicTable: 'Bảng tuần hoàn',
 
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Lộ trình hôm nay',
@@ -447,6 +448,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeExamGenerator: 'AI Exam Generator',
     routeInteraction:   'Class Interaction',
     routeMeetingNotes:  'Meeting Notes',
+    routePeriodicTable: 'Periodic Table',
 
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Today\'s Plan',

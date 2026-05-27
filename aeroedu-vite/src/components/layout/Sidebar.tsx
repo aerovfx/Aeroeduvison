@@ -14,7 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
-  Bot, MessageCircle, ClipboardEdit,
+  Bot, MessageCircle, ClipboardEdit, Atom,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -85,6 +85,7 @@ const studentSections: RouteSection[] = [
     routes: [
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab', badge: 'Mới' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
+      { icon: Atom,           labelKey: 'routePeriodicTable', href: '/dashboard/labtwin/labs/periodic-table', badge: 'Hoá' },
       { icon: Gamepad2,       labelKey: 'routeGames',   href: '/dashboard/games',     badge: 'Game' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
@@ -173,6 +174,20 @@ const teacherSections: RouteSection[] = [
       { icon: Kanban,       labelKey: 'routeScrum',       href: '/teacher/scrumboard' },
       { icon: Bot,          labelKey: 'routeAgents',      href: '/teacher/agents',   badge: 'AI' },
       { icon: KeyRound,     labelKey: 'routeApiKeys',     href: '/teacher/api-keys', badge: 'MCP' },
+    ],
+  },
+  {
+    // Labs & Simulators — GV cần để minh hoạ dạy học, chuẩn bị thí nghiệm ảo
+    titleKey: 'sectionLabsTools',
+    routes: [
+      { icon: FlaskConical,   labelKey: 'routeLabTwin',        href: '/dashboard/labtwin',          badge: 'Lab' },
+      { icon: Sparkles,       labelKey: 'routeAura',           href: '/dashboard/aura',             badge: '3D' },
+      { icon: Atom,           labelKey: 'routePeriodicTable',  href: '/dashboard/labtwin/labs/periodic-table', badge: 'Hoá' },
+      { icon: CircuitBoard,   labelKey: 'routeCircuit',        href: '/dashboard/iot-lab',          badge: 'IoT' },
+      { icon: FunctionSquare, labelKey: 'routeGraph',          href: '/dashboard/graph-lab' },
+      { icon: Zap,            labelKey: 'routeStem',           href: '/dashboard/stem' },
+      { icon: Gamepad2,       labelKey: 'routeGames',          href: '/dashboard/games',            badge: 'Game' },
+      { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/dashboard/knowledge-graph',  badge: 'AI' },
     ],
   },
   {

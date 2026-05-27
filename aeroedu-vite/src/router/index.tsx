@@ -124,6 +124,7 @@ const GestureSwarm       = lazy(() => import('@/pages/labs/GestureSwarm'))
 const AssemblySim        = lazy(() => import('@/pages/labs/AssemblySim'))
 const IoTLab             = lazy(() => import('@/pages/labs/IoTLab'))
 const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
+const PeriodicTablePage  = lazy(() => import('@/pages/labs/PeriodicTable'))
 
 // ── Teacher Pages (đã port) ──────────────────────────────────
 const TeacherDashboard      = lazy(() => import('@/pages/teacher/Dashboard'))
@@ -394,6 +395,8 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
+            <Route path="/dashboard/labtwin/labs/periodic-table"          element={<PeriodicTablePage />} />
+            <Route path="/dashboard/periodic-table"                       element={<PeriodicTablePage />} />{/* shortcut */}
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
             <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
             {/* ── GAME HUB — mọi game mount trực tiếp dưới /dashboard/games/* ── */}
