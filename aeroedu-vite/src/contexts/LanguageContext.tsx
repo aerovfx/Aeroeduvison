@@ -89,6 +89,37 @@ export const translations: Record<Language, Record<string, string>> = {
     routeProfKG:        'Cây tri thức GV',
     routeKnowledgeGraph:'Cây tri thức',
 
+    // ── Sidebar — Missing keys (fix raw-key display 2026-05-27) ─
+    routeSprint:        'Sprint AI',
+    routeTaodethi:      'Tạo đề thi',
+    routeStudentRequests: 'Yêu cầu học sinh',
+    routeGradeBook:     'Sổ điểm',
+    routeLessonPlans:   'Kế hoạch dạy học',
+    routeNewsCompose:   'Viết bài tin',
+    routeExamGenerator: 'Tạo đề AI',
+    routeInteraction:   'Tương tác lớp',
+    routeMeetingNotes:  'Biên bản họp',
+
+    // ── Sidebar — Student missing keys ────────────────────────
+    routeDaily:         'Lộ trình hôm nay',
+    routeForYou:        'Dành cho bạn',
+    routeMyTeachers:    'Giáo viên của tôi',
+    routeExamRooms:     'Phòng thi',
+    routePixelGames:    'Pixel Games',
+    routeGames:         'Game học',
+    routeSchedule:      'Lịch trình',
+    routeWishlist:      'Yêu thích',
+    routePurchase:      'Lịch sử mua',
+
+    // ── Sidebar — Docs/News + admin missing ──────────────────
+    routeDocs:          'Tài liệu',
+    routeNews:          'Tin tức',
+    routeAdminUsers:    'Người dùng',
+    routeAdminPayments: 'Thanh toán',
+    routeInsights:      'Insights',
+    routeNewsReview:    'Duyệt tin',
+    routeRsExperiments: 'RS Experiments',
+
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Tổng quan',
     routeStudents:      'Học sinh',
@@ -405,6 +436,37 @@ export const translations: Record<Language, Record<string, string>> = {
     routeApiKeys:       'API Keys',
     routeProfKG:        'Cây tri thức GV',
     routeKnowledgeGraph:'Cây tri thức',
+
+    // ── Sidebar — Missing keys (fix raw-key display 2026-05-27) ─
+    routeSprint:        'AI Sprint',
+    routeTaodethi:      'Create Exam',
+    routeStudentRequests: 'Student Requests',
+    routeGradeBook:     'Gradebook',
+    routeLessonPlans:   'Lesson Plans',
+    routeNewsCompose:   'Compose News',
+    routeExamGenerator: 'AI Exam Generator',
+    routeInteraction:   'Class Interaction',
+    routeMeetingNotes:  'Meeting Notes',
+
+    // ── Sidebar — Student missing keys ────────────────────────
+    routeDaily:         'Today\'s Plan',
+    routeForYou:        'For You',
+    routeMyTeachers:    'My Teachers',
+    routeExamRooms:     'Exam Rooms',
+    routePixelGames:    'Pixel Games',
+    routeGames:         'Games',
+    routeSchedule:      'Schedule',
+    routeWishlist:      'Wishlist',
+    routePurchase:      'Purchase History',
+
+    // ── Sidebar — Docs/News + admin missing ──────────────────
+    routeDocs:          'Docs',
+    routeNews:          'News',
+    routeAdminUsers:    'Users',
+    routeAdminPayments: 'Payments',
+    routeInsights:      'Insights',
+    routeNewsReview:    'Review News',
+    routeRsExperiments: 'RS Experiments',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Overview',

@@ -14,6 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
+  Bot, MessageCircle, ClipboardEdit,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -124,11 +125,12 @@ const teacherSections: RouteSection[] = [
   {
     titleKey: 'sectionExam',
     routes: [
-      { icon: Wand2,     labelKey: 'routeTaodethi',      href: '/teacher/taodethi',         isHighlighted: true },
-      { icon: Grid3x3,   labelKey: 'routeExamMatrix',   href: '/teacher/exam-matrix' },
-      { icon: HelpCircle,labelKey: 'routeQuestionBank',  href: '/teacher/question-bank' },
-      { icon: FileText,  labelKey: 'routeExams',         href: '/teacher/exams',            badge: 'AI' },
-      { icon: Target,    labelKey: 'routeOnlineExam',    href: '/teacher/online-exam-room' },
+      { icon: Wand2,     labelKey: 'routeTaodethi',       href: '/teacher/taodethi',         isHighlighted: true },
+      { icon: Sparkles,  labelKey: 'routeExamGenerator',  href: '/teacher/exam-generator',   badge: 'AI' },
+      { icon: Grid3x3,   labelKey: 'routeExamMatrix',     href: '/teacher/exam-matrix' },
+      { icon: HelpCircle,labelKey: 'routeQuestionBank',   href: '/teacher/question-bank' },
+      { icon: FileText,  labelKey: 'routeExams',          href: '/teacher/exams',            badge: 'AI' },
+      { icon: Target,    labelKey: 'routeOnlineExam',     href: '/teacher/online-exam-room' },
     ],
   },
   {
@@ -162,11 +164,14 @@ const teacherSections: RouteSection[] = [
       { icon: BookOpenCheck,labelKey: 'routeClasses',     href: '/teacher/classes' },
       { icon: Users,        labelKey: 'routeStudentRequests', href: '/teacher/student-requests' },
       { icon: ClipboardList,labelKey: 'routeGradeBook',   href: '/teacher/gradebook' },
+      { icon: MessageCircle,labelKey: 'routeInteraction', href: '/teacher/interaction-center' },
       { icon: MonitorPlay,  labelKey: 'routeCameraClass', href: '/teacher/camera-management', badge: 'Live' },
       { icon: Thermometer,  labelKey: 'routeEnvironment', href: '/teacher/environment-monitoring', badge: 'IoT' },
       { icon: FileEdit,     labelKey: 'routeAssignments', href: '/teacher/assignments' },
       { icon: Calendar,     labelKey: 'routeCalendar',    href: '/teacher/calendar' },
+      { icon: ClipboardEdit, labelKey: 'routeMeetingNotes', href: '/teacher/meeting-notes' },
       { icon: Kanban,       labelKey: 'routeScrum',       href: '/teacher/scrumboard' },
+      { icon: Bot,          labelKey: 'routeAgents',      href: '/teacher/agents',   badge: 'AI' },
       { icon: KeyRound,     labelKey: 'routeApiKeys',     href: '/teacher/api-keys', badge: 'MCP' },
     ],
   },
