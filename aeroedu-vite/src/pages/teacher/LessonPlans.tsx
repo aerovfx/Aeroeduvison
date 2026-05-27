@@ -9,14 +9,15 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText, Plus, Search, Trash2, Cloud, CloudOff, Edit3, Loader2,
   Calendar, BookOpen, Hash, X, Sparkles, ExternalLink, Download, Wand2,
+  Share2, Globe, Users, Copy,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { lessonPlanService, type LessonPlanSummary, type GcsSnapshot } from '@/services/lessonPlan.service'
+import { lessonPlanService, type LessonPlanSummary, type GcsSnapshot, type LibraryPlan } from '@/services/lessonPlan.service'
 import { LESSON_PLAN_TEMPLATES, type LessonPlanTemplate } from '@/lib/lesson-plan-templates'
 import AiGenerateLatexLessonPlanModal from '@/components/lesson-plan/AiGenerateLatexLessonPlanModal'
 import NotebookGenerator from '@/components/lesson-plan/NotebookGenerator'
 
-type TabKey = 'plans' | 'gcs'
+type TabKey = 'plans' | 'library' | 'gcs'
 
 function formatBytes(b: number): string {
   if (b < 1024) return `${b} B`
@@ -34,11 +35,17 @@ export default function LessonPlans() {
   const [aiModalOpen, setAiModalOpen] = useState(false)
   const [notebookOpen, setNotebookOpen] = useState(false)   // NotebookLM-style generator
 
-  // ── Tabs: Plans (DB) vs GCS Snapshots ──
+  // ── Tabs: Plans (DB) | Library (community public) | GCS Snapshots ──
   const [tab, setTab] = useState<TabKey>('plans')
   const [snapshots, setSnapshots] = useState<GcsSnapshot[]>([])
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
   const [snapshotsError, setSnapshotsError] = useState<string | null>(null)
+  // Library state (2026-05-27)
+  const [library, setLibrary] = useState<LibraryPlan[]>([])
+  const [libraryLoading, setLibraryLoading] = useState(false)
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [libraryFilter, setLibraryFilter] = useState<{ subject: string; grade: string }>({ subject: '', grade: '' })
+  const [cloningId, setCloningId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -62,10 +69,58 @@ export default function LessonPlans() {
     } finally { setSnapshotsLoading(false) }
   }
 
+  const loadLibrary = async () => {
+    setLibraryLoading(true)
+    try {
+      const r = await lessonPlanService.listLibrary({
+        search: librarySearch || undefined,
+        subject: libraryFilter.subject || undefined,
+        grade: libraryFilter.grade || undefined,
+        limit: 100,
+      })
+      setLibrary(r.plans)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Không tải được thư viện')
+      setLibrary([])
+    } finally { setLibraryLoading(false) }
+  }
+
+  const handleShare = async (plan: LessonPlanSummary) => {
+    const targetState = !plan.isPublic
+    const verb = targetState ? 'chia sẻ' : 'thu hồi chia sẻ'
+    if (!confirm(`Bạn muốn ${verb} giáo án "${plan.title}"?\n${targetState
+      ? 'Giáo viên khác có thể xem + sao chép.'
+      : 'Giáo án sẽ ẩn khỏi Thư viện chung.'}`)) return
+    try {
+      const updated = await lessonPlanService.share(plan.id, targetState)
+      setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, ...updated } : p))
+      toast.success(targetState ? '🌍 Đã chia sẻ với cộng đồng' : 'Đã thu hồi chia sẻ')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Lỗi cập nhật trạng thái')
+    }
+  }
+
+  const handleClone = async (plan: LibraryPlan) => {
+    setCloningId(plan.id)
+    try {
+      const r = await lessonPlanService.clone(plan.id)
+      toast.success('📚 Đã sao chép vào kho của bạn')
+      // Refresh own plans + auto-switch to "plans" tab + open editor
+      await load()
+      setTab('plans')
+      navigate(`/teacher/lesson-plans/${r.plan.id}`)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Lỗi sao chép')
+    } finally { setCloningId(null) }
+  }
+
   useEffect(() => { load() }, [])
   useEffect(() => {
     if (tab === 'gcs' && snapshots.length === 0 && !snapshotsLoading && !snapshotsError) {
       loadSnapshots()
+    }
+    if (tab === 'library' && library.length === 0 && !libraryLoading) {
+      loadLibrary()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
@@ -207,8 +262,9 @@ export default function LessonPlans() {
           borderRadius: 10, padding: 4, width: 'fit-content',
         }}>
           {[
-            { key: 'plans' as const, label: '📝 Giáo án đã soạn', count: plans.length },
-            { key: 'gcs' as const, label: '☁️ Drive Snapshots', count: snapshots.length },
+            { key: 'plans' as const,   label: '📝 Giáo án của tôi',  count: plans.length },
+            { key: 'library' as const, label: '🌍 Thư viện chung',    count: library.length },
+            { key: 'gcs' as const,     label: '☁️ Drive Snapshots',   count: snapshots.length },
           ].map(t => (
             <button key={t.key}
               onClick={() => setTab(t.key)}
@@ -504,6 +560,19 @@ export default function LessonPlans() {
                   }}>
                   <Edit3 size={13} />
                 </button>
+                <button onClick={() => handleShare(plan)}
+                  title={plan.isPublic ? 'Đang chia sẻ — Click để thu hồi' : 'Chia sẻ vào Thư viện chung'}
+                  style={{
+                    padding: '7px 10px',
+                    background: plan.isPublic ? 'rgba(34,211,238,0.18)' : 'rgba(34,211,238,0.06)',
+                    border: `1px solid ${plan.isPublic ? 'rgba(34,211,238,0.5)' : 'rgba(34,211,238,0.18)'}`,
+                    borderRadius: 8, cursor: 'pointer',
+                    color: plan.isPublic ? '#67e8f9' : '#22d3ee',
+                  }}>
+                  {plan.isPublic
+                    ? <Globe size={13} />
+                    : <Share2 size={13} />}
+                </button>
                 <button onClick={() => handleDelete(plan)}
                   title="Xoá"
                   style={{
@@ -519,6 +588,164 @@ export default function LessonPlans() {
           </div>
         )}
           </>
+        )}
+
+        {/* ── TAB 3: Thư viện chung (community library) ── */}
+        {tab === 'library' && (
+          <div>
+            {/* Header banner */}
+            <div style={{
+              background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.3)',
+              borderRadius: 10, padding: 12, marginBottom: 16,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Users size={18} style={{ color: '#67e8f9', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700, margin: 0 }}>
+                  Thư viện giáo án chia sẻ của cộng đồng giáo viên AeroEdu
+                </p>
+                <p style={{ color: 'var(--td-muted)', fontSize: 11, margin: '2px 0 0' }}>
+                  Sao chép về kho cá nhân để chỉnh sửa — bản gốc của tác giả không bị ảnh hưởng
+                </p>
+              </div>
+              <button onClick={loadLibrary} disabled={libraryLoading}
+                style={{
+                  padding: '6px 12px', background: 'rgba(34,211,238,0.2)',
+                  border: '1px solid rgba(34,211,238,0.4)', borderRadius: 8,
+                  color: '#67e8f9', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}>
+                {libraryLoading ? '...' : '↻ Tải lại'}
+              </button>
+            </div>
+
+            {/* Search + filter row */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+                <Search size={14} style={{
+                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--td-muted)',
+                }} />
+                <input value={librarySearch}
+                  onChange={e => setLibrarySearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') loadLibrary() }}
+                  placeholder="Tìm theo tiêu đề / nội dung..."
+                  style={{
+                    width: '100%', padding: '8px 12px 8px 34px', boxSizing: 'border-box',
+                    background: 'var(--td-card)', border: '1px solid #1e2033', borderRadius: 8,
+                    color: 'var(--td-text)', fontSize: 13, outline: 'none',
+                  }} />
+              </div>
+              <input value={libraryFilter.subject}
+                onChange={e => setLibraryFilter(f => ({ ...f, subject: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') loadLibrary() }}
+                placeholder="Môn..."
+                style={{
+                  width: 120, padding: '8px 12px', background: 'var(--td-card)',
+                  border: '1px solid #1e2033', borderRadius: 8,
+                  color: 'var(--td-text)', fontSize: 13, outline: 'none',
+                }} />
+              <input value={libraryFilter.grade}
+                onChange={e => setLibraryFilter(f => ({ ...f, grade: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') loadLibrary() }}
+                placeholder="Khối..."
+                style={{
+                  width: 100, padding: '8px 12px', background: 'var(--td-card)',
+                  border: '1px solid #1e2033', borderRadius: 8,
+                  color: 'var(--td-text)', fontSize: 13, outline: 'none',
+                }} />
+              <button onClick={loadLibrary} disabled={libraryLoading}
+                style={{
+                  padding: '8px 16px', background: '#7c3aed',
+                  border: 'none', borderRadius: 8, color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>
+                Tìm
+              </button>
+            </div>
+
+            {libraryLoading ? (
+              <div style={{ textAlign: 'center', padding: 60 }}>
+                <Loader2 size={28} className="animate-spin" style={{ color: '#22d3ee', margin: '0 auto' }} />
+              </div>
+            ) : library.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: 50, background: 'var(--td-card)',
+                border: '1px solid #1e2033', borderRadius: 14,
+              }}>
+                <Globe size={36} style={{ color: '#475569', margin: '0 auto 10px' }} />
+                <p style={{ color: '#cbd5e1', fontWeight: 600, margin: '0 0 4px' }}>
+                  Thư viện trống
+                </p>
+                <p style={{ color: 'var(--td-muted2)', fontSize: 12, margin: 0 }}>
+                  Hãy là người đầu tiên chia sẻ giáo án — bấm <Share2 size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> trên giáo án của bạn
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {library.map(plan => (
+                  <div key={plan.id} style={{
+                    background: 'var(--td-card)',
+                    border: '1px solid rgba(34,211,238,0.18)',
+                    borderRadius: 12,
+                    padding: 14, display: 'flex', gap: 12, alignItems: 'flex-start',
+                  }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: 'rgba(34,211,238,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Globe size={18} style={{ color: '#67e8f9' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{
+                        fontSize: 14, fontWeight: 700, color: 'var(--td-text)',
+                        margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>{plan.title}</h3>
+                      {plan.contentPreview && (
+                        <p style={{
+                          color: 'var(--td-muted)', fontSize: 11, margin: '0 0 6px',
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden', lineHeight: 1.4,
+                        }}>{plan.contentPreview}</p>
+                      )}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 10, fontSize: 11,
+                        color: 'var(--td-muted2)', flexWrap: 'wrap',
+                      }}>
+                        {plan.author?.name && (
+                          <span style={{ color: '#67e8f9', fontWeight: 600 }}>
+                            👤 {plan.author.name}
+                          </span>
+                        )}
+                        {plan.subject && <span>📚 {plan.subject}</span>}
+                        {plan.grade && <span>· Lớp {plan.grade}</span>}
+                        <span>· {plan.wordCount} từ</span>
+                        {(plan.cloneCount ?? 0) > 0 && (
+                          <span style={{ color: '#a78bfa' }}>· 📥 {plan.cloneCount} clone</span>
+                        )}
+                      </div>
+                    </div>
+                    <button onClick={() => handleClone(plan)} disabled={cloningId === plan.id}
+                      title="Sao chép về kho của bạn"
+                      style={{
+                        padding: '7px 12px', background: 'rgba(34,211,238,0.18)',
+                        border: '1px solid rgba(34,211,238,0.4)', borderRadius: 8,
+                        color: '#67e8f9', fontSize: 12, fontWeight: 700,
+                        cursor: cloningId === plan.id ? 'wait' : 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        whiteSpace: 'nowrap',
+                      }}>
+                      {cloningId === plan.id
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <Copy size={12} />}
+                      Sao chép
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

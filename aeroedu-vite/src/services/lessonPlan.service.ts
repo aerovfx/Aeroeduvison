@@ -27,6 +27,15 @@ export interface LessonPlanSummary {
   lastSavedAt: string
   createdAt: string
   updatedAt: string
+  // Library share (2026-05-27)
+  isPublic?: boolean
+  sharedAt?: string | null
+  cloneCount?: number
+  clonedFrom?: string | null
+}
+
+export interface LibraryPlan extends LessonPlanSummary {
+  author: { id: string; name: string; image: string | null } | null
 }
 
 export interface LessonPlan extends LessonPlanSummary {
@@ -81,6 +90,22 @@ export const lessonPlanService = {
 
   deleteGcsSnapshot: (filename: string) =>
     api.delete<{ ok: boolean; deleted: string }>(`/teacher/lesson-plans-gcs/${encodeURIComponent(filename)}`).then(r => r.data),
+
+  // ── Thư viện giáo án chia sẻ (2026-05-27) ──
+  /** List public lesson plans from OTHER teachers — community library */
+  listLibrary: (params?: { search?: string; subject?: string; grade?: string; limit?: number }) =>
+    api.get<{ plans: LibraryPlan[]; count: number }>('/teacher/lesson-plans/library', { params })
+       .then(r => r.data),
+
+  /** Toggle is_public — owner only */
+  share: (id: string, isPublic: boolean) =>
+    api.patch<{ plan: LessonPlanSummary }>(`/teacher/lesson-plans/${id}/share`, { isPublic })
+       .then(r => r.data.plan),
+
+  /** Clone a public plan into own library */
+  clone: (id: string) =>
+    api.post<{ plan: LessonPlan; clonedFrom: string }>(`/teacher/lesson-plans/${id}/clone`)
+       .then(r => r.data),
 }
 
 export interface GcsSnapshot {

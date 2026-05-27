@@ -2344,6 +2344,11 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       lastSavedAt: r.last_saved_at,
       createdAt: r.created_at, updatedAt: r.updated_at,
       contentPreview: r.content ? String(r.content).slice(0, 200) : '',
+      // Library share fields
+      isPublic: !!r.is_public,
+      sharedAt: r.shared_at || null,
+      cloneCount: r.clone_count || 0,
+      clonedFrom: r.cloned_from || null,
     };
   }
   // Helper: match teacher_id qua ANY của mọi JWT field
@@ -2440,6 +2445,156 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
       return res.json({ ok: true });
     } catch (e) { console.error('[lp:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 2026-05-27: Thư viện giáo án chia sẻ (community library)
+  // - GET    /api/teacher/lesson-plans/library     — list public plans
+  // - PATCH  /api/teacher/lesson-plans/:id/share   — toggle is_public
+  // - POST   /api/teacher/lesson-plans/:id/clone   — clone về kho của mình
+  // ═══════════════════════════════════════════════════════════════
+
+  // GET library — list giáo án is_public của TẤT CẢ GV (trừ chính mình → tab khác)
+  app.get('/api/teacher/lesson-plans/library', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const search = (req.query.search || '').toString().toLowerCase();
+      const subject = (req.query.subject || '').toString();
+      const grade = (req.query.grade || '').toString();
+      const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+
+      // Filter dynamic
+      const conditions = ['lp.is_public = true', 'NOT (lp.teacher_id = ANY($1::text[]))'];
+      const params = [_ids(decoded)];
+      let idx = 1;
+      if (search) {
+        params.push(`%${search}%`);
+        idx = params.length;
+        conditions.push(`(LOWER(lp.title) LIKE $${idx} OR LOWER(COALESCE(lp.content, '')) LIKE $${idx})`);
+      }
+      if (subject) {
+        params.push(subject);
+        idx = params.length;
+        conditions.push(`lp.subject = $${idx}`);
+      }
+      if (grade) {
+        params.push(grade);
+        idx = params.length;
+        conditions.push(`lp.grade = $${idx}`);
+      }
+      params.push(limit);
+      const limitIdx = params.length;
+
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT lp.id, lp.title, lp.subject, lp.grade, lp.tags, lp.word_count,
+               lp.format, lp.shared_at, lp.clone_count,
+               lp.created_at, lp.updated_at, lp.content,
+               lp.teacher_id,
+               u.name AS author_name, u.image AS author_image
+        FROM "LessonPlan" lp
+        LEFT JOIN "User" u ON u.id = lp.teacher_id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY lp.shared_at DESC NULLS LAST, lp.updated_at DESC
+        LIMIT $${limitIdx}
+      `, params);
+      return res.json({
+        plans: rows.map(r => ({
+          ...lpRow(r),
+          isPublic: true,
+          sharedAt: r.shared_at,
+          cloneCount: r.clone_count || 0,
+          author: r.teacher_id ? {
+            id: r.teacher_id,
+            name: r.author_name || 'Giáo viên',
+            image: r.author_image,
+          } : null,
+        })),
+        count: rows.length,
+      });
+    } catch (e) {
+      console.error('[lp:library]', e.message);
+      return res.json({ plans: [], count: 0 });
+    }
+  });
+
+  // PATCH share — toggle is_public (chỉ owner)
+  app.patch('/api/teacher/lesson-plans/:id/share', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    try {
+      const isPublic = req.body?.isPublic === true || req.body?.is_public === true;
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        UPDATE "LessonPlan"
+        SET is_public = $1,
+            shared_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+            updated_at = NOW()
+        WHERE id = $2 AND teacher_id = ANY($3::text[])
+        RETURNING *
+      `, [isPublic, req.params.id, _ids(decoded)]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án hoặc không có quyền' });
+      const r = rows[0];
+      return res.json({
+        plan: {
+          ...lpRow(r),
+          isPublic: !!r.is_public,
+          sharedAt: r.shared_at,
+          cloneCount: r.clone_count || 0,
+        },
+      });
+    } catch (e) {
+      console.error('[lp:share]', e.message);
+      return res.status(500).json({ error: 'Lỗi cập nhật trạng thái chia sẻ' });
+    }
+  });
+
+  // POST clone — clone giáo án public của GV khác về kho của mình
+  app.post('/api/teacher/lesson-plans/:id/clone', async (req, res) => {
+    const decoded = lpAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      // Verify nguồn là public
+      const { rows: src } = await pool.query(
+        `SELECT * FROM "LessonPlan" WHERE id = $1 AND is_public = true`,
+        [req.params.id]
+      );
+      if (!src.length) return res.status(404).json({ error: 'Giáo án không tồn tại hoặc chưa được chia sẻ' });
+      const original = src[0];
+
+      // Tạo bản clone với teacher_id = mình + cloned_from = original.id
+      const { randomUUID } = require('crypto');
+      const newId = randomUUID();
+      const { rows } = await pool.query(`
+        INSERT INTO "LessonPlan"(
+          id, teacher_id, title, subject, grade, tags, content, content_json,
+          word_count, format, is_public, cloned_from
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9, $10, false, $11)
+        RETURNING *
+      `, [
+        newId, myId,
+        `[Sao chép] ${original.title}`,
+        original.subject, original.grade,
+        JSON.stringify(original.tags || []),
+        original.content || '',
+        original.content_json ? JSON.stringify(original.content_json) : null,
+        original.word_count || 0,
+        original.format || 'html',
+        original.id,
+      ]);
+      // Tăng clone_count của bản gốc
+      pool.query(`UPDATE "LessonPlan" SET clone_count = clone_count + 1 WHERE id = $1`, [original.id])
+        .catch(() => {});
+      const r = rows[0];
+      return res.json({
+        plan: { ...lpRow(r), content: r.content || '', contentJson: r.content_json || null },
+        clonedFrom: original.id,
+      });
+    } catch (e) {
+      console.error('[lp:clone]', e.message);
+      return res.status(500).json({ error: 'Lỗi sao chép giáo án' });
+    }
   });
 
   // Stubs GCS
@@ -11133,6 +11288,11 @@ async function _ensureLessonPlanTable() {
     ['last_saved_at',    "TIMESTAMPTZ DEFAULT NOW()"],
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
+    // 2026-05-27: Thư viện giáo án chia sẻ
+    ['is_public',        "BOOLEAN DEFAULT false"],
+    ['shared_at',        "TIMESTAMPTZ"],
+    ['clone_count',      "INTEGER DEFAULT 0"],
+    ['cloned_from',      "VARCHAR(36)"],  // ID giáo án gốc nếu là clone
   ]);
   await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
   await _backfillSnakeFromCamel('LessonPlan', [
@@ -11145,6 +11305,7 @@ async function _ensureLessonPlanTable() {
     catch { /* skip */ }
   }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_public ON "LessonPlan"(is_public, shared_at DESC) WHERE is_public = true`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
 
