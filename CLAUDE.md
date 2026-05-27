@@ -15,11 +15,31 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `6836a9a` (revision pixiai-00596-how, 2026-05-27 — HOTFIX: move STEM block lên TRƯỚC /api/teacher proxy → fix 503 ECONNREFUSED trên /api/teacher/stem-projects/*. 880 lines moved)
+- Last deployed commit: `252ff2a` (revision pixiai-00595-soh, 2026-05-27 — STEM backend module: 17 endpoints + 7 bảng StemProject/Member/Invite/Task/Log/Feedback/Milestone)
+- Last deployed commit: `7297225` (revision pixiai-00594-goq, 2026-05-27 — Sidebar routeStemProjects bị mất khi merge — restore /teacher/stem-projects + /student/stem-projects)
+- Last deployed commit: `a443fdd` (revision pixiai-00593-quj, 2026-05-27 — MERGE session-fixes-2026-05-23 → main: 107 commits, 23 trang lab MỚI + PeriodicTable R3F + LabsIndex redesign + STEM Agile Scrum + sidebar lab section. 86 files, +32747 -2441)
+- Last deployed commit: `72e5b65` (revision pixiai-00592-yos, 2026-05-27 — Sidebar hotfix: +30 translation keys VI/EN (fix raw "routeSprint" display) + 4 teacher module bị mất: agents/exam-generator/interaction-center/meeting-notes)
+- Last deployed commit: `34659ef` (revision pixiai-00591-yej, 2026-05-27 — Nút upload GCS cho PDF + PPTX block trong LessonAssetEditor + extend uploader generic + BE signed-url accept docx/xlsx/pptx/pdf/image)
+- Last deployed commit: `1ce4d21` (revision pixiai-00590-vud, 2026-05-27 — Realtime chat UI Contacts qua broker + ChatPanel drawer + DM/group topic)
+- Last deployed commit: `7a8759c` (revision pixiai-00589-lec, 2026-05-27 — Newton's Cradle redesign + broker level 2 Redis Pub/Sub + curriculum CRUD step=2 hotfix)
 - Last deployed commit: `957561f` (revision pixiai-00385-sah, 2026-05-22 — Free pedagogy course + plan Đậu Lém + AI prompts LaTeX + Question Bank ownership + Career Survey skip + Soft skills KG + Fix curriculum blocks)
 - Last deployed commit: `6f00a99` (revision pixiai-00386-rix, 2026-05-22 — MCP v0.2: 10 tools SDK v1.x, KG tools + audit log)
+- Last deployed commit: `4eeac01` (revision pixiai-00478-vaq, 2026-05-24 — Documents CRUD + Bearer fix DocumentDigitization)
+- Last deployed commit: `a1d905b` (revision pixiai-00477-pul, 2026-05-24 — 3-fix batch: demo cam MP4 + gradebook hoTen→name + video upload GCS)
+- Last deployed commit: `909c3f3` (revision pixiai-00475-juk, 2026-05-24 — HOTFIX learning-paths 5 endpoints + 2 bảng)
+- Last deployed commit: `913c2ba` (revision pixiai-00473-naj, 2026-05-24 — HOTFIX public profile GET /api/users/:userId/profile)
+- Last deployed commit: `4b1d663` (revision pixiai-00472-daz, 2026-05-24 — Camera/Env: Bearer fix bare fetch() + 6 BE stubs IoT/camera/student-cams)
+- Last deployed commit: `6dfc463` (revision pixiai-00470-xoh, 2026-05-24 — HOTFIX gradebook handlers TRƯỚC proxy /api/teacher/*)
+- Last deployed commit: `23c241a` (revision pixiai-00468-xov, 2026-05-24 — HOTFIX AssignmentTarget targetType DROP NOT NULL)
+- Last deployed commit: `f4f7e64` (revision pixiai-00467-dog, 2026-05-24 — fix assign-modal map hoTen→name)
+- Last deployed commit: `b3df660` (revision pixiai-00466-maz, 2026-05-24 — 5-fix batch: auto-save loop + course CRUD + gradebook 5ep + assignments targets + class JWT trung tâm)
 - Last deployed commit: `6d4f356` (revision pixiai-00464-moq, 2026-05-24 — HOTFIX TSL: 13 handlers + 2 bảng cho /teacher/student-requests)
 - Last deployed commit: `cdd769f` (revision pixiai-00389-qob, 2026-05-22 — HOTFIX api-keys routes trước catch-all proxy)
-- Commits since last deploy: `4/5` (5348209 asgn targets/from-exam + 5b98f8d gradebook + 98b7c8a courses POST/PATCH + fce4beb auto-save)
+- Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
+- Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
+- Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
+- Commits since last deploy: `0/5`
 - Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
 - Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools
