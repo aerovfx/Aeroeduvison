@@ -14194,6 +14194,134 @@ app.get('/api/exam-xp/me', (_req, res) => res.json({
   });
 })();
 
+// ── /api/openfang-service — Teacher AI Agents page ─────────
+// FE Agents.tsx poll mỗi 10s. Có 3 endpoint:
+//   GET  /api/openfang-service          — status { running, pid?, url }
+//   POST /api/openfang-service          — control { action: 'start'|'stop' }
+//   POST /api/openfang-service/chat     — chat { agentId, message } → { reply }
+// Strategy: transparently route chat về DeepSeek/Anthropic với agent-specific
+// system prompt, KHÔNG cần spawn OpenFang Rust process thật. Status luôn
+// "running" để chat UI hoạt động ngay.
+;(() => {
+  // Trạng thái stub — không thực sự spawn process
+  let _openfangStarted = true;  // default "running" để FE chat ngay
+  const AGENT_PROMPTS = {
+    'tutor-general':
+      'Bạn là gia sư AI kiên nhẫn. Giải thích khái niệm step-by-step, ' +
+      'thích nghi theo trình độ học viên. LaTeX công thức $...$ inline.',
+    'lesson-planner':
+      'Bạn là chuyên gia thiết kế giáo án theo CT GDPT 2018 + TT22/2021. ' +
+      'Đề xuất mục tiêu, hoạt động, đánh giá khớp syllabus VN.',
+    'assessment-designer':
+      'Bạn là chuyên gia thiết kế đề kiểm tra. Sinh quiz/exam có gợi ý ' +
+      'loại câu (TN/Đ-S/TLN/Tự luận) và mức độ khó phù hợp Bloom.',
+    'feedback-writer':
+      'Bạn là chuyên gia viết phản hồi giáo dục mang tính xây dựng cho HS ' +
+      'dựa trên performance + progress. Khuyến khích + cụ thể + actionable.',
+    'parent-communicator':
+      'Bạn soạn thảo tin nhắn chuyên nghiệp gửi phụ huynh về tiến độ + ' +
+      'tình hình lớp học. Rõ ràng, lịch sự, mang tính hợp tác.',
+    'general-assistant':
+      'Bạn là trợ lý đa năng cho giáo viên — giúp công việc dạy học ' +
+      'thường ngày + trả lời câu hỏi nhanh.',
+  };
+
+  app.get('/api/openfang-service', (_req, res) => {
+    res.json({
+      running: _openfangStarted,
+      pid: _openfangStarted ? 1 : null,
+      url: 'inphysic-ai',
+    });
+  });
+
+  app.post('/api/openfang-service', (req, res) => {
+    const action = (req.body?.action || '').toString();
+    if (action === 'start') {
+      _openfangStarted = true;
+      return res.json({ success: true, running: true });
+    }
+    if (action === 'stop') {
+      _openfangStarted = false;
+      return res.json({ success: true, running: false });
+    }
+    return res.status(400).json({ success: false, error: 'action phải là start hoặc stop' });
+  });
+
+  app.post('/api/openfang-service/chat', async (req, res) => {
+    try {
+      if (!_openfangStarted) {
+        return res.status(503).json({ error: 'AI Agent chưa khởi động — bấm Start' });
+      }
+      const agentId = req.body?.agentId || 'general-assistant';
+      const message = (req.body?.message || '').toString().trim();
+      if (!message) return res.status(400).json({ error: 'message_required' });
+
+      const sysPrompt = AGENT_PROMPTS[agentId] || AGENT_PROMPTS['general-assistant'];
+      const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
+      const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+      if (!hasDeepseek && !hasAnthropic) {
+        return res.status(503).json({ error: 'AI chưa cấu hình' });
+      }
+
+      // DeepSeek primary
+      if (hasDeepseek) {
+        try {
+          const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+              messages: [
+                { role: 'system', content: sysPrompt },
+                { role: 'user', content: message },
+              ],
+              max_tokens: 1200,
+              temperature: 0.7,
+            }),
+          });
+          if (r.ok) {
+            const j = await r.json();
+            const reply = j.choices?.[0]?.message?.content || 'Không có phản hồi';
+            return res.json({ reply, agentId, provider: 'deepseek' });
+          }
+        } catch (e) {
+          console.warn('[openfang:chat:deepseek]', e.message);
+        }
+      }
+
+      // Anthropic fallback
+      if (hasAnthropic) {
+        try {
+          const Anthropic = require('@anthropic-ai/sdk');
+          const Ctor = Anthropic.default || Anthropic.Anthropic || Anthropic;
+          const client = new Ctor({ apiKey: process.env.ANTHROPIC_API_KEY });
+          const completion = await client.messages.create({
+            model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
+            max_tokens: 1200,
+            system: sysPrompt,
+            messages: [{ role: 'user', content: message }],
+          });
+          let reply = '';
+          for (const block of completion.content || []) {
+            if (block.type === 'text') reply += block.text;
+          }
+          return res.json({ reply: reply || 'Không có phản hồi', agentId, provider: 'anthropic' });
+        } catch (e) {
+          console.error('[openfang:chat:anthropic]', e.message);
+        }
+      }
+
+      return res.status(503).json({ error: 'Tất cả AI provider lỗi' });
+    } catch (err) {
+      console.error('[openfang:chat]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+})();
+
 // ── Stubs cho IoT/Camera (chưa có service thực) — tránh 503 spam ──
 // /api/iot/classroom/:id — FE EnvironmentMonitoring.tsx fetch endpoint này
 // Shape ClassroomEnvironment: { class_id, class_name, temperature?, humidity?,
