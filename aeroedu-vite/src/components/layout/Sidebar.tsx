@@ -95,6 +95,7 @@ const studentSections: RouteSection[] = [
       { icon: StickyNote,     labelKey: 'routeNotes',   href: '/dashboard/notes' },
       { icon: Kanban,         labelKey: 'routeScrum',   href: '/dashboard/scrumboard' },
       { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/dashboard/knowledge-graph', badge: 'AI' },
+      { icon: Camera,         labelKey: 'routePostureMonitor', href: '/dashboard/posture-monitor', badge: 'AI' },
     ],
   },
   {
@@ -123,6 +124,7 @@ const teacherSections: RouteSection[] = [
       { icon: BarChart,labelKey: 'routeAnalytics',   href: '/teacher/analytics' },
       { icon: Heart,   labelKey: 'routeEmotionMap',  href: '/teacher/emotion-map' },
       { icon: Network, labelKey: 'routeProfKG',      href: '/teacher/knowledge-graph', badge: 'CPD' },
+      { icon: Camera,  labelKey: 'routePostureMonitor', href: '/teacher/posture-monitor', badge: 'AI' },
     ],
   },
   {

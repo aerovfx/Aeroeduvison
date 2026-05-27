@@ -61,6 +61,7 @@ const KeoCoLivePage      = lazy(() => import('@/pages/public/KeoCoLive'))
 
 // ── Dashboard (Student/General) ──────────────────────────────
 const DashboardHome    = lazy(() => import('@/pages/dashboard/Home'))
+const PostureMonitorPage = lazy(() => import('@/pages/dashboard/PostureMonitor'))
 const AnalyticsPage    = lazy(() => import('@/pages/dashboard/Analytics'))
 const AchievementsPage = lazy(() => import('@/pages/dashboard/Achievements'))
 const AssignmentsPage  = lazy(() => import('@/pages/dashboard/Assignments'))
@@ -424,6 +425,8 @@ export function AppRouter() {
             <Route path="/dashboard/quizzes"               element={<Navigate to="/student/exam-prep" replace />} />
             <Route path="/dashboard/scrumboard"            element={<ScrumboardPage />} />
             <Route path="/dashboard/knowledge-graph"        element={<KnowledgeGraphPage />} />
+            <Route path="/dashboard/posture-monitor"        element={<PostureMonitorPage />} />
+            <Route path="/teacher/posture-monitor"          element={<PostureMonitorPage />} />
             <Route path="/dashboard/settings"              element={<SettingsPage />} />
             {/* 2026-05-27 user request: REMOVE /dashboard/stem (HS dashboard cũ).
                 HS giờ dùng /student/stem-projects (unified joined + owned).

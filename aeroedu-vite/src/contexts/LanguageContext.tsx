@@ -88,6 +88,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeApiKeys:       'API Keys',
     routeProfKG:        'Cây tri thức GV',
     routeKnowledgeGraph:'Cây tri thức',
+    routePostureMonitor:'Theo dõi tư thế',
 
     // ── Sidebar — Missing keys (fix raw-key display 2026-05-27) ─
     routeSprint:        'Sprint AI',
@@ -438,6 +439,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeApiKeys:       'API Keys',
     routeProfKG:        'Cây tri thức GV',
     routeKnowledgeGraph:'Cây tri thức',
+    routePostureMonitor:'Theo dõi tư thế',
 
     // ── Sidebar — Missing keys (fix raw-key display 2026-05-27) ─
     routeSprint:        'AI Sprint',
