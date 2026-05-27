@@ -361,13 +361,51 @@ function BlockForm({ initialType, initial, courseId, onCancel, onSubmit, busy }:
       {type === 'pdf' && (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">URL PDF <span className="text-red-400">*</span></label>
-            <input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="https://.../tai-lieu.pdf"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
-            />
+            <label className="block text-xs font-medium text-gray-300 mb-2">
+              Nguồn PDF <span className="text-red-400">*</span>
+            </label>
+            {/* Tabs URL / Upload — giống video/audio block */}
+            <div className="inline-flex rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 mb-2">
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'url')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode !== 'upload' ? 'bg-rose-500/20 text-rose-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >🔗 Dán URL</button>
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'upload')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode === 'upload' ? 'bg-rose-500/20 text-rose-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >☁ Upload lên GCS</button>
+            </div>
+            {meta.sourceMode === 'upload' ? (
+              <VideoUploader
+                courseId={courseId}
+                mediaType="pdf"
+                maxSizeMB={50}
+                onComplete={(info) => {
+                  setContent(info.url)
+                  meta_('fileSize', Math.round(info.fileSize / 1024)) // KB
+                  meta_('originalFilename', info.filename)
+                  meta_('uploadedAt', new Date().toISOString())
+                }}
+              />
+            ) : (
+              <input
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="https://.../tai-lieu.pdf"
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
+              />
+            )}
+            {meta.originalFilename && (
+              <p className="text-[10px] text-rose-300 mt-1">📄 File: {meta.originalFilename}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -524,16 +562,53 @@ function BlockForm({ initialType, initial, courseId, onCancel, onSubmit, busy }:
       {type === 'pptx' && (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">URL .pptx <span className="text-red-400">*</span></label>
-            <input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="https://.../bai-giang.pptx"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
-            />
+            <label className="block text-xs font-medium text-gray-300 mb-2">
+              Nguồn slide <span className="text-red-400">*</span>
+            </label>
+            <div className="inline-flex rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 mb-2">
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'url')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode !== 'upload' ? 'bg-orange-500/20 text-orange-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >🔗 Dán URL</button>
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'upload')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode === 'upload' ? 'bg-orange-500/20 text-orange-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >☁ Upload lên GCS</button>
+            </div>
+            {meta.sourceMode === 'upload' ? (
+              <VideoUploader
+                courseId={courseId}
+                mediaType="pptx"
+                maxSizeMB={100}
+                onComplete={(info) => {
+                  setContent(info.url)
+                  meta_('fileSize', Math.round(info.fileSize / 1024))
+                  meta_('originalFilename', info.filename)
+                  meta_('uploadedAt', new Date().toISOString())
+                }}
+              />
+            ) : (
+              <input
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="https://.../bai-giang.pptx"
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
+              />
+            )}
             <p className="text-[10px] text-gray-500 mt-1">
               Render qua Google Docs viewer iframe HS xem trực tiếp (không cần download)
             </p>
+            {meta.originalFilename && (
+              <p className="text-[10px] text-orange-300 mt-1">📊 File: {meta.originalFilename}</p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Số slide</label>

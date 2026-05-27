@@ -2441,6 +2441,8 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   const BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
 
   // POST /api/upload/video-signed-url { filename, contentType, courseId? }
+  // Lưu ý: tên endpoint giữ là "video-signed-url" cho backward compat,
+  // nhưng đã accept cả PDF/PPTX/DOC để re-use cho LessonBlock asset upload.
   app.post('/api/upload/video-signed-url', async (req, res) => {
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
@@ -2451,10 +2453,13 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     try {
       const storage = _getStorage();
       if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
-      const { filename = 'video.mp4', contentType = 'video/mp4', courseId } = req.body || {};
-      // Validate content type
-      if (!/^(video|audio)\//.test(contentType)) {
-        return res.status(400).json({ error: 'contentType phải là video/* hoặc audio/*' });
+      const { filename = 'file', contentType = 'application/octet-stream', courseId } = req.body || {};
+      // Validate content type — accept video/audio/pdf/document mime types
+      const ALLOWED_MIME = /^(video\/|audio\/|application\/pdf$|application\/vnd\.openxmlformats-officedocument|application\/vnd\.ms-powerpoint$|application\/msword$|application\/vnd\.ms-excel$|image\/(png|jpeg|webp|gif|svg\+xml)$)/;
+      if (!ALLOWED_MIME.test(contentType)) {
+        return res.status(400).json({
+          error: 'contentType không hỗ trợ. Chấp nhận: video/*, audio/*, application/pdf, .docx, .xlsx, .pptx, image/*'
+        });
       }
       // Safe filename: timestamp + random + sanitized original
       const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);

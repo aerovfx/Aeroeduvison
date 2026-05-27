@@ -1,5 +1,6 @@
 /**
- * VideoUploader — Upload video lên GCS bucket qua signed URL flow.
+ * VideoUploader — Upload file (video/audio/pdf/pptx/document) lên GCS bucket
+ * qua signed URL flow.
  *
  * Flow:
  *  1. User chọn file → validate (type/size)
@@ -10,21 +11,27 @@
  *
  * Tiết kiệm bandwidth Cloud Run: file đi trực tiếp browser → GCS,
  * không qua Cloud Run.
+ *
+ * Note: tên component giữ là VideoUploader để khỏi vỡ import cũ, nhưng
+ * hiện đã hỗ trợ mọi mediaType (video/audio/pdf/pptx/document).
  */
 import { useRef, useState } from 'react'
 import {
-  Upload, X, Loader2, CheckCircle2, AlertCircle, FileVideo, RotateCw,
+  Upload, X, Loader2, CheckCircle2, AlertCircle, FileVideo, FileText,
+  Presentation, RotateCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
+
+type MediaType = 'video' | 'audio' | 'pdf' | 'pptx' | 'document'
 
 interface Props {
   /** courseId hoặc generic identifier (vd: "learning-path", "assignment").
    * Optional — nếu thiếu, BE auto fallback uploads/{userId}/ */
   courseId?: string
-  /** Loại media: video hoặc audio (signed URL endpoint accept cả 2) */
-  mediaType?: 'video' | 'audio'
-  /** Max size MB. Default 500 cho video, 100 cho audio */
+  /** Loại media: video/audio/pdf/pptx/document. Signed URL endpoint accept tất cả. */
+  mediaType?: MediaType
+  /** Max size MB. Default: 500 video / 100 audio / 50 pdf-pptx-doc */
   maxSizeMB?: number
   /** Callback khi upload xong thành công */
   onComplete: (info: { url: string; fileSize: number; contentType: string; filename: string }) => void
@@ -32,6 +39,82 @@ interface Props {
 
 const ACCEPT_VIDEO = 'video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska'
 const ACCEPT_AUDIO = 'audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/x-m4a,audio/aac'
+const ACCEPT_PDF   = 'application/pdf,.pdf'
+const ACCEPT_PPTX  = 'application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint,.pptx,.ppt'
+const ACCEPT_DOC   =
+  'application/pdf,' +
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+  'application/msword,' +
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+  'application/vnd.ms-excel,' +
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation,' +
+  'application/vnd.ms-powerpoint,' +
+  '.pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt'
+
+function getAccept(t: MediaType): string {
+  switch (t) {
+    case 'video':    return ACCEPT_VIDEO
+    case 'audio':    return ACCEPT_AUDIO
+    case 'pdf':      return ACCEPT_PDF
+    case 'pptx':     return ACCEPT_PPTX
+    case 'document': return ACCEPT_DOC
+  }
+}
+
+function getDefaultMaxMB(t: MediaType): number {
+  switch (t) {
+    case 'video':    return 500
+    case 'audio':    return 100
+    case 'pdf':      return 50
+    case 'pptx':     return 100
+    case 'document': return 50
+  }
+}
+
+function getDefaultMime(t: MediaType): string {
+  switch (t) {
+    case 'video':    return 'video/mp4'
+    case 'audio':    return 'audio/mpeg'
+    case 'pdf':      return 'application/pdf'
+    case 'pptx':     return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    case 'document': return 'application/octet-stream'
+  }
+}
+
+function getMediaIcon(t: MediaType) {
+  if (t === 'pdf')  return FileText
+  if (t === 'pptx') return Presentation
+  if (t === 'document') return FileText
+  return FileVideo
+}
+
+function getLabel(t: MediaType): string {
+  if (t === 'pdf')  return 'PDF'
+  if (t === 'pptx') return 'PowerPoint'
+  if (t === 'document') return 'tài liệu'
+  if (t === 'audio') return 'audio'
+  return 'video'
+}
+
+function getFormatHint(t: MediaType): string {
+  if (t === 'pdf')  return 'PDF'
+  if (t === 'pptx') return 'PPTX / PPT'
+  if (t === 'document') return 'PDF / DOCX / XLSX / PPTX'
+  if (t === 'audio') return 'MP3 / WAV / M4A'
+  return 'MP4 / WebM / MOV'
+}
+
+function isAcceptableMime(t: MediaType, mime: string): boolean {
+  if (t === 'video')    return mime.startsWith('video/')
+  if (t === 'audio')    return mime.startsWith('audio/')
+  if (t === 'pdf')      return mime === 'application/pdf'
+  if (t === 'pptx')     return /presentation|powerpoint/.test(mime)
+  if (t === 'document') {
+    return mime === 'application/pdf'
+      || /officedocument|msword|ms-excel|ms-powerpoint/.test(mime)
+  }
+  return false
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -54,8 +137,10 @@ export default function VideoUploader({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
-  const effectiveMaxMB = maxSizeMB ?? (mediaType === 'video' ? 500 : 100)
-  const acceptAttr = mediaType === 'video' ? ACCEPT_VIDEO : ACCEPT_AUDIO
+  const effectiveMaxMB = maxSizeMB ?? getDefaultMaxMB(mediaType)
+  const acceptAttr = getAccept(mediaType)
+  const MediaIcon = getMediaIcon(mediaType)
+  const label = getLabel(mediaType)
 
   const pickFile = () => fileRef.current?.click()
 
@@ -65,11 +150,17 @@ export default function VideoUploader({
     setError(null)
     setDone(false)
     setProgress(0)
-    // Validate type
-    const accepted = (mediaType === 'video' && f.type.startsWith('video/')) ||
-                     (mediaType === 'audio' && f.type.startsWith('audio/'))
+    // Validate type — some browsers ko set MIME đúng (vd .pptx cũ), accept luôn
+    // nếu MIME rỗng + extension hợp lệ
+    let accepted = isAcceptableMime(mediaType, f.type || '')
+    if (!accepted && !f.type) {
+      const lowerName = f.name.toLowerCase()
+      if (mediaType === 'pdf' && lowerName.endsWith('.pdf')) accepted = true
+      if (mediaType === 'pptx' && (lowerName.endsWith('.pptx') || lowerName.endsWith('.ppt'))) accepted = true
+      if (mediaType === 'document' && /\.(pdf|docx?|xlsx?|pptx?)$/i.test(lowerName)) accepted = true
+    }
     if (!accepted) {
-      setError(`File phải là ${mediaType === 'video' ? 'video (mp4/webm/mov)' : 'audio (mp3/wav/m4a)'}`)
+      setError(`File phải là ${getFormatHint(mediaType)}`)
       return
     }
     // Validate size
@@ -110,7 +201,7 @@ export default function VideoUploader({
         uploadUrl: string; publicUrl: string; contentType: string
       }>('/upload/video-signed-url', {
         filename: file.name,
-        contentType: file.type || (mediaType === 'video' ? 'video/mp4' : 'audio/mpeg'),
+        contentType: file.type || getDefaultMime(mediaType),
         courseId,
       })
 
@@ -213,11 +304,11 @@ export default function VideoUploader({
     return (
       <div className="rounded-lg border border-zinc-700 bg-zinc-900/40 p-3">
         <div className="flex items-center gap-3">
-          <FileVideo className="w-5 h-5 text-purple-300 flex-shrink-0" />
+          <MediaIcon className="w-5 h-5 text-purple-300 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-white truncate">{file.name}</div>
             <div className="text-[11px] text-zinc-400">
-              {formatBytes(file.size)} · {file.type}
+              {formatBytes(file.size)} · {file.type || 'unknown'}
             </div>
           </div>
           <button
@@ -262,9 +353,9 @@ export default function VideoUploader({
         className="w-full p-5 rounded-xl border border-dashed border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 text-purple-200 transition-colors flex flex-col items-center gap-2"
       >
         <Upload className="w-7 h-7" />
-        <div className="font-bold text-sm">Chọn file {mediaType} để upload</div>
+        <div className="font-bold text-sm">Chọn file {label} để upload</div>
         <div className="text-[11px] text-purple-300/70">
-          {mediaType === 'video' ? 'MP4 / WebM / MOV' : 'MP3 / WAV / M4A'} · Tối đa {effectiveMaxMB} MB
+          {getFormatHint(mediaType)} · Tối đa {effectiveMaxMB} MB
         </div>
         <div className="text-[10px] text-zinc-500">
           Upload trực tiếp lên GCS bucket — không qua Cloud Run
