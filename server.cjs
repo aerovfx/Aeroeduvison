@@ -5403,12 +5403,16 @@ if (USE_NODEJS_QUESTIONS) {
         '- Tư vấn phương pháp giảng dạy theo CT GDPT 2018 + TT22/2021\n' +
         '- Gợi ý soạn giáo án, đề thi, ma trận, learning path\n' +
         '- Phân tích kết quả học sinh + đề xuất can thiệp\n' +
-        '- Hướng dẫn dùng AeroEdu tools (taodethi, lesson-plans, stem-projects, KG GV).';
+        '- Hướng dẫn dùng AeroEdu tools (taodethi, lesson-plans, stem-projects, KG GV)\n' +
+        '- **Sinh mẫu LaTeX/JSON ra đề nhanh** khi GV yêu cầu — output code block ' +
+        'sẵn-copy với babel vietnamese + amsmath + siunitx + mhchem (Hoá); JSON ' +
+        'đúng format Question Bank import (type/subject/options/answer/explanation).';
     } else if (roleUpper === 'ADMIN') {
       rolePrompt = '\n\nNgười dùng là **QUẢN TRỊ HỆ THỐNG**. Hỗ trợ:\n' +
         '- Quản lý người dùng (HS/GV/PH), lớp học, trường\n' +
         '- Phân tích báo cáo, KPI, vận hành\n' +
-        '- Cấu hình tính năng, workflow, RS experiments.';
+        '- Cấu hình tính năng, workflow, RS experiments\n' +
+        '- Sinh mẫu LaTeX/JSON (giáo án, đề thi, báo cáo) khi cần.';
     } else {
       rolePrompt = '\n\nNgười dùng là **HỌC SINH**. Hỗ trợ:\n' +
         '- Giải bài tập step-by-step (đề → dữ kiện → phương pháp → lời giải)\n' +
