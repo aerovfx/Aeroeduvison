@@ -2006,8 +2006,10 @@ function AnalogCircuitBuilderInner(
                       filter={isLive ? 'url(#acb-glow)' : undefined}
                       pointerEvents="none"
                     />
-                    {/* Waypoint handles — drag để di chuyển, double-click để xoá */}
-                    {wp.map((point, idx) => {
+                    {/* Waypoint handles — drag để di chuyển, double-click để xoá.
+                        Ẩn khi đang giả lập (isLive) để dòng cyan glow liền mạch — không
+                        bị các ô vuông gray trông như "dây đứt". */}
+                    {!isLive && wp.map((point, idx) => {
                       // Chỉ render handle cho waypoints user-controlled (có trong w.waypoints).
                       // Auto-route waypoints chỉ render khi user chưa custom, sẽ thành custom
                       // sau lần drag/click đầu tiên.
@@ -2107,12 +2109,17 @@ function AnalogCircuitBuilderInner(
                     {/* Reading labels moved to separate pass below — tránh che dây nối */}
 
                     {/* Terminals (in absolute coords so they're not rotated visually) */}
+                    {/* Khi đang giả lập (simIsLive): fade terminals xuống để dòng cyan
+                        liền mạch — không bị các chấm đỏ ngắt quãng trông như "đứt dây" */}
                     {['a', 'b'].map(term => {
                       if (c.type === 'ground' && term === 'b') return null
                       const tp = getTerminalPos(c, term as 'a' | 'b')
                       const termKey = `${c.id}:${term}`
                       const isHover = hoverTermKey === termKey
                       const isWireStartTerm = wireStart?.componentId === c.id && wireStart.terminal === term
+                      const simIsLive = simResult?.ok && (simResult.current ?? 0) > LED_IF_MIN
+                      // Khi sim đang chạy + không hover/select → ẩn hẳn để wire liền mạch
+                      const termOpacity = simIsLive && !isHover && !isWireStartTerm ? 0 : 1
                       return (
                         <circle
                           key={term}
@@ -2121,7 +2128,8 @@ function AnalogCircuitBuilderInner(
                           fill={isWireStartTerm ? '#fbbf24' : isHover ? '#f87171' : '#ef4444'}
                           stroke={isHover || isWireStartTerm ? '#ffffff' : 'none'}
                           strokeWidth={1.5}
-                          style={{ cursor: 'crosshair' }}
+                          opacity={termOpacity}
+                          style={{ cursor: 'crosshair', transition: 'opacity 0.25s' }}
                           onMouseEnter={() => setHoverTermKey(termKey)}
                           onMouseLeave={() => setHoverTermKey(prev => prev === termKey ? null : prev)}
                           onClick={e => handleTerminalClick(e, c.id, term as 'a' | 'b')}
