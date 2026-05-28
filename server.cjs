@@ -6301,6 +6301,23 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // POST /api/push/test — gửi 1 push thử tới chính device của user (verify pipeline)
+  app.post('/api/push/test', async (req, res) => {
+    try {
+      const userId = getUserIdFromReq(req);
+      if (!userId) return res.status(401).json({ error: 'unauthorized' });
+      const result = await global.sendPush(userId, {
+        title: 'AeroEdu 🚀',
+        body: req.body?.body || 'Push notification hoạt động! Đây là thông báo thử.',
+        route: req.body?.route || '/dashboard',
+      });
+      return res.json({ ok: true, result });
+    } catch (e) {
+      console.error('[push:test]', e.message);
+      return res.status(500).json({ error: 'internal', message: e.message });
+    }
+  });
+
   // ── sendPush(userId, { title, body, route }) — helper dispatch APNs ──
   // Env-gated: cần APNS_KEY_PATH (.p8) + APNS_KEY_ID + APNS_TEAM_ID +
   // APNS_BUNDLE_ID. Chưa cấu hình → log + no-op (token vẫn được lưu).
