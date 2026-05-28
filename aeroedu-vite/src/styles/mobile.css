@@ -466,3 +466,10 @@ body {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* Chặn overscroll rubber-band bounce (cảm giác native, không phải web scroll) */
+.capacitor-native,
+.capacitor-native body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
