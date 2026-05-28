@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `b0b23d2` (revision pixiai-00612-zaw, 2026-05-28 — iOS app: Capacitor CORS cho capacitor://localhost (production accept origin cho TestFlight) + PWA foundation + native iOS platform SPM + Info.plist privacy strings. Verified CORS preflight 204 OK)
 - Last deployed commit: `84a0876` (revision pixiai-00611-zey, 2026-05-28 — Subject names FE chuẩn CT GDPT 2018: "Vật lí"/"Hoá học"/"Địa lí"/"Toán" trong QuestionBank picker + LabsIndex header mobile fix: stack flex-col sm:flex-row, QR full-width strip mobile, title truncate, font/padding responsive)
 - Last deployed commit: `c691eaf` (revision pixiai-00610-bag, 2026-05-28 — Batch 5: Posture/Emotion MediaPipe theo dõi tư thế HS+GV background-safe + CFD snapshot báo cáo Re/Cd/Cl + CFD 21 shapes polygon + 60 FPS + KG wheel preventDefault fix 3 files)
 - Last deployed commit: `776bf60` (revision pixiai-00609-xir, 2026-05-28 — HOTFIX: /api/ai/generate-questions "không phải JSON hợp lệ" — robust 5-strategy extractor + schema khớp mau-cau-hoi.json + retry DeepSeek→Anthropic + return `json` field cho textarea)
