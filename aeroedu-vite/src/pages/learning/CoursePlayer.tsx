@@ -50,6 +50,14 @@ import CurriculumSidebar from '@/components/learning/CurriculumSidebar'
 import LessonBlockRenderer from '@/components/learning/LessonBlockRenderer'
 import { Lock, Target } from 'lucide-react'
 import type { CourseVideo, CourseExtras, StudentChapter, StudentLesson } from '@/types'
+import { OfflineDownloadButton } from '@/components/common/OfflineDownloadButton'
+
+// Chỉ video direct (GCS / .mp4 ...) tải offline được. YouTube/Vimeo iframe → không.
+function isDownloadableVideo(url?: string | null): boolean {
+  if (!url) return false
+  if (url.includes('youtube') || url.includes('youtu.be') || url.includes('vimeo')) return false
+  return /^https?:\/\//.test(url)
+}
 
 // ── Video Player ────────────────────────────────────────────
 function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
@@ -833,9 +841,26 @@ export default function CoursePlayer() {
             /* LEGACY MODE: video player */
             <>
               {currentVideo ? (
-                <VideoSecurityOverlay videoTitle={currentVideo.title}>
-                  <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as { url?: string }).url} />
-                </VideoSecurityOverlay>
+                <>
+                  <VideoSecurityOverlay videoTitle={currentVideo.title}>
+                    <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as { url?: string }).url} />
+                  </VideoSecurityOverlay>
+                  {/* 📥 Tải video về học offline (chỉ video GCS direct, không YouTube/Vimeo) */}
+                  {(() => {
+                    const vurl = currentVideo.videoUrl || (currentVideo as { url?: string }).url
+                    if (!isDownloadableVideo(vurl)) return null
+                    return (
+                      <div className="mt-2 flex justify-end">
+                        <OfflineDownloadButton
+                          downloadKey={`video:${currentVideo.id}`}
+                          url={vurl!}
+                          title={currentVideo.title || 'Video bài học'}
+                          type="video"
+                        />
+                      </div>
+                    )
+                  })()}
+                </>
               ) : (
                 <div className="aspect-video bg-muted rounded-xl flex items-center justify-center">
                   <Play className="w-16 h-16 text-muted-foreground/50" />
@@ -1000,11 +1025,24 @@ export default function CoursePlayer() {
           )}
           {activeTab === 'pdfbook' && (
             courseInfo?.pdfBookUrl ? (
-              <PdfBookViewer
-                pdfUrl={courseInfo.pdfBookUrl}
-                title={courseInfo?.title ? `Sách: ${courseInfo.title}` : 'Sách giáo trình'}
-                compact
-              />
+              <div>
+                {/* 📥 Tải PDF giáo trình về đọc offline */}
+                {courseId && (
+                  <div className="mb-2 flex justify-end">
+                    <OfflineDownloadButton
+                      downloadKey={`pdf:${courseId}`}
+                      url={courseInfo.pdfBookUrl}
+                      title={courseInfo?.title ? `Sách: ${courseInfo.title}` : 'Sách giáo trình'}
+                      type="pdf"
+                    />
+                  </div>
+                )}
+                <PdfBookViewer
+                  pdfUrl={courseInfo.pdfBookUrl}
+                  title={courseInfo?.title ? `Sách: ${courseInfo.title}` : 'Sách giáo trình'}
+                  compact
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
                 <BookOpen className="w-12 h-12 opacity-30" />
