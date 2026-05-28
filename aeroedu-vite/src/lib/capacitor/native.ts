@@ -69,6 +69,34 @@ export async function initNative(navigate: NavigateFn, isDark: boolean = true): 
   // (mobile.css safe-area chỉ áp dụng ≤640px; native cần mọi kích thước)
   document.documentElement.classList.add('capacitor-native', `platform-${platform}`)
 
+  // ── Patch window.fetch: rewrite raw fetch('/api/...') → absolute ──
+  // Nhiều component dùng raw fetch('/api/...') (URL tương đối). Trên native
+  // app chạy từ capacitor://localhost → fetch('/api/...') resolve sai →
+  // "Không thể tải". Axios `api` đã handle, nhưng raw fetch thì không.
+  // Patch 1 lần: rewrite /api/* → https://inphysic.com/api/* + gắn auth token
+  // + credentials. Fix toàn bộ ~20 file dùng raw fetch mà không phải sửa từng cái.
+  try {
+    const { tokenStore } = await import('@/services/api')
+    const API_ORIGIN = (import.meta.env.VITE_API_URL_NATIVE as string | undefined)?.replace(/\/api\/?$/, '')
+      || 'https://inphysic.com'
+    const origFetch = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      let url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
+      if (typeof url === 'string' && url.startsWith('/api/')) {
+        const abs = API_ORIGIN + url
+        const headers = new Headers(init?.headers || (typeof input !== 'string' && !(input instanceof URL) ? (input as Request).headers : undefined))
+        const token = tokenStore.getAccessToken()
+        if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+        const nextInit: RequestInit = { ...init, headers, credentials: 'include' }
+        return origFetch(abs, nextInit)
+      }
+      return origFetch(input as any, init)
+    }
+    console.info('[native] fetch patched → rewrite /api/* to', API_ORIGIN)
+  } catch (e) {
+    console.warn('[native] fetch patch fail:', e)
+  }
+
   // ── Splash screen: hide sau khi app mount ──
   try {
     const { SplashScreen } = await import('@capacitor/splash-screen')

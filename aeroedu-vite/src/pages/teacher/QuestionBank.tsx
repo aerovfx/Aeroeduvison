@@ -203,8 +203,10 @@ export default function QuestionBank() {
       params.set("limit", String(PAGE_SIZE))
       const currentPage = resetPage ? 1 : page
       params.set("offset", String((currentPage - 1) * PAGE_SIZE))
-      const response = await fetch(`/api/questions?${params.toString()}`)
-      const data = await response.json()
+      // Dùng axios `api` (KHÔNG raw fetch) — đúng baseURL native (Capacitor →
+      // https://inphysic.com/api) + tự gắn Authorization token. Raw fetch với
+      // URL tương đối '/api/...' fail trên app native (capacitor://localhost).
+      const { data } = await api.get(`/questions?${params.toString()}`)
       if (data.success) {
         setTotalQuestions(data.data.pagination.total)
         if (resetPage) {
@@ -243,26 +245,18 @@ export default function QuestionBank() {
 
   const handleSaveEdit = async (id: string, updates: Partial<Question>) => {
     try {
-      const response = await fetch(`/api/questions/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      })
-      if (response.ok) {
-        toast.success("Đã cập nhật câu hỏi")
-        loadQuestions()
-      } else {
-        toast.error("Không thể cập nhật")
-      }
+      await api.put(`/questions/${id}`, updates)
+      toast.success("Đã cập nhật câu hỏi")
+      loadQuestions()
     } catch {
-      toast.error("Lỗi khi lưu")
+      toast.error("Không thể cập nhật")
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Xóa câu hỏi này?")) return
     try {
-      await fetch(`/api/questions/${id}`, { method: "DELETE" })
+      await api.delete(`/questions/${id}`)
       toast.success("Đã xóa")
       loadQuestions()
     } catch {
@@ -437,32 +431,25 @@ export default function QuestionBank() {
         correctAnswer = filtered.map(x => x.a).join(",")
       }
 
-      const res = await fetch("/api/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: form.content.trim(),
-          questionType: form.questionType,
-          subject: form.subject,
-          grade: form.grade,
-          difficulty: form.difficulty,
-          topic: form.topic.trim() || form.subject,
-          /* 2026-05-19: gửi đủ taxonomy 4 cấp về backend cho phân loại */
-          chapter: form.chapter || null,        // code chương VD "VL-G11-CH1"
-          lesson: form.lesson || null,          // code bài VD "VL-G11-CH1-B1"
-          unitCode: form.unitCode || null,      // code đơn vị KT VD "VL-G11-CH1-B1-DV1"
-          explanation: form.explanation.trim(),
-          options,
-          correctAnswer,
-          learningObjectives: [form.topic.trim() || form.subject],
-          keywords: [form.topic.trim() || form.subject, form.subject].concat(
-            form.unitCode ? [form.unitCode] : []
-          ),
-        }),
+      await api.post("/questions", {
+        content: form.content.trim(),
+        questionType: form.questionType,
+        subject: form.subject,
+        grade: form.grade,
+        difficulty: form.difficulty,
+        topic: form.topic.trim() || form.subject,
+        /* 2026-05-19: gửi đủ taxonomy 4 cấp về backend cho phân loại */
+        chapter: form.chapter || null,        // code chương VD "VL-G11-CH1"
+        lesson: form.lesson || null,          // code bài VD "VL-G11-CH1-B1"
+        unitCode: form.unitCode || null,      // code đơn vị KT VD "VL-G11-CH1-B1-DV1"
+        explanation: form.explanation.trim(),
+        options,
+        correctAnswer,
+        learningObjectives: [form.topic.trim() || form.subject],
+        keywords: [form.topic.trim() || form.subject, form.subject].concat(
+          form.unitCode ? [form.unitCode] : []
+        ),
       })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Không thể tạo câu hỏi")
 
       toast.success("Đã tạo câu hỏi thành công!")
 
