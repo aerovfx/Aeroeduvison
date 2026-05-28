@@ -1,7 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
@@ -66,23 +68,47 @@ window.addEventListener('error', (e) => {
 })
 
 // TanStack Query client — cấu hình tương tự với SWR/fetch trong Next.js
+// gcTime tăng lên 24h để cache survive lâu cho offline mode (persist xuống
+// localStorage). Khi offline, query trả cached data thay vì lỗi network.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,    // 5 phút
-      gcTime: 1000 * 60 * 10,      // 10 phút cache
+      staleTime: 1000 * 60 * 5,        // 5 phút "fresh"
+      gcTime: 1000 * 60 * 60 * 24,     // 24h giữ cache (offline survive)
       retry: 1,
       refetchOnWindowFocus: false,
+      // Khi offline → không retry vô ích, dùng luôn cached data
+      networkMode: 'offlineFirst',
     },
     mutations: {
       retry: 0,
+      networkMode: 'offlineFirst',
     },
   },
 })
 
+// ─── Offline persistence (Phase 4 — iOS offline mode) ───
+// Cache query state xuống localStorage → data hiển thị ngay khi offline /
+// reload. Throttle 1s tránh write quá nhiều. maxAge 24h.
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: 'aero:query-cache',
+  throttleTime: 1000,
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        maxAge: 1000 * 60 * 60 * 24,   // 24h
+        // Chỉ persist query thành công (tránh cache lỗi)
+        dehydrateOptions: {
+          shouldDehydrateQuery: (q) => q.state.status === 'success',
+        },
+      }}
+    >
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <App />
         <Toaster
@@ -98,6 +124,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         />
       </BrowserRouter>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </React.StrictMode>,
 )

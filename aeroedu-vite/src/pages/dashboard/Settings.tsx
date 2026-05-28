@@ -30,6 +30,7 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import { learningService } from '@/services/learning.service'
 import { authService } from '@/services/auth.service'
 import { recommendationService as rs } from '@/services/recommendation.service'
+import { OfflineManager } from '@/components/common/OfflineManager'
 
 // ─────────────────────────────────────────────────────────────────
 // Types & constants
@@ -1100,15 +1101,19 @@ export default function SettingsPage() {
       />
     ),
     appearance: (
-      <AppearanceTab
-        state={appearance}
-        onChange={patchAppearance}
-        onSave={saveAppearance}
-        themeMode={themeSettings.mode}
-        setThemeMode={(m) => updateTheme({ mode: m })}
-        lang={language}
-        setLang={setLanguage}
-      />
+      <div className="space-y-4">
+        <AppearanceTab
+          state={appearance}
+          onChange={patchAppearance}
+          onSave={saveAppearance}
+          themeMode={themeSettings.mode}
+          setThemeMode={(m) => updateTheme({ mode: m })}
+          lang={language}
+          setLang={setLanguage}
+        />
+        {/* Offline content manager (Phase 4 — iOS offline mode) */}
+        <OfflineManager />
+      </div>
     ),
     privacy: (
       <PrivacyTab

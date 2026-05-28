@@ -8,6 +8,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 import { AppRouter } from '@/router'
 import { ColdStartIndicator } from '@/components/common/ColdStartIndicator'
 import { NativeBridge } from '@/components/common/NativeBridge'
+import { OfflineIndicator } from '@/components/common/OfflineIndicator'
 import ArkAssistant from '@/components/ai/ArkAssistant'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           {/* 📱 Capacitor native bridge (splash/status-bar/deep-link/back/haptics)
               — no-op trên web browser thường */}
           <NativeBridge />
+          <OfflineIndicator />
           <ColdStartIndicator />
           <AppRouter />
           {/* 🤖 ByteDance Ark Bot — floating chat all pages
