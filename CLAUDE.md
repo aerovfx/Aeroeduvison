@@ -50,7 +50,14 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `7/5` — DEPLOY NGAY (user yêu cầu)
+  - `e0f0af5` — offline download buttons CoursePlayer (video+PDF)
+  - `d84c257` — Phase 4 offline mode (query persist + indicator + download manager)
+  - `5738fa5` — iOS overscroll off + build 3
+  - `1df3eb4` — iOS Phase 2 native bridge
+  - `ac2e0df` — iOS bump build 2
+  - `2bf5b1e` — logo AeroEdu mới (neon)
+  - `248c44f` — counter chore
 - Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
 - Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools
