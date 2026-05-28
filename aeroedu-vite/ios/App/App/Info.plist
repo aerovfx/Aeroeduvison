@@ -62,5 +62,14 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+
+	<!-- Push notifications: background mode để nhận silent/remote push.
+	     LƯU Ý: cần bật capability "Push Notifications" trong Xcode (Signing &
+	     Capabilities → + Capability) để Xcode tự thêm entitlement aps-environment.
+	     Xem docs/IOS_APP_GUIDE.md mục Push. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

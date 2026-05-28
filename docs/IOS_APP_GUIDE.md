@@ -134,3 +134,42 @@ Sau mỗi `npm install` plugin → bắt buộc `npx cap sync` để link native
 - Plan gốc: `/Users/pixidev/.claude/plans/lazy-snuggling-gadget.md`
 - Repo: github.com/aerovfx/Aeroeduvison
 - Apple bundle ID: `com.aeroedu.inphysic`
+
+---
+
+## Push Notifications setup (Phase 2 — cần làm thủ công)
+
+Pipeline đã code sẵn (FE register token + backend lưu DeviceToken + sendPush
+helper). Để KÍCH HOẠT cần 3 bước thủ công:
+
+### 1. Bật capability trong Xcode
+- Mở `App.xcodeproj` → target App → **Signing & Capabilities**
+- **+ Capability** → **Push Notifications**
+- Xcode tự thêm entitlement `aps-environment` + bật Push trên App ID
+
+### 2. Tạo APNs Auth Key (.p8) trên Apple portal
+- https://developer.apple.com/account/resources/authkeys → **+**
+- Tick **Apple Push Notifications service (APNs)** → Register
+- **Download** file `AuthKey_XXXXXX.p8` (CHỈ tải được 1 lần!) → lưu an toàn
+- Ghi lại **Key ID** (10 ký tự) + **Team ID** (CGT5VR25M3)
+
+### 3. Cấu hình server (env vars)
+Trên Cloud Run service `pixiai`, set:
+```
+APNS_KEY_PATH=/path/to/AuthKey_XXXXXX.p8   # hoặc mount qua Secret Manager
+APNS_KEY_ID=XXXXXXXXXX
+APNS_TEAM_ID=CGT5VR25M3
+APNS_BUNDLE_ID=com.aeroedu.inphysic
+APNS_PRODUCTION=true                        # false cho TestFlight/dev
+```
+Cài lib: `npm i @parse/node-apn` trong root server.
+
+### Test
+- App login trên device → tự xin quyền push → token gửi `/api/devices/register`
+- Gọi `global.sendPush(userId, { title, body, route })` từ bất kỳ chỗ nào
+  trong server.cjs (vd khi GV publish đề thi, assignment due) → push tới HS.
+
+### Tích hợp gợi ý (chỗ gọi sendPush)
+- GV publish đề thi → push HS trong lớp: "Đề thi mới: {tên}"
+- Assignment sắp deadline (cron) → "Bài tập {tên} còn 1 ngày"
+- Chat message mới → "{người gửi}: {preview}"

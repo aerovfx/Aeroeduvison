@@ -6207,6 +6207,141 @@ if (USE_NODEJS_QUESTIONS) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS — device token registration (iOS APNs / Android FCM)
+// Endpoints (đăng ký TRƯỚC catch-all proxy):
+//   POST /api/devices/register   — body { token, platform } → lưu DeviceToken
+//   POST /api/devices/unregister — body { platform }        → xoá token user
+//
+// Bảng DeviceToken: lazy CREATE TABLE IF NOT EXISTS. 1 user nhiều device.
+//
+// GỬI push: helper sendPush() env-gated (APNS_KEY_PATH/APNS_KEY_ID/
+// APNS_TEAM_ID/APNS_BUNDLE_ID). Chưa cấu hình → no-op (chỉ lưu token).
+// Tạo APNs Auth Key: docs/IOS_APP_GUIDE.md.
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool } = require('pg');
+  const jwt = require('jsonwebtoken');
+  const JWT_SECRET_DT = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+
+  let _dtPool = null;
+  function getDtPool() {
+    if (_dtPool) return _dtPool;
+    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');
+    _dtPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    return _dtPool;
+  }
+
+  let _dtReady = false;
+  async function ensureDeviceTokenTable() {
+    if (_dtReady) return;
+    await getDtPool().query(`
+      CREATE TABLE IF NOT EXISTS "DeviceToken" (
+        "id"        TEXT PRIMARY KEY,
+        "userId"    TEXT NOT NULL,
+        "token"     TEXT NOT NULL UNIQUE,
+        "platform"  TEXT NOT NULL,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "DeviceToken_userId_idx" ON "DeviceToken" ("userId");
+    `);
+    _dtReady = true;
+  }
+
+  function getUserIdFromReq(req) {
+    const auth = req.headers.authorization || '';
+    const m = auth.match(/^Bearer\s+(.+)$/i);
+    if (!m) return null;
+    try {
+      const payload = jwt.verify(m[1], JWT_SECRET_DT, { ignoreExpiration: true });
+      return payload.sub || payload.userId || payload.id || null;
+    } catch { return null; }
+  }
+
+  // POST /api/devices/register
+  app.post('/api/devices/register', async (req, res) => {
+    try {
+      const userId = getUserIdFromReq(req);
+      if (!userId) return res.status(401).json({ error: 'unauthorized' });
+      const { token, platform } = req.body || {};
+      if (!token || !platform) return res.status(400).json({ error: 'missing_token_or_platform' });
+      await ensureDeviceTokenTable();
+      // Upsert theo token (1 device 1 token; đổi user thì re-assign)
+      const id = `dt_${Buffer.from(token).toString('base64').slice(0, 24)}`;
+      await getDtPool().query(`
+        INSERT INTO "DeviceToken" ("id","userId","token","platform","updatedAt")
+        VALUES ($1,$2,$3,$4, now())
+        ON CONFLICT ("token") DO UPDATE
+          SET "userId" = EXCLUDED."userId", "platform" = EXCLUDED."platform", "updatedAt" = now()
+      `, [id, userId, token, platform]);
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error('[push:register]', e.message);
+      return res.status(500).json({ error: 'internal', message: e.message });
+    }
+  });
+
+  // POST /api/devices/unregister — xoá tất cả token của user trên platform này
+  app.post('/api/devices/unregister', async (req, res) => {
+    try {
+      const userId = getUserIdFromReq(req);
+      if (!userId) return res.status(401).json({ error: 'unauthorized' });
+      const { platform, token } = req.body || {};
+      await ensureDeviceTokenTable();
+      if (token) {
+        await getDtPool().query(`DELETE FROM "DeviceToken" WHERE "token" = $1`, [token]);
+      } else {
+        await getDtPool().query(`DELETE FROM "DeviceToken" WHERE "userId" = $1 AND "platform" = $2`, [userId, platform || 'ios']);
+      }
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error('[push:unregister]', e.message);
+      return res.status(500).json({ error: 'internal', message: e.message });
+    }
+  });
+
+  // ── sendPush(userId, { title, body, route }) — helper dispatch APNs ──
+  // Env-gated: cần APNS_KEY_PATH (.p8) + APNS_KEY_ID + APNS_TEAM_ID +
+  // APNS_BUNDLE_ID. Chưa cấu hình → log + no-op (token vẫn được lưu).
+  // Export ra global để các module khác (exam publish, assignment due) gọi.
+  global.sendPush = async function sendPush(userId, payload) {
+    const { APNS_KEY_PATH, APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID } = process.env;
+    if (!APNS_KEY_PATH || !APNS_KEY_ID || !APNS_TEAM_ID || !APNS_BUNDLE_ID) {
+      console.info('[push:send] APNs chưa cấu hình — skip (token đã lưu).');
+      return { sent: 0, skipped: true };
+    }
+    try {
+      await ensureDeviceTokenTable();
+      const { rows } = await getDtPool().query(
+        `SELECT "token" FROM "DeviceToken" WHERE "userId" = $1 AND "platform" = 'ios'`, [userId]);
+      if (rows.length === 0) return { sent: 0 };
+
+      // Lazy require — chỉ load apns lib khi thực sự gửi (tránh crash nếu chưa cài)
+      let apn;
+      try { apn = require('@parse/node-apn'); }
+      catch { console.warn('[push:send] thiếu @parse/node-apn — npm i @parse/node-apn'); return { sent: 0, error: 'no-apn-lib' }; }
+
+      const provider = new apn.Provider({
+        token: { key: APNS_KEY_PATH, keyId: APNS_KEY_ID, teamId: APNS_TEAM_ID },
+        production: process.env.APNS_PRODUCTION === 'true',
+      });
+      const note = new apn.Notification();
+      note.alert = { title: payload.title || 'AeroEdu', body: payload.body || '' };
+      note.topic = APNS_BUNDLE_ID;
+      note.sound = 'default';
+      note.payload = { route: payload.route || '/dashboard' };
+      const result = await provider.send(note, rows.map(r => r.token));
+      provider.shutdown();
+      return { sent: result.sent.length, failed: result.failed.length };
+    } catch (e) {
+      console.error('[push:send]', e.message);
+      return { sent: 0, error: e.message };
+    }
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 // LEARNING HISTORY — per-student per-course timeline
 // Endpoints:
 //   POST /api/learning/events                          — append event
