@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `e0f0af5` (revision pixiai-00613-fab, 2026-05-28 — Logo AeroEdu neon vào web/PWA + iOS Phase 2 native bridge (no-op web) + Phase 4 offline mode: TanStack query persist 24h + online/offline indicator + download manager video/PDF + Settings offline manager. Web/PWA users thấy logo + offline indicator)
 - Last deployed commit: `b0b23d2` (revision pixiai-00612-zaw, 2026-05-28 — iOS app: Capacitor CORS cho capacitor://localhost (production accept origin cho TestFlight) + PWA foundation + native iOS platform SPM + Info.plist privacy strings. Verified CORS preflight 204 OK)
 - Last deployed commit: `84a0876` (revision pixiai-00611-zey, 2026-05-28 — Subject names FE chuẩn CT GDPT 2018: "Vật lí"/"Hoá học"/"Địa lí"/"Toán" trong QuestionBank picker + LabsIndex header mobile fix: stack flex-col sm:flex-row, QR full-width strip mobile, title truncate, font/padding responsive)
 - Last deployed commit: `c691eaf` (revision pixiai-00610-bag, 2026-05-28 — Batch 5: Posture/Emotion MediaPipe theo dõi tư thế HS+GV background-safe + CFD snapshot báo cáo Re/Cd/Cl + CFD 21 shapes polygon + 60 FPS + KG wheel preventDefault fix 3 files)
@@ -50,14 +51,8 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `7/5` — DEPLOY NGAY (user yêu cầu)
-  - `e0f0af5` — offline download buttons CoursePlayer (video+PDF)
-  - `d84c257` — Phase 4 offline mode (query persist + indicator + download manager)
-  - `5738fa5` — iOS overscroll off + build 3
-  - `1df3eb4` — iOS Phase 2 native bridge
-  - `ac2e0df` — iOS bump build 2
-  - `2bf5b1e` — logo AeroEdu mới (neon)
-  - `248c44f` — counter chore
+- Commits since last deploy: `1/5`
+  - `4940c92` — push notification pipeline (FE register + backend token + sendPush, chờ APNs key)
 - Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
 - Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools
