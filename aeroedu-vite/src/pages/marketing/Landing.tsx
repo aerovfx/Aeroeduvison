@@ -205,14 +205,10 @@ export default function Landing() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: `linear-gradient(135deg, ${C.cyan}, ${C.blue}, ${C.purple})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: 13, color: '#fff',
+            <img src="/logo.png" alt="AeroEduVision" style={{
+              width: 36, height: 36, borderRadius: 10, objectFit: 'contain',
               boxShadow: `0 0 16px ${C.cyanA(0.5)}`,
-              animation: 'flicker 8s infinite',
-            }}>AE</div>
+            }} />
             <span style={{ fontWeight: 800, fontSize: 17, background: `linear-gradient(135deg, ${C.cyan}, ${C.blue})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               AeroEduVision
             </span>
@@ -1484,7 +1480,7 @@ export default function Landing() {
             {/* Brand */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg,${C.cyan},${C.blue},${C.purple})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#fff' }}>AE</div>
+                <img src="/logo.png" alt="AeroEduVision" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain' }} />
                 <span style={{ fontWeight: 800, fontSize: 15, background: `linear-gradient(135deg,${C.cyan},${C.blue})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AeroEduVision</span>
               </div>
               <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>Nền tảng giáo dục STEM thông minh tích hợp AI, Lab 3D và IoT cho trường học Việt Nam.</p>

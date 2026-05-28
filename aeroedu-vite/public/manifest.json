@@ -12,12 +12,6 @@
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "/logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
@@ -56,28 +50,28 @@
       "short_name": "Bài tập",
       "description": "Xem bài tập được giao",
       "url": "/dashboard/assignments",
-      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "any" }]
     },
     {
       "name": "Lab thí nghiệm",
       "short_name": "Lab",
       "description": "Mở thư viện thí nghiệm STEM",
       "url": "/dashboard/labtwin",
-      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "any" }]
     },
     {
       "name": "Trợ lý AI",
       "short_name": "AI",
       "description": "Hỏi đáp với AI Gia sư",
       "url": "/dashboard/ai-tutor",
-      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "any" }]
     },
     {
       "name": "Tư thế",
       "short_name": "Posture",
       "description": "Theo dõi tư thế học tập",
       "url": "/dashboard/posture-monitor",
-      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "any" }]
     }
   ]
 }

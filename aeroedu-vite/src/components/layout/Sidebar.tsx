@@ -484,9 +484,7 @@ export const Sidebar = memo(function Sidebar({ mobileOpen = false, onMobileClose
         'flex items-center gap-2 px-4 py-4 border-b border-border',
         collapsed && 'justify-center px-2',
       )}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(262,83%,58%)] to-[hsl(217,91%,60%)] flex items-center justify-center shrink-0">
-          <GraduationCap className="w-5 h-5 text-white" />
-        </div>
+        <img src="/logo.png" alt="AeroEduVision" className="w-8 h-8 rounded-lg shrink-0 object-contain" />
         {!collapsed && (
           <span className="font-bold text-sm text-foreground">AeroEduVision</span>
         )}

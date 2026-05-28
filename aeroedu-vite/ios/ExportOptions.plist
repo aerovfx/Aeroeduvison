@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Export cho App Store / TestFlight -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>teamID</key>
+	<string>CGT5VR25M3</string>
+	<!-- Automatic signing — Xcode quản profile -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- Upload symbols cho crash report -->
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- Quản version/build tự động (tránh trùng build number) -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<true/>
+</dict>
+</plist>
