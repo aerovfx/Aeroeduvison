@@ -135,29 +135,69 @@ export function usePostureMonitor(
     return () => clearTimeout(id)
   }, [history, persistHistory])
 
-  // ─ Visibility-aware pause/resume ─
+  // ─ Visibility/app-state-aware pause/resume ─
+  // Web: document.visibilitychange. iOS WKWebView: native:appStateChange
+  // (NativeBridge emit) vì visibilitychange không phải lúc nào cũng fire
+  // tin cậy trong WebView. iOS giới hạn background ~30s nên pause là đúng.
   useEffect(() => {
     if (status !== 'running' && status !== 'paused') return
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        if (backgroundMode) {
-          // Throttle to MAX (slow background sampling)
-          currentIntervalRef.current = MAX_INTERVAL_MS
-        } else {
-          // Hard pause
-          isPausedRef.current = true
-          setStatus('paused')
-        }
+    const goBackground = () => {
+      if (backgroundMode) {
+        currentIntervalRef.current = MAX_INTERVAL_MS  // slow sampling 0.5 Hz
       } else {
-        // Restore baseline + resume
-        currentIntervalRef.current = DEFAULT_INTERVAL_MS
-        isPausedRef.current = false
-        if (status === 'paused') setStatus('running')
+        isPausedRef.current = true
+        setStatus('paused')                            // hard pause
       }
     }
+    const goForeground = () => {
+      currentIntervalRef.current = DEFAULT_INTERVAL_MS
+      isPausedRef.current = false
+      if (status === 'paused') setStatus('running')
+    }
+    const onVisibilityChange = () => { document.hidden ? goBackground() : goForeground() }
+    const onAppState = (e: Event) => {
+      const active = (e as CustomEvent<{ isActive: boolean }>).detail?.isActive
+      active ? goForeground() : goBackground()
+    }
     document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('native:appStateChange', onAppState)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('native:appStateChange', onAppState)
+    }
   }, [status, backgroundMode])
+
+  // ─ Battery-aware throttle (iOS/Android native) ─
+  // Pin < 15% + không sạc → giảm xuống 1 Hz (tiết kiệm pin). Pin < 8% → pause.
+  // Check mỗi 30s. Web không có @capacitor/device → no-op.
+  useEffect(() => {
+    if (status !== 'running') return
+    let cancelled = false
+    const checkBattery = async () => {
+      if (typeof window === 'undefined') return
+      const cap = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+      if (!cap?.isNativePlatform?.()) return
+      try {
+        const { Device } = await import('@capacitor/device')
+        const info = await Device.getBatteryInfo()
+        if (cancelled) return
+        const level = info.batteryLevel ?? 1
+        const charging = info.isCharging ?? false
+        if (!charging && level < 0.08) {
+          // Pin cực thấp → pause để tiết kiệm
+          isPausedRef.current = true
+          console.info('[posture-monitor] battery <8% → pause')
+        } else if (!charging && level < 0.15) {
+          // Pin thấp → throttle 1 Hz
+          currentIntervalRef.current = Math.max(currentIntervalRef.current, 1000)
+          console.info('[posture-monitor] battery <15% → throttle 1Hz')
+        }
+      } catch { /* @capacitor/device chưa cài / lỗi → bỏ qua */ }
+    }
+    checkBattery()
+    const id = window.setInterval(checkBattery, 30_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [status])
 
   // ─ Inference tick — called on adaptive interval ─
   const tick = useCallback(async () => {
