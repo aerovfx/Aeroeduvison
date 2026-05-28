@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
 import viteCompression from 'vite-plugin-compression'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,6 +14,82 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      // ── PWA (Phase 0 — iOS app foundation) ──
+      // Workbox precache toàn bộ build output. Runtime cache cho API GET +
+      // CDN MediaPipe wasm/models + images. manifest.json đã được generate
+      // tay ở public/ — KHÔNG để plugin generate (giữ control field shortcuts/
+      // screenshots tiếng Việt). injectRegister: false → main.tsx tự register
+      // qua Workbox-window khi user opt-in (tránh service worker block dev).
+      VitePWA({
+        registerType: 'prompt',          // 'New version available' prompt khi update
+        injectRegister: false,           // manual register trong main.tsx
+        strategies: 'generateSW',         // Workbox auto-generate sw.js
+        srcDir: 'src',
+        // Vẫn dùng manifest tay ở public/manifest.json — plugin chỉ build SW
+        manifest: false,
+        includeAssets: ['favicon.ico', 'favicon-32x32.png', 'logo.svg', 'icons/*.png'],
+        workbox: {
+          // Precache: chỉ static assets (HTML + JS + CSS + images < 5MB).
+          // Skip three-vendor (~6MB) + mediapipe wasm (download on-demand).
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // Runtime cache rules — đảm bảo offline experience:
+          runtimeCaching: [
+            {
+              // CDN MediaPipe (Google + jsdelivr) — wasm + model files lớn
+              urlPattern: /^https:\/\/(storage\.googleapis\.com\/mediapipe-models|cdn\.jsdelivr\.net\/npm\/@mediapipe)/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'mediapipe-cdn',
+                expiration: { maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              // API GET — stale-while-revalidate cho user-facing data
+              urlPattern: ({ url, request }) =>
+                request.method === 'GET' &&
+                url.pathname.startsWith('/api/') &&
+                // Exclude streaming endpoints (SSE chat) khỏi cache
+                !url.pathname.includes('/chat/') &&
+                !url.pathname.includes('/stream'),
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'api-cache',
+                networkTimeoutSeconds: 5,
+                expiration: { maxEntries: 100, maxAgeSeconds: 10 * 60 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              // GCS bucket images / PDFs
+              urlPattern: /^https:\/\/storage\.googleapis\.com\/aeroedu-media/,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'gcs-media',
+                expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              },
+            },
+            {
+              // QR code generator (external)
+              urlPattern: /^https:\/\/api\.qrserver\.com/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'qr-cache',
+                expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              },
+            },
+          ],
+          // Navigation fallback — SPA cần trả index.html cho mọi route
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api/, /^\/admin/, /^\/_/],
+          skipWaiting: false,             // Wait for user accept update
+          clientsClaim: false,
+        },
+        devOptions: {
+          enabled: false,                 // KHÔNG enable SW trong dev (gây cache headache)
+        },
+      }),
       // Bundle analyzer — chạy: npm run build để xem stats.html
       visualizer({ open: false, filename: 'stats.html' }),
       // Pre-compress build output — nginx sẽ serve trực tiếp .gz / .br

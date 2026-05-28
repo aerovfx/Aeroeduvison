@@ -52,7 +52,10 @@ pnpm-debug.log*
 
 # Optional: MacOS and Linux
 ehthumbs.db
-Icon?
+# Icon\r (macOS Finder custom icon metadata file — the literal name is "Icon"
+# + carriage return). NOTE: cũ là `Icon?` accidentally match `icon-XX.png` qua
+# glob `?` wildcard + case-insensitive filesystem. Dùng exact name + no glob.
+Icon[]
 Thumbs.db
 
 # Python virtual environments

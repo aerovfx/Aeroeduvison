@@ -1,0 +1,83 @@
+{
+  "name": "AeroEdu — Nền tảng STEM cho THPT Việt Nam",
+  "short_name": "AeroEdu",
+  "description": "AI Gia sư, Lab 3D Vật lí, mạch điện Wokwi, đề thi AI, lộ trình học cá nhân hoá.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "lang": "vi",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/team/dang-viet-chung.jpg",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Trang chủ AeroEdu"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bài tập",
+      "short_name": "Bài tập",
+      "description": "Xem bài tập được giao",
+      "url": "/dashboard/assignments",
+      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Lab thí nghiệm",
+      "short_name": "Lab",
+      "description": "Mở thư viện thí nghiệm STEM",
+      "url": "/dashboard/labtwin",
+      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Trợ lý AI",
+      "short_name": "AI",
+      "description": "Hỏi đáp với AI Gia sư",
+      "url": "/dashboard/ai-tutor",
+      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Tư thế",
+      "short_name": "Posture",
+      "description": "Theo dõi tư thế học tập",
+      "url": "/dashboard/posture-monitor",
+      "icons": [{ "src": "/logo.svg", "sizes": "any" }]
+    }
+  ]
+}

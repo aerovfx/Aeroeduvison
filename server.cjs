@@ -88,6 +88,35 @@ app.use((_req, res, next) => {
   next();
 });
 
+// ── CORS cho Capacitor iOS/Android app (Phase 1 — iOS app shell) ──
+// WKWebView native chạy từ capacitor://localhost (iOS) hoặc https://localhost
+// (Android). Phải explicit allow cho httpOnly cookie cross-origin work.
+// LƯU Ý: KHÔNG dùng wildcard '*' với credentials — phải reflect origin chính xác
+// nếu origin khớp allowlist.
+{
+  const CAPACITOR_ORIGINS = new Set([
+    'capacitor://localhost',
+    'https://localhost',
+    'ionic://localhost',
+  ]);
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && CAPACITOR_ORIGINS.has(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Length, X-Request-Id');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      // Preflight OPTIONS: respond immediately
+      if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+      }
+    }
+    next();
+  });
+}
+
 // ── Body parser (needed for auth routes) ───────────────────
 // Default limit là 100kb; PDF base64 có thể tới ~30MB → bump lên 50mb cho
 // các route đặc biệt (quiz-extract). express.json() chấp nhận limit duy nhất

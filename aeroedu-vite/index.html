@@ -2,10 +2,27 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="alternate icon" href="/favicon-32x32.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- ── PWA + iOS app meta (Phase 0 — Capacitor foundation) ── -->
+    <!-- viewport-fit=cover cho iPhone notch + Dynamic Island, user-scalable=no
+         giữ UI ổn định trong WKWebView (tránh accidental zoom khi nhập). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#0a0f1e" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Apple-specific (iOS home screen + Capacitor WKWebView) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="mask-icon" href="/icons/safari-pinned-tab.png" color="#0a0f1e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AeroEdu" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="AeroEdu" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="AeroEduVision — Nền tảng STEM thông minh tích hợp AI gia sư, mô phỏng Vật lý 3D và mạch điện Wokwi cho giáo viên & học sinh THPT Việt Nam." />
     <meta name="keywords" content="aeroeduvision, inphysic, ai gia sư, ôn thi THPT, mạch điện wokwi, lab 3d, giáo dục stem việt nam, đề thi trắc nghiệm, lộ trình học, vật lý lớp 12" />
     <meta name="author" content="Đặng Việt Chung, Trần Thị Hương — AeroEduVision Team" />

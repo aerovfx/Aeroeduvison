@@ -6,9 +6,26 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { coldStart } from '@/lib/coldStart'
 
-// Luôn dùng /api để đi qua Vite proxy → tránh CORS
-// VITE_API_URL chỉ dùng trong vite.config.ts làm proxy target
-const BASE_URL = '/api'
+// ── Base URL resolution ──
+// Web (Vite dev + production same-origin): /api  → đi qua proxy / nginx → backend
+// Capacitor native (iOS/Android): app chạy từ capacitor://localhost — phải gọi
+//   tuyệt đối tới https://inphysic.com/api, KHÔNG có proxy.
+// Detect Capacitor qua window.Capacitor (injected bởi WebView bridge).
+function resolveBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const cap = (window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean }
+    }).Capacitor
+    if (cap?.isNativePlatform?.()) {
+      // Override qua env nếu cần switch sang staging
+      const native = (import.meta.env.VITE_API_URL_NATIVE as string | undefined)
+        || 'https://inphysic.com/api'
+      return native
+    }
+  }
+  return '/api'
+}
+const BASE_URL = resolveBaseUrl()
 
 export const api = axios.create({
   baseURL: BASE_URL,

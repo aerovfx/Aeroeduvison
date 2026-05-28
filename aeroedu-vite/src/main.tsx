@@ -5,7 +5,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
+import { registerPwa } from './lib/pwa-register'
 import './index.css'
+
+// PWA / Service Worker — chạy sau khi React mount để không block initial render
+// Phase 0 (Capacitor foundation). Production only — dev mode disabled.
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    registerPwa().catch(err => console.warn('[pwa] register error:', err))
+  })
+}
 
 // ─── Chunk load error recovery ─────────────────────────────────────
 // Khi deploy mới, browser có thể giữ index.html cũ trỏ tới chunk
