@@ -8080,7 +8080,41 @@ if (USE_NODEJS_QUESTIONS) {
           added++;
         } catch (e) { if (e.code !== '23505') throw e; }
       }
-      // TODO: notification cho HS — hiện chưa wire vào notifications table
+      // ── Push notification cho HS được giao bài (fire-and-forget) ──
+      // Resolve User.id của HS: studentIds (ClassStudent.id → user_id) +
+      // classIds (mọi HS có account trong lớp). Push async, KHÔNG block response.
+      ;(async () => {
+        if (typeof global.sendPush !== 'function') return;
+        try {
+          const { rows: a } = await pool.query(`SELECT title FROM "Assignment" WHERE id = $1`, [req.params.id]);
+          const title = a[0]?.title || 'bài tập mới';
+          const userIds = new Set();
+          // Students trong các lớp được giao (chỉ HS có tài khoản)
+          if (classIds.length > 0) {
+            const { rows } = await pool.query(
+              `SELECT DISTINCT user_id FROM "ClassStudent" WHERE class_id = ANY($1::text[]) AND user_id IS NOT NULL`,
+              [classIds.filter(Boolean)]);
+            rows.forEach(r => r.user_id && userIds.add(r.user_id));
+          }
+          // Student targets trực tiếp: sid có thể là ClassStudent.id hoặc User.id
+          for (const sid of studentIds.filter(Boolean)) {
+            const { rows } = await pool.query(`SELECT user_id FROM "ClassStudent" WHERE id = $1 LIMIT 1`, [sid]);
+            if (rows[0]?.user_id) userIds.add(rows[0].user_id);
+            else userIds.add(sid); // giả định sid là User.id (sendPush no-op nếu không có token)
+          }
+          // Dispatch (mỗi user 1 lần)
+          let sent = 0;
+          for (const uid of userIds) {
+            const r = await global.sendPush(uid, {
+              title: '📚 Bài tập mới',
+              body: `Bạn được giao: ${title}`,
+              route: '/dashboard/assignments',
+            }).catch(() => null);
+            if (r?.sent) sent += r.sent;
+          }
+          if (sent > 0) console.log(`[asgn:targets:push] sent ${sent} push cho ${userIds.size} HS`);
+        } catch (e) { console.warn('[asgn:targets:push]', e.message); }
+      })();
       return res.json({ ok: true, added, notified: 0 });
     } catch (e) { console.error('[asgn:targets:add]', e.message); return res.status(500).json({ error: 'Lỗi giao bài' }); }
   });
