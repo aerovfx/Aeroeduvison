@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `84a0876` (revision pixiai-00611-zey, 2026-05-28 — Subject names FE chuẩn CT GDPT 2018: "Vật lí"/"Hoá học"/"Địa lí"/"Toán" trong QuestionBank picker + LabsIndex header mobile fix: stack flex-col sm:flex-row, QR full-width strip mobile, title truncate, font/padding responsive)
 - Last deployed commit: `c691eaf` (revision pixiai-00610-bag, 2026-05-28 — Batch 5: Posture/Emotion MediaPipe theo dõi tư thế HS+GV background-safe + CFD snapshot báo cáo Re/Cd/Cl + CFD 21 shapes polygon + 60 FPS + KG wheel preventDefault fix 3 files)
 - Last deployed commit: `776bf60` (revision pixiai-00609-xir, 2026-05-28 — HOTFIX: /api/ai/generate-questions "không phải JSON hợp lệ" — robust 5-strategy extractor + schema khớp mau-cau-hoi.json + retry DeepSeek→Anthropic + return `json` field cho textarea)
 - Last deployed commit: `ba9dbda` (revision pixiai-00608-ten, 2026-05-27 — Batch 10: GraphLab snap giao điểm + nhãn toạ độ + Quizzes redirect + Subject normalize "Vật lý"→"Vật lí" + My Courses theo khối + Lesson plans library + Openfang DeepSeek + IoT 200 + LaTeX compact + community-stats + bỏ exam-generator route)
@@ -48,9 +49,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `2/5`
-  - `84a0876` — subjects FE chuẩn (Vật lí/Hoá học/Địa lí/Toán) + LabsIndex mobile fix
-  - `63e45e5` — counter chore
+- Commits since last deploy: `0/5`
 - Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
 - Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools
