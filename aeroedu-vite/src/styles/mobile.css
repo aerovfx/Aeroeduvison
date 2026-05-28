@@ -410,3 +410,59 @@ body {
 @media (max-width: 639px) {
   .tablet-up { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+ * CAPACITOR NATIVE SHELL — safe-area cho iOS/Android app
+ * Class `.capacitor-native` được native.ts thêm vào <html> khi chạy
+ * trong WKWebView/WebView. Áp dụng MỌI kích thước (không chỉ ≤640px)
+ * vì app native luôn cần tránh notch/Dynamic Island/home indicator.
+ * ═══════════════════════════════════════════════════════════ */
+
+/* Sticky/fixed top chrome (navbar, header) tránh notch + status bar */
+.capacitor-native .sticky.top-0,
+.capacitor-native header.sticky,
+.capacitor-native [data-app-header] {
+  top: env(safe-area-inset-top, 0) !important;
+}
+
+/* Padding top cho top-level app container (đẩy nội dung xuống dưới status bar) */
+.capacitor-native body,
+.capacitor-native #root {
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Fixed bottom UI (bottom nav, floating action) tránh home indicator */
+.capacitor-native .fixed.bottom-0,
+.capacitor-native .sticky.bottom-0,
+.capacitor-native [data-app-bottom] {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+}
+
+/* Toast: đẩy xuống dưới notch nếu top, lên trên home indicator nếu bottom */
+.capacitor-native [data-sonner-toaster],
+.capacitor-native .react-hot-toast {
+  top: max(env(safe-area-inset-top), 0.5rem) !important;
+}
+
+/* Floating chat assistant (ArkAssistant) + posture widget tránh home indicator */
+.capacitor-native .fixed.bottom-4,
+.capacitor-native .fixed.bottom-2 {
+  bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem)) !important;
+}
+
+/* Disable text-select + callout trên native (cảm giác app, không phải web) */
+.capacitor-native {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Nhưng cho phép select trong input/textarea/editor + nội dung bài học */
+.capacitor-native input,
+.capacitor-native textarea,
+.capacitor-native [contenteditable],
+.capacitor-native .prose,
+.capacitor-native .select-text {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
