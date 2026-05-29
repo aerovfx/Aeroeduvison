@@ -289,6 +289,7 @@ const AdminContentPage      = lazy(() => import('@/pages/admin/Content'))
 const AdminOperationsPage   = lazy(() => import('@/pages/admin/Operations'))
 const AdminCategoriesPage   = lazy(() => import('@/pages/admin/Categories'))
 const AdminEnglishEditorPage = lazy(() => import('@/pages/admin/EnglishEditor'))
+const AdminSkillsContentPage = lazy(() => import('@/pages/admin/SkillsContent'))
 const AdminAnalyticsPage    = lazy(() => import('@/pages/admin/Analytics'))
 const AdminInsightsPage     = lazy(() => import('@/pages/admin/Insights'))
 const AdminPaymentsPage     = lazy(() => import('@/pages/admin/Payments'))
@@ -747,6 +748,7 @@ export function AppRouter() {
               <Route path="/admin/at-risk"             element={<AdminAtRiskPage />} />
               <Route path="/admin/content"             element={<AdminContentPage />} />
               <Route path="/admin/english-editor"      element={<AdminEnglishEditorPage />} />
+              <Route path="/admin/skills-content"      element={<AdminSkillsContentPage />} />
               <Route path="/admin/emotion"             element={<AdminEmotionPage />} />
               <Route path="/admin/operations"          element={<AdminOperationsPage />} />
               <Route path="/admin/categories"          element={<AdminCategoriesPage />} />

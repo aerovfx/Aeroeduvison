@@ -8,6 +8,8 @@ import { Heart, X, Check, ArrowRight, Star, Flame, Trophy, RotateCcw, Lightbulb 
 import { MathText } from '@/components/common/MathText'
 import { getLesson } from '@/lib/ai/curriculum'
 import { getHearts, loseHeart, refillHearts, completeLesson, minutesToNextHeart, MAX_HEARTS } from '@/lib/ai/progress'
+import { fetchOverlay, mergeStopQuestions } from '@/lib/skill-overlay'
+import { useEffect } from 'react'
 
 const GRAD = 'linear-gradient(135deg,#22d3ee 0%,#7c5cff 100%)'
 const CORRECT = '#22c55e'
@@ -27,7 +29,14 @@ export default function AiLesson() {
   const { lessonId = '' } = useParams()
   const navigate = useNavigate()
   const found = useMemo(() => getLesson(lessonId), [lessonId])
-  const questions = found?.lesson.questions || []
+  // Gộp câu hỏi admin thêm (overlay DB) vào câu gốc theo chặng
+  const [extra, setExtra] = useState<import('@/lib/ai/curriculum').AIQuestion[]>([])
+  useEffect(() => {
+    let on = true
+    if (found) fetchOverlay('ai').then(ov => { if (on) setExtra(mergeStopQuestions(found.lesson.questions, ov, found.stop.id).slice(found.lesson.questions.length)) })
+    return () => { on = false }
+  }, [lessonId, found])
+  const questions = found ? [...found.lesson.questions, ...extra] : []
 
   const [idx, setIdx] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)

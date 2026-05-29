@@ -2,13 +2,14 @@
  * MathLesson — trình chơi bài Toán (trắc nghiệm + giải thích + bối cảnh).
  * Route: /student/math/:lessonId
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Heart, X, Check, ArrowRight, Star, Flame, Trophy, RotateCcw, Lightbulb } from 'lucide-react'
 import { MathText } from '@/components/common/MathText'
 import TikzFigure from '@/components/common/TikzFigure'
-import { getLesson } from '@/lib/math/curriculum'
+import { getLesson, type MathQuestion } from '@/lib/math/curriculum'
 import { getHearts, loseHeart, refillHearts, completeLesson, minutesToNextHeart, MAX_HEARTS } from '@/lib/math/progress'
+import { fetchOverlay, mergeStopQuestions } from '@/lib/skill-overlay'
 
 const GRAD = 'linear-gradient(135deg,#d4a017 0%,#7c5cff 100%)' // cổ đại → hiện đại
 const CORRECT = '#22c55e'
@@ -28,7 +29,14 @@ export default function MathLesson() {
   const { lessonId = '' } = useParams()
   const navigate = useNavigate()
   const found = useMemo(() => getLesson(lessonId), [lessonId])
-  const questions = found?.lesson.questions || []
+  // Gộp câu hỏi admin thêm (overlay DB) theo chặng
+  const [extra, setExtra] = useState<MathQuestion[]>([])
+  useEffect(() => {
+    let on = true
+    if (found) fetchOverlay('math').then(ov => { if (on) setExtra(mergeStopQuestions(found.lesson.questions, ov, found.stop.id).slice(found.lesson.questions.length)) })
+    return () => { on = false }
+  }, [lessonId, found])
+  const questions = found ? [...found.lesson.questions, ...extra] : []
 
   const [idx, setIdx] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)

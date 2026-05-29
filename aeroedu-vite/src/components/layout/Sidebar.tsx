@@ -235,6 +235,7 @@ const adminSections: RouteSection[] = [
       { icon: Heart,    labelKey: 'routeAdminEmotion',  href: '/admin/emotion' },
       { icon: BookOpen, labelKey: 'routeContent',       href: '/admin/content' },
       { icon: Languages, labelKey: 'routeEnglishEditor', href: '/admin/english-editor', badge: 'Mới' },
+      { icon: Cpu,      labelKey: 'routeSkillsContent',  href: '/admin/skills-content', badge: 'Mới' },
       { icon: Tag,      labelKey: 'routeAdminCategories', href: '/admin/categories' },
     ],
   },

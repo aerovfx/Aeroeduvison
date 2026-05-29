@@ -16088,6 +16088,52 @@ app.get('/api/english/curriculum', async (_req, res) => {
     res.json({ journey: null }); // FE tự fallback seed
   }
 });
+
+// ── SKILL OVERLAY — admin quản lý nội dung 3 khoá kỹ năng (Anh/Toán/AI) ───────
+// Lớp phủ DB gộp với curriculum gốc (trong code) lúc chạy: thêm câu hỏi tuỳ
+// chỉnh theo từng chặng + ghi đè blurb. Lưu 1 dòng JSON/skill.
+//   data = { extraQuestions: {[stopId]: [{id,prompt,options[],correctIdx,explain}]},
+//            stopOverrides: {[stopId]: {blurbVi?, topicVi?}} }
+let _skillOverlayReady = false;
+async function _ensureSkillOverlay(pool) {
+  if (_skillOverlayReady) return;
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS "SkillOverlay" (
+      skill TEXT PRIMARY KEY, data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  } catch (e) { console.warn('[skill-overlay] ensure:', e.message); }
+  _skillOverlayReady = true;
+}
+const _SKILLS = ['english', 'math', 'ai'];
+// GET công khai — trang học sinh fetch để gộp (không lộ gì nhạy cảm)
+app.get('/api/skills/:skill/overlay', async (req, res) => {
+  const skill = String(req.params.skill || '').toLowerCase();
+  if (!_SKILLS.includes(skill)) return res.status(404).json({ error: 'Skill không hợp lệ' });
+  try {
+    const pool = _getPool(); await _ensureSkillOverlay(pool);
+    const { rows } = await pool.query(`SELECT data FROM "SkillOverlay" WHERE skill=$1`, [skill]);
+    return res.json({ skill, data: rows[0]?.data || {} });
+  } catch (e) { console.warn('[skill-overlay:get]', e.message); return res.json({ skill, data: {} }); }
+});
+// PUT admin — lưu toàn bộ overlay cho 1 skill
+app.put('/api/admin/skills/:skill/overlay', async (req, res) => {
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+  if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+  const skill = String(req.params.skill || '').toLowerCase();
+  if (!_SKILLS.includes(skill)) return res.status(404).json({ error: 'Skill không hợp lệ' });
+  const data = req.body?.data;
+  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'data không hợp lệ' });
+  try {
+    const pool = _getPool(); await _ensureSkillOverlay(pool);
+    await pool.query(
+      `INSERT INTO "SkillOverlay"(skill, data, "updatedAt") VALUES ($1,$2,NOW())
+       ON CONFLICT (skill) DO UPDATE SET data=EXCLUDED.data, "updatedAt"=NOW()`,
+      [skill, JSON.stringify(data)]);
+    return res.json({ ok: true, skill });
+  } catch (e) { console.error('[skill-overlay:put]', e.message); return res.status(500).json({ error: 'Lưu thất bại: ' + e.message }); }
+});
+
 app.put('/api/english/curriculum', async (req, res) => {
   const verdict = await _isAdminRequest(req);
   if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
