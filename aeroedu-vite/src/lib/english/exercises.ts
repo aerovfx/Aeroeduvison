@@ -18,6 +18,7 @@ export type Exercise =
   | { kind: 'type'; word: EnWord; answer: string }
   | { kind: 'match'; pairs: { id: string; en: string; vi: string }[] }
   | { kind: 'repeat'; word: EnWord }
+  | { kind: 'speak'; word: EnWord }  // nói vào mic → nhận dạng giọng nói
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -68,8 +69,8 @@ export function generateExercises(words: EnWord[], pool?: EnWord[]): Exercise[] 
   const typable = words.find(x => x.en.length <= 12)
   if (typable) out.push({ kind: 'type', word: typable, answer: typable.en })
 
-  // 1 bài "repeat" luyện phát âm cho từ thứ 2 (nếu có)
-  if (words[1]) out.push({ kind: 'repeat', word: words[1] })
+  // 1 bài "speak" luyện phát âm qua mic cho từ thứ 2 (nếu có)
+  if (words[1]) out.push({ kind: 'speak', word: words[1] })
 
   let seq = shuffle(out)
 

@@ -46,9 +46,12 @@
 	<!-- Camera: Posture Monitor (MediaPipe) + Document Digitization chụp tài liệu -->
 	<key>NSCameraUsageDescription</key>
 	<string>AeroEdu dùng camera để phân tích tư thế học tập (MediaPipe) và chụp tài liệu/bài làm. Toàn bộ xử lý diễn ra trên thiết bị, không gửi video lên máy chủ.</string>
-	<!-- Microphone: Transcript recording (ghi âm bài giảng) -->
+	<!-- Microphone: Transcript recording (ghi âm bài giảng) + luyện phát âm tiếng Anh -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AeroEdu dùng micro để ghi âm và tạo bản chép lời bài giảng khi bạn chủ động bật tính năng này.</string>
+	<string>AeroEdu dùng micro để ghi âm bài giảng và luyện phát âm tiếng Anh khi bạn chủ động bật tính năng này.</string>
+	<!-- Speech recognition: luyện nói tiếng Anh (nhận dạng giọng nói) -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>AeroEdu dùng nhận dạng giọng nói để chấm phát âm tiếng Anh của bạn ngay trên thiết bị.</string>
 	<!-- Photo library read: chọn ảnh đại diện + nộp bài tập -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AeroEdu truy cập thư viện ảnh để bạn chọn ảnh đại diện và đính kèm bài làm.</string>

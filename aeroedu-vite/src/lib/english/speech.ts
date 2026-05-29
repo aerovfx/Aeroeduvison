@@ -95,3 +95,45 @@ export function hasEnglishVoice(): boolean {
   if (!_ready) loadVoices()
   return _voices.some(v => v.lang?.toLowerCase().startsWith('en'))
 }
+
+// ─── Nhận dạng giọng nói (mic) — luyện phát âm ──────────────────────────────
+// Dùng Web Speech Recognition (Chrome/Safari). Trình duyệt tự hỏi quyền micro
+// khi .start(). Không hỗ trợ → trả null để UI fallback "tự xác nhận".
+
+export interface RecognizeHandle { stop: () => void }
+
+export function speechRecognitionSupported(): boolean {
+  return typeof window !== 'undefined'
+    && !!((window as Window & { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
+       || (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition)
+}
+
+/**
+ * Nghe 1 lần (không liên tục) → trả transcript. Trình duyệt sẽ XIN QUYỀN micro.
+ * onError nhận: 'unsupported' | 'not-allowed' | 'no-speech' | 'start-failed' | ...
+ */
+export function recognizeOnce(opts: {
+  lang?: 'en' | 'vi'
+  onResult: (transcript: string, confidence: number) => void
+  onError?: (err: string) => void
+  onEnd?: () => void
+}): RecognizeHandle | null {
+  const w = window as Window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }
+  const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+  if (!SR) { opts.onError?.('unsupported'); return null }
+  let rec: any
+  try { rec = new SR() } catch { opts.onError?.('start-failed'); return null }
+  rec.lang = opts.lang === 'vi' ? 'vi-VN' : 'en-US'
+  rec.interimResults = false
+  rec.maxAlternatives = 3
+  rec.continuous = false
+  rec.onresult = (e: any) => {
+    const best = e.results?.[0]?.[0]
+    opts.onResult(String(best?.transcript || ''), Number(best?.confidence || 0))
+  }
+  rec.onerror = (e: any) => opts.onError?.(String(e?.error || 'error'))
+  rec.onend = () => opts.onEnd?.()
+  try { window.speechSynthesis?.cancel() } catch { /* tránh TTS chen tiếng */ }
+  try { rec.start() } catch { opts.onError?.('start-failed'); return null }
+  return { stop: () => { try { rec.stop() } catch { /* ignore */ } } }
+}

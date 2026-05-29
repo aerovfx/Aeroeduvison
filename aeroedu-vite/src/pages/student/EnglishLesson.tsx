@@ -8,12 +8,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Heart, X, Volume2, Turtle, Check, ArrowRight, Star, Flame, Trophy, RotateCcw,
+  Heart, X, Volume2, Turtle, Check, ArrowRight, Star, Flame, Trophy, RotateCcw, Mic,
 } from 'lucide-react'
 import { getLesson, allWords } from '@/lib/english/curriculum'
 import { useEnglishContent } from '@/lib/english/contentApi'
 import { generateExercises, type Exercise } from '@/lib/english/exercises'
-import { speak, speakSlow } from '@/lib/english/speech'
+import { speak, speakSlow, recognizeOnce, speechRecognitionSupported } from '@/lib/english/speech'
 import {
   getHearts, loseHeart, refillHearts, completeLesson, minutesToNextHeart, MAX_HEARTS,
 } from '@/lib/english/progress'
@@ -217,13 +217,20 @@ function ExerciseView({ ex, phase, onGrade }: {
   const [selEn, setSelEn] = useState<string | null>(null)
   const [matched, setMatched] = useState<Set<string>>(new Set())
   const [matchMistake, setMatchMistake] = useState(false)
+  // speak (mic)
+  const [listening, setListening] = useState(false)
+  const [heard, setHeard] = useState<string | null>(null)
+  const [micErr, setMicErr] = useState<string | null>(null)
   const matchCols = useMemo(() => {
     if (ex.kind !== 'match') return null
     return { en: ex.pairs, vi: [...ex.pairs].sort(() => Math.random() - 0.5) }
   }, [ex])
 
   // reset khi đổi câu
-  useEffect(() => { setPicked(null); setTyped(''); setSelEn(null); setMatched(new Set()); setMatchMistake(false) }, [ex])
+  useEffect(() => {
+    setPicked(null); setTyped(''); setSelEn(null); setMatched(new Set()); setMatchMistake(false)
+    setListening(false); setHeard(null); setMicErr(null)
+  }, [ex])
 
   const disabled = phase !== 'answering'
 
@@ -346,6 +353,72 @@ function ExerciseView({ ex, phase, onGrade }: {
             className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: ENG.primaryGrad }}>
             <Check className="w-5 h-5 inline mr-1" /> Tôi đã nói được
           </button>
+        )}
+      </div>
+    )
+  }
+
+  // ─ Nói vào mic (nhận dạng giọng nói) ─
+  if (ex.kind === 'speak') {
+    const supported = speechRecognitionSupported()
+    const startListen = () => {
+      setHeard(null); setMicErr(null); setListening(true)
+      recognizeOnce({
+        lang: 'en',
+        onResult: (t) => {
+          setHeard(t)
+          const ok = norm(t).includes(norm(ex.word.en)) || norm(ex.word.en).includes(norm(t))
+          if (ok) onGrade(true, ex.word.id, true)
+        },
+        onError: (e) => { setMicErr(e); setListening(false) },
+        onEnd: () => setListening(false),
+      })
+    }
+    return (
+      <div className="text-center">
+        <h2 className="text-xl font-bold mb-6">Nói theo 🎤</h2>
+        <div className="text-4xl font-extrabold mb-2">{ex.word.emoji} {ex.word.en}</div>
+        {ex.word.ipa && <div className="opacity-60 mb-1">{ex.word.ipa}</div>}
+        <div className="opacity-70 mb-6">{ex.word.vi}</div>
+
+        <button onClick={() => speak(ex.word.en)}
+          className="mb-6 px-4 py-2 rounded-xl inline-flex items-center gap-2 font-semibold"
+          style={{ border: '1px solid var(--ai-card-border)', color: ENG.cyan }}>
+          <Volume2 className="w-5 h-5" /> Nghe mẫu
+        </button>
+
+        {supported ? (
+          <div className="flex flex-col items-center gap-3">
+            <button disabled={disabled || listening} onClick={startListen}
+              className="w-24 h-24 rounded-full flex items-center justify-center text-white disabled:opacity-60"
+              style={{ background: listening ? ENG.coral : ENG.primaryGrad, boxShadow: listening ? `0 0 0 8px ${ENG.coral}33` : 'none' }}>
+              <Mic className={`w-10 h-10 ${listening ? 'animate-pulse' : ''}`} />
+            </button>
+            <div className="text-sm font-semibold opacity-80">
+              {listening ? 'Đang nghe… hãy nói rõ' : 'Nhấn micro rồi đọc to từ trên'}
+            </div>
+            {heard && (
+              <div className="text-sm">Bạn nói: <b style={{ color: ENG.cyan }}>"{heard}"</b></div>
+            )}
+            {micErr === 'not-allowed' && (
+              <div className="text-sm" style={{ color: ENG.wrong }}>Cần cấp quyền micro cho trình duyệt để luyện nói.</div>
+            )}
+            {micErr === 'no-speech' && (
+              <div className="text-sm opacity-70">Chưa nghe rõ — thử lại nhé.</div>
+            )}
+            {!disabled && (
+              <button onClick={() => onGrade(true, ex.word.id, false)} className="mt-1 text-sm underline opacity-60">
+                Bỏ qua
+              </button>
+            )}
+          </div>
+        ) : (
+          !disabled && (
+            <button onClick={() => onGrade(true, ex.word.id, false)}
+              className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: ENG.primaryGrad }}>
+              <Check className="w-5 h-5 inline mr-1" /> Tôi đã nói được
+            </button>
+          )
         )}
       </div>
     )
