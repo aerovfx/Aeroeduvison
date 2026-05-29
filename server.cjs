@@ -14013,21 +14013,105 @@ app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
 // ── /api/kg/* Knowledge Graph stubs với shape match FE interface ──
 // Tránh ErrorBoundary crash khi page truy cập field undefined.
 
-app.get('/api/kg/search', (req, res) => res.json({
-  success: true, items: [], query: String(req.query.q || ''),
-}));
+// ─── KG thật (Postgres) — node/edge + seed + expand/search ──────────
+let _kgInit = false;
+async function _ensureKgTables() {
+  if (_kgInit) return;
+  const pool = _getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "KgNode" (
+      id TEXT PRIMARY KEY, type TEXT NOT NULL, label TEXT NOT NULL,
+      description TEXT, properties JSONB
+    );
+    CREATE TABLE IF NOT EXISTS "KgEdge" (
+      id TEXT PRIMARY KEY, from_id TEXT NOT NULL, to_id TEXT NOT NULL,
+      rel_type TEXT NOT NULL, weight DOUBLE PRECISION DEFAULT 1, properties JSONB
+    );
+    CREATE INDEX IF NOT EXISTS idx_kgedge_from ON "KgEdge"(from_id);
+    CREATE INDEX IF NOT EXISTS idx_kgedge_to   ON "KgEdge"(to_id);
+  `);
+  _kgInit = true;
+}
+function _mapKgNode(r) {
+  return { id: r.id, type: r.type, label: r.label, description: r.description || null, properties: r.properties || {} };
+}
+function _mapKgEdge(r) {
+  return { id: r.id, from_id: r.from_id, to_id: r.to_id, rel_type: r.rel_type, weight: r.weight == null ? 1 : Number(r.weight), properties: r.properties || {} };
+}
 
-app.get('/api/kg/node/:id', (req, res) => res.json({
-  success: true,
-  node: { id: req.params.id, label: req.params.id, type: 'topic', description: null },
-  neighbors: [], edges: [], notes: [], comments: [],
-}));
+app.get('/api/kg/search', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.json({ success: true, items: [], query: q });
+  try {
+    await _ensureKgTables();
+    const params = [`%${q}%`];
+    let sql = `SELECT * FROM "KgNode" WHERE label ILIKE $1`;
+    if (req.query.type) { params.push(String(req.query.type)); sql += ` AND type = $${params.length}`; }
+    params.push(Math.min(50, Number(req.query.limit) || 20));
+    sql += ` ORDER BY (label ILIKE $1) DESC, label LIMIT $${params.length}`;
+    const { rows } = await _getPool().query(sql, params);
+    res.json({ success: true, items: rows.map(_mapKgNode), query: q });
+  } catch (e) { console.warn('[kg] search fail:', e.message); res.json({ success: true, items: [], query: q }); }
+});
 
-app.get('/api/kg/expand/:id', (req, res) => res.json({
-  success: true,
-  rootId: req.params.id,
-  nodes: [], edges: [], depth: Number(req.query.depth) || 1,
-}));
+app.get('/api/kg/node/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    await _ensureKgTables();
+    const pool = _getPool();
+    const nodeRes = await pool.query(`SELECT * FROM "KgNode" WHERE id = $1 LIMIT 1`, [id]);
+    const node = nodeRes.rows[0]
+      ? _mapKgNode(nodeRes.rows[0])
+      : { id, label: id, type: 'Topic', description: null, properties: {} };
+    const { rows } = await pool.query(
+      `SELECT e.*, nf.label lf, nf.type tf, nt.label lt, nt.type tt
+       FROM "KgEdge" e
+       LEFT JOIN "KgNode" nf ON nf.id = e.from_id
+       LEFT JOIN "KgNode" nt ON nt.id = e.to_id
+       WHERE e.from_id = $1 OR e.to_id = $1`, [id]);
+    const neighbors = rows.map(r => {
+      const out = r.from_id === id;
+      return {
+        id: out ? r.to_id : r.from_id,
+        label: (out ? r.lt : r.lf) || (out ? r.to_id : r.from_id),
+        type: (out ? r.tt : r.tf) || 'Topic',
+        relType: r.rel_type, direction: out ? 'out' : 'in',
+        weight: r.weight == null ? 1 : Number(r.weight),
+      };
+    });
+    res.json({ success: true, node, neighbors, edges: rows.map(_mapKgEdge), notes: [], comments: [] });
+  } catch (e) {
+    console.warn('[kg] node fail:', e.message);
+    res.json({ success: true, node: { id, label: id, type: 'Topic', description: null }, neighbors: [], edges: [], notes: [], comments: [] });
+  }
+});
+
+app.get('/api/kg/expand/:id', async (req, res) => {
+  const startId = req.params.id;
+  const depth = Math.min(3, Math.max(1, Number(req.query.depth) || 2));
+  try {
+    await _ensureKgTables();
+    const pool = _getPool();
+    const visited = new Set([startId]);
+    let frontier = [startId];
+    for (let d = 0; d < depth && frontier.length; d++) {
+      const { rows } = await pool.query(
+        `SELECT from_id, to_id FROM "KgEdge" WHERE from_id = ANY($1) OR to_id = ANY($1)`, [frontier]);
+      const next = [];
+      for (const r of rows) for (const nb of [r.from_id, r.to_id]) {
+        if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
+      }
+      frontier = next;
+    }
+    const ids = [...visited];
+    const nodesRes = await pool.query(`SELECT * FROM "KgNode" WHERE id = ANY($1)`, [ids]);
+    const edgesRes = await pool.query(`SELECT * FROM "KgEdge" WHERE from_id = ANY($1) AND to_id = ANY($1)`, [ids]);
+    res.json({ success: true, startId, depth, nodes: nodesRes.rows.map(_mapKgNode), edges: edgesRes.rows.map(_mapKgEdge) });
+  } catch (e) {
+    console.warn('[kg] expand fail:', e.message);
+    res.json({ success: true, startId, depth, nodes: [], edges: [] });
+  }
+});
 
 app.get('/api/kg/my-brain', (_req, res) => res.json({
   success: true,
@@ -14065,14 +14149,41 @@ app.post('/api/kg/extract', (_req, res) => res.json({
   success: true, nodes: [], edges: [], extracted: 0,
 }));
 
-app.get('/api/kg/seed', (_req, res) => res.json({
-  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
-  message: 'KG seed endpoint chưa kết nối Rust backend',
-}));
-app.post('/api/kg/seed', (_req, res) => res.json({
-  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
-  message: 'KG seed endpoint chưa kết nối Rust backend',
-}));
+async function _kgSeed(_req, res) {
+  try {
+    await _ensureKgTables();
+    const pool = _getPool();
+    const { NODES, EDGES } = require('./lib/kg-seed.cjs');
+    // Upsert nodes (giữ id ổn định, cập nhật label/desc nếu đổi)
+    for (const n of NODES) {
+      await pool.query(
+        `INSERT INTO "KgNode" (id, type, label, description) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (id) DO UPDATE SET type=EXCLUDED.type, label=EXCLUDED.label, description=EXCLUDED.description`,
+        [n.id, n.type, n.label, n.description || null]);
+    }
+    let edgeInserted = 0;
+    for (const e of EDGES) {
+      const r = await pool.query(
+        `INSERT INTO "KgEdge" (id, from_id, to_id, rel_type, weight) VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (id) DO NOTHING`,
+        [e.id, e.from_id, e.to_id, e.rel_type, e.weight == null ? 1 : e.weight]);
+      edgeInserted += r.rowCount || 0;
+    }
+    const [{ rows: nc }, { rows: ec }] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int c FROM "KgNode"`),
+      pool.query(`SELECT COUNT(*)::int c FROM "KgEdge"`),
+    ]);
+    res.json({
+      success: true, nodeCount: nc[0].c, edgeCount: ec[0].c, edgeInserted,
+      message: `Seed xong: ${nc[0].c} nodes, ${ec[0].c} edges (+${edgeInserted} mới)`,
+    });
+  } catch (e) {
+    console.error('[kg] seed fail:', e.message);
+    res.status(500).json({ success: false, nodeCount: 0, edgeCount: 0, edgeInserted: 0, error: 'Seed thất bại: ' + e.message });
+  }
+}
+app.get('/api/kg/seed', _kgSeed);
+app.post('/api/kg/seed', _kgSeed);
 
 app.post('/api/kg/link-similarity', (_req, res) => res.json({
   success: true, linked: 0, scanned: 0, threshold: 0.7, tookMs: 0,
