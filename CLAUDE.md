@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `dac729c` (revision pixiai-00619-gin, 2026-05-29 — Module Tiếng Anh "Hành trình Vũ trụ" kiểu Duolingo: lộ trình 11 hành tinh Trái Đất→Dải Ngân Hà (khoá tuần tự, tên lửa đánh dấu nhiệm vụ, crown sao), 104 từ vựng + bài tập tự sinh 6 dạng, phát âm Web Speech API native, flashcard+SRS, XP/streak/tim, nền 3D React Three Fiber (Stars+hành tinh quay, lazy+ErrorBoundary tự ẩn nếu thiếu WebGL). + Nền tảng IAP StoreKit (runbook + grantPlan) + bộ tài liệu nộp App Store. Client-side, /student/english)
 - Last deployed commit: `d132294` (revision pixiai-00618-vuy, 2026-05-29 — HOTFIX màn hình đen: ThemeProvider trả children TRẦN khi !mounted → NativeBridge gọi useTheme() đồng bộ trong render đọc context undefined → crash trắng/đen toàn app. Bỏ guard chống-flash (Vite SPA không SSR) → luôn render Provider. Verify dev render OK. Kèm iOS build 10 archived cho TestFlight)
 - Last deployed commit: `a219061` (revision pixiai-00617-jut, 2026-05-28 — Push notification backend LIVE: @parse/node-apn + /api/devices/register + /api/push/test + sendPush helper. Secret APNS_AUTH_KEY mounted /secrets/apns/AuthKey.p8 + env APNS_KEY_ID=YA994F5C95/TEAM=CGT5VR25M3/BUNDLE=com.aeroedu.inphysic/PRODUCTION=true. /api/push/test → 401 verified live. iOS build 6 push-enabled archived)
 - Last deployed commit: `e0f0af5` (revision pixiai-00613-fab, 2026-05-28 — Logo AeroEdu neon vào web/PWA + iOS Phase 2 native bridge (no-op web) + Phase 4 offline mode: TanStack query persist 24h + online/offline indicator + download manager video/PDF + Settings offline manager. Web/PWA users thấy logo + offline indicator)
@@ -53,7 +54,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00618-vuy sau hotfix màn hình đen)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00619-gin — module Tiếng Anh Hành trình Vũ trụ)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
