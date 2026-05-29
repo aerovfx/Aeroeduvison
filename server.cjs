@@ -11138,6 +11138,48 @@ app.post('/api/analytics/pageview', async (req, res) => {
   }
 });
 
+// ── PRESENCE HEARTBEAT — ai đang online (realtime chính xác) ─────────────────
+// PageView chỉ ghi khi ĐIỀU HƯỚNG → user ngồi yên 1 trang >5 phút sẽ rớt khỏi
+// "active now" dù vẫn mở tab. FE gửi ping định kỳ (~45s) khi tab hiển thị →
+// upsert UserPresence(last_seen) → /admin/analytics realtime phản ánh ĐÚNG ai
+// đang online (kể cả không thao tác).
+let _presenceReady = false;
+async function _ensurePresence(pool) {
+  if (_presenceReady) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "UserPresence" (
+        user_id     TEXT PRIMARY KEY,
+        session_id  TEXT,
+        path        TEXT,
+        last_seen   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "UserPresence_last_seen_idx" ON "UserPresence"(last_seen DESC)`);
+  } catch (e) { console.warn('[presence] ensure:', e.message); }
+  _presenceReady = true;
+}
+// Tên endpoint khớp ĐÚNG với FE usePageTracking (đã ping sẵn /analytics/heartbeat
+// mỗi 30s khi tab visible + đã login) — trước đây BE chưa có handler nên presence
+// không được ghi → realtime undercount.
+app.post('/api/analytics/heartbeat', async (req, res) => {
+  res.status(204).end(); // fire-and-forget
+  try {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return; // chỉ track user đăng nhập
+    let uid = null;
+    try { uid = _akVerify(auth.slice(7)).sub; } catch { return; }
+    if (!uid) return;
+    const { path = '', sessionId = null } = req.body || {};
+    const pool = _getPool();
+    await _ensurePresence(pool);
+    await pool.query(
+      `INSERT INTO "UserPresence"(user_id, session_id, path, last_seen)
+       VALUES ($1,$2,$3,NOW())
+       ON CONFLICT (user_id) DO UPDATE SET session_id=EXCLUDED.session_id, path=EXCLUDED.path, last_seen=NOW()`,
+      [uid, sessionId ? String(sessionId).slice(0,60) : null, String(path).slice(0,500)]);
+  } catch (e) { if (Math.random() < 0.02) console.warn('[presence:ping]', e.message); }
+});
+
 // ── Stub handlers cho Rust microservices offline ──────────
 // (aero-backend, teacher-service, reco-service đều ECONNREFUSED)
 // Trả empty payload thay vì 503 → UI hiện empty state, không lỗi đỏ.
@@ -14559,43 +14601,36 @@ app.get('/api/admin/analytics/routes', async (req, res) => {
 app.get('/api/admin/analytics/realtime', async (_req, res) => {
   try {
     const pool = _getPool();
-    const [active5m, active30s, recent, online] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS c
-                  FROM "PageView"
-                  WHERE created_at >= NOW() - INTERVAL '5 minute' AND session_id IS NOT NULL`),
-      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS c
-                  FROM "PageView"
-                  WHERE created_at >= NOW() - INTERVAL '30 second' AND session_id IS NOT NULL`),
+    await _ensurePresence(pool);
+    const [recent, online] = await Promise.all([
       pool.query(`
         SELECT pv.path, u.role AS "userRole", u.name AS "userName", u.image AS "userImage",
                pv.created_at AS "createdAt"
         FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
         WHERE pv.session_id IS NOT NULL
         ORDER BY pv.created_at DESC LIMIT 20`),
-      // Người dùng ĐANG online (đăng nhập + hoạt động trong 5 phút) — hiện tên,
-      // vai trò, trang đang xem. Đây là phần "ai đang online" kiểu YouTube/FB.
-      // Khớp ĐÚNG shape ActiveUser của FE (Analytics.tsx) để panel hiển thị.
+      // Người dùng ĐANG online — LẤY TỪ UserPresence (heartbeat ~45s) nên CHÍNH
+      // XÁC cả khi user mở tab mà không thao tác (không như PageView chỉ ghi khi
+      // điều hướng). Cửa sổ 90s = bỏ lỡ 1 nhịp ping vẫn coi là online.
       pool.query(`
-        SELECT DISTINCT ON (pv.user_id)
-               pv.user_id          AS "userId",
-               u.name              AS "userName",
-               u.image             AS "userImage",
-               u.role              AS "userRole",
-               u.email             AS "userEmail",
-               pv.path             AS "currentPath",
-               pv.created_at       AS "lastSeen",
-               EXTRACT(EPOCH FROM (NOW() - pv.created_at))::int AS "secondsAgo"
-        FROM "PageView" pv JOIN "User" u ON u.id = pv.user_id
-        WHERE pv.created_at >= NOW() - INTERVAL '5 minute' AND pv.user_id IS NOT NULL
-        ORDER BY pv.user_id, pv.created_at DESC`),
+        SELECT up.user_id      AS "userId",
+               u.name          AS "userName",
+               u.image         AS "userImage",
+               u.role          AS "userRole",
+               u.email         AS "userEmail",
+               up.path         AS "currentPath",
+               up.last_seen    AS "lastSeen",
+               EXTRACT(EPOCH FROM (NOW() - up.last_seen))::int AS "secondsAgo"
+        FROM "UserPresence" up JOIN "User" u ON u.id = up.user_id
+        WHERE up.last_seen >= NOW() - INTERVAL '90 second'
+        ORDER BY up.last_seen DESC`),
     ]);
-    // Sắp xếp user online theo mới nhất (DISTINCT ON buộc ORDER BY user_id trước)
-    const activeUsers = online.rows.sort((a, b) => (a.secondsAgo || 0) - (b.secondsAgo || 0));
+    const activeUsers = online.rows;
     return res.json({
-      activeNow: active5m.rows[0]?.c || 0,
-      activeLast30s: active30s.rows[0]?.c || 0,
-      activeUsers5min: activeUsers.length,   // số user đăng nhập đang online
-      activeUsers,                           // danh sách (VietChung hiện ở đây)
+      activeNow: activeUsers.length,                                   // user đăng nhập đang online
+      activeLast30s: activeUsers.filter(u => (u.secondsAgo || 999) <= 45).length, // ping gần nhất
+      activeUsers5min: activeUsers.length,
+      activeUsers,                                                     // danh sách (VietChung hiện ở đây)
       recent: recent.rows,
     });
   } catch (e) {
