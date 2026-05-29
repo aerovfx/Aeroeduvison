@@ -10446,6 +10446,53 @@ app.use(async (req, res, next) => {
   return next();
 });
 
+// ── Cấp tài khoản đăng nhập (User role STUDENT) cho HS trong danh sách lớp ────
+// HS giáo viên import chỉ là roster (ClassStudent) → không hiện trong /admin/users
+// và không đăng nhập được. Helper dưới đây tạo User account thật + LINK qua cột
+// ClassStudent.user_id (idempotent — chạy lại không nhân đôi).
+// Credential: email đăng nhập sinh tự động (KHÔNG chứa mã định danh — PII),
+// mật khẩu ban đầu = ngày sinh (số) nếu có, ngược lại sinh ngẫu nhiên; trả về
+// danh sách credential cho admin phân phát.
+let _classStudentUserCol = false;
+async function _ensureClassStudentUserCol(pool) {
+  if (_classStudentUserCol) return;
+  try { await pool.query(`ALTER TABLE "ClassStudent" ADD COLUMN IF NOT EXISTS user_id TEXT`); } catch (e) { console.warn('[provision] add col:', e.message); }
+  _classStudentUserCol = true;
+}
+function _slugVi(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'hs';
+}
+// Cấp tài khoản cho TẤT CẢ HS chưa có user_id trong 1 lớp. Trả {created, linked, credentials[]}.
+async function _provisionClassRoster(pool, classId) {
+  await _ensureClassStudentUserCol(pool);
+  const { randomUUID } = require('crypto');
+  const { rows } = await pool.query(
+    `SELECT id, ho_ten, ngay_sinh FROM "ClassStudent"
+     WHERE class_id = $1 AND (user_id IS NULL OR user_id = '') AND COALESCE(ho_ten,'') <> ''`, [classId]);
+  let created = 0; const credentials = [];
+  for (const cs of rows) {
+    const shortId = randomUUID().slice(0, 4);
+    const email = `hs.${_slugVi(cs.ho_ten)}.${shortId}@inphysic.vn`;
+    const dob = String(cs.ngay_sinh || '').replace(/\D/g, '');
+    const initialPassword = dob.length >= 6 ? dob : `Aero@${shortId}`;
+    try {
+      const hash = await _akBcrypt.hash(initialPassword, 10);
+      const uid = randomUUID(); const now = new Date();
+      await pool.query(
+        `INSERT INTO "User"(id,email,name,password,role,"emailVerified","twoFactorEnabled","failedLoginAttempts","createdAt","updatedAt")
+         VALUES ($1,$2,$3,$4,'STUDENT',NULL,false,0,$5,$6)`,
+        [uid, email, cs.ho_ten, hash, now, now]);
+      await pool.query(`UPDATE "ClassStudent" SET user_id = $1 WHERE id = $2`, [uid, cs.id]);
+      created++;
+      credentials.push({ name: cs.ho_ten, email, initialPassword });
+    } catch (e) {
+      console.warn('[provision] student:', cs.ho_ten, e.message);
+    }
+  }
+  return { created, credentials };
+}
+
 // (_getPool helper đã được khai báo ở đầu file — TRƯỚC _ensureLatexProjectTable)
 
 app.post('/api/user/api-keys', async (req, res) => {
@@ -10754,10 +10801,16 @@ app.post('/api/classes/:id/students/import', async (req, res) => {
         if (errors.length < 3) errors.push(`Dòng ${stt || '?'}: ${e.message.slice(0,100)}`);
       }
     }
+    // Tự cấp tài khoản đăng nhập (User role STUDENT) cho HS mới import → hiện
+    // trong /admin/users + HS đăng nhập được. Best-effort, không chặn import.
+    let accountsCreated = 0;
+    try { const prov = await _provisionClassRoster(pool, classId); accountsCreated = prov.created; }
+    catch (e) { console.warn('[classes:students:import] provision:', e.message); }
+
     return res.json({
       success: true,
-      message: `Import xong: ${inserted} thêm mới + ${updated} cập nhật + ${skipped} bỏ qua`,
-      results: { inserted, updated, skipped, total: studentsIn.length },
+      message: `Import xong: ${inserted} thêm mới + ${updated} cập nhật + ${skipped} bỏ qua` + (accountsCreated ? ` · ${accountsCreated} tài khoản HS mới` : ''),
+      results: { inserted, updated, skipped, total: studentsIn.length, accountsCreated },
       errors,
     });
   } catch (e) { console.error('[classes:students:import]', e.message); return res.status(500).json({ error: 'Lỗi import học sinh' }); }
@@ -13743,6 +13796,33 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
       const users = list.rows.map(r => _mapAdminUser(r, { account_type: r.account_type }));
       return res.json({ users, total: count.rows[0]?.total || 0, page, limit });
     } catch (e) { console.error('[admin:users:list]', e.message); return res.json({ users: [], total: 0, page: 1, limit: 25 }); }
+  });
+
+  // POST /api/admin/users/provision-students — backfill: cấp tài khoản đăng nhập
+  // (User role STUDENT) cho TẤT CẢ HS roster (ClassStudent) chưa có user_id, trên
+  // mọi lớp của mọi giáo viên. Idempotent. Trả tổng + danh sách credential
+  // (email + mật khẩu ban đầu) để admin/giáo viên phân phát. KHÔNG lộ mã định danh.
+  app.post('/api/admin/users/provision-students', async (req, res) => {
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      await _ensureClassStudentUserCol(pool);
+      const { rows: classes } = await pool.query(
+        `SELECT DISTINCT cs.class_id FROM "ClassStudent" cs
+         WHERE (cs.user_id IS NULL OR cs.user_id = '') AND COALESCE(cs.ho_ten,'') <> ''`);
+      let created = 0; const credentials = [];
+      for (const c of classes) {
+        try {
+          const prov = await _provisionClassRoster(pool, c.class_id);
+          created += prov.created;
+          for (const cr of prov.credentials) if (credentials.length < 500) credentials.push(cr);
+        } catch (e) { console.warn('[admin:provision] class', c.class_id, e.message); }
+      }
+      return res.json({ ok: true, classesProcessed: classes.length, accountsCreated: created, credentials });
+    } catch (e) {
+      console.error('[admin:provision-students]', e.message);
+      return res.status(500).json({ error: 'Lỗi cấp tài khoản: ' + e.message });
+    }
   });
 
   // GET /api/admin/users/stats

@@ -120,6 +120,87 @@ function InheritTeacherModal({ onClose, onDone }: { onClose: () => void; onDone:
   )
 }
 
+interface ProvCred { name: string; email: string; initialPassword: string }
+function ProvisionStudentsModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ accountsCreated: number; classesProcessed: number; credentials: ProvCred[] } | null>(null)
+
+  const run = async () => {
+    setBusy(true)
+    try {
+      const { data } = await api.post<{ ok: boolean; accountsCreated: number; classesProcessed: number; credentials: ProvCred[] }>('/admin/users/provision-students', {})
+      setResult(data)
+      if (data.accountsCreated > 0) { toast.success(`Đã tạo ${data.accountsCreated} tài khoản học sinh`); onDone() }
+      else toast('Không có học sinh mới cần tạo tài khoản', { icon: 'ℹ️' })
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      toast.error(err.response?.data?.error || 'Tạo tài khoản thất bại')
+    } finally { setBusy(false) }
+  }
+
+  const exportCsv = () => {
+    if (!result?.credentials?.length) return
+    const head = 'Họ tên,Email đăng nhập,Mật khẩu ban đầu\n'
+    const body = result.credentials.map(c => `"${c.name}","${c.email}","${c.initialPassword}"`).join('\n')
+    const blob = new Blob(['﻿' + head + body], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+    a.download = `tai-khoan-hoc-sinh-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
+          <GraduationCap className="w-5 h-5 text-sky-400" /> Tạo tài khoản đăng nhập cho học sinh từ lớp
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Quét tất cả lớp của mọi giáo viên, tạo tài khoản đăng nhập (vai trò Học sinh) cho học sinh trong danh sách lớp chưa có tài khoản. Idempotent — chạy lại không tạo trùng. Email đăng nhập sinh tự động (không chứa mã định danh), mật khẩu ban đầu = ngày sinh nếu có.
+        </p>
+
+        {result && (
+          <div className="mb-4 rounded-xl border border-border bg-background/60 p-3">
+            <div className="text-sm font-bold text-emerald-400 mb-2">
+              Đã tạo {result.accountsCreated} tài khoản · quét {result.classesProcessed} lớp
+            </div>
+            {result.credentials.length > 0 && (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">Danh sách đăng nhập (phân phát cho học sinh):</span>
+                  <button onClick={exportCsv} className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">⬇ Xuất CSV</button>
+                </div>
+                <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-secondary text-muted-foreground sticky top-0">
+                      <tr><th className="text-left p-2">Họ tên</th><th className="text-left p-2">Email đăng nhập</th><th className="text-left p-2">Mật khẩu</th></tr>
+                    </thead>
+                    <tbody>
+                      {result.credentials.map((c, i) => (
+                        <tr key={i} className="border-t border-border">
+                          <td className="p-2 text-foreground">{c.name}</td>
+                          <td className="p-2 font-mono text-foreground/80">{c.email}</td>
+                          <td className="p-2 font-mono text-foreground/80">{c.initialPassword}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-amber-400 mt-2">⚠ Phân phát an toàn — học sinh nên đổi mật khẩu sau lần đăng nhập đầu.</p>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-secondary">Đóng</button>
+          <button onClick={run} disabled={busy} className="px-4 py-2 rounded-lg bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-sm font-bold disabled:opacity-50">
+            {busy ? 'Đang tạo…' : (result ? 'Quét lại' : 'Bắt đầu tạo tài khoản')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ──────────────────────────────────────────────
    Helpers
 ─────────────────────────────────────────────── */
@@ -189,6 +270,7 @@ export default function AdminUsersPage() {
   const [detailUserId, setDetailUserId] = useState<string | null>(null)
   const [actionMenuFor, setActionMenuFor] = useState<string | null>(null)
   const [inheritOpen, setInheritOpen] = useState(false)
+  const [provisionOpen, setProvisionOpen] = useState(false)
 
   // Debounce search 300ms
   useEffect(() => {
@@ -346,10 +428,16 @@ export default function AdminUsersPage() {
             {(stats?.bannedCount ?? 0) > 0 && ` · ${stats?.bannedCount} bị khoá`}
           </p>
         </div>
-        <button onClick={() => setInheritOpen(true)}
-          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:opacity-90">
-          <Sparkles className="w-4 h-4" /> Chuyển GV + kế thừa tài liệu
-        </button>
+        <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+          <button onClick={() => setProvisionOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-sm font-bold shadow-lg shadow-sky-500/20 hover:opacity-90">
+            <GraduationCap className="w-4 h-4" /> Tạo tài khoản HS từ lớp
+          </button>
+          <button onClick={() => setInheritOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:opacity-90">
+            <Sparkles className="w-4 h-4" /> Chuyển GV + kế thừa tài liệu
+          </button>
+        </div>
       </div>
 
       {/* Stats cards */}
@@ -662,6 +750,16 @@ export default function AdminUsersPage() {
       {inheritOpen && (
         <InheritTeacherModal
           onClose={() => setInheritOpen(false)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ['admin-users-list'] })
+            qc.invalidateQueries({ queryKey: ['admin-users-stats'] })
+          }}
+        />
+      )}
+
+      {provisionOpen && (
+        <ProvisionStudentsModal
+          onClose={() => setProvisionOpen(false)}
           onDone={() => {
             qc.invalidateQueries({ queryKey: ['admin-users-list'] })
             qc.invalidateQueries({ queryKey: ['admin-users-stats'] })
