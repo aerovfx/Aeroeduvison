@@ -230,6 +230,12 @@ if (USE_NODEJS_AUTH) {
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
       }
 
+      // BẢO MẬT: chặn tài khoản đã bị khoá/xoá (banned=true) đăng nhập
+      if (user.banned) {
+        console.warn(`[auth:login] 🚫 BANNED login blocked: ${user.email}`);
+        return res.status(403).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' });
+      }
+
       // Update lastLoginAt
       pool.query(
         'UPDATE "User" SET "lastLoginAt" = $1 WHERE id = $2',
@@ -320,6 +326,12 @@ if (USE_NODEJS_AUTH) {
         }
       }
 
+      // BẢO MẬT: chặn tài khoản đã bị khoá/xoá đăng nhập qua Google
+      if (user.banned) {
+        console.warn(`[auth:google] 🚫 BANNED login blocked: ${user.email}`);
+        return res.status(403).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' });
+      }
+
       const token = issueToken(user);
       console.log(`[auth:google] ✅ ${user.email}`);
       return res.json({
@@ -348,6 +360,10 @@ if (USE_NODEJS_AUTH) {
         [decoded.sub]
       );
       if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+      // BẢO MẬT: tài khoản bị khoá → cắt phiên đang đăng nhập (token cũ vô hiệu)
+      if (rows[0].banned) {
+        return res.status(403).json({ error: 'Tài khoản đã bị khoá', banned: true });
+      }
       return res.json(publicUser(rows[0]));
     } catch {
       return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn' });
@@ -388,6 +404,8 @@ if (USE_NODEJS_AUTH) {
       const pool = getPool();
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [decoded.sub]);
       if (!rows[0]) return res.status(401).json({ error: 'User not found' });
+      // BẢO MẬT: không cấp token mới cho tài khoản đã bị khoá
+      if (rows[0].banned) return res.status(403).json({ error: 'Tài khoản đã bị khoá', banned: true });
 
       const newToken = issueToken(rows[0]);
       return res.json({ accessToken: newToken, refreshToken: '' });
