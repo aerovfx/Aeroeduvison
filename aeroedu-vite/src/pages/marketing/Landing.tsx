@@ -175,7 +175,7 @@ export default function Landing() {
         @keyframes border-run { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
         @keyframes flicker    { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:0.6} 94%{opacity:1} 97%{opacity:0.8} }
 
-        .land-nav-link { color:${C.muted}; text-decoration:none; font-size:14px; font-weight:500; transition:color .2s; }
+        .land-nav-link { color:${C.muted}; text-decoration:none; font-size:14px; font-weight:500; transition:color .2s; white-space:nowrap; }
         .land-nav-link:hover { color:${C.cyan}; }
         .land-feature-card { cursor:pointer; transition:border-color .25s, transform .25s, box-shadow .25s; }
         .land-feature-card:hover { transform:translateY(-4px) !important; }
@@ -203,19 +203,16 @@ export default function Landing() {
         transition: 'all 0.3s',
       }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Logo — chỉ icon (bỏ chữ "AeroEduVision" để menu đủ chỗ, không xuống dòng) */}
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} aria-label="AeroEduVision">
             <img src="/logo.png" alt="AeroEduVision" style={{
-              width: 36, height: 36, borderRadius: 10, objectFit: 'contain',
+              width: 38, height: 38, borderRadius: 10, objectFit: 'contain',
               boxShadow: `0 0 16px ${C.cyanA(0.5)}`,
             }} />
-            <span style={{ fontWeight: 800, fontSize: 17, background: `linear-gradient(135deg, ${C.cyan}, ${C.blue})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              AeroEduVision
-            </span>
-          </div>
+          </Link>
 
           {/* Desktop nav */}
-          <div style={{ display: 'flex', gap: 32, alignItems: 'center' }} className="hidden-mobile">
+          <div style={{ display: 'flex', gap: 22, alignItems: 'center' }} className="hidden-mobile">
             <a href="#features" className="land-nav-link">Tính năng</a>
             <a href="#platform" className="land-nav-link">Nền tảng</a>
             <a href="#ai"       className="land-nav-link">AI & Labs</a>
@@ -231,8 +228,8 @@ export default function Landing() {
           </div>
 
           {/* Desktop CTA */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="hidden-mobile">
-            <Link to="/auth/login" style={{ padding: '8px 18px', color: C.muted, textDecoration: 'none', fontSize: 14, fontWeight: 500, borderRadius: 8, transition: 'color .2s' }}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }} className="hidden-mobile">
+            <Link to="/auth/login" style={{ padding: '8px 18px', color: C.muted, textDecoration: 'none', fontSize: 14, fontWeight: 500, borderRadius: 8, transition: 'color .2s', whiteSpace: 'nowrap' }}
               onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
               onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
               Đăng nhập
@@ -240,7 +237,7 @@ export default function Landing() {
             <Link to="/auth/register" className="land-btn-primary" style={{
               padding: '9px 22px', background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
               color: '#fff', textDecoration: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14,
-              boxShadow: `0 4px 20px ${C.blueA(0.4)}`,
+              boxShadow: `0 4px 20px ${C.blueA(0.4)}`, whiteSpace: 'nowrap',
             }}>
               Bắt đầu miễn phí
             </Link>
@@ -555,7 +552,7 @@ export default function Landing() {
             const active = activeFeature === i
             return (
               <Link key={i} to={f.path} className="land-feature-card" style={{
-                display: 'block', textDecoration: 'none',
+                display: 'flex', flexDirection: 'column', height: '100%', textDecoration: 'none',
                 padding: 24, borderRadius: 16,
                 background: active ? `linear-gradient(135deg, ${C.card}, rgba(8,15,40,0.95))` : C.card,
                 border: `1px solid ${active ? f.color + '55' : C.border}`,
@@ -573,8 +570,8 @@ export default function Landing() {
                 </div>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>{f.label}</h3>
                 <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>{f.desc}</p>
-                {/* Arrow */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 16, fontSize: 12, color: f.color, fontWeight: 600 }}>
+                {/* Arrow — ghim xuống đáy để "Khám phá" thẳng hàng giữa các card */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 'auto', paddingTop: 16, fontSize: 12, color: f.color, fontWeight: 600 }}>
                   Khám phá <ChevronRight size={14} />
                 </div>
               </Link>
