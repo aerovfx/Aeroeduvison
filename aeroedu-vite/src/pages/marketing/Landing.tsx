@@ -1490,7 +1490,7 @@ export default function Landing() {
             {/* Features */}
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Tính năng</p>
-              {['Camera AI', 'AI Gia Sư', 'Lab 3D', 'Thi trực tuyến', 'IoT Monitoring', 'Phân tích cảm xúc'].map(f => (
+              {['Camera AI', 'AI Gia Sư', 'Lab 3D', 'Thi trực tuyến', 'IoT Monitoring', 'Phân tích cảm xúc', 'Số hoá tài liệu'].map(f => (
                 <p key={f} style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>{f}</p>
               ))}
             </div>
@@ -1530,6 +1530,16 @@ export default function Landing() {
                 onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
                 Trần Thị Hương — Co-Founder
               </a>
+              <a href="#awards" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Giải thưởng & Ghi nhận
+              </a>
+              <Link to="/contact-sales" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Hợp tác với trường
+              </Link>
               <p style={{ fontSize: 12, color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
                 Sáng lập bởi 2 giáo viên THPT đang trực tiếp đứng lớp tại TP. Hồ Chí Minh.
               </p>
@@ -1545,6 +1555,7 @@ export default function Landing() {
                 { label: 'Tài liệu hướng dẫn', path: '/docs' },
                 { label: 'Tin tức',            path: '/news' },
                 { label: 'Khoá AI miễn phí',   path: '/free-courses/llm-mastery' },
+                { label: 'Câu hỏi thường gặp', path: '/docs' },
               ].map(l => (
                 <p key={l.label} style={{ marginBottom: 8 }}>
                   <Link to={l.path} style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
