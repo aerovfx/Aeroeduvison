@@ -55,13 +55,13 @@ export default function ContactSalesPage() {
               Phản hồi trong 1 ngày làm việc. Đính kèm screenshot nếu báo lỗi.
             </p>
             <a
-              href="mailto:hello@inphysic.com"
+              href="mailto:thegioithu2@gmail.com"
               className="text-sm text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1.5 break-all"
             >
-              hello@inphysic.com
+              thegioithu2@gmail.com
             </a>
             <button
-              onClick={() => copy('hello@inphysic.com', 'email')}
+              onClick={() => copy('thegioithu2@gmail.com', 'email')}
               className="mt-2 text-[11px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1 self-start"
             >
               {copied === 'email' ? <><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Đã copy</> : 'Copy'}
@@ -80,10 +80,10 @@ export default function ContactSalesPage() {
               Thứ 2 - Thứ 7, 8:00 - 18:00. Hỗ trợ kỹ thuật + tư vấn gói.
             </p>
             <a
-              href="tel:+84909000000"
+              href="tel:+84909933936"
               className="text-sm text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1.5"
             >
-              +84 909 000 000
+              0909 933 936
             </a>
             <span className="mt-2 text-[11px] text-zinc-500 inline-flex items-center gap-1">
               <Clock className="w-3 h-3" /> 8h - 18h, T2-T7
@@ -130,14 +130,14 @@ export default function ContactSalesPage() {
               icon: Building2,
               title: 'Trường học / Sở GD',
               desc: 'Triển khai cho cả trường, ưu đãi theo quy mô, tích hợp SSO.',
-              cta: 'Yêu cầu báo giá', href: 'mailto:hello@inphysic.com?subject=Yêu%20cầu%20báo%20giá%20cho%20trường',
+              cta: 'Yêu cầu báo giá', href: 'mailto:thegioithu2@gmail.com?subject=Yêu%20cầu%20báo%20giá%20cho%20trường',
               hex: { fg: '#6ee7b7', fgHover: '#34d399', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
             },
             {
               icon: Users,
               title: 'Đối tác / Nhà phân phối',
               desc: 'Hợp tác phát hành nội dung, reseller, integration.',
-              cta: 'Liên hệ partnership', href: 'mailto:partner@inphysic.com',
+              cta: 'Liên hệ partnership', href: 'mailto:thegioithu2@gmail.com',
               hex: { fg: '#d8b4fe', fgHover: '#a855f7', bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.35)' },
             },
           ].map(({ icon: Icon, title, desc, cta, href, hex }) => (
