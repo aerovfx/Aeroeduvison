@@ -1,21 +1,40 @@
 // Shared constants for Question Bank, Exam Matrix, and related features
 // Single source of truth — import from here in all components
 
+// Tên môn chuẩn CT GDPT 2018 (đồng bộ với SUBJECT_CATEGORIES trong QuestionBank
+// + lib/subject-normalize.cjs): "Vật lí"/"Hoá học"/"Địa lí"/"Mĩ thuật".
+// Bao gồm đủ môn & hoạt động giáo dục THPT.
 export const SUBJECTS = [
   "Toán",
   "Ngữ văn",
+  // Ngoại ngữ 1
   "Tiếng Anh",
-  "Vật lý",
-  "Hóa học",
+  "Tiếng Nga",
+  "Tiếng Pháp",
+  "Tiếng Trung",
+  "Tiếng Nhật",
+  "Tiếng Hàn",
+  "Tiếng Đức",
+  // Khoa học tự nhiên
+  "Vật lí",
+  "Hoá học",
   "Sinh học",
+  // Khoa học xã hội
   "Lịch sử",
-  "Địa lý",
-  "GDCD",
+  "Địa lí",
+  "Giáo dục kinh tế và pháp luật",
+  // Công nghệ - Tin học - Nghệ thuật
   "Công nghệ",
   "Tin học",
-  "Thể dục",
+  "Nghệ thuật",
   "Âm nhạc",
-  "Mỹ thuật",
+  "Mĩ thuật",
+  // Thể chất - QP-AN
+  "Giáo dục thể chất",
+  "Giáo dục Quốc phòng và An ninh",
+  // Hoạt động giáo dục
+  "Nội dung giáo dục của địa phương",
+  "Hoạt động trải nghiệm, hướng nghiệp",
 ] as const;
 
 export type Subject = (typeof SUBJECTS)[number];

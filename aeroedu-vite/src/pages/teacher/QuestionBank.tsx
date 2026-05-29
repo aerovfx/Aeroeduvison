@@ -74,8 +74,24 @@ const SUBJECT_CATEGORIES: SubjectCategory[] = [
   { id: "cong-nghe", name: "Công nghệ", dbValue: "Công nghệ", description: "Công nghệ, Kỹ thuật" },
   { id: "am-nhac", name: "Âm nhạc", dbValue: "Âm nhạc", description: "Âm nhạc, Hát" },
   { id: "mi-thuat", name: "Mĩ thuật", dbValue: "Mĩ thuật", description: "Vẽ, Tạo hình" },
-  { id: "the-duc", name: "Thể dục", dbValue: "Thể dục", description: "Thể thao, Sức khỏe" },
+  { id: "the-duc", name: "Thể dục", dbValue: "Thể dục", description: "Thể thao, Sức khỏe (Tiểu học/THCS)" },
   { id: "quoc-phong", name: "QPAN", dbValue: "Quốc phòng", description: "Quốc phòng, An ninh" },
+
+  // ── Ngoại ngữ 1 — CT GDPT 2018 (ngoài Tiếng Anh đã có ở trên) ──
+  { id: "tieng-nga", name: "Tiếng Nga", dbValue: "Tiếng Nga", description: "Ngoại ngữ 1" },
+  { id: "tieng-phap", name: "Tiếng Pháp", dbValue: "Tiếng Pháp", description: "Ngoại ngữ 1" },
+  { id: "tieng-trung", name: "Tiếng Trung", dbValue: "Tiếng Trung", description: "Ngoại ngữ 1" },
+  { id: "tieng-nhat", name: "Tiếng Nhật", dbValue: "Tiếng Nhật", description: "Ngoại ngữ 1" },
+  { id: "tieng-han", name: "Tiếng Hàn", dbValue: "Tiếng Hàn", description: "Ngoại ngữ 1" },
+  { id: "tieng-duc", name: "Tiếng Đức", dbValue: "Tiếng Đức", description: "Ngoại ngữ 1" },
+
+  // ── Môn/hoạt động THPT theo CT GDPT 2018 ──
+  { id: "gd-kt-pl", name: "GD Kinh tế & Pháp luật", dbValue: "Giáo dục kinh tế và pháp luật", description: "Kinh tế, Pháp luật (THPT)" },
+  { id: "gd-the-chat", name: "GD Thể chất", dbValue: "Giáo dục thể chất", description: "Thể chất (THPT)" },
+  { id: "gd-qpan", name: "GD Quốc phòng & An ninh", dbValue: "Giáo dục Quốc phòng và An ninh", description: "Quốc phòng, An ninh (THPT)" },
+  { id: "nghe-thuat", name: "Nghệ thuật", dbValue: "Nghệ thuật", description: "Âm nhạc, Mĩ thuật (THPT)" },
+  { id: "gd-dia-phuong", name: "GD địa phương", dbValue: "Nội dung giáo dục của địa phương", description: "Nội dung giáo dục địa phương" },
+  { id: "hdtn-hn", name: "HĐ Trải nghiệm, HN", dbValue: "Hoạt động trải nghiệm, hướng nghiệp", description: "Trải nghiệm, hướng nghiệp" },
 ]
 
 const getSubjectDbValue = (subjectId: string): string => {
