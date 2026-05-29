@@ -14239,20 +14239,48 @@ app.get('/api/admin/analytics/routes', async (req, res) => {
 app.get('/api/admin/analytics/realtime', async (_req, res) => {
   try {
     const pool = _getPool();
-    const [active, recent] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active
+    const [active5m, active30s, recent, online] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS c
                   FROM "PageView"
                   WHERE created_at >= NOW() - INTERVAL '5 minute' AND session_id IS NOT NULL`),
+      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS c
+                  FROM "PageView"
+                  WHERE created_at >= NOW() - INTERVAL '30 second' AND session_id IS NOT NULL`),
       pool.query(`
-        SELECT pv.path, u.role AS "userRole", pv.created_at AS "createdAt"
+        SELECT pv.path, u.role AS "userRole", u.name AS "userName", u.image AS "userImage",
+               pv.created_at AS "createdAt"
         FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
         WHERE pv.session_id IS NOT NULL
         ORDER BY pv.created_at DESC LIMIT 20`),
+      // Người dùng ĐANG online (đăng nhập + hoạt động trong 5 phút) — hiện tên,
+      // vai trò, trang đang xem. Đây là phần "ai đang online" kiểu YouTube/FB.
+      // Khớp ĐÚNG shape ActiveUser của FE (Analytics.tsx) để panel hiển thị.
+      pool.query(`
+        SELECT DISTINCT ON (pv.user_id)
+               pv.user_id          AS "userId",
+               u.name              AS "userName",
+               u.image             AS "userImage",
+               u.role              AS "userRole",
+               u.email             AS "userEmail",
+               pv.path             AS "currentPath",
+               pv.created_at       AS "lastSeen",
+               EXTRACT(EPOCH FROM (NOW() - pv.created_at))::int AS "secondsAgo"
+        FROM "PageView" pv JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.created_at >= NOW() - INTERVAL '5 minute' AND pv.user_id IS NOT NULL
+        ORDER BY pv.user_id, pv.created_at DESC`),
     ]);
-    return res.json({ activeNow: active.rows[0]?.active || 0, recent: recent.rows });
+    // Sắp xếp user online theo mới nhất (DISTINCT ON buộc ORDER BY user_id trước)
+    const activeUsers = online.rows.sort((a, b) => (a.secondsAgo || 0) - (b.secondsAgo || 0));
+    return res.json({
+      activeNow: active5m.rows[0]?.c || 0,
+      activeLast30s: active30s.rows[0]?.c || 0,
+      activeUsers5min: activeUsers.length,   // số user đăng nhập đang online
+      activeUsers,                           // danh sách (VietChung hiện ở đây)
+      recent: recent.rows,
+    });
   } catch (e) {
     console.error('[admin:realtime]', e.message);
-    return res.json({ activeNow: 0, recent: [] });
+    return res.json({ activeNow: 0, activeLast30s: 0, activeUsers5min: 0, activeUsers: [], recent: [] });
   }
 });
 
