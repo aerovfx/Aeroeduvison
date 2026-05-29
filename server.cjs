@@ -4391,6 +4391,69 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
     }
   });
 
+  // ── Category CRUD (admin) — TRƯỚC catch-all proxy để /admin/categories tạo/
+  //    sửa/xoá được (trước đây không có handler → rớt xuống aero-backend tắt →
+  //    503 "không có dịch vụ"). Gate ADMIN qua _isAdminRequest (DB-role fallback).
+  app.post('/api/categories', async (req, res) => {
+    const verdict = await _isAdminRequest(req);
+    if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+    if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Tên danh mục không được để trống' });
+    try {
+      const pool = getIPool();
+      const id = require('crypto').randomUUID();
+      const { rows } = await pool.query(
+        `INSERT INTO "Category" (id, name) VALUES ($1, $2)
+         ON CONFLICT (name) DO NOTHING
+         RETURNING id, name`, [id, name]);
+      if (!rows[0]) return res.status(409).json({ error: 'Danh mục đã tồn tại' });
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[categories:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/categories/:id', async (req, res) => {
+    const verdict = await _isAdminRequest(req);
+    if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+    if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Tên danh mục không được để trống' });
+    try {
+      const pool = getIPool();
+      const { rows } = await pool.query(
+        `UPDATE "Category" SET name = $1 WHERE id = $2 RETURNING id, name`, [name, req.params.id]);
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy danh mục' });
+      return res.json(rows[0]);
+    } catch (err) {
+      if (/unique/i.test(err.message)) return res.status(409).json({ error: 'Tên danh mục đã tồn tại' });
+      console.error('[categories:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/categories/:id', async (req, res) => {
+    const verdict = await _isAdminRequest(req);
+    if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+    if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+    try {
+      const pool = getIPool();
+      // Chặn xoá nếu còn khoá học thuộc danh mục (tránh vỡ khoá ngoại)
+      const used = await pool.query(`SELECT COUNT(*)::int AS n FROM "Course" WHERE "categoryId" = $1`, [req.params.id]).catch(() => ({ rows: [{ n: 0 }] }));
+      if ((used.rows[0]?.n || 0) > 0) {
+        return res.status(409).json({ error: `Không thể xoá: còn ${used.rows[0].n} khoá học thuộc danh mục này` });
+      }
+      const r = await pool.query(`DELETE FROM "Category" WHERE id = $1`, [req.params.id]);
+      if (!r.rowCount) return res.status(404).json({ error: 'Không tìm thấy danh mục' });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[categories:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════
   // CURRICULUM CRUD — Chapter / Lesson / LessonBlock
   //   Endpoints needed bởi /teacher/course/:id/edit?step=2 (CurriculumStep)
