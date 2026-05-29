@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `b20fa2b` (revision pixiai-00629-jor, 2026-05-29 — Cập nhật liên hệ thật /contact-sales: email hello@/partner@inphysic.com → thegioithu2@gmail.com, hotline → 0909 933 936 (tel:+84909933936))
 - Last deployed commit: `961e230` (revision pixiai-00628-buz, 2026-05-29 — Footer trang chủ cân bằng số mục để các cột ngang hàng: Tính năng 7 (+Số hoá tài liệu), Nền tảng 7, Đội ngũ +Giải thưởng/Hợp tác với trường, Pháp lý & Hỗ trợ 7 (+Câu hỏi thường gặp))
 - Last deployed commit: `b3356df` (revision pixiai-00627-reg, 2026-05-29 — Fix lệch khung trang chủ: card cảm nhận + card nền tảng flex-column + margin-top:auto (khối tác giả/CTA ghim đáy thẳng hàng) + footer alignItems:start & cân bằng cột (Nền tảng +Tiếng Anh/Toán, "Pháp lý"→"Pháp lý & Hỗ trợ" +Tài liệu/Tin tức/Khoá AI))
 - Last deployed commit: `284fa64` (revision pixiai-00626-xax, 2026-05-29 — Fix UI trang chủ: bỏ chữ "AeroEduVision" cạnh logo navbar + white-space:nowrap + giảm gap → menu hết xuống dòng; card tính năng flex-column + margin-top:auto cho "Khám phá" → thẳng hàng đáy mọi card. Verify DOM: nav-link đều 21px/0 wrap, 9 card "Khám phá" cách đáy đúng 25px)
@@ -60,7 +61,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00628-buz — cân bằng số mục footer cho ngang hàng)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00629-jor — cập nhật hotline/email thật /contact-sales)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
