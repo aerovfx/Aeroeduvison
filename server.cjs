@@ -13938,6 +13938,112 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     } catch (e) { console.error('[admin:users:stats]', e.message); return res.json({ total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 }); }
   });
 
+  // GET /api/admin/users/behavior — PHÂN TÍCH HÀNH VI NGƯỜI DÙNG
+  // Lấy cảm hứng từ thuật toán X home-mixer (algorithm/home-mixer): mỗi tín hiệu
+  // hành vi × trọng số → điểm tổng có chuẩn hoá (giống weighted_score = Σ
+  // action_prob × weight + recency). Áp lên dữ liệu THẬT: PageView (lượt
+  // xem/phiên/ngày hoạt động), PracticeExam (bài thi/hoàn thành/điểm), UserPresence
+  // (đang online), PaymentOrder (đã mua). Phân nhóm: power/steady/new/at_risk/dormant.
+  // ĐĂNG TRƯỚC route /:id để không bị nuốt là id="behavior".
+  app.get('/api/admin/users/behavior', async (req, res) => {
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
+    // Trọng số kiểu Phoenix/home-mixer (hành động giá trị cao > xem thụ động)
+    const W = { activeDays: 6, views: 0.35, sessions: 2, examCompleted: 8, avgScorePct: 0.3, recency: 20, paying: 10 };
+    try {
+      const pool = _getPool();
+      await _ensurePresence(pool);
+      const { rows } = await pool.query(`
+        WITH pv AS (
+          SELECT user_id,
+                 COUNT(*)::int AS views,
+                 COUNT(DISTINCT DATE(created_at))::int AS active_days,
+                 COUNT(DISTINCT session_id)::int AS sessions,
+                 MAX(created_at) AS last_view
+          FROM "PageView"
+          WHERE user_id IS NOT NULL AND created_at >= NOW() - INTERVAL '30 day'
+          GROUP BY user_id
+        ), ex AS (
+          SELECT "studentId" AS uid,
+                 COUNT(*)::int AS exams,
+                 COUNT(*) FILTER (WHERE completed)::int AS completed,
+                 COALESCE(AVG(percentage),0)::int AS avg_pct
+          FROM "PracticeExam"
+          WHERE "createdAt" >= NOW() - INTERVAL '30 day'
+          GROUP BY "studentId"
+        ), pay AS (
+          SELECT "userId" AS uid, COUNT(*)::int AS paid
+          FROM "PaymentOrder" WHERE status='PAID' GROUP BY "userId"
+        )
+        SELECT u.id, u.name, u.email, u.role, u."createdAt", u."lastLoginAt",
+               COALESCE(u.banned,false) AS banned,
+               COALESCE(pv.views,0) AS views, COALESCE(pv.active_days,0) AS active_days,
+               COALESCE(pv.sessions,0) AS sessions, pv.last_view,
+               COALESCE(ex.exams,0) AS exams, COALESCE(ex.completed,0) AS exams_completed,
+               COALESCE(ex.avg_pct,0) AS avg_pct,
+               COALESCE(pay.paid,0) AS paid_orders,
+               up.last_seen,
+               GREATEST(COALESCE(pv.last_view, u."lastLoginAt", u."createdAt"), up.last_seen) AS last_active
+        FROM "User" u
+        LEFT JOIN pv  ON pv.user_id = u.id
+        LEFT JOIN ex  ON ex.uid = u.id
+        LEFT JOIN pay ON pay.uid = u.id
+        LEFT JOIN "UserPresence" up ON up.user_id = u.id
+        WHERE COALESCE(u.banned,false) = false
+      `);
+
+      const now = Date.now();
+      const DAY = 86400000;
+      const users = rows.map(r => {
+        const lastActive = r.last_active ? new Date(r.last_active).getTime() : null;
+        const recencyDays = lastActive ? Math.floor((now - lastActive) / DAY) : null;
+        const ageDays = r.createdAt ? Math.floor((now - new Date(r.createdAt).getTime()) / DAY) : 999;
+        // ── Điểm hành vi (weighted, home-mixer-style) ──
+        let raw = 0;
+        raw += Math.min(r.active_days, 30) * W.activeDays;
+        raw += Math.min(r.views, 200) * W.views;
+        raw += Math.min(r.sessions, 40) * W.sessions;
+        raw += r.exams_completed * W.examCompleted;
+        raw += (r.avg_pct / 100) * 100 * W.avgScorePct;
+        if (recencyDays != null && recencyDays <= 2) raw += W.recency;
+        if (r.paid_orders > 0) raw += W.paying;
+        const score = Math.max(0, Math.min(100, Math.round(raw)));
+        // ── Phân nhóm hành vi ──
+        let segment;
+        if (ageDays <= 7) segment = 'new';
+        else if (recencyDays == null || recencyDays > 30) segment = 'dormant';
+        else if (recencyDays > 14) segment = 'at_risk';
+        else if (score >= 60) segment = 'power';
+        else segment = 'steady';
+        return {
+          id: r.id, name: r.name, email: r.email, role: r.role,
+          score, segment, recencyDays,
+          signals: {
+            views: r.views, activeDays: r.active_days, sessions: r.sessions,
+            exams: r.exams, examsCompleted: r.exams_completed, avgScore: r.avg_pct,
+            paying: r.paid_orders > 0, online: r.last_seen ? (now - new Date(r.last_seen).getTime() <= 90000) : false,
+          },
+        };
+      }).sort((a, b) => b.score - a.score);
+
+      const SEG = ['power', 'steady', 'new', 'at_risk', 'dormant'];
+      const SEG_LABEL = { power: 'Tích cực cao', steady: 'Đều đặn', new: 'Mới', at_risk: 'Nguy cơ rời bỏ', dormant: 'Ngủ đông' };
+      const segments = SEG.map(k => ({ key: k, label: SEG_LABEL[k], count: users.filter(u => u.segment === k).length }));
+      const onlineNow = users.filter(u => u.signals.online).length;
+      const avgScore = users.length ? Math.round(users.reduce((s, u) => s + u.score, 0) / users.length) : 0;
+
+      return res.json({
+        weights: W,
+        summary: { total: users.length, onlineNow, avgScore, windowDays: 30 },
+        segments,
+        users: users.slice(0, 500),
+        algorithm: 'home-mixer weighted-score (action × weight + recency)',
+      });
+    } catch (e) {
+      console.error('[admin:users:behavior]', e.message);
+      return res.status(500).json({ error: 'Lỗi phân tích hành vi: ' + e.message });
+    }
+  });
+
   // GET /api/admin/users/:id — detail
   app.get('/api/admin/users/:id', async (req, res) => {
     const decoded = await _adminAuth(req, res); if (!decoded) return;

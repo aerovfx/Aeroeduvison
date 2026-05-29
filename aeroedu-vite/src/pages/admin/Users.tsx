@@ -15,7 +15,7 @@ import {
   Users as UsersIcon, GraduationCap, Heart, Shield, Briefcase,
   Search, MoreVertical, Eye, KeyRound, Lock, Unlock, Trash2,
   Check, X, AlertCircle, Calendar, ChevronLeft, ChevronRight,
-  Activity, ShieldCheck, UserCog, Sparkles, Wrench, ChevronDown,
+  Activity, ShieldCheck, UserCog, Sparkles, Wrench, ChevronDown, Loader2,
 } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
@@ -202,6 +202,138 @@ function ProvisionStudentsModal({ onClose, onDone }: { onClose: () => void; onDo
 }
 
 /* ──────────────────────────────────────────────
+   Phân tích hành vi người dùng (home-mixer weighted score)
+─────────────────────────────────────────────── */
+interface BehaviorUser {
+  id: string; name: string | null; email: string; role: string
+  score: number; segment: string; recencyDays: number | null
+  signals: { views: number; activeDays: number; sessions: number; exams: number; examsCompleted: number; avgScore: number; paying: boolean; online: boolean }
+}
+interface BehaviorResp {
+  weights: Record<string, number>
+  summary: { total: number; onlineNow: number; avgScore: number; windowDays: number }
+  segments: { key: string; label: string; count: number }[]
+  users: BehaviorUser[]
+  algorithm: string
+}
+const SEG_COLOR: Record<string, string> = {
+  power: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  steady: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  new: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+  at_risk: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  dormant: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+}
+function BehaviorModal({ onClose }: { onClose: () => void }) {
+  const [data, setData] = useState<BehaviorResp | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [segFilter, setSegFilter] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.get<BehaviorResp>('/admin/users/behavior')
+      .then(r => setData(r.data))
+      .catch((e: unknown) => { const err = e as { response?: { data?: { error?: string } } }; toast.error(err.response?.data?.error || 'Không tải được phân tích') })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const shown = (data?.users || []).filter(u => !segFilter || u.segment === segFilter)
+  const segLabel = (k: string) => data?.segments.find(s => s.key === k)?.label || k
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-4xl p-5 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-1">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Activity className="w-5 h-5 text-fuchsia-400" /> Phân tích hành vi người dùng
+          </h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Điểm hành vi tính theo thuật toán kiểu <b>X home-mixer</b>: mỗi tín hiệu (ngày hoạt động · phiên · lượt xem · hoàn thành bài thi · điểm TB · độ mới · đã mua) × trọng số → điểm 0-100. Cửa sổ {data?.summary.windowDays ?? 30} ngày.
+        </p>
+
+        {loading ? (
+          <div className="py-16 text-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin inline" /> Đang phân tích…</div>
+        ) : !data ? null : (
+          <>
+            {/* Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                { label: 'Tổng người dùng', value: data.summary.total },
+                { label: 'Đang online', value: data.summary.onlineNow, hl: 'text-emerald-400' },
+                { label: 'Điểm hành vi TB', value: data.summary.avgScore },
+                { label: 'Cửa sổ', value: `${data.summary.windowDays} ngày` },
+              ].map(c => (
+                <div key={c.label} className="rounded-xl border border-border bg-background/60 p-3">
+                  <div className={`text-xl font-black ${c.hl || 'text-foreground'}`}>{c.value}</div>
+                  <div className="text-[11px] text-muted-foreground">{c.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Segments */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button onClick={() => setSegFilter(null)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${!segFilter ? 'bg-secondary text-foreground border-border' : 'text-muted-foreground border-border'}`}>
+                Tất cả ({data.users.length})
+              </button>
+              {data.segments.map(s => (
+                <button key={s.key} onClick={() => setSegFilter(segFilter === s.key ? null : s.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${segFilter === s.key ? SEG_COLOR[s.key] : 'text-muted-foreground border-border hover:bg-secondary'}`}>
+                  {s.label} ({s.count})
+                </button>
+              ))}
+            </div>
+
+            {/* User table */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="max-h-[46vh] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-secondary text-muted-foreground sticky top-0">
+                    <tr>
+                      <th className="text-left p-2">Người dùng</th>
+                      <th className="text-center p-2">Điểm</th>
+                      <th className="text-left p-2">Nhóm</th>
+                      <th className="text-center p-2">Ngày HĐ</th>
+                      <th className="text-center p-2">Phiên</th>
+                      <th className="text-center p-2">Bài thi ✓</th>
+                      <th className="text-center p-2">Điểm TB</th>
+                      <th className="text-center p-2">Lần cuối</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map(u => (
+                      <tr key={u.id} className="border-t border-border hover:bg-secondary/40">
+                        <td className="p-2">
+                          <div className="flex items-center gap-1.5">
+                            {u.signals.online && <span className="w-2 h-2 rounded-full bg-emerald-400" title="Đang online" />}
+                            <span className="text-foreground font-medium">{u.name || u.email?.split('@')[0] || '—'}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{u.role}</div>
+                        </td>
+                        <td className="p-2 text-center">
+                          <span className="inline-block min-w-[2.2rem] px-1.5 py-0.5 rounded font-bold text-foreground" style={{ background: `hsl(${Math.round(u.score * 1.2)},70%,30%)` }}>{u.score}</span>
+                        </td>
+                        <td className="p-2"><span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${SEG_COLOR[u.segment]}`}>{segLabel(u.segment)}</span></td>
+                        <td className="p-2 text-center text-foreground/80">{u.signals.activeDays}</td>
+                        <td className="p-2 text-center text-foreground/80">{u.signals.sessions}</td>
+                        <td className="p-2 text-center text-foreground/80">{u.signals.examsCompleted}/{u.signals.exams}</td>
+                        <td className="p-2 text-center text-foreground/80">{u.signals.avgScore || '—'}{u.signals.avgScore ? '%' : ''}</td>
+                        <td className="p-2 text-center text-foreground/60">{u.recencyDays == null ? '—' : u.recencyDays === 0 ? 'hôm nay' : `${u.recencyDays}d`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">Thuật toán: {data.algorithm}. Mã định danh HS không hiển thị (PII).</p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────
    Helpers
 ─────────────────────────────────────────────── */
 
@@ -272,6 +404,7 @@ export default function AdminUsersPage() {
   const [inheritOpen, setInheritOpen] = useState(false)
   const [provisionOpen, setProvisionOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [behaviorOpen, setBehaviorOpen] = useState(false)
 
   // Debounce search 300ms
   useEffect(() => {
@@ -442,6 +575,10 @@ export default function AdminUsersPage() {
           </button>
           {toolsOpen && (
             <>
+              <button onClick={() => setBehaviorOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white text-sm font-bold shadow-lg shadow-fuchsia-500/20 hover:opacity-90">
+                <Activity className="w-4 h-4" /> Phân tích hành vi
+              </button>
               <button onClick={() => setProvisionOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-sm font-bold shadow-lg shadow-sky-500/20 hover:opacity-90">
                 <GraduationCap className="w-4 h-4" /> Tạo tài khoản HS từ lớp
@@ -781,6 +918,8 @@ export default function AdminUsersPage() {
           }}
         />
       )}
+
+      {behaviorOpen && <BehaviorModal onClose={() => setBehaviorOpen(false)} />}
     </div>
   )
 }
