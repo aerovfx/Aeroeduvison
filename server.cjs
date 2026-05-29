@@ -10734,17 +10734,47 @@ app.get('/api/classes/:id/students', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
-    // Verify lớp thuộc teacher (match qua mọi JWT id field)
-    const { rowCount } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
-      [req.params.id, _classIds(decoded)]);
-    if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    await _ensureClassStudentUserCol(pool);
+    // Verify lớp thuộc teacher (match qua mọi JWT id field). ADMIN xem được mọi lớp.
+    let owns = true;
+    if (decoded.role !== 'ADMIN') {
+      const chk = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _classIds(decoded)]);
+      owns = chk.rowCount > 0;
+    }
+    if (!owns) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    // Trả ĐÚNG shape StudentRecord mà FE ClassDetail mong đợi: nested student{}.
+    // (Trước đây trả phẳng hoTen/maDinhDanh → FE đọc s.student.name → crash →
+    //  "không xem được danh sách học sinh".) Join User qua user_id để lấy email.
     const { rows } = await pool.query(
-      `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
-              ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh", created_at AS "createdAt"
-       FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+      `SELECT cs.id, cs.stt, cs.ho_ten, cs.ma_dinh_danh, cs.ngay_sinh, cs.gioi_tinh,
+              cs.created_at, cs.user_id, u.email AS user_email, u.name AS user_name
+       FROM "ClassStudent" cs
+       LEFT JOIN "User" u ON u.id = cs.user_id
+       WHERE cs.class_id = $1 ORDER BY cs.stt NULLS LAST, cs.ho_ten`,
       [req.params.id]);
-    return res.json({ students: rows, total: rows.length });
+    const students = rows.map(r => ({
+      id: r.id,
+      studentId: r.user_id || r.id,
+      student: {
+        id: r.user_id || r.id,
+        name: r.user_name || r.ho_ten || '',
+        email: r.user_email || '',
+        idNumber: r.ma_dinh_danh || undefined, // FE dùng để TÌM, KHÔNG hiển thị (PII)
+        dateOfBirth: r.ngay_sinh || undefined,
+        gender: r.gioi_tinh || undefined,
+      },
+      studentNumber: r.stt || undefined,
+      attendanceRate: null,
+      averageScore: null,
+      totalXP: 0,
+      completedExams: 0,
+      passedExams: 0,
+      status: 'active',
+      enrollmentDate: r.created_at,
+    }));
+    return res.json({ students, total: students.length });
   } catch (e) { console.error('[classes:students:list]', e.message); return res.status(500).json({ error: 'Lỗi tải DS học sinh' }); }
 });
 
