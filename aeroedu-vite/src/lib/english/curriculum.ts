@@ -359,13 +359,25 @@ export const JOURNEY: Destination[] = [
   },
 ]
 
-// ─── Lookups ──────────────────────────────────────────────────────────────
+// ─── Override (admin biên tập) ──────────────────────────────────────────────
+// JOURNEY ở trên là bản SEED mặc định (đóng gói trong app). Admin có thể xuất
+// bản nội dung qua /api/english/curriculum → FE nạp vào override và mọi nơi
+// dùng getJourney() sẽ thấy nội dung admin. Nếu chưa có → dùng seed.
+let _override: Destination[] | null = null
+export function setJourneyOverride(j: Destination[] | null): void {
+  _override = j && Array.isArray(j) && j.length ? j : null
+}
+export function getJourney(): Destination[] {
+  return _override || JOURNEY
+}
+
+// ─── Lookups (đọc getJourney → phản ánh bản admin nếu có) ───────────────────
 export function getDestination(id: string): Destination | undefined {
-  return JOURNEY.find(d => d.id === id)
+  return getJourney().find(d => d.id === id)
 }
 
 export function getLesson(lessonId: string): { destination: Destination; lesson: EnLesson } | undefined {
-  for (const destination of JOURNEY) {
+  for (const destination of getJourney()) {
     const lesson = destination.lessons.find(l => l.id === lessonId)
     if (lesson) return { destination, lesson }
   }
@@ -375,13 +387,13 @@ export function getLesson(lessonId: string): { destination: Destination; lesson:
 /** Tất cả lesson theo đúng thứ tự hành trình (để khoá tuần tự) */
 export function allLessonsInOrder(): EnLesson[] {
   const out: EnLesson[] = []
-  for (const d of JOURNEY) out.push(...d.lessons)
+  for (const d of getJourney()) out.push(...d.lessons)
   return out
 }
 
 export function allWords(): EnWord[] {
   const out: EnWord[] = []
-  for (const d of JOURNEY) for (const l of d.lessons) out.push(...l.words)
+  for (const d of getJourney()) for (const l of d.lessons) out.push(...l.words)
   return out
 }
 
@@ -392,7 +404,8 @@ export function wordById(): Record<string, EnWord> {
 }
 
 export function journeyStats() {
+  const j = getJourney()
   let lessons = 0, words = 0
-  for (const d of JOURNEY) for (const l of d.lessons) { lessons++; words += l.words.length }
-  return { destinations: JOURNEY.length, lessons, words }
+  for (const d of j) for (const l of d.lessons) { lessons++; words += l.words.length }
+  return { destinations: j.length, lessons, words }
 }

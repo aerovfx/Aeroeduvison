@@ -106,6 +106,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Lộ trình hôm nay',
     routeEnglish:       'Tiếng Anh',
+    routeEnglishEditor: 'Biên tập Tiếng Anh',
     routeForYou:        'Dành cho bạn',
     routeMyTeachers:    'Giáo viên của tôi',
     routeExamRooms:     'Phòng thi',
@@ -458,6 +459,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // ── Sidebar — Student missing keys ────────────────────────
     routeDaily:         'Today\'s Plan',
     routeEnglish:       'English',
+    routeEnglishEditor: 'English Editor',
     routeForYou:        'For You',
     routeMyTeachers:    'My Teachers',
     routeExamRooms:     'Exam Rooms',

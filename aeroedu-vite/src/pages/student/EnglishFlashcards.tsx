@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Volume2, Turtle, RotateCcw } from 'lucide-react'
 import { allWords, wordById, type EnWord } from '@/lib/english/curriculum'
+import { useEnglishContent } from '@/lib/english/contentApi'
 import { speak, speakSlow } from '@/lib/english/speech'
 import { getDueCards, recordReview } from '@/lib/srs'
 
@@ -17,6 +18,7 @@ const DECK_SIZE = 15
 
 export default function EnglishFlashcards() {
   const navigate = useNavigate()
+  const v = useEnglishContent()
 
   // Dựng deck: due trước, bù random cho đủ DECK_SIZE
   const deck = useMemo<EnWord[]>(() => {
@@ -27,7 +29,7 @@ export default function EnglishFlashcards() {
     const have = new Set(due.map(w => w.id))
     const pool = allWords().filter(w => !have.has(w.id)).sort(() => Math.random() - 0.5)
     return [...due, ...pool].slice(0, DECK_SIZE)
-  }, [])
+  }, [v])
 
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)

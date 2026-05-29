@@ -14872,6 +14872,62 @@ app.post('/api/camera/recording', (_req, res) => res.status(501).json({ success:
 app.post('/api/camera/recording/:id/stop', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
 app.get('/api/camera/file/:filename', (_req, res) => res.status(404).json({ error: 'File không tồn tại — demo MP4 chưa upload GCS' }));
 
+// ─── Module Tiếng Anh "Hành trình Vũ trụ" — nội dung admin biên tập ───
+// GET công khai (learner tải bản admin xuất bản; journey=null → FE dùng seed tĩnh).
+// PUT chỉ ADMIN. Lưu cả JOURNEY dưới dạng 1 document JSON (id='journey').
+// PHẢI đặt TRƯỚC catch-all proxy /api/* bên dưới.
+let _enContentInit = false;
+async function _ensureEnglishContentTable() {
+  if (_enContentInit) return;
+  const pool = _getPool();
+  await pool.query(`CREATE TABLE IF NOT EXISTS "EnglishContent" (
+    id          TEXT PRIMARY KEY,
+    data        JSONB NOT NULL,
+    "updatedBy" TEXT,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  _enContentInit = true;
+}
+app.get('/api/english/curriculum', async (_req, res) => {
+  try {
+    await _ensureEnglishContentTable();
+    const { rows } = await _getPool().query(`SELECT data, "updatedAt" FROM "EnglishContent" WHERE id='journey' LIMIT 1`);
+    if (!rows[0]) return res.json({ journey: null });
+    res.json({ journey: rows[0].data, updatedAt: rows[0].updatedAt });
+  } catch (e) {
+    console.warn('[english] get curriculum fail:', e.message);
+    res.json({ journey: null }); // FE tự fallback seed
+  }
+});
+app.put('/api/english/curriculum', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  if (decoded.role !== 'ADMIN' && process.env.DISABLE_ADMIN_GATE !== '1') {
+    return res.status(403).json({ error: 'Chỉ admin được biên tập module Tiếng Anh' });
+  }
+  const journey = req.body && req.body.journey;
+  if (!Array.isArray(journey) || journey.length === 0) return res.status(400).json({ error: 'journey không hợp lệ' });
+  for (const d of journey) {
+    if (!d || typeof d.id !== 'string' || !Array.isArray(d.lessons)) {
+      return res.status(400).json({ error: 'Cấu trúc điểm đến không hợp lệ (cần id + lessons[])' });
+    }
+  }
+  try {
+    await _ensureEnglishContentTable();
+    await _getPool().query(
+      `INSERT INTO "EnglishContent" (id, data, "updatedBy", "updatedAt") VALUES ('journey',$1,$2,now())
+       ON CONFLICT (id) DO UPDATE SET data=$1, "updatedBy"=$2, "updatedAt"=now()`,
+      [JSON.stringify(journey), decoded.sub || decoded.email || 'admin'],
+    );
+    res.json({ ok: true, destinations: journey.length });
+  } catch (e) {
+    console.error('[english] save curriculum fail:', e.message);
+    res.status(500).json({ error: 'Không lưu được nội dung' });
+  }
+});
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 

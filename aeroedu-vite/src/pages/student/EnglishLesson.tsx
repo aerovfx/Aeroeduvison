@@ -11,6 +11,7 @@ import {
   Heart, X, Volume2, Turtle, Check, ArrowRight, Star, Flame, Trophy, RotateCcw,
 } from 'lucide-react'
 import { getLesson, allWords } from '@/lib/english/curriculum'
+import { useEnglishContent } from '@/lib/english/contentApi'
 import { generateExercises, type Exercise } from '@/lib/english/exercises'
 import { speak, speakSlow } from '@/lib/english/speech'
 import {
@@ -39,7 +40,8 @@ const norm = (s: string) => s.trim().toLowerCase().replace(/[.,!?;:'"]/g, '').re
 export default function EnglishLesson() {
   const { lessonId = '' } = useParams()
   const navigate = useNavigate()
-  const found = useMemo(() => getLesson(lessonId), [lessonId])
+  const v = useEnglishContent() // đảm bảo có bản admin khi deep-link thẳng vào bài
+  const found = useMemo(() => getLesson(lessonId), [lessonId, v])
   const exercises = useMemo(
     () => (found ? generateExercises(found.lesson.words, allWords()) : []),
     [found],

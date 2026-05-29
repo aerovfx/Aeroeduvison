@@ -9,19 +9,21 @@
 import { useMemo, Suspense, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Flame, Heart, Star, Lock, Check, Layers, Rocket } from 'lucide-react'
-import { JOURNEY, journeyStats, allLessonsInOrder } from '@/lib/english/curriculum'
+import { getJourney, journeyStats, allLessonsInOrder } from '@/lib/english/curriculum'
 import { getProgress, lessonStars, isLessonDone } from '@/lib/english/progress'
+import { useEnglishContent } from '@/lib/english/contentApi'
 
 // Cảnh 3D R3F nặng (three) → lazy, chỉ tải khi vào trang. Có ErrorBoundary nội bộ.
 const SpaceScene = lazy(() => import('@/components/english/SpaceScene'))
 
 export default function EnglishLearn() {
   const navigate = useNavigate()
+  const v = useEnglishContent() // nạp bản admin (nếu có) + re-render khi xong
   const progress = getProgress()
-  const stats = useMemo(() => journeyStats(), [])
+  const stats = useMemo(() => journeyStats(), [v])
 
   // Khoá tuần tự theo thứ tự hành trình
-  const flat = useMemo(() => allLessonsInOrder(), [])
+  const flat = useMemo(() => allLessonsInOrder(), [v])
   const doneCount = flat.filter(l => isLessonDone(l.id)).length
   const currentLessonId = flat.find(l => !isLessonDone(l.id))?.id ?? null
   const travelledPct = Math.round((doneCount / flat.length) * 100)
@@ -88,13 +90,13 @@ export default function EnglishLearn() {
         </button>
 
         {/* Các điểm đến */}
-        {JOURNEY.map((dest, di) => {
+        {getJourney().map((dest, di) => {
           const destUnlocked = isUnlocked(dest.lessons[0].id)
           const allDone = dest.lessons.every(l => isLessonDone(l.id))
           return (
             <div key={dest.id} className="relative">
               {/* Đường bay nối xuống điểm kế */}
-              {di < JOURNEY.length - 1 && (
+              {di < getJourney().length - 1 && (
                 <div className="absolute left-[34px] top-16 bottom-0 w-0.5"
                   style={{ background: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.35) 0 6px, transparent 6px 14px)' }} />
               )}

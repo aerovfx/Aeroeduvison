@@ -126,6 +126,7 @@ const teacherSections: RouteSection[] = [
       { icon: Heart,   labelKey: 'routeEmotionMap',  href: '/teacher/emotion-map' },
       { icon: Network, labelKey: 'routeProfKG',      href: '/teacher/knowledge-graph', badge: 'CPD' },
       { icon: Camera,  labelKey: 'routePostureMonitor', href: '/teacher/posture-monitor', badge: 'AI' },
+      { icon: Languages, labelKey: 'routeEnglish',      href: '/student/english',        badge: 'Mới' },
     ],
   },
   {
@@ -229,6 +230,7 @@ const adminSections: RouteSection[] = [
       { icon: Cpu,      labelKey: 'routeIoT',         href: '/admin/iot-management',    badge: 'Hub' },
       { icon: Heart,    labelKey: 'routeAdminEmotion',  href: '/admin/emotion' },
       { icon: BookOpen, labelKey: 'routeContent',       href: '/admin/content' },
+      { icon: Languages, labelKey: 'routeEnglishEditor', href: '/admin/english-editor', badge: 'Mới' },
       { icon: Tag,      labelKey: 'routeAdminCategories', href: '/admin/categories' },
     ],
   },
