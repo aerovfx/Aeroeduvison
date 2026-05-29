@@ -14051,6 +14051,93 @@ app.get('/api/admin/overview/full', async (req, res) => {
   });
 }
 
+// ── Admin: chuyển GV + kế thừa tài liệu từ GV khác ───────────────────────────
+// POST /api/admin/users/inherit-teacher { targetEmail, sourceEmail?, dryRun? }
+// - dryRun=true (mặc định): CHỈ đếm số dòng sẽ chuyển mỗi bảng (xem trước, KHÔNG ghi)
+// - dryRun=false: set target role=TEACHER + chuyển quyền sở hữu (UPDATE owner col)
+// Introspect information_schema để bắt đúng cột chủ sở hữu thực tế (Question có
+// thể là createdBy HOẶC teacher_id tuỳ đường insert). Mỗi bảng try/catch riêng,
+// idempotent (chạy lại tìm 0 dòng). Gate ADMIN. KHÔNG đụng bảng student/payment/auth.
+app.post('/api/admin/users/inherit-teacher', async (req, res) => {
+  // Gate ADMIN (module-scope → dùng _akVerify)
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  if (process.env.DISABLE_ADMIN_GATE !== '1' && decoded.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+  }
+
+  // Chỉ các bảng TÀI LIỆU/TÀI SẢN của giáo viên (KHÔNG gồm payment/auth/student-progress)
+  const CONTENT_TABLES = [
+    'Course', 'Exam', 'ExamMatrix', 'Question', 'LessonPlan', 'Class',
+    'LatexProject', 'Document', 'DocumentFolder', 'DigitizedResource',
+    'LearningPath', 'LearningPathTemplate', 'STEMProject', 'StemProject',
+    'OnlineExamRoom', 'AIGeneratedContent', 'GradingAnswerKey', 'LessonHistory',
+  ];
+  const OWNER_COLS = ['userId', 'teacherId', 'teacher_id', 'createdBy', 'createdById', 'instructorId', 'ownerId', 'authorId'];
+
+  try {
+    const pool = _getPool();
+    const targetEmail = String(req.body?.targetEmail || '').trim().toLowerCase();
+    const sourceEmail = String(req.body?.sourceEmail || 'teacher@example.com').trim().toLowerCase();
+    const dryRun = req.body?.dryRun !== false; // mặc định true (an toàn)
+    if (!targetEmail) return res.status(400).json({ error: 'Thiếu targetEmail' });
+    if (targetEmail === sourceEmail) return res.status(400).json({ error: 'Nguồn và đích trùng nhau' });
+
+    // Resolve 2 user (KHÔNG tạo mới — phải tồn tại sẵn)
+    const uq = await pool.query(
+      `SELECT id, email, role, name FROM "User" WHERE LOWER(email) IN ($1,$2)`, [targetEmail, sourceEmail]);
+    const target = uq.rows.find(u => u.email.toLowerCase() === targetEmail);
+    const source = uq.rows.find(u => u.email.toLowerCase() === sourceEmail);
+    if (!target) return res.status(404).json({ error: `Không tìm thấy tài khoản đích: ${targetEmail}` });
+    if (!source) return res.status(404).json({ error: `Không tìm thấy tài khoản nguồn: ${sourceEmail}` });
+
+    // Tìm (bảng, cột chủ sở hữu) THỰC TẾ tồn tại trong schema
+    const pairs = (await pool.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE table_schema='public' AND table_name = ANY($1) AND column_name = ANY($2)`,
+      [CONTENT_TABLES, OWNER_COLS])).rows;
+
+    const report = [];
+    let totalRows = 0;
+    for (const { table_name, column_name } of pairs) {
+      try {
+        if (dryRun) {
+          const c = await pool.query(`SELECT COUNT(*)::int AS n FROM "${table_name}" WHERE "${column_name}" = $1`, [source.id]);
+          const n = c.rows[0]?.n || 0;
+          if (n > 0) { report.push({ table: table_name, column: column_name, rows: n }); totalRows += n; }
+        } else {
+          const u = await pool.query(`UPDATE "${table_name}" SET "${column_name}" = $1 WHERE "${column_name}" = $2`, [target.id, source.id]);
+          if (u.rowCount > 0) { report.push({ table: table_name, column: column_name, rows: u.rowCount }); totalRows += u.rowCount; }
+        }
+      } catch (e) { console.warn(`[inherit-teacher] ${table_name}.${column_name}:`, e.message); }
+    }
+
+    // Set role TEACHER khi thực thi (không hạ cấp admin)
+    let roleChanged = false;
+    if (!dryRun && target.role !== 'TEACHER' && target.role !== 'ADMIN') {
+      try {
+        await pool.query(`UPDATE "User" SET role='TEACHER', "updatedAt"=NOW() WHERE id=$1`, [target.id]);
+        roleChanged = true;
+      } catch (e) { console.warn('[inherit-teacher] role:', e.message); }
+    }
+
+    return res.json({
+      dryRun,
+      source: { id: source.id, email: source.email, name: source.name },
+      target: { id: target.id, email: target.email, name: target.name, role: target.role },
+      roleChanged,
+      totalRows,
+      tables: report.sort((a, b) => b.rows - a.rows),
+    });
+  } catch (e) {
+    console.error('[inherit-teacher]', e.message);
+    return res.status(500).json({ error: 'Lỗi khi chuyển quyền sở hữu: ' + e.message });
+  }
+});
+
 app.get('/api/admin/operations/services-health', async (_req, res) => {
   const now = new Date().toISOString();
   const services = [];

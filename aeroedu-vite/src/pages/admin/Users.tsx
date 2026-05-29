@@ -26,6 +26,99 @@ import {
   type ListUsersParams,
 } from '@/services/adminUsers.service'
 import { UserDetailModal } from '@/components/admin/UserDetailModal'
+import { api } from '@/services/api'
+
+/* ──────────────────────────────────────────────
+   Inherit-teacher (chuyển GV + kế thừa tài liệu)
+─────────────────────────────────────────────── */
+interface InheritReport {
+  dryRun: boolean
+  source: { id: string; email: string; name: string | null }
+  target: { id: string; email: string; name: string | null; role: string }
+  roleChanged: boolean
+  totalRows: number
+  tables: { table: string; column: string; rows: number }[]
+}
+
+function InheritTeacherModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [targetEmail, setTargetEmail] = useState('vietchungvn@gmail.com')
+  const [sourceEmail, setSourceEmail] = useState('teacher@example.com')
+  const [preview, setPreview] = useState<InheritReport | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const run = async (dryRun: boolean) => {
+    setBusy(true)
+    try {
+      const { data } = await api.post<InheritReport>('/admin/users/inherit-teacher', { targetEmail, sourceEmail, dryRun })
+      if (dryRun) {
+        setPreview(data)
+        if (data.totalRows === 0) toast('Không có tài liệu nào để chuyển', { icon: 'ℹ️' })
+      } else {
+        toast.success(`Đã chuyển ${data.totalRows} mục${data.roleChanged ? ' + đặt vai trò GIÁO VIÊN' : ''}`)
+        onDone()
+        onClose()
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      toast.error(err.response?.data?.error || 'Thao tác thất bại')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-400" /> Chuyển giáo viên + kế thừa tài liệu
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Đặt tài khoản <b>đích</b> thành GIÁO VIÊN và chuyển quyền sở hữu toàn bộ tài liệu (khoá học, đề thi, ngân hàng câu hỏi, giáo án, lớp, dự án STEM…) từ tài khoản <b>nguồn</b>. Luôn <b>Xem trước</b> trước khi thực hiện.
+        </p>
+        <label className="block text-xs font-semibold text-muted-foreground mb-1">Tài khoản đích (sẽ thành GV)</label>
+        <input value={targetEmail} onChange={e => { setTargetEmail(e.target.value); setPreview(null) }}
+          className="w-full mb-3 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm" placeholder="email đích" />
+        <label className="block text-xs font-semibold text-muted-foreground mb-1">Tài khoản nguồn (GV demo)</label>
+        <input value={sourceEmail} onChange={e => { setSourceEmail(e.target.value); setPreview(null) }}
+          className="w-full mb-4 px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm" placeholder="email nguồn" />
+
+        {preview && (
+          <div className="mb-4 rounded-xl border border-border bg-background/60 p-3">
+            <div className="text-xs text-muted-foreground mb-2">
+              Nguồn: <b className="text-foreground">{preview.source.name || preview.source.email}</b> → Đích: <b className="text-foreground">{preview.target.name || preview.target.email}</b> (vai trò hiện tại: {preview.target.role})
+            </div>
+            {preview.totalRows === 0 ? (
+              <p className="text-sm text-amber-400">Không có tài liệu nào thuộc tài khoản nguồn.</p>
+            ) : (
+              <>
+                <div className="text-sm font-bold text-emerald-400 mb-2">Sẽ chuyển {preview.totalRows} mục:</div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {preview.tables.map(t => (
+                    <div key={`${t.table}.${t.column}`} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">{t.table} <span className="opacity-50">({t.column})</span></span>
+                      <span className="font-semibold text-foreground">{t.rows}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} disabled={busy}
+            className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-secondary">Đóng</button>
+          <button onClick={() => run(true)} disabled={busy || !targetEmail}
+            className="px-4 py-2 rounded-lg bg-secondary border border-border text-sm font-semibold text-foreground disabled:opacity-50">
+            {busy ? 'Đang xử lý…' : 'Xem trước'}
+          </button>
+          <button onClick={() => run(false)} disabled={busy || !preview || preview.totalRows === 0}
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold disabled:opacity-40">
+            Thực hiện chuyển
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /* ──────────────────────────────────────────────
    Helpers
@@ -95,6 +188,7 @@ export default function AdminUsersPage() {
 
   const [detailUserId, setDetailUserId] = useState<string | null>(null)
   const [actionMenuFor, setActionMenuFor] = useState<string | null>(null)
+  const [inheritOpen, setInheritOpen] = useState(false)
 
   // Debounce search 300ms
   useEffect(() => {
@@ -252,6 +346,10 @@ export default function AdminUsersPage() {
             {(stats?.bannedCount ?? 0) > 0 && ` · ${stats?.bannedCount} bị khoá`}
           </p>
         </div>
+        <button onClick={() => setInheritOpen(true)}
+          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:opacity-90">
+          <Sparkles className="w-4 h-4" /> Chuyển GV + kế thừa tài liệu
+        </button>
       </div>
 
       {/* Stats cards */}
@@ -558,6 +656,16 @@ export default function AdminUsersPage() {
           onChangeRole={handleChangeRole}
           onDelete={handleDelete}
           currentUserId={currentUser?.id}
+        />
+      )}
+
+      {inheritOpen && (
+        <InheritTeacherModal
+          onClose={() => setInheritOpen(false)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ['admin-users-list'] })
+            qc.invalidateQueries({ queryKey: ['admin-users-stats'] })
+          }}
         />
       )}
     </div>
