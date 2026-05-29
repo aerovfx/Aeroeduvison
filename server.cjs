@@ -14009,6 +14009,112 @@ app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
 // Cameras
 app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
 
+// ─── Learning: Wishlist + Purchase history + Contacts (Node, TRƯỚC proxy) ───
+function _lcUserKey(req) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return null;
+  try { const d = _akVerify(auth.slice(7)); return d.sub || d.id || d.email || null; } catch { return null; }
+}
+let _wlInit = false;
+async function _ensureWishlistTable() {
+  if (_wlInit) return;
+  await _getPool().query(`CREATE TABLE IF NOT EXISTS "Wishlist" (
+    id TEXT PRIMARY KEY, "userKey" TEXT NOT NULL, "courseId" TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE("userKey","courseId")
+  )`);
+  _wlInit = true;
+}
+function _mapCourseForList(c) {
+  return {
+    id: c.id, title: c.title || 'Khoá học', slug: c.id,
+    image: c.imageUrl || null, imageUrl: c.imageUrl || null,
+    description: c.description || null,
+    regularPrice: Number(c.price || 0), price: Number(c.price || 0), beforePrice: undefined,
+    lessons: 0, duration: null, accessTime: null,
+    user: { id: c.userId || null, name: c.userName || null, image: c.userImage || null },
+  };
+}
+app.get('/api/learning/wishlist', async (req, res) => {
+  const userKey = _lcUserKey(req);
+  if (!userKey) return res.json([]);
+  try {
+    await _ensureWishlistTable();
+    const { rows } = await _getPool().query(
+      `SELECT w.id, w."courseId", w."createdAt", c.*, u.name "userName", u.image "userImage"
+       FROM "Wishlist" w JOIN "Course" c ON c.id = w."courseId"
+       LEFT JOIN "User" u ON u.id = c."userId"
+       WHERE w."userKey" = $1 ORDER BY w."createdAt" DESC`, [userKey]);
+    res.json(rows.map(r => ({
+      id: r.id, userId: userKey, courseId: r.courseId, createdAt: r.createdAt, course: _mapCourseForList(r),
+    })));
+  } catch (e) { console.warn('[wishlist] get fail:', e.message); res.json([]); }
+});
+app.post('/api/learning/wishlist/:courseId', async (req, res) => {
+  const userKey = _lcUserKey(req);
+  if (!userKey) return res.status(401).json({ error: 'Cần đăng nhập' });
+  try {
+    await _ensureWishlistTable();
+    await _getPool().query(
+      `INSERT INTO "Wishlist" (id, "userKey", "courseId") VALUES ($1,$2,$3)
+       ON CONFLICT ("userKey","courseId") DO NOTHING`,
+      [`wl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, userKey, req.params.courseId]);
+    res.json({ success: true });
+  } catch (e) { console.warn('[wishlist] add fail:', e.message); res.status(500).json({ error: 'Lỗi thêm wishlist' }); }
+});
+app.delete('/api/learning/wishlist/:courseId', async (req, res) => {
+  const userKey = _lcUserKey(req);
+  if (!userKey) return res.status(401).json({ error: 'Cần đăng nhập' });
+  try {
+    await _ensureWishlistTable();
+    await _getPool().query(`DELETE FROM "Wishlist" WHERE "userKey"=$1 AND "courseId"=$2`, [userKey, req.params.courseId]);
+    res.json({ success: true });
+  } catch (e) { console.warn('[wishlist] del fail:', e.message); res.status(500).json({ error: 'Lỗi xoá' }); }
+});
+// Lịch sử mua: nền tảng bán GÓI đăng ký (không bán khoá lẻ) → trả enrollment khoá
+// miễn phí user đã ghi danh nếu có; mặc định mảng rỗng hợp lệ (hết lỗi 404/502).
+app.get('/api/learning/purchase-history', async (req, res) => {
+  const userKey = _lcUserKey(req);
+  if (!userKey) return res.json([]);
+  try {
+    await _ensureWishlistTable(); // reuse pool readiness
+    const { rows } = await _getPool().query(
+      `SELECT to_regclass('public."Enrollment"') AS t`);
+    if (!rows[0] || !rows[0].t) return res.json([]); // chưa có bảng Enrollment
+    const { rows: enr } = await _getPool().query(
+      `SELECT e.id, e."courseId", e.price, e."createdAt", c.*, u.name "userName", u.image "userImage"
+       FROM "Enrollment" e JOIN "Course" c ON c.id = e."courseId"
+       LEFT JOIN "User" u ON u.id = c."userId"
+       WHERE e."userId" = $1 ORDER BY e."createdAt" DESC`, [userKey]).catch(() => ({ rows: [] }));
+    res.json(enr.map(r => ({
+      id: r.id, userId: userKey, courseId: r.courseId, price: Number(r.price || 0),
+      createdAt: r.createdAt, course: _mapCourseForList(r),
+    })));
+  } catch (e) { console.warn('[purchase-history] fail:', e.message); res.json([]); }
+});
+// Danh bạ thật từ DB (thay mock) — /dashboard/contacts
+app.get('/api/contacts/discover', async (req, res) => {
+  try {
+    const me = _lcUserKey(req);
+    const q = String(req.query.q || '').trim();
+    const params = [];
+    let sql = `SELECT id, name, email, image, role FROM "User" WHERE COALESCE(banned,false)=false`;
+    if (me) { params.push(me); sql += ` AND id <> $${params.length}`; }
+    if (q) { params.push(`%${q}%`); sql += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
+    sql += ` ORDER BY "createdAt" DESC NULLS LAST LIMIT 80`;
+    const { rows } = await _getPool().query(sql, params);
+    res.json({
+      success: true,
+      contacts: rows.map(u => ({
+        id: u.id,
+        name: u.name || (u.email || '').split('@')[0] || 'Học viên',
+        username: (u.email || '').split('@')[0] || String(u.id).slice(0, 8),
+        image: u.image || null,
+        role: (u.role || 'STUDENT'),
+      })),
+    });
+  } catch (e) { console.warn('[contacts] discover fail:', e.message); res.json({ success: true, contacts: [] }); }
+});
+
 // KG
 // ── /api/kg/* Knowledge Graph stubs với shape match FE interface ──
 // Tránh ErrorBoundary crash khi page truy cập field undefined.

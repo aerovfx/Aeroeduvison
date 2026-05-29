@@ -4,7 +4,7 @@
  * Realtime chat: click "Nhắn tin" hoặc card nhóm để mở chat drawer
  * (qua /api/broker WebSocket — topic chat:dm hoặc chat:group).
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Search, UserPlus, MessageCircle, Users, UserCheck,
   Clock, Star, Zap, Trophy, Atom, Calculator, FlaskConical,
@@ -12,6 +12,7 @@ import {
   GraduationCap, Flame,
 } from 'lucide-react'
 import ChatPanel, { type ChatTarget } from '@/components/chat/ChatPanel'
+import { api } from '@/services/api'
 
 // ─────────────────────────────────────────────────────────────────
 // Types & Data
@@ -210,6 +211,33 @@ export default function ContactsPage() {
   const [search, setSearch]       = useState('')
   const [filterSubject, setFilterSubject] = useState('all')
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null)
+
+  // Nạp danh bạ THẬT từ DB (thay mock). Giữ mock nếu DB rỗng / lỗi mạng.
+  useEffect(() => {
+    let alive = true
+    api.get<{ success: boolean; contacts: Array<{ id: string; name: string; username: string; image: string | null; role: string }> }>('/contacts/discover')
+      .then(r => {
+        if (!alive) return
+        const list = r.data?.contacts || []
+        if (!list.length) return
+        setStudents(list.map((u, i) => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          avatar: (u.name || u.username || '?').charAt(0).toUpperCase(),
+          avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          grade: '',
+          school: u.role === 'TEACHER' ? 'Giáo viên' : u.role === 'ADMIN' ? 'Quản trị' : 'Học sinh',
+          subjects: [],
+          xp: 0, streak: 0, achievements: 0,
+          status: 'friend' as FriendStatus,
+          online: false,
+          bio: '',
+        })))
+      })
+      .catch(() => { /* giữ mock */ })
+    return () => { alive = false }
+  }, [])
 
   const openChatWith = (s: Student) => {
     setChatTarget({
