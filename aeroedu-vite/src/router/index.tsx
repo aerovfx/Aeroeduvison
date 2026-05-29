@@ -240,6 +240,9 @@ const EnglishFlashcardsPage           = lazy(() => import('@/pages/student/Engli
 const MathJourneyPage                 = lazy(() => import('@/pages/student/MathJourney'))
 const MathLessonPage                  = lazy(() => import('@/pages/student/MathLesson'))
 const MathFlashcardsPage              = lazy(() => import('@/pages/student/MathFlashcards'))
+const AiJourneyPage                   = lazy(() => import('@/pages/student/AiJourney'))
+const AiLessonPage                    = lazy(() => import('@/pages/student/AiLesson'))
+const AiFlashcardsPage                = lazy(() => import('@/pages/student/AiFlashcards'))
 const CareerGamesPage                 = lazy(() => import('@/pages/student/CareerGames'))
 const CareerWorldOdysseyPage          = lazy(() => import('@/pages/student/CareerWorldOdyssey'))
 const StudentVideoTranscriptPage      = lazy(() => import('@/pages/student/VideoTranscript'))
@@ -627,6 +630,9 @@ export function AppRouter() {
               <Route path="/student/math"                     element={<MathJourneyPage />} />
               <Route path="/student/math/flashcards"          element={<MathFlashcardsPage />} />
               <Route path="/student/math/:lessonId"           element={<MathLessonPage />} />
+              <Route path="/student/ai"                       element={<AiJourneyPage />} />
+              <Route path="/student/ai/flashcards"            element={<AiFlashcardsPage />} />
+              <Route path="/student/ai/:lessonId"             element={<AiLessonPage />} />
               <Route path="/student/games"                    element={<CareerGamesPage />} />
               <Route path="/student/career-world"             element={<CareerWorldOdysseyPage />} />
               <Route path="/student/video-transcript/history" element={<StudentVideoTranscriptHistoryPage />} />

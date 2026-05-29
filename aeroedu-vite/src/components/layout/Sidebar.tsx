@@ -57,6 +57,7 @@ const studentSections: RouteSection[] = [
       { icon: Brain,        labelKey: 'routeAiTutor',      href: '/ai-tutor',             isHighlighted: true },
       { icon: Languages,    labelKey: 'routeEnglish',      href: '/student/english',      badge: 'Mới' },
       { icon: FunctionSquare, labelKey: 'routeMath',       href: '/student/math',         badge: 'Mới' },
+      { icon: Cpu,          labelKey: 'routeAiSkill',      href: '/student/ai',           badge: 'Mới' },
       { icon: BookOpen,     labelKey: 'routeMyCourses',    href: '/student/my-courses',   badge: 'LMS' },
       { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },
       { icon: Map,          labelKey: 'routeLearningPath',  href: '/learning-paths' },
@@ -129,6 +130,7 @@ const teacherSections: RouteSection[] = [
       { icon: Camera,  labelKey: 'routePostureMonitor', href: '/teacher/posture-monitor', badge: 'AI' },
       { icon: Languages, labelKey: 'routeEnglish',      href: '/student/english',        badge: 'Mới' },
       { icon: FunctionSquare, labelKey: 'routeMath',    href: '/student/math',           badge: 'Mới' },
+      { icon: Cpu,       labelKey: 'routeAiSkill',      href: '/student/ai',             badge: 'Mới' },
     ],
   },
   {
