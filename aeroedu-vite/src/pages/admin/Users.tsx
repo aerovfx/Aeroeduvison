@@ -15,7 +15,7 @@ import {
   Users as UsersIcon, GraduationCap, Heart, Shield, Briefcase,
   Search, MoreVertical, Eye, KeyRound, Lock, Unlock, Trash2,
   Check, X, AlertCircle, Calendar, ChevronLeft, ChevronRight,
-  Activity, ShieldCheck, UserCog, Sparkles,
+  Activity, ShieldCheck, UserCog, Sparkles, Wrench, ChevronDown,
 } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
@@ -271,6 +271,7 @@ export default function AdminUsersPage() {
   const [actionMenuFor, setActionMenuFor] = useState<string | null>(null)
   const [inheritOpen, setInheritOpen] = useState(false)
   const [provisionOpen, setProvisionOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   // Debounce search 300ms
   useEffect(() => {
@@ -429,14 +430,28 @@ export default function AdminUsersPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-          <button onClick={() => setProvisionOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-sm font-bold shadow-lg shadow-sky-500/20 hover:opacity-90">
-            <GraduationCap className="w-4 h-4" /> Tạo tài khoản HS từ lớp
+          {/* Nút bật/tắt — 2 công cụ nâng cao chỉ hiện khi kích hoạt */}
+          <button onClick={() => setToolsOpen(o => !o)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
+              toolsOpen
+                ? 'bg-secondary border-border text-foreground'
+                : 'bg-card border-border text-foreground/70 hover:bg-secondary'
+            }`}>
+            <Wrench className="w-4 h-4" /> Công cụ
+            <ChevronDown className={`w-4 h-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
           </button>
-          <button onClick={() => setInheritOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:opacity-90">
-            <Sparkles className="w-4 h-4" /> Chuyển GV + kế thừa tài liệu
-          </button>
+          {toolsOpen && (
+            <>
+              <button onClick={() => setProvisionOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-sm font-bold shadow-lg shadow-sky-500/20 hover:opacity-90">
+                <GraduationCap className="w-4 h-4" /> Tạo tài khoản HS từ lớp
+              </button>
+              <button onClick={() => setInheritOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:opacity-90">
+                <Sparkles className="w-4 h-4" /> Chuyển GV + kế thừa tài liệu
+              </button>
+            </>
+          )}
         </div>
       </div>
 
