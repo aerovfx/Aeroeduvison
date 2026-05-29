@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `d5a5769` (revision pixiai-00646-hun, 2026-05-30 — Fix admin mới nâng quyền bị 403 "Không tải được dữ liệu": cổng admin check role từ JWT cũ (ignoreExpiration → token giữ role cũ). Thêm DB-role fallback: role token chưa ADMIN → tra "User".role theo sub trước khi từ chối. _isAdminRequest() async cho guard prefixes + _adminAuth async (6 caller await) + cleanup-null + english/curriculum. Verify: no token vẫn 401. Admin vừa nâng quyền vào được ngay không cần re-login)
 - Last deployed commit: `46852fa` (revision pixiai-00645-fuv, 2026-05-30 — Fix ô nhập mã TikZ tàng hình: textarea modal có color:#111 nhưng thiếu background → rule global .dark textarea ép nền tối → chữ đen trên nền tối. Thêm background:#fff + caretColor:#111 inline → đọc rõ)
 - Last deployed commit: `ec72496` (revision pixiai-00644-zih, 2026-05-30 — (1) Bổ sung đủ môn THPT CT GDPT 2018 vào SUBJECT_CATEGORIES (6 ngoại ngữ + GD KT&PL/Thể chất/QPAN/Nghệ thuật/Nội dung địa phương/HĐ trải nghiệm) + chuẩn hoá SUBJECTS constants. (2) Render mã TikZ dán thẳng vào nội dung câu hỏi: lib/tikz.ts + QuestionContentView detect tikzpicture→TikzFigure; modal bóc vỏ standalone)
 - Last deployed commit: `3dcb016` (revision pixiai-00643-woj, 2026-05-29 — Ngân hàng đề: "Sửa nhanh"→"Sửa với trình soạn thảo" (QuestionRichEditor TipTap cho Nội dung+Giải thích). RichTextEditor dùng chung +@tiptap/extension-image: nút Chèn ảnh + DÁN Ctrl+V + KÉO-THẢ ảnh (nén→data-URL) + nút Hình TikZ/LaTeX (modal gõ mã→tikzjax render→chèn ảnh SVG nền trắng). CSS img responsive)
@@ -77,7 +78,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00645-fuv — fix contrast ô nhập TikZ; trước đó 00644-zih môn THPT + render TikZ)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00646-hun — fix admin nâng quyền 403 (DB role fallback); trước đó 00645-fuv contrast TikZ, 00644-zih môn THPT)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
