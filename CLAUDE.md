@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `522f0c5+` (revision pixiai-00651-kin, 2026-05-30 — (1) Fix /teacher/classes/:id "Không thể tải thông tin lớp học": thêm GET /api/classes/:id (trước đây không có handler → proxy chết → 503). Trả {class:{...studentCount}} đúng shape FE, ADMIN xem mọi lớp. Verify: 503→401. (2) Kèm: ẩn 2 công cụ admin sau nút "Công cụ" toggle. Audit endpoint: 424 route Node, chỉ /api/classes/:id hỏng — đã fix)
 - Last deployed commit: `72408ac` (revision pixiai-00650-lor, 2026-05-30 — Fix /teacher/classes/:id không xem được DS học sinh: BE GET /api/classes/:id/students trả PHẲNG (hoTen/maDinhDanh) nhưng FE đọc s.student.name nested → crash. Sửa trả đúng shape StudentRecord {studentId, student:{name,email,idNumber,...}}, join User qua user_id lấy email, idNumber chỉ để FE tìm (PII không hiển thị), ADMIN xem mọi lớp. Verify: no token → 401)
 - Last deployed commit: `9b63346` (revision pixiai-00649-rah, 2026-05-30 — Cấp tài khoản đăng nhập (User STUDENT) cho HS từ danh sách lớp: ClassStudent +user_id, _provisionClassRoster (email hs.<slug>.<hex>@inphysic.vn không lộ mã định danh, mật khẩu = ngày sinh), hook import tự cấp, POST /api/admin/users/provision-students backfill + nút "Tạo tài khoản HS từ lớp" /admin/users hiện credential + xuất CSV)
 - Last deployed commit: `ceba383` (revision pixiai-00648-qid, 2026-05-30 — Fix /admin/categories 503: thêm POST/PUT/DELETE /api/categories (tạo/sửa/xoá danh mục) — trước đây chỉ có GET, mutation rớt xuống proxy chết. Gate ADMIN qua _isAdminRequest. DELETE chặn nếu còn Course thuộc danh mục)
@@ -82,7 +83,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `1/5` (deploy gần nhất pixiai-00650-lor; CHƯA deploy: 522f0c5 ẩn 2 công cụ admin sau nút Công cụ)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00651-kin — fix GET /api/classes/:id + ẩn công cụ admin; trước đó 00650 DS học sinh)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
