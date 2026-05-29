@@ -91,6 +91,14 @@ export default function AiJourney() {
                   </div>
                   <div className="text-xs opacity-60 mt-0.5">🎯 {stop.topicVi} · 📚 {stop.figure}</div>
                   <div className="text-sm opacity-80 mt-1.5">{stop.blurbVi}</div>
+                  {stop.refUrl && (
+                    <a href={stop.refUrl} target="_blank" rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 mt-2 text-xs font-bold px-2.5 py-1 rounded-lg"
+                      style={{ background: 'rgba(34,211,238,0.14)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.35)' }}>
+                      {stop.refLabel || '🔬 Tài liệu tham khảo'}
+                    </a>
+                  )}
                   {done && (
                     <div className="flex gap-0.5 mt-2">
                       {[1, 2, 3].map(s => <Star key={s} className="w-4 h-4" fill={s <= stars ? '#ffc800' : 'transparent'} style={{ color: s <= stars ? '#ffc800' : 'rgba(255,255,255,0.25)' }} />)}

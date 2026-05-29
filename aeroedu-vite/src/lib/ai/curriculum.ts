@@ -38,6 +38,9 @@ export interface AIStop {
   color: string
   blurbVi: string
   lessons: AILesson[]
+  /** Link tham khảo riêng (vd giả lập LLM) hiện trên thẻ chặng */
+  refUrl?: string
+  refLabel?: string
 }
 
 const q = (id: string, prompt: string, options: string[], correctIdx: number, explain: string): AIQuestion =>
@@ -127,6 +130,7 @@ export const JOURNEY: AIStop[] = [
   {
     id: 'transformer', place: 'Transformer', placeVi: 'Transformer — "Attention is All You Need"', year: '2017', emoji: '🔁',
     era: 'Hiện đại', topicVi: 'Attention · xử lý ngôn ngữ', figure: 'Google · cơ chế self-attention', color: '#7c5cff',
+    refUrl: '/free-courses/llm-mastery/visualize', refLabel: '🔬 Giả lập attention',
     blurbVi: 'Năm 2017, bài báo "Attention is All You Need" của Google giới thiệu kiến trúc Transformer + cơ chế attention — nền tảng cho mọi LLM hiện đại (GPT, BERT, Claude).',
     lessons: [{ id: 'tf-1', title: 'Cơ chế Attention', icon: '🔁', questions: [
       q('tf-q1', 'Kiến trúc Transformer (2017) là nền tảng của?', ['Các mô hình ngôn ngữ lớn LLM (GPT, Claude…)', 'Máy giặt', 'Trình duyệt web', 'Pin mặt trời'], 0, 'Transformer thay RNN/LSTM, xử lý song song và là "xương sống" của LLM ngày nay.'),
@@ -137,6 +141,7 @@ export const JOURNEY: AIStop[] = [
   {
     id: 'llm', place: 'LLM', placeVi: 'LLM — Mô hình ngôn ngữ lớn (GPT, Claude)', year: '2018→', emoji: '💬',
     era: 'Hiện tại', topicVi: 'LLM · token · prompt · RAG', figure: 'GPT · BERT · ChatGPT · Claude', color: '#22d3ee',
+    refUrl: '/free-courses/llm-mastery/visualize', refLabel: '🔬 Mở giả lập LLM (token→embedding→attention)',
     blurbVi: 'Mô hình ngôn ngữ lớn (LLM) học từ khối lượng văn bản khổng lồ, dự đoán từ tiếp theo → trò chuyện, viết, lập trình. ChatGPT (2022) đưa AI đến mọi người.',
     lessons: [{ id: 'llm-1', title: 'Hiểu về LLM', icon: '💬', questions: [
       q('llm-q1', 'LLM (như ChatGPT, Claude) về cơ bản học cách?', ['Dự đoán từ/token tiếp theo dựa trên ngữ cảnh', 'Sao chép Google', 'Quay video', 'Vẽ 3D'], 0, 'LLM được huấn luyện dự đoán token kế tiếp trên lượng văn bản khổng lồ → sinh ra văn bản mạch lạc.'),
@@ -166,6 +171,45 @@ export const JOURNEY: AIStop[] = [
     ] }],
   },
 ]
+
+// ── Nạp câu hỏi từ khoá LLM Mastery (/free-courses/llm-mastery) ──────────────
+// Lấy các câu MCQ trong AI_LLM_QUIZ, đổi đáp án chữ→index, tiêm vào chặng tương
+// ứng — PHẦN LỚN vào chặng 10 (LLM); một số vào Transformer & AGI/Safety.
+import { AI_LLM_QUIZ } from '@/data/aiLlmCourse'
+
+const _LETTER: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, E: 4 }
+// Map module khoá LLM → chặng AI. Mặc định (không có trong map) → 'llm'.
+const _MODULE_TO_STOP: Record<string, string> = {
+  'm4-build-gpt': 'transformer',   // xây GPT/transformer
+  'm9-safety': 'agi-future',       // an toàn AI → tương lai/AGI
+  'm8-interpretability': 'agi-future',
+}
+function _stopForModule(moduleId: string): string {
+  return _MODULE_TO_STOP[moduleId] || 'llm'
+}
+try {
+  const byStop: Record<string, AIQuestion[]> = {}
+  for (const qz of AI_LLM_QUIZ) {
+    if (qz.questionType !== 'MCQ') continue // chỉ lấy trắc nghiệm 1 đáp án
+    const idx = _LETTER[String(qz.correctAnswer || 'A').trim().toUpperCase()] ?? 0
+    if (!Array.isArray(qz.options) || qz.options.length < 2) continue
+    const stopId = _stopForModule(qz.moduleId)
+    ;(byStop[stopId] ||= []).push({
+      id: `llmc-${qz.id}`,
+      prompt: qz.content,
+      options: qz.options,
+      correctIdx: Math.min(idx, qz.options.length - 1),
+      explain: qz.explanation || '',
+    })
+  }
+  for (const stop of JOURNEY) {
+    const add = byStop[stop.id]
+    if (add && add.length && stop.lessons[0]) {
+      const existing = new Set(stop.lessons[0].questions.map(q => q.id))
+      stop.lessons[0].questions.push(...add.filter(q => !existing.has(q.id)))
+    }
+  }
+} catch { /* dữ liệu khoá lỗi → giữ câu gốc */ }
 
 // ── Lookups (giống math/curriculum) ───────────────────────────────
 export function allLessonsInOrder(): AILesson[] {
