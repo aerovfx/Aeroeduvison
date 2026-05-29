@@ -146,8 +146,8 @@ export default function PrivacyPage() {
                 <p className="text-zinc-300 text-xs">
                   Nếu phát hiện lỗ hổng bảo mật hoặc dữ liệu của bạn bị rò rỉ, vui lòng báo
                   ngay cho chúng tôi qua email
-                  <a href="mailto:security@inphysic.com" className="text-cyan-400 hover:underline mx-1">
-                    security@inphysic.com
+                  <a href="mailto:thegioithu2@gmail.com" className="text-cyan-400 hover:underline mx-1">
+                    thegioithu2@gmail.com
                   </a>
                   — chúng tôi cam kết phản hồi trong 24 giờ và công khai post-mortem
                   trong 7 ngày nếu ảnh hưởng người dùng.
@@ -163,8 +163,8 @@ export default function PrivacyPage() {
                 <p className="text-cyan-200 text-sm font-semibold mb-1">Yêu cầu về dữ liệu</p>
                 <p className="text-zinc-300 text-xs">
                   Để xuất / xoá / chỉnh sửa dữ liệu cá nhân, gửi email
-                  <a href="mailto:privacy@inphysic.com" className="text-cyan-400 hover:underline mx-1">
-                    privacy@inphysic.com
+                  <a href="mailto:thegioithu2@gmail.com" className="text-cyan-400 hover:underline mx-1">
+                    thegioithu2@gmail.com
                   </a>
                   với chủ đề "Yêu cầu xử lý dữ liệu". Vui lòng xác nhận danh tính
                   bằng email đăng ký tài khoản.

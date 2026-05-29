@@ -48,7 +48,7 @@ export default function TermsPage() {
             <ul className="list-disc pl-5 space-y-1.5 text-zinc-300">
               <li>Cung cấp thông tin chính xác (họ tên thật, email, vai trò).</li>
               <li>Giữ bí mật mật khẩu — chịu trách nhiệm về mọi hoạt động dưới tài khoản của mình.</li>
-              <li>Báo cáo ngay cho admin@inphysic.com nếu nghi tài khoản bị xâm nhập.</li>
+              <li>Báo cáo ngay cho thegioithu2@gmail.com nếu nghi tài khoản bị xâm nhập.</li>
               <li>Không chia sẻ tài khoản trả phí cho người khác — vi phạm có thể bị khoá tài khoản.</li>
             </ul>
           </section>
@@ -105,8 +105,8 @@ export default function TermsPage() {
             <p className="text-zinc-300">
               Chúng tôi có thể khoá tài khoản nếu phát hiện vi phạm. Bạn có thể yêu cầu xoá
               tài khoản và toàn bộ dữ liệu cá nhân bất kỳ lúc nào — gửi email tới
-              <a href="mailto:admin@inphysic.com" className="text-cyan-400 hover:underline mx-1">
-                admin@inphysic.com
+              <a href="mailto:thegioithu2@gmail.com" className="text-cyan-400 hover:underline mx-1">
+                thegioithu2@gmail.com
               </a>
               và chúng tôi sẽ xử lý trong 30 ngày.
             </p>
@@ -141,8 +141,8 @@ export default function TermsPage() {
                 <p className="text-cyan-200 text-sm font-semibold mb-1">Liên hệ pháp lý</p>
                 <p className="text-zinc-300 text-xs">
                   Mọi câu hỏi về điều khoản hoặc tranh chấp: gửi email
-                  <a href="mailto:admin@inphysic.com" className="text-cyan-400 hover:underline mx-1">
-                    admin@inphysic.com
+                  <a href="mailto:thegioithu2@gmail.com" className="text-cyan-400 hover:underline mx-1">
+                    thegioithu2@gmail.com
                   </a>
                   — chúng tôi phản hồi trong 5 ngày làm việc.
                 </p>
