@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Heart, X, Check, ArrowRight, Star, Flame, Trophy, RotateCcw, Lightbulb } from 'lucide-react'
 import { MathText } from '@/components/common/MathText'
+import TikzFigure from '@/components/common/TikzFigure'
 import { getLesson } from '@/lib/math/curriculum'
 import { getHearts, loseHeart, refillHearts, completeLesson, minutesToNextHeart, MAX_HEARTS } from '@/lib/math/progress'
 
@@ -121,9 +122,11 @@ export default function MathLesson() {
       {/* Question */}
       <div className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-8 py-6">
         <div className="text-xs uppercase tracking-wide opacity-50 mb-2">{found.stop.emoji} {found.stop.placeVi} · {found.stop.era}</div>
-        <div className="rounded-2xl p-5 mb-5" style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
+        <div className="rounded-2xl p-5 mb-3" style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
           <MathText as="div" className="text-lg font-semibold leading-snug">{qn.prompt}</MathText>
         </div>
+        {qn.tikz && <TikzFigure code={qn.tikz} />}
+        <div className="mb-2" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {qn.options.map((opt, i) => {
             const isPick = picked === i, isAns = i === qn.correctIdx

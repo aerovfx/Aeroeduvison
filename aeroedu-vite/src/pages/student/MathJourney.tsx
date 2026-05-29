@@ -85,7 +85,7 @@ export default function MathJourney() {
                     <span className="font-extrabold">{stop.placeVi}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${stop.color}22`, color: stop.color }}>{stop.era}</span>
                   </div>
-                  <div className="text-xs opacity-60 mt-0.5">👤 {stop.figure}</div>
+                  <div className="text-xs opacity-60 mt-0.5">📚 {stop.figure}</div>
                   <div className="text-sm opacity-80 mt-1.5">{stop.blurbVi}</div>
                   {done && (
                     <div className="flex gap-0.5 mt-2">
