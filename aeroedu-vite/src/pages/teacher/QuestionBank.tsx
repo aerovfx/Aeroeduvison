@@ -13,6 +13,7 @@ import { MathText } from "@/components/common/MathText"
 import QuestionRichEditor, { QuestionContentView } from "@/components/exam/QuestionRichEditor"
 import { KnowledgeUnitPicker } from "@/components/question-bank/KnowledgeUnitPicker"
 import { getCatalogStats } from "@/lib/knowledge-units-catalog"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 interface Question {
   id: string
@@ -140,16 +141,15 @@ const INITIAL_FORM = {
 
 export default function QuestionBank() {
   // V2 (2026-05-22): GV chỉ được xoá/sửa câu hỏi do CHÍNH MÌNH tạo.
-  // Đọc user từ localStorage để compute isOwner cho mỗi QuestionCard.
-  // ADMIN bypass — có quyền sửa/xoá tất cả.
-  const currentUser = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('user')
-      if (!raw) return null
-      const u = JSON.parse(raw)
-      return { id: u.id || null, role: (u.role || 'TEACHER').toUpperCase() }
-    } catch { return null }
-  }, [])
+  // Lấy user từ AuthContext (useCurrentUser) để compute isOwner cho mỗi
+  // QuestionCard. ADMIN bypass — có quyền sửa/xoá tất cả.
+  // LƯU Ý: trước đây đọc localStorage['user'] — key này KHÔNG hề được set ở
+  // đâu → currentUser luôn null → MỌI câu hiện "Của GV khác · Chỉ xem" kể cả
+  // câu của chính mình. Dùng useAuth().user (id = User.id = createdBy) mới đúng.
+  const authUser = useCurrentUser()
+  const currentUser = useMemo(() => (
+    authUser?.id ? { id: authUser.id, role: String(authUser.role || 'TEACHER').toUpperCase() } : null
+  ), [authUser])
 
   const [generateOpen, setGenerateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
