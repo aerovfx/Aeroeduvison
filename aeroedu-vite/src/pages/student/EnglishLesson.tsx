@@ -18,6 +18,7 @@ import {
   getHearts, loseHeart, refillHearts, completeLesson, minutesToNextHeart, MAX_HEARTS,
 } from '@/lib/english/progress'
 import { recordReview } from '@/lib/srs'
+import { ENG } from '@/lib/english/theme'
 
 // Âm phản hồi nhẹ (không phụ thuộc lib ngoài)
 let _ac: AudioContext | null = null
@@ -72,7 +73,7 @@ export default function EnglishLesson() {
         style={{ background: 'var(--ai-page-bg)', color: 'hsl(var(--foreground))' }}>
         <p className="text-lg font-semibold">Không tìm thấy bài học</p>
         <button onClick={() => navigate('/student/english')}
-          className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: '#58cc02' }}>
+          className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: ENG.primary }}>
           ← Về lộ trình
         </button>
       </div>
@@ -91,7 +92,7 @@ export default function EnglishLesson() {
         </p>
         <div className="flex gap-3">
           <button onClick={() => { refillHearts(); setHearts(MAX_HEARTS) }}
-            className="px-5 py-3 rounded-xl font-bold text-white" style={{ background: '#1cb0f6' }}>
+            className="px-5 py-3 rounded-xl font-bold text-white" style={{ background: ENG.cyan }}>
             ❤️ Nạp đầy tim (miễn phí)
           </button>
           <button onClick={() => navigate('/student/english')}
@@ -132,7 +133,7 @@ export default function EnglishLesson() {
         </div>
         <div className="flex gap-3 mt-2">
           <button onClick={() => navigate('/student/english')}
-            className="px-6 py-3 rounded-xl font-bold text-white" style={{ background: '#58cc02' }}>
+            className="px-6 py-3 rounded-xl font-bold text-white" style={{ background: ENG.primaryGrad }}>
             Tiếp tục lộ trình
           </button>
           <button onClick={() => window.location.reload()}
@@ -186,7 +187,7 @@ export default function EnglishLesson() {
           <X className="w-6 h-6" />
         </button>
         <div className="flex-1 h-3.5 rounded-full overflow-hidden" style={{ background: 'hsl(var(--foreground)/0.1)' }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: '#58cc02' }} />
+          <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: ENG.primaryGrad }} />
         </div>
         <div className="flex items-center gap-1 font-bold" style={{ color: '#ff4b4b' }}>
           <Heart className="w-5 h-5" fill="#ff4b4b" /> {hearts}
@@ -240,7 +241,7 @@ function ExerciseView({ ex, phase, onGrade }: {
           <button onClick={() => speak(ex.word.en)}
             className="flex items-center gap-3 mb-8 px-5 py-4 rounded-2xl mx-auto"
             style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
-            <Volume2 className="w-7 h-7" style={{ color: '#1cb0f6' }} />
+            <Volume2 className="w-7 h-7" style={{ color: ENG.cyan }} />
             <div className="text-left">
               <div className="text-2xl font-extrabold">{ex.word.emoji} {ex.word.en}</div>
               {ex.word.ipa && <div className="text-sm opacity-60">{ex.word.ipa}</div>}
@@ -256,13 +257,13 @@ function ExerciseView({ ex, phase, onGrade }: {
           <div className="flex justify-center gap-3 mb-8">
             <button onClick={() => speak(ex.word.en)}
               className="w-20 h-20 rounded-2xl flex items-center justify-center text-white"
-              style={{ background: '#1cb0f6' }}>
+              style={{ background: ENG.cyan }}>
               <Volume2 className="w-9 h-9" />
             </button>
             <button onClick={() => speakSlow(ex.word.en)}
               className="w-14 h-20 rounded-2xl flex items-center justify-center"
               style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
-              <Turtle className="w-7 h-7" style={{ color: '#1cb0f6' }} />
+              <Turtle className="w-7 h-7" style={{ color: ENG.cyan }} />
             </button>
           </div>
         )}
@@ -273,9 +274,9 @@ function ExerciseView({ ex, phase, onGrade }: {
             const isPicked = picked === opt
             const isAnswer = opt === ex.answer
             let bg = 'var(--ai-card-bg)', border = 'var(--ai-card-border)', color = 'hsl(var(--foreground))'
-            if (disabled && isAnswer) { bg = 'rgba(88,204,2,0.15)'; border = '#58cc02'; color = '#58cc02' }
+            if (disabled && isAnswer) { bg = 'rgba(88,204,2,0.15)'; border = ENG.correct; color = ENG.correct }
             else if (disabled && isPicked && !isAnswer) { bg = 'rgba(255,75,75,0.12)'; border = '#ff4b4b'; color = '#ff4b4b' }
-            else if (isPicked) { border = '#1cb0f6' }
+            else if (isPicked) { border = ENG.cyan }
             return (
               <button key={opt} disabled={disabled}
                 onClick={() => { setPicked(opt); onGrade(opt === ex.answer, ex.word.id) }}
@@ -299,7 +300,7 @@ function ExerciseView({ ex, phase, onGrade }: {
         <button onClick={() => speak(ex.word.en)}
           className="flex items-center gap-3 mb-6 px-5 py-4 rounded-2xl mx-auto"
           style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
-          <Volume2 className="w-6 h-6" style={{ color: '#1cb0f6' }} />
+          <Volume2 className="w-6 h-6" style={{ color: ENG.cyan }} />
           <span className="text-2xl font-extrabold">{ex.word.emoji} {ex.word.vi}</span>
         </button>
         <input
@@ -313,7 +314,7 @@ function ExerciseView({ ex, phase, onGrade }: {
         {!disabled && (
           <button onClick={() => onGrade(ok, ex.word.id)} disabled={!typed.trim()}
             className="mt-5 w-full py-3.5 rounded-2xl font-extrabold text-white disabled:opacity-40"
-            style={{ background: '#58cc02' }}>
+            style={{ background: ENG.primaryGrad }}>
             Kiểm tra
           </button>
         )}
@@ -331,18 +332,18 @@ function ExerciseView({ ex, phase, onGrade }: {
         <div className="opacity-70 mb-8">{ex.word.vi}</div>
         <div className="flex justify-center gap-3 mb-8">
           <button onClick={() => speak(ex.word.en)}
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-white" style={{ background: '#1cb0f6' }}>
+            className="w-20 h-20 rounded-2xl flex items-center justify-center text-white" style={{ background: ENG.cyan }}>
             <Volume2 className="w-9 h-9" />
           </button>
           <button onClick={() => speakSlow(ex.word.en)}
             className="w-14 h-20 rounded-2xl flex items-center justify-center"
             style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
-            <Turtle className="w-7 h-7" style={{ color: '#1cb0f6' }} />
+            <Turtle className="w-7 h-7" style={{ color: ENG.cyan }} />
           </button>
         </div>
         {!disabled && (
           <button onClick={() => onGrade(true, ex.word.id, false)}
-            className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: '#58cc02' }}>
+            className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: ENG.primaryGrad }}>
             <Check className="w-5 h-5 inline mr-1" /> Tôi đã nói được
           </button>
         )}
@@ -375,7 +376,7 @@ function ExerciseView({ ex, phase, onGrade }: {
                 className="px-4 py-3.5 rounded-2xl font-semibold transition-colors"
                 style={{
                   background: matched.has(p.id) ? 'rgba(88,204,2,0.12)' : selEn === p.id ? 'rgba(28,176,246,0.15)' : 'var(--ai-card-bg)',
-                  border: `2px solid ${matched.has(p.id) ? '#58cc02' : selEn === p.id ? '#1cb0f6' : 'var(--ai-card-border)'}`,
+                  border: `2px solid ${matched.has(p.id) ? ENG.correct : selEn === p.id ? ENG.cyan : 'var(--ai-card-border)'}`,
                   opacity: matched.has(p.id) ? 0.5 : 1,
                 }}>
                 {p.en}
@@ -388,7 +389,7 @@ function ExerciseView({ ex, phase, onGrade }: {
                 className="px-4 py-3.5 rounded-2xl font-semibold transition-colors"
                 style={{
                   background: matched.has(p.id) ? 'rgba(88,204,2,0.12)' : 'var(--ai-card-bg)',
-                  border: `2px solid ${matched.has(p.id) ? '#58cc02' : 'var(--ai-card-border)'}`,
+                  border: `2px solid ${matched.has(p.id) ? ENG.correct : 'var(--ai-card-border)'}`,
                   opacity: matched.has(p.id) ? 0.5 : 1,
                 }}>
                 {p.vi}
@@ -396,7 +397,7 @@ function ExerciseView({ ex, phase, onGrade }: {
             ))}
           </div>
         </div>
-        {allDone && <p className="mt-4 text-center font-semibold" style={{ color: '#58cc02' }}>Tuyệt vời! ✓</p>}
+        {allDone && <p className="mt-4 text-center font-semibold" style={{ color: ENG.correct }}>Tuyệt vời! ✓</p>}
       </div>
     )
   }
@@ -413,11 +414,11 @@ function FeedbackBar({ phase, correct, ex, onNext }: {
   return (
     <div className="w-full" style={{
       background: correct ? 'rgba(88,204,2,0.12)' : 'rgba(255,75,75,0.10)',
-      borderTop: `2px solid ${correct ? '#58cc02' : '#ff4b4b'}`,
+      borderTop: `2px solid ${correct ? ENG.correct : '#ff4b4b'}`,
     }}>
       <div className="max-w-2xl mx-auto w-full px-4 sm:px-8 py-5 flex items-center justify-between gap-4">
         <div>
-          <div className="font-extrabold flex items-center gap-2" style={{ color: correct ? '#58cc02' : '#ff4b4b' }}>
+          <div className="font-extrabold flex items-center gap-2" style={{ color: correct ? ENG.correct : '#ff4b4b' }}>
             {correct ? <><Check className="w-5 h-5" /> Chính xác!</> : <><X className="w-5 h-5" /> Chưa đúng</>}
           </div>
           {!correct && word && (
@@ -426,7 +427,7 @@ function FeedbackBar({ phase, correct, ex, onNext }: {
         </div>
         <button onClick={onNext}
           className="px-7 py-3 rounded-2xl font-extrabold text-white inline-flex items-center gap-2 shrink-0"
-          style={{ background: correct ? '#58cc02' : '#ff4b4b' }}>
+          style={{ background: correct ? ENG.correct : '#ff4b4b' }}>
           Tiếp tục <ArrowRight className="w-5 h-5" />
         </button>
       </div>

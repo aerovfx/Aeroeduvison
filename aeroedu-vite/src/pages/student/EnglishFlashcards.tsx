@@ -13,6 +13,7 @@ import { allWords, wordById, type EnWord } from '@/lib/english/curriculum'
 import { useEnglishContent } from '@/lib/english/contentApi'
 import { speak, speakSlow } from '@/lib/english/speech'
 import { getDueCards, recordReview } from '@/lib/srs'
+import { ENG } from '@/lib/english/theme'
 
 const DECK_SIZE = 15
 
@@ -42,7 +43,7 @@ export default function EnglishFlashcards() {
         style={{ background: 'var(--ai-page-bg)', color: 'hsl(var(--foreground))' }}>
         <p className="text-lg font-semibold">Chưa có từ để ôn.</p>
         <button onClick={() => navigate('/student/english')}
-          className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: '#58cc02' }}>← Về lộ trình</button>
+          className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: ENG.primary }}>← Về lộ trình</button>
       </div>
     )
   }
@@ -55,7 +56,7 @@ export default function EnglishFlashcards() {
         <h2 className="text-2xl font-extrabold">Ôn xong {done} từ!</h2>
         <div className="flex gap-3">
           <button onClick={() => navigate('/student/english')}
-            className="px-6 py-3 rounded-xl font-bold text-white" style={{ background: '#58cc02' }}>Về lộ trình</button>
+            className="px-6 py-3 rounded-xl font-bold text-white" style={{ background: ENG.primary }}>Về lộ trình</button>
           <button onClick={() => window.location.reload()}
             className="px-5 py-3 rounded-xl font-bold border inline-flex items-center gap-2"
             style={{ borderColor: 'var(--ai-card-border)' }}>
@@ -81,7 +82,7 @@ export default function EnglishFlashcards() {
           <X className="w-6 h-6" />
         </button>
         <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'hsl(var(--foreground)/0.1)' }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${(idx / deck.length) * 100}%`, background: '#1cb0f6' }} />
+          <div className="h-full rounded-full transition-all" style={{ width: `${(idx / deck.length) * 100}%`, background: ENG.primaryGrad }} />
         </div>
         <span className="text-sm font-bold opacity-70">{idx + 1}/{deck.length}</span>
       </div>
@@ -101,7 +102,7 @@ export default function EnglishFlashcards() {
           ) : (
             <>
               <div className="text-3xl font-extrabold mb-1">{word.en}</div>
-              <div className="text-xl" style={{ color: '#58cc02' }}>{word.vi}</div>
+              <div className="text-xl" style={{ color: ENG.primary }}>{word.vi}</div>
               {word.example && (
                 <div className="mt-5 text-sm opacity-80 italic">
                   "{word.example}"
@@ -110,13 +111,13 @@ export default function EnglishFlashcards() {
               )}
               <div className="flex gap-3 mt-6">
                 <span onClick={(e) => { e.stopPropagation(); speak(word.en) }}
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white cursor-pointer" style={{ background: '#1cb0f6' }}>
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white cursor-pointer" style={{ background: ENG.cyan }}>
                   <Volume2 className="w-6 h-6" />
                 </span>
                 <span onClick={(e) => { e.stopPropagation(); speakSlow(word.en) }}
                   className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer"
                   style={{ border: '1px solid var(--ai-card-border)' }}>
-                  <Turtle className="w-6 h-6" style={{ color: '#1cb0f6' }} />
+                  <Turtle className="w-6 h-6" style={{ color: ENG.cyan }} />
                 </span>
               </div>
             </>
@@ -128,7 +129,7 @@ export default function EnglishFlashcards() {
       <div className="max-w-md mx-auto w-full px-4 pb-8 pt-4">
         {flipped ? (
           <div className="grid grid-cols-4 gap-2">
-            {([['Lại', 1, '#ff4b4b'], ['Khó', 3, '#ff9600'], ['Tốt', 4, '#1cb0f6'], ['Dễ', 5, '#58cc02']] as const).map(
+            {([['Lại', 1, '#ff4b4b'], ['Khó', 3, '#ff9600'], ['Tốt', 4, ENG.cyan], ['Dễ', 5, ENG.primary]] as const).map(
               ([label, r, color]) => (
                 <button key={label} onClick={() => rate(r)}
                   className="py-3 rounded-2xl font-bold text-white text-sm" style={{ background: color }}>
@@ -138,7 +139,7 @@ export default function EnglishFlashcards() {
           </div>
         ) : (
           <button onClick={() => { setFlipped(true); speak(word.en) }}
-            className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: '#1cb0f6' }}>
+            className="w-full py-3.5 rounded-2xl font-extrabold text-white" style={{ background: ENG.primaryGrad }}>
             Lật thẻ
           </button>
         )}
