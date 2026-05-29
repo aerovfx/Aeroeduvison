@@ -745,7 +745,7 @@ function TikzInsertModal({ onClose, onInsert }: { onClose: () => void; onInsert:
           value={code}
           onChange={e => { setCode(e.target.value); setStatus('idle') }}
           spellCheck={false}
-          style={{ width: '100%', minHeight: 140, fontFamily: 'ui-monospace, monospace', fontSize: 13, padding: 10, border: '1px solid #d1d5db', borderRadius: 8, color: '#111', resize: 'vertical' }}
+          style={{ width: '100%', minHeight: 140, fontFamily: 'ui-monospace, monospace', fontSize: 13, padding: 10, border: '1px solid #d1d5db', borderRadius: 8, background: '#ffffff', color: '#111', caretColor: '#111', resize: 'vertical' }}
         />
         <div style={{ marginTop: 10, background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 8, padding: 12, minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div ref={hostRef} style={{ color: '#111' }} />
