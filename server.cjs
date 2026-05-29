@@ -10325,6 +10325,28 @@ function _akVerify(token) {
   return _akJwt.verify(token, _akSecret(), { ignoreExpiration: true });
 }
 
+// ── BẢO MẬT: chặn truy cập admin data/analytics/insights/operations ──────────
+// Các handler overview/analytics/insights/operations nằm ở outer-scope (không
+// thấy _adminAuth nội bộ trong if(USE_NODEJS_AUTH)) nên TRƯỚC ĐÂY trả 200 mà
+// KHÔNG cần đăng nhập → lộ doanh thu, số liệu người dùng, lưu lượng, hành vi.
+// Middleware này gate ở tầng path-prefix, đặt TRƯỚC mọi route /api/admin/*
+// (đăng ký phía sau dòng này). FE admin gọi qua axios `api` đã tự gắn Bearer
+// nên admin đăng nhập không bị ảnh hưởng. Endpoint proxy (students/payments/
+// teachers) KHÔNG nằm trong danh sách → giữ nguyên hành vi.
+const _ADMIN_GUARD_PREFIXES = ['/api/admin/overview', '/api/admin/analytics', '/api/admin/insights', '/api/admin/operations'];
+app.use((req, res, next) => {
+  if (!_ADMIN_GUARD_PREFIXES.some(p => req.path.startsWith(p))) return next();
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  if (process.env.DISABLE_ADMIN_GATE !== '1' && decoded.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+  }
+  return next();
+});
+
 // (_getPool helper đã được khai báo ở đầu file — TRƯỚC _ensureLatexProjectTable)
 
 app.post('/api/user/api-keys', async (req, res) => {
