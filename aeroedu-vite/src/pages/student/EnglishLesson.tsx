@@ -152,7 +152,7 @@ export default function EnglishLesson() {
     if (wordId && !answeredIds.current.has(wordId)) {
       answeredIds.current.add(wordId)
       // SRS: đúng → rating 4, sai → rating 1
-      recordReview(wordId, ok ? 4 : 1, { subject: 'English', topic: found!.unit.id })
+      recordReview(wordId, ok ? 4 : 1, { subject: 'English', topic: found!.destination.id })
     }
     if (countable) {
       gradedTotal.current += 1
