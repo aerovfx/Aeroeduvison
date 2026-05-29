@@ -29,6 +29,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
@@ -36,10 +37,37 @@ import {
   Heading1, Heading2, Heading3, Pilcrow,
   Link as LinkIcon, Table as TableIcon, Minus,
   Undo2, Redo2, Highlighter, Palette, Sigma, Sheet,
+  ImagePlus, Shapes, Loader2,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MathInline, MathBlock } from './MathExtension'
 import { Spreadsheet } from './SpreadsheetExtension'
+
+const TIKZJAX_JS = 'https://tikzjax.com/v1/tikzjax.js'
+const TIKZJAX_CSS = 'https://tikzjax.com/v1/fonts.css'
+
+/** Nén ảnh → data URL base64 (tái dùng pattern instructor.service.uploadImage —
+ *  GCS image endpoint hiện là stub 501 nên lưu inline; câu hỏi/giáo án ảnh nhỏ OK). */
+async function imageFileToDataUrl(file: File): Promise<string> {
+  try {
+    const { compressImage } = await import('@/lib/imageCompression')
+    const { blob } = await compressImage(file, { maxWidth: 1280, maxHeight: 1280, quality: 0.82, skipBelowKB: 80 })
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result as string)
+      r.onerror = () => reject(new Error('read fail'))
+      r.readAsDataURL(blob)
+    })
+  } catch {
+    // Fallback: đọc thẳng không nén
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result as string)
+      r.onerror = () => reject(new Error('read fail'))
+      r.readAsDataURL(file)
+    })
+  }
+}
 
 interface RichTextEditorProps {
   /** Initial HTML content */
@@ -68,6 +96,9 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
   const [linkUrl, setLinkUrl] = useState('')
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [highlightPickerOpen, setHighlightPickerOpen] = useState(false)
+  const [tikzOpen, setTikzOpen] = useState(false)
+  const editorRef = useRef<Editor | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -94,14 +125,50 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
       MathInline,
       MathBlock,
       Spreadsheet,
+      Image.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'tiptap-img' } }),
       Placeholder.configure({ placeholder: placeholder || 'Bắt đầu soạn giáo án... (gõ $E=mc^2$ → tự render công thức)' }),
     ],
     content: value,
     editable,
+    editorProps: {
+      // Dán ảnh từ clipboard (Ctrl+V hình từ bên ngoài) → nén → chèn <img>
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items
+        if (!items) return false
+        for (const it of items) {
+          if (it.type.startsWith('image/')) {
+            const file = it.getAsFile()
+            if (file) {
+              event.preventDefault()
+              imageFileToDataUrl(file).then(src => {
+                editorRef.current?.chain().focus().setImage({ src }).run()
+              })
+              return true
+            }
+          }
+        }
+        return false
+      },
+      // Kéo-thả file ảnh vào editor
+      handleDrop: (_view, event) => {
+        const files = (event as DragEvent).dataTransfer?.files
+        if (files && files.length && files[0].type.startsWith('image/')) {
+          event.preventDefault()
+          imageFileToDataUrl(files[0]).then(src => {
+            editorRef.current?.chain().focus().setImage({ src }).run()
+          })
+          return true
+        }
+        return false
+      },
+    },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML(), editor.getJSON())
     },
   })
+
+  // Giữ ref tới editor để dùng trong handlePaste/handleDrop (tránh stale closure)
+  useEffect(() => { editorRef.current = editor }, [editor])
 
   // Sync external value change → editor (for loading existing doc)
   useEffect(() => {
@@ -353,6 +420,22 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
           title="Chèn công thức LaTeX (KaTeX) — hoặc gõ $...$ trong text để auto-render"
         />
 
+        {/* Image — chọn file / dán (Ctrl+V) / kéo-thả ảnh từ bên ngoài */}
+        <ToolbarBtn
+          icon={<ImagePlus size={15} />}
+          active={false}
+          onClick={() => fileInputRef.current?.click()}
+          title="Chèn ảnh (chọn file, hoặc dán Ctrl+V / kéo-thả ảnh từ bên ngoài)"
+        />
+
+        {/* TikZ / LaTeX figure — vẽ hình bằng mã LaTeX */}
+        <ToolbarBtn
+          icon={<Shapes size={15} />}
+          active={tikzOpen}
+          onClick={() => setTikzOpen(true)}
+          title="Chèn hình vẽ LaTeX/TikZ (gõ mã \\begin{tikzpicture}... → render thành hình)"
+        />
+
         {/* Link */}
         <div style={{ position: 'relative' }}>
           <ToolbarBtn
@@ -523,8 +606,40 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
           .ProseMirror :focus {
             outline: none;
           }
+          .ProseMirror img.tiptap-img, .ProseMirror img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            margin: 8px 0;
+            display: block;
+          }
+          .ProseMirror img.ProseMirror-selectednode {
+            outline: 3px solid #7c3aed;
+          }
         `}</style>
         <EditorContent editor={editor} />
+
+        {/* Hidden file input cho nút Chèn ảnh */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            const src = await imageFileToDataUrl(f)
+            editor.chain().focus().setImage({ src }).run()
+          }}
+        />
+
+        {tikzOpen && (
+          <TikzInsertModal
+            onClose={() => setTikzOpen(false)}
+            onInsert={(src) => { editor.chain().focus().setImage({ src }).run(); setTikzOpen(false) }}
+          />
+        )}
       </div>
     </div>
   )
@@ -553,6 +668,89 @@ function ToolbarBtn({ icon, active, onClick, title, disabled }: {
 
 function Divider() {
   return <div style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 4px' }} />
+}
+
+/**
+ * TikzInsertModal — gõ mã LaTeX/TikZ → render bằng tikzjax → chèn vào editor
+ * dưới dạng <img> (SVG nền trắng) nên hiển thị được ở mọi nơi (không cần
+ * tikzjax lúc xem). Có nút "Vẽ/Xem trước" rồi mới "Chèn vào bài".
+ */
+function TikzInsertModal({ onClose, onInsert }: { onClose: () => void; onInsert: (src: string) => void }) {
+  const [code, setCode] = useState(
+    '\\begin{tikzpicture}\n' +
+    '  \\draw[->] (-2,0) -- (2,0) node[right]{$x$};\n' +
+    '  \\draw[->] (0,-2) -- (0,2) node[above]{$y$};\n' +
+    '  \\draw[thick,blue] (-1.5,-1.5) -- (1.5,1.5);\n' +
+    '\\end{tikzpicture}'
+  )
+  const [status, setStatus] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle')
+  const hostRef = useRef<HTMLDivElement>(null)
+
+  const render = () => {
+    const host = hostRef.current
+    if (!host) return
+    if (!document.querySelector(`link[href="${TIKZJAX_CSS}"]`)) {
+      const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = TIKZJAX_CSS; document.head.appendChild(l)
+    }
+    host.innerHTML = ''
+    setStatus('rendering')
+    const tikz = document.createElement('script')
+    tikz.setAttribute('type', 'text/tikz'); tikz.setAttribute('data-show-console', 'false')
+    tikz.textContent = code
+    host.appendChild(tikz)
+    const obs = new MutationObserver(() => { if (host.querySelector('svg')) { setStatus('done'); obs.disconnect() } })
+    obs.observe(host, { childList: true, subtree: true })
+    const js = document.createElement('script'); js.src = TIKZJAX_JS; js.async = true
+    js.onerror = () => setStatus('error')
+    document.body.appendChild(js)
+    setTimeout(() => setStatus(s => (s === 'rendering' ? 'error' : s)), 15000)
+  }
+
+  const insert = () => {
+    const svg = hostRef.current?.querySelector('svg')
+    if (!svg) return
+    try {
+      const clone = svg.cloneNode(true) as SVGSVGElement
+      const vb = (svg.getAttribute('viewBox') || '0 0 100 100').split(/\s+/).map(Number)
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      rect.setAttribute('x', String(vb[0] || 0)); rect.setAttribute('y', String(vb[1] || 0))
+      rect.setAttribute('width', String(vb[2] || 100)); rect.setAttribute('height', String(vb[3] || 100))
+      rect.setAttribute('fill', '#ffffff')
+      clone.insertBefore(rect, clone.firstChild)
+      const xml = new XMLSerializer().serializeToString(clone)
+      onInsert('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml))
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', padding: 18, color: '#111' }}>
+        <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Shapes size={18} color="#7c3aed" /> Chèn hình vẽ LaTeX / TikZ
+        </h3>
+        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+          Gõ mã <code>\begin{'{tikzpicture}'}</code>…<code>\end{'{tikzpicture}'}</code> rồi bấm <b>Vẽ / Xem trước</b>. Hình sẽ được chèn dạng ảnh (nền trắng) nên hiển thị mọi nơi.
+        </p>
+        <textarea
+          value={code}
+          onChange={e => { setCode(e.target.value); setStatus('idle') }}
+          spellCheck={false}
+          style={{ width: '100%', minHeight: 140, fontFamily: 'ui-monospace, monospace', fontSize: 13, padding: 10, border: '1px solid #d1d5db', borderRadius: 8, color: '#111', resize: 'vertical' }}
+        />
+        <div style={{ marginTop: 10, background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 8, padding: 12, minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div ref={hostRef} style={{ color: '#111' }} />
+          {status === 'idle' && <span style={{ fontSize: 12, color: '#94a3b8' }}>Bấm "Vẽ / Xem trước" để hiển thị hình</span>}
+          {status === 'rendering' && <span style={{ fontSize: 12, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Loader2 size={14} className="animate-spin" /> Đang vẽ…</span>}
+          {status === 'error' && <span style={{ fontSize: 12, color: '#ef4444' }}>Không vẽ được — kiểm tra lại mã TikZ.</span>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, color: '#374151', cursor: 'pointer' }}>Đóng</button>
+          <button onClick={render} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#f3f4f6', fontSize: 13, fontWeight: 600, color: '#111', cursor: 'pointer' }}>Vẽ / Xem trước</button>
+          <button onClick={insert} disabled={status !== 'done'} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: status === 'done' ? '#7c3aed' : '#c4b5fd', color: '#fff', fontSize: 13, fontWeight: 700, cursor: status === 'done' ? 'pointer' : 'not-allowed' }}>Chèn vào bài</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /** Helper: extract editor instance for parent to call commands */

@@ -1527,6 +1527,7 @@ html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
 .tiptap-display li { margin-bottom: 0.2rem; }
 .tiptap-display strong { font-weight: 700; }
 .tiptap-display hr { border-top: 1px solid rgba(255,255,255,0.15); margin: 0.75rem 0; }
+.tiptap-display img { max-width: 100%; height: auto; border-radius: 6px; margin: 8px 0; display: block; }
 
 
 /* Hide scrollbar utility — for horizontal-scrolling toolbars on mobile */

@@ -1327,11 +1327,11 @@ function QuestionCard({
               {canEdit ? (
                 <>
                   <button
-                    onClick={() => { setIsEditing(true); onToggle() }}
+                    onClick={() => { setIsEditing(true); if (!isExpanded) onToggle() }}
                     className="px-3 py-1.5 border border-border text-foreground/80 rounded-lg text-xs hover:bg-secondary flex items-center gap-1"
                   >
-                    <Edit2 className="w-3 h-3" />
-                    Sửa nhanh
+                    <PenLine className="w-3 h-3" />
+                    Sửa với trình soạn thảo
                   </button>
                   <button
                     onClick={onDelete}
@@ -1364,11 +1364,11 @@ function QuestionCard({
                 <label className="text-sm font-semibold text-foreground/80 mb-2 block">
                   Nội dung câu hỏi
                 </label>
-                <textarea
+                <QuestionRichEditor
                   value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
-                  rows={3}
+                  onChange={setEditedContent}
+                  minHeight={180}
+                  placeholder="Soạn câu hỏi: $x^2$ inline, $$\int$$ block, chèn ảnh (dán/kéo-thả), hình TikZ qua nút ◆"
                 />
               </div>
 
@@ -1412,12 +1412,11 @@ function QuestionCard({
 
               <div>
                 <label className="text-sm font-semibold text-foreground/80 mb-2 block">Giải thích</label>
-                <textarea
-                  value={editedExplanation}
-                  onChange={(e) => setEditedExplanation(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
-                  rows={2}
-                  placeholder="Giải thích chi tiết (tùy chọn)..."
+                <QuestionRichEditor
+                  value={editedExplanation || ''}
+                  onChange={setEditedExplanation}
+                  minHeight={140}
+                  placeholder="Giải thích chi tiết (tùy chọn) — hỗ trợ công thức, ảnh, hình TikZ..."
                 />
               </div>
 
