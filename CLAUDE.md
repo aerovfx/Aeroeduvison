@@ -15,6 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `61ba236` (revision pixiai-00634-xaj, 2026-05-29 — Render LaTeX cho đáp án A/B/C/D trong thẻ ngân hàng đề (/teacher/question-bank): bọc opt trong MathText, strip HTML + bỏ tiền tố chữ cái → KaTeX render công thức $\dfrac{2}{4}=\dfrac{3}{6}$ thay vì raw)
+- Last deployed commit: `f5c29d6` (revision pixiai-00633-vob, 2026-05-29 — Fix phần thi /exam-sheet/:id: ExamSheet dùng api instance (auth Bearer + baseURL native) thay axios trần + chuẩn hoá field type→questionType / correct→correctAnswer → câu vào đúng Phần I-IV, đủ ô tô đáp án. MathText thêm prop style. Verify live: /api/exams/:id trả 10 câu multiple_choice 4 options)
 - Last deployed commit: `c758d78` (revision pixiai-00632-xew, 2026-05-29 — IoT Lab thêm link công cụ còn thiếu: card "Mô phỏng mạch" (/dashboard/iot-lab/circuit-simulator) vào Quick Access grid, mở rộng lg:grid-cols-6→7)
 - Last deployed commit: `41bb875` (revision pixiai-00631-til, 2026-05-29 — Module Toán mở rộng TOÀN LỨA TUỔI: 10 chặng theo cấp độ Lớp 1–2→3–5→6–7→8–9→10→11→12→Đại học→Toán cho Vật lí→Toán cho AI, 50 câu trắc nghiệm giàu LaTeX (∫, ∇, ma trận, sigmoid/softmax/MSE/gradient descent, v=dx/dt, E=mc²) + giải thích. Thêm TikzFigure (tikzjax) render HÌNH VẼ LaTeX/TikZ trên nền trắng — 4 hình. /student/math HTTP 200)
 - Last deployed commit: `20037ca` (revision pixiai-00630-det, 2026-05-29 — Cập nhật email các trang Chính sách/Điều khoản: security@/privacy@/admin@inphysic.com → thegioithu2@gmail.com)
@@ -64,7 +66,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00631-til — module Toán toàn lứa tuổi + hình vẽ LaTeX TikZ)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00634-xaj — LaTeX đáp án ngân hàng đề; trước đó 00633-vob fix phần thi /exam-sheet, 00632-xew IoT link)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
