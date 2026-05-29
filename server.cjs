@@ -13140,8 +13140,9 @@ app.get('/api/learning/my-courses', async (req, res) => {
 });
 
 // (real /api/teachers/all handler moved TRƯỚC proxy line 2606 — dead code)
-app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
-app.get('/api/learning/purchase-history', (_req, res) => res.json({ orders: [], total: 0 }));
+// LƯU Ý: stub /api/learning/wishlist + purchase-history (trả {items/orders,total})
+// ĐÃ GỠ — chúng shadow handler thật bên dưới VÀ trả object trong khi FE cần
+// mảng → .map crash. Handler thật (DB-backed) nằm gần block KG/contacts.
 
 // Agents (exam-prep stats)
 app.get('/api/agents/exam-prep/stats', (_req, res) => res.json({ total: 0, today: 0, streak: 0, accuracy: 0 }));
