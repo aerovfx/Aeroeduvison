@@ -10730,6 +10730,25 @@ app.patch('/api/classes/:id', async (req, res) => {
 });
 
 // GET /api/classes/:id/students → { students: [...] }
+// GET /api/classes/:id — thông tin 1 lớp (trước đây KHÔNG có handler → rớt
+// xuống proxy aero-backend tắt → 503 "Không thể tải thông tin lớp học").
+app.get('/api/classes/:id', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const isAdmin = decoded.role === 'ADMIN';
+    const params = isAdmin ? [req.params.id] : [req.params.id, _classIds(decoded)];
+    const ownClause = isAdmin ? '' : ' AND teacher_id = ANY($2::text[])';
+    const { rows } = await pool.query(
+      `SELECT id, name, grade, school_year AS "schoolYear", description,
+              context_type, institution_name, teacher_id AS "teacherId", created_at AS "createdAt",
+              COALESCE((SELECT COUNT(*) FROM "ClassStudent" cs WHERE cs.class_id = "Class".id), 0)::int AS "studentCount"
+       FROM "Class" WHERE id = $1${ownClause} LIMIT 1`, params);
+    if (!rows[0]) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    return res.json({ class: rows[0] });
+  } catch (e) { console.error('[classes:get]', e.message); return res.status(500).json({ error: 'Lỗi tải thông tin lớp' }); }
+});
+
 app.get('/api/classes/:id/students', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
