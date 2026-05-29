@@ -10334,16 +10334,34 @@ function _akVerify(token) {
 // nên admin đăng nhập không bị ảnh hưởng. Endpoint proxy (students/payments/
 // teachers) KHÔNG nằm trong danh sách → giữ nguyên hành vi.
 const _ADMIN_GUARD_PREFIXES = ['/api/admin/overview', '/api/admin/analytics', '/api/admin/insights', '/api/admin/operations', '/api/admin/payments'];
-app.use((req, res, next) => {
-  if (!_ADMIN_GUARD_PREFIXES.some(p => req.path.startsWith(p))) return next();
+
+// Kiểm tra 1 request có quyền ADMIN không. Trả 'ok' | 'noauth' | 'forbidden'.
+// QUAN TRỌNG: token JWT dùng ignoreExpiration nên role trong token có thể CŨ
+// (user vừa được nâng quyền ADMIN nhưng token cũ vẫn ghi role cũ). Vì vậy nếu
+// role trong token chưa phải ADMIN → tra role THẬT trong DB trước khi từ chối.
+async function _isAdminRequest(req) {
   const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!auth.startsWith('Bearer ')) return 'noauth';
   let decoded;
   try { decoded = _akVerify(auth.slice(7)); }
-  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
-  if (process.env.DISABLE_ADMIN_GATE !== '1' && decoded.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Chỉ admin truy cập được' });
+  catch { return 'noauth'; }
+  if (process.env.DISABLE_ADMIN_GATE === '1') return 'ok';
+  if (decoded.role === 'ADMIN') return 'ok';
+  const uid = decoded.sub || decoded.userId || decoded.id;
+  if (uid) {
+    try {
+      const { rows } = await _getPool().query('SELECT role FROM "User" WHERE id = $1', [uid]);
+      if (rows[0]?.role === 'ADMIN') return 'ok';
+    } catch (e) { console.warn('[admin-gate] role lookup:', e.message); }
   }
+  return 'forbidden';
+}
+
+app.use(async (req, res, next) => {
+  if (!_ADMIN_GUARD_PREFIXES.some(p => req.path.startsWith(p))) return next();
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+  if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
   return next();
 });
 
@@ -13551,7 +13569,9 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
   }
   _ensureUserProfileSchema().catch(() => {});
 
-  function _adminAuth(req, res) {
+  // async vì có thể tra role THẬT trong DB khi token role cũ (user vừa nâng
+  // quyền ADMIN nhưng JWT cũ — ignoreExpiration — vẫn ghi role cũ).
+  async function _adminAuth(req, res) {
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
     let decoded;
@@ -13559,8 +13579,16 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
     // Bypass cho dev / cho phép TEACHER tạm thời xem admin
     if (process.env.DISABLE_ADMIN_GATE === '1') return decoded;
-    if (decoded.role !== 'ADMIN') { res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null; }
-    return decoded;
+    if (decoded.role === 'ADMIN') return decoded;
+    // Token role chưa phải ADMIN → kiểm tra role hiện tại trong DB
+    const uid = decoded.sub || decoded.userId || decoded.id;
+    if (uid) {
+      try {
+        const { rows } = await _getPool().query('SELECT role FROM "User" WHERE id = $1', [uid]);
+        if (rows[0]?.role === 'ADMIN') return decoded;
+      } catch (e) { console.warn('[admin-gate] role lookup:', e.message); }
+    }
+    res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null;
   }
 
   function _mapAdminUser(u, profileRow) {
@@ -13583,7 +13611,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // GET /api/admin/users — pagination + filters
   app.get('/api/admin/users', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const pool = _getPool();
       const page = Math.max(1, Number(req.query.page) || 1);
@@ -13638,7 +13666,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // GET /api/admin/users/stats
   app.get('/api/admin/users/stats', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const pool = _getPool();
       const { rows } = await pool.query(`
@@ -13660,7 +13688,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // GET /api/admin/users/:id — detail
   app.get('/api/admin/users/:id', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const pool = _getPool();
       const { rows } = await pool.query(`
@@ -13686,7 +13714,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // PATCH /api/admin/users/:id — update name/email/role/accountType/banned
   app.patch('/api/admin/users/:id', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const b = req.body || {};
       const updates = ['"updatedAt" = NOW()'];
@@ -13727,7 +13755,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // POST /api/admin/users/:id/reset-password
   app.post('/api/admin/users/:id/reset-password', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const newPassword = String(req.body?.newPassword || '');
       if (newPassword.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
@@ -13740,7 +13768,7 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
 
   // DELETE /api/admin/users/:id — soft delete (banned=true)
   app.delete('/api/admin/users/:id', async (req, res) => {
-    const decoded = _adminAuth(req, res); if (!decoded) return;
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
     try {
       const pool = _getPool();
       await pool.query(`UPDATE "User" SET banned = true, "bannedReason" = 'Đã xoá bởi admin', "bannedAt" = NOW(), "updatedAt" = NOW() WHERE id = $1`, [req.params.id]);
@@ -14059,15 +14087,10 @@ app.get('/api/admin/overview/full', async (req, res) => {
 // thể là createdBy HOẶC teacher_id tuỳ đường insert). Mỗi bảng try/catch riêng,
 // idempotent (chạy lại tìm 0 dòng). Gate ADMIN. KHÔNG đụng bảng student/payment/auth.
 app.post('/api/admin/users/inherit-teacher', async (req, res) => {
-  // Gate ADMIN (module-scope → dùng _akVerify)
-  const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
-  let decoded;
-  try { decoded = _akVerify(auth.slice(7)); }
-  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
-  if (process.env.DISABLE_ADMIN_GATE !== '1' && decoded.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Chỉ admin truy cập được' });
-  }
+  // Gate ADMIN (DB-fallback cho token role cũ)
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+  if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin truy cập được' });
 
   // Chỉ các bảng TÀI LIỆU/TÀI SẢN của giáo viên (KHÔNG gồm payment/auth/student-progress)
   const CONTENT_TABLES = [
@@ -14411,14 +14434,9 @@ app.get('/api/admin/analytics/funnel', async (req, res) => {
 
 // DELETE rows session_id NULL — admin only, dùng để cleanup historical noise
 app.delete('/api/admin/analytics/cleanup-null', async (req, res) => {
-  const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
-  let decoded;
-  try { decoded = _akVerify(auth.slice(7)); }
-  catch { return res.status(401).json({ error: 'Invalid token' }); }
-  if (decoded.role !== 'ADMIN' && process.env.DISABLE_ADMIN_GATE !== '1') {
-    return res.status(403).json({ error: 'Admin only' });
-  }
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+  if (verdict === 'forbidden') return res.status(403).json({ error: 'Admin only' });
   try {
     const pool = _getPool();
     const { rowCount } = await pool.query(
@@ -15568,13 +15586,9 @@ app.get('/api/english/curriculum', async (_req, res) => {
   }
 });
 app.put('/api/english/curriculum', async (req, res) => {
-  const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
-  let decoded;
-  try { decoded = _akVerify(auth.slice(7)); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
-  if (decoded.role !== 'ADMIN' && process.env.DISABLE_ADMIN_GATE !== '1') {
-    return res.status(403).json({ error: 'Chỉ admin được biên tập module Tiếng Anh' });
-  }
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
+  if (verdict === 'forbidden') return res.status(403).json({ error: 'Chỉ admin được biên tập module Tiếng Anh' });
   const journey = req.body && req.body.journey;
   if (!Array.isArray(journey) || journey.length === 0) return res.status(400).json({ error: 'journey không hợp lệ' });
   for (const d of journey) {
