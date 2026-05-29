@@ -1437,10 +1437,11 @@ export default function IoTLab() {
         </div>
 
         {/* ── Quick Access Cards — deep-link cho assignment "lắp ráp / nghiên cứu mạch" ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
           {[
             { to: '/dashboard/iot-lab/circuit-builder', icon: Wrench, color: 'from-amber-500 to-orange-600', label: 'Mạch Analog', desc: 'Battery, R, LED, tụ' },
             { to: '/dashboard/iot-lab/circuit-presets', icon: BookOpen, color: 'from-emerald-500 to-teal-600', label: '8 Mạch mẫu', desc: 'Nối tiếp, song song, RC' },
+            { to: '/dashboard/iot-lab/circuit-simulator', icon: Activity, color: 'from-sky-500 to-indigo-600', label: 'Mô phỏng mạch', desc: 'RLC, dao động, đồ thị' },
             { to: '/dashboard/iot-lab/semiconductor', icon: Sigma, color: 'from-purple-500 to-indigo-600', label: 'Bán dẫn', desc: 'Diode, NE555, Op-Amp' },
             { to: '/dashboard/iot-lab/digital-logic', icon: Cpu, color: 'from-blue-500 to-cyan-600', label: 'Cổng Logic', desc: 'AND, OR, NOT, FF' },
             { to: '/dashboard/iot-lab/custom-board', icon: CircuitBoard, color: 'from-pink-500 to-rose-600', label: 'Wokwi Custom', desc: 'Tự thiết kế mạch' },
