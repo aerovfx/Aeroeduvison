@@ -119,8 +119,8 @@ export default function MathLesson() {
         <div className="flex items-center gap-1 font-bold" style={{ color: WRONG }}><Heart className="w-5 h-5" fill={WRONG} /> {hearts}</div>
       </div>
 
-      {/* Question */}
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-8 py-6">
+      {/* Question — KHÔNG flex-1: dồn nội dung + phản hồi lên cao, nút "Tiếp" sát đáp án dễ bấm */}
+      <div className="max-w-2xl mx-auto w-full px-4 sm:px-8 py-6">
         <div className="text-xs uppercase tracking-wide opacity-50 mb-2">{found.stop.emoji} {found.stop.placeVi} · {found.stop.era}</div>
         <div className="rounded-2xl p-5 mb-3" style={{ background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)' }}>
           <MathText as="div" className="text-lg font-semibold leading-snug">{qn.prompt}</MathText>

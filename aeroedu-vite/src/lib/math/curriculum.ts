@@ -1,9 +1,13 @@
 /**
- * Math curriculum — HÀNH TRÌNH TOÁN HỌC toàn lứa tuổi.
+ * Math curriculum — HÀNH TRÌNH TOÁN HỌC: vừa theo CẤP ĐỘ vừa theo LỊCH SỬ.
  *
- * Lộ trình theo CẤP ĐỘ từ vỡ lòng → đại học → toán ứng dụng:
- *   🔢 Lớp 1–2 → ✖️ Lớp 3–5 → ➗ Lớp 6–7 → 📐 Lớp 8–9 → 📊 Lớp 10 →
- *   🧮 Lớp 11 → ∫ Lớp 12 → 🎓 Đại học → ⚛️ Toán cho Vật lí → 🤖 Toán cho AI.
+ * Mỗi chặng vừa là một bậc học, vừa là một nền văn minh toán học — du hành
+ * theo dòng lịch sử từ Ai Cập cổ đại bên sông Nile đến thánh địa hiện đại
+ * Viện IAS Princeton (Mỹ):
+ *   🏜️ Ai Cập (Lớp 1–2) → 🏺 Babylon (Lớp 3–5) → 🏛️ Hy Lạp (Lớp 6–7) →
+ *   🗼 Alexandria (Lớp 8–9) → 🕌 Ấn Độ & Hồi giáo (Lớp 10) →
+ *   🎲 Phục Hưng (Lớp 11) → 🍎 Newton–Leibniz (Lớp 12) →
+ *   🎓 Göttingen (Đại học) → ⚛️ Einstein (Toán Vật lí) → 🤖 Princeton (Toán AI).
  * Mỗi chặng = 1 bài gồm câu trắc nghiệm có LaTeX (ký hiệu + hình vẽ TikZ) +
  * giải thích. Khoá tuần tự, XP/streak/sao.
  *
@@ -30,11 +34,13 @@ export interface MathLesson {
 
 export interface MathStop {
   id: string
-  place: string        // nhãn ngắn EN
-  placeVi: string      // tên chặng VN
+  place: string        // nhãn ngắn EN (trung tâm toán học lịch sử)
+  placeVi: string      // tên nền văn minh / trung tâm toán học VN
+  year: string         // mốc thời gian lịch sử (vd "~3000 TCN")
   emoji: string
-  era: string          // nhãn cấp độ (Lớp …/Đại học/Ứng dụng)
-  figure: string       // chủ đề chính
+  era: string          // nhãn cấp độ học (Lớp …/Đại học/Ứng dụng)
+  topicVi: string      // chủ đề toán của chặng (vd "Số học vỡ lòng")
+  figure: string       // nhà toán học tiêu biểu + ý tưởng
   color: string
   blurbVi: string
   lessons: MathLesson[]
@@ -45,9 +51,9 @@ const q = (id: string, prompt: string, options: string[], correctIdx: number, ex
 
 export const JOURNEY: MathStop[] = [
   {
-    id: 'g1-2', place: 'Grade 1-2', placeVi: 'Số học vỡ lòng', emoji: '🔢',
-    era: 'Lớp 1–2', figure: 'Đếm · Cộng · Trừ', color: '#58cc02',
-    blurbVi: 'Khởi đầu: đếm số, cộng trừ trong phạm vi nhỏ.',
+    id: 'g1-2', place: 'Ancient Egypt', placeVi: 'Ai Cập cổ đại', year: '~3000 TCN', emoji: '🏜️',
+    era: 'Lớp 1–2', topicVi: 'Số học vỡ lòng', figure: 'Ahmes · giấy cói Rhind', color: '#58cc02',
+    blurbVi: 'Bên sông Nile ~3000 năm TCN, người Ai Cập đếm và cộng trừ bằng chữ số tượng hình — nơi em khởi đầu hành trình với Lớp 1–2.',
     lessons: [{
       id: 'math-g1-2-l1', title: 'Cộng trừ cơ bản', icon: '🧸', questions: [
         q('m-g12-1', '$3 + 4 = ?$', ['6', '7', '8', '5'], 1, '$3+4=7$.'),
@@ -59,9 +65,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g3-5', place: 'Grade 3-5', placeVi: 'Tiểu học', emoji: '✖️',
-    era: 'Lớp 3–5', figure: 'Nhân chia · Phân số', color: '#1cb0f6',
-    blurbVi: 'Nhân chia, phân số và hình học cơ bản.',
+    id: 'g3-5', place: 'Babylon', placeVi: 'Lưỡng Hà — Babylon', year: '~1800 TCN', emoji: '🏺',
+    era: 'Lớp 3–5', topicVi: 'Nhân chia · Phân số', figure: 'Bảng đất sét cơ số 60', color: '#1cb0f6',
+    blurbVi: 'Người Babylon dùng hệ cơ số 60 và bảng nhân khắc trên đất sét — nền tảng cho nhân, chia và phân số ở Lớp 3–5.',
     lessons: [{
       id: 'math-g3-5-l1', title: 'Nhân chia & phân số', icon: '🍕', questions: [
         q('m-g35-1', '$6 \\times 7 = ?$', ['42', '48', '36', '49'], 0, '$6\\times 7 = 42$.'),
@@ -73,9 +79,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g6-7', place: 'Grade 6-7', placeVi: 'THCS (đầu cấp)', emoji: '➗',
-    era: 'Lớp 6–7', figure: 'Số nguyên · Tỉ lệ', color: '#ce82ff',
-    blurbVi: 'Số nguyên âm, tỉ lệ và biểu thức đại số đầu tiên.',
+    id: 'g6-7', place: 'Ancient Greece', placeVi: 'Hy Lạp cổ đại', year: '~500 TCN', emoji: '🏛️',
+    era: 'Lớp 6–7', topicVi: 'Số nguyên · Tỉ lệ', figure: 'Pythagoras · Thales', color: '#ce82ff',
+    blurbVi: 'Pythagoras và Thales biến toán thành khoa học suy luận: số, tỉ lệ và biểu thức đầu tiên — đúng tầm Lớp 6–7.',
     lessons: [{
       id: 'math-g6-7-l1', title: 'Số nguyên & biểu thức', icon: '🌡️', questions: [
         q('m-g67-1', '$(-7) + 12 = ?$', ['$-5$', '$5$', '$19$', '$-19$'], 1, '$-7+12 = 5$.'),
@@ -87,9 +93,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g8-9', place: 'Grade 8-9', placeVi: 'THCS', emoji: '📐',
-    era: 'Lớp 8–9', figure: 'Phương trình · Pythagoras', color: '#ff9600',
-    blurbVi: 'Phương trình bậc nhất, căn bậc hai, định lý Pythagoras.',
+    id: 'g8-9', place: 'Alexandria', placeVi: 'Alexandria (Ai Cập)', year: '~300 TCN', emoji: '🗼',
+    era: 'Lớp 8–9', topicVi: 'Phương trình · Pythagoras', figure: 'Euclid — "Cơ sở"', color: '#ff9600',
+    blurbVi: 'Tại thư viện Alexandria, Euclid viết "Cơ sở" — bộ sách hình học vĩ đại với định lý Pythagoras, nền của Lớp 8–9.',
     lessons: [{
       id: 'math-g8-9-l1', title: 'Phương trình & hình học', icon: '📏', questions: [
         q('m-g89-1', 'Giải $2x - 6 = 10$', ['$x=2$', '$x=8$', '$x=4$', '$x=16$'], 1, '$2x=16 \\Rightarrow x=8$.'),
@@ -102,9 +108,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g10', place: 'Grade 10', placeVi: 'THPT — Lớp 10', emoji: '📊',
-    era: 'Lớp 10', figure: 'Hàm số · Lượng giác', color: '#22d3ee',
-    blurbVi: 'Tập hợp, hàm số bậc hai (parabol), lượng giác cơ bản.',
+    id: 'g10', place: 'India & Islamic World', placeVi: 'Ấn Độ & Thế giới Hồi giáo', year: '~500–900', emoji: '🕌',
+    era: 'Lớp 10', topicVi: 'Hàm số · Lượng giác', figure: 'Aryabhata · Al-Khwarizmi', color: '#22d3ee',
+    blurbVi: 'Aryabhata khai sinh lượng giác (sin), Al-Khwarizmi đặt nền "đại số" (algebra) và số 0 — hành trang cho Lớp 10.',
     lessons: [{
       id: 'math-g10-l1', title: 'Hàm số & lượng giác', icon: '📈', questions: [
         q('m-g10-1', 'Đồ thị hàm $y = x^2$ có dạng?', ['Đường thẳng', 'Parabol', 'Đường tròn', 'Hyperbol'], 1, '$y=x^2$ là parabol đỉnh $O$, mở lên.',
@@ -117,9 +123,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g11', place: 'Grade 11', placeVi: 'THPT — Lớp 11', emoji: '🧮',
-    era: 'Lớp 11', figure: 'Đạo hàm · Xác suất', color: '#a06bff',
-    blurbVi: 'Dãy số, giới hạn, đạo hàm, tổ hợp – xác suất.',
+    id: 'g11', place: 'Renaissance Europe', placeVi: 'Châu Âu Phục Hưng', year: '~1600', emoji: '🎲',
+    era: 'Lớp 11', topicVi: 'Đạo hàm · Xác suất', figure: 'Descartes · Fermat · Pascal', color: '#a06bff',
+    blurbVi: 'Descartes nối hình học với đại số, Pascal–Fermat sáng lập xác suất qua các ván cờ may rủi — chính là Lớp 11.',
     lessons: [{
       id: 'math-g11-l1', title: 'Đạo hàm & xác suất', icon: '🎲', questions: [
         q('m-g11-1', 'Đạo hàm $(x^3)\' = ?$', ['$3x^2$', '$x^2$', '$3x$', '$x^4$'], 0, 'Quy tắc luỹ thừa: $(x^n)\'=nx^{n-1}$.'),
@@ -131,9 +137,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'g12', place: 'Grade 12', placeVi: 'THPT — Lớp 12', emoji: '∫',
-    era: 'Lớp 12', figure: 'Tích phân · Số phức', color: '#f5b301',
-    blurbVi: 'Nguyên hàm – tích phân, số phức, hình giải tích $Oxyz$.',
+    id: 'g12', place: 'Newton & Leibniz', placeVi: 'Anh & Đức — Vi tích phân', year: '~1680', emoji: '🍎',
+    era: 'Lớp 12', topicVi: 'Tích phân · Số phức', figure: 'Newton · Leibniz', color: '#f5b301',
+    blurbVi: 'Newton và Leibniz phát minh vi–tích phân, mở cánh cửa giải tích và số phức — đỉnh toán phổ thông ở Lớp 12.',
     lessons: [{
       id: 'math-g12-l1', title: 'Tích phân & số phức', icon: '🧊', questions: [
         q('m-g12b-1', '$\\displaystyle\\int_0^1 2x\\,dx = ?$', ['$1$', '$2$', '$\\frac12$', '$0$'], 0, '$\\int 2x\\,dx = x^2$; thay cận: $1^2-0^2 = 1$.'),
@@ -145,9 +151,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'university', place: 'University', placeVi: 'Toán Đại học', emoji: '🎓',
-    era: 'Đại học', figure: 'Đại số tuyến tính · Giải tích', color: '#3b6fe0',
-    blurbVi: 'Đại số tuyến tính, giải tích nhiều biến, xác suất – thống kê.',
+    id: 'university', place: 'Göttingen', placeVi: 'Đức — Göttingen', year: '~1800–1900', emoji: '🎓',
+    era: 'Đại học', topicVi: 'Đại số tuyến tính · Giải tích', figure: 'Gauss · Riemann · Hilbert', color: '#3b6fe0',
+    blurbVi: '"Ông hoàng toán học" Gauss cùng Riemann, Hilbert ở Göttingen dựng nên toán hiện đại: ma trận, giải tích nhiều biến.',
     lessons: [{
       id: 'math-university-l1', title: 'Toán cao cấp', icon: '🏛️', questions: [
         q('m-uni-1', 'Định thức $\\det\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix} = ?$', ['$-2$', '$2$', '$10$', '$-10$'], 0, '$ad-bc = 1\\cdot4 - 2\\cdot3 = -2$.'),
@@ -159,9 +165,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'physics-math', place: 'Math for Physics', placeVi: 'Toán cho Vật lí', emoji: '⚛️',
-    era: 'Ứng dụng', figure: 'Vector · Vi phân', color: '#ef4444',
-    blurbVi: 'Công cụ toán cho vật lí: vector, đạo hàm/tích phân, phương trình vi phân.',
+    id: 'physics-math', place: 'Einstein era', placeVi: 'Thụy Sĩ–Đức — Thời Einstein', year: '~1905', emoji: '⚛️',
+    era: 'Ứng dụng', topicVi: 'Toán cho Vật lí', figure: 'Minkowski · Einstein', color: '#ef4444',
+    blurbVi: 'Vector, đạo hàm và hình học Minkowski trở thành ngôn ngữ của thuyết tương đối Einstein — toán phục vụ vật lí.',
     lessons: [{
       id: 'math-physics-l1', title: 'Toán trong Vật lí', icon: '🚀', questions: [
         q('m-phy-1', 'Vận tốc là đạo hàm của quãng đường theo thời gian: $v = ?$', ['$\\frac{dx}{dt}$', '$\\int x\\,dt$', '$x\\cdot t$', '$\\frac{dt}{dx}$'], 0, '$v=\\dfrac{dx}{dt}$ — tốc độ thay đổi vị trí.'),
@@ -174,9 +180,9 @@ export const JOURNEY: MathStop[] = [
     }],
   },
   {
-    id: 'ai-math', place: 'Math for AI', placeVi: 'Toán cho Nghiên cứu AI', emoji: '🤖',
-    era: 'Ứng dụng', figure: 'Ma trận · Gradient · Xác suất', color: '#7c5cff',
-    blurbVi: 'Đích đến: nền toán cho AI — đại số tuyến tính, gradient, xác suất, hàm mất mát.',
+    id: 'ai-math', place: 'IAS Princeton (USA)', placeVi: 'Mỹ — Viện IAS Princeton', year: 'Hiện đại', emoji: '🤖',
+    era: 'Ứng dụng', topicVi: 'Toán cho Nghiên cứu AI', figure: 'von Neumann · Turing', color: '#7c5cff',
+    blurbVi: 'Đích đến: Viện Nghiên cứu Cao cấp Princeton (Mỹ) — nơi von Neumann, Turing đặt nền cho máy tính & AI: ma trận, gradient, xác suất.',
     lessons: [{
       id: 'math-ai-l1', title: 'Toán cho Machine Learning', icon: '🧠', questions: [
         q('m-ai-1', 'Đạo hàm hàm sigmoid $\\sigma(x)=\\dfrac{1}{1+e^{-x}}$ bằng?', ['$\\sigma(x)$', '$\\sigma(x)(1-\\sigma(x))$', '$e^{-x}$', '$1-\\sigma(x)$'], 1, 'Kết quả đẹp dùng trong backprop: $\\sigma\'=\\sigma(1-\\sigma)$.'),

@@ -53,7 +53,7 @@ export default function MathJourney() {
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         <p className="text-center text-sm opacity-70 mt-4 mb-6">
-          Du hành theo dòng lịch sử: từ thư viện <b>Alexandria</b> cổ đại đến thánh địa toán học hiện đại — <b>Viện IAS Princeton</b>.
+          Du hành theo dòng lịch sử toán học: từ <b>Ai Cập cổ đại</b> bên sông Nile → Hy Lạp, Ấn Độ, châu Âu → đến thánh địa hiện đại <b>Viện IAS Princeton (Mỹ)</b>. Mỗi chặng vừa là một cấp độ học, vừa là một nền văn minh toán học.
         </p>
 
         {JOURNEY.map((stop, si) => {
@@ -83,8 +83,10 @@ export default function MathJourney() {
                 <div className="flex-1 min-w-0 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${stop.color}44`, opacity: unlocked ? 1 : 0.55 }}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-extrabold">{stop.placeVi}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold opacity-80" style={{ background: 'rgba(255,255,255,0.1)' }}>🕰️ {stop.year}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: `${stop.color}22`, color: stop.color }}>{stop.era}</span>
                   </div>
+                  <div className="text-xs font-bold mt-1" style={{ color: stop.color }}>🎯 {stop.topicVi}</div>
                   <div className="text-xs opacity-60 mt-0.5">📚 {stop.figure}</div>
                   <div className="text-sm opacity-80 mt-1.5">{stop.blurbVi}</div>
                   {done && (

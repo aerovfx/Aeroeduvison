@@ -194,8 +194,8 @@ export default function EnglishLesson() {
         </div>
       </div>
 
-      {/* Thân câu hỏi */}
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-8 py-6">
+      {/* Thân câu hỏi — KHÔNG flex-1: dồn lên cao, nút "Tiếp tục" sát đáp án dễ bấm */}
+      <div className="max-w-2xl mx-auto w-full px-4 sm:px-8 py-6">
         {ex && <ExerciseView ex={ex} phase={phase} onGrade={grade} />}
       </div>
 
