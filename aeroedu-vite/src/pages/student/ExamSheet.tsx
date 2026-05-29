@@ -15,7 +15,17 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Clock, Send, Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle, FileText, ClipboardList, ExternalLink, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import { api } from '@/services/api'
+
+// Chuẩn hoá kiểu câu hỏi: /api/exams/:id trả `type` (vd 'multiple_choice'),
+// nhưng UI phân phần theo `questionType` (MULTIPLE_CHOICE/TRUE_FALSE/…).
+function mapQType(t: unknown): string {
+  const s = String(t || '').toLowerCase()
+  if (s.includes('true') || s.includes('false') || s.includes('dung_sai') || s.includes('tf')) return 'TRUE_FALSE'
+  if (s.includes('short') || s.includes('answer') || s.includes('fill') || s.includes('ngan')) return 'SHORT_ANSWER'
+  if (s.includes('essay') || s.includes('tu_luan')) return 'ESSAY'
+  return 'MULTIPLE_CHOICE'
+}
 import { MathText } from '@/components/common/MathText'
 import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
 import MusicToggle from '@/components/common/MusicToggle'
@@ -28,6 +38,7 @@ interface Question {
   options: string[]
   order: number
   points: number
+  correctAnswer?: string  // chỉ dùng client-side cho shuffleOptions remap letter
 }
 interface Exam {
   id: string
@@ -70,7 +81,7 @@ export default function ExamSheetPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await axios.get<{ exam: Exam; questions: Question[] }>(`/api/exams/${examId}`)
+        const res = await api.get<{ exam: Exam; questions: Question[] }>(`/exams/${examId}`)
         if (cancelled) return
         const exam = res.data.exam
         setExam(exam)
@@ -120,10 +131,19 @@ export default function ExamSheetPage() {
           return
         }
 
-        // Mode mặc định: shuffle questions từ DB
+        // Mode mặc định: chuẩn hoá field (type→questionType, correct→correctAnswer)
+        // rồi shuffle. Tránh việc câu hỏi không vào đúng phần → thiếu ô đáp án.
+        const normalized = (res.data.questions || []).map((qq) => {
+          const r = qq as unknown as Record<string, unknown>
+          return {
+            ...qq,
+            questionType: (qq.questionType as string) || mapQType(r.type),
+            correctAnswer: (qq.correctAnswer as string) ?? (r.correct as string) ?? (r.answer as string),
+          } as Question
+        })
         const prefs = readShufflePrefs()
         const seed = `${examId}-sheet`
-        const qs = shuffleQuestions(res.data.questions || [], { ...prefs, seed })
+        const qs = shuffleQuestions(normalized, { ...prefs, seed })
         setQuestions(qs)
       } catch (err: unknown) {
         const e = err as { response?: { data?: { error?: string } } }
@@ -187,12 +207,12 @@ export default function ExamSheetPage() {
       let scored = 0
       const total = questions.length
       // Submit answers tới backend grading endpoint
-      const res = await axios.post<{
+      const res = await api.post<{
         correct: number; total: number; percentage: number; score: number;
         phanIV?: Array<{ index: number; score: number; maxScore: number; feedback: string }>;
         phanIVMax?: number; phanIVEarned?: number;
       }>(
-        `/api/exams/${examId}/grade`,
+        `/exams/${examId}/grade`,
         { answers },
       ).catch(() => null)
       let finalPct = 0

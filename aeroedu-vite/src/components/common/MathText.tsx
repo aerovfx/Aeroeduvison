@@ -15,7 +15,7 @@
  *   <MathText>Định luật II Newton: $\vec{F} = m\vec{a}$ với $m$ là khối lượng.</MathText>
  *   <MathText display>$$\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$</MathText>
  */
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -26,6 +26,8 @@ interface MathTextProps {
   display?: boolean
   /** Tag wrapper (default: span). Dùng "div" cho block content. */
   as?: 'span' | 'div' | 'p'
+  /** Inline style cho wrapper tag (vd màu chữ trên nền sáng). */
+  style?: CSSProperties
 }
 
 // Regex tìm các đoạn math:
@@ -89,7 +91,7 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-export function MathText({ children, className = '', display = false, as = 'span' }: MathTextProps) {
+export function MathText({ children, className = '', display = false, as = 'span', style }: MathTextProps) {
   const html = useMemo(() => {
     const text = String(children ?? '')
     if (!text) return ''
@@ -122,7 +124,7 @@ export function MathText({ children, className = '', display = false, as = 'span
   }, [children, display])
 
   const Tag = as
-  return <Tag className={`math-text ${className}`} dangerouslySetInnerHTML={{ __html: html }} />
+  return <Tag className={`math-text ${className}`} style={style} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 export default MathText
