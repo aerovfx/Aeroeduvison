@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   MessageSquare, Send, Users, Bell, Brain,
   Video, Phone, Search, MoreVertical, Star, Clock,
   FileText, TrendingUp, Sparkles, Zap, Image as ImageIcon,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { api } from '@/services/api'
 
 interface Student {
   id: string
@@ -68,14 +69,37 @@ function TypeBadge({ type }: { type: AutoMessage['type'] }) {
 
 export default function InteractionCenterPage() {
   const [activeTab, setActiveTab] = useState<'chat' | 'notifications' | 'ai-copilot'>('chat')
+  const [students, setStudents] = useState<Student[]>(STUDENTS)
   const [selectedStudent, setSelectedStudent] = useState<string>('s1')
   const [messageInput, setMessageInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filtered = STUDENTS.filter(s =>
+  // Nạp HS THẬT: lớp đang dạy (ClassStudent) + HS đã kết nối (TeacherStudentLink approved)
+  useEffect(() => {
+    let alive = true
+    api.get<{ students: Array<{ id: string; name: string; avatar: string | null; classNames?: string[]; isLinked?: boolean }>; total: number }>('/teacher/roster')
+      .then(r => {
+        if (!alive) return
+        const list = r.data?.students || []
+        if (!list.length) return // giữ mock nếu chưa có HS
+        const mapped: Student[] = list.map(s => ({
+          id: s.id,
+          name: s.name,
+          avatar: '🧑‍🎓',
+          online: false,
+          unread: 0,
+        }))
+        setStudents(mapped)
+        setSelectedStudent(mapped[0].id)
+      })
+      .catch(() => { /* giữ mock nếu lỗi */ })
+    return () => { alive = false }
+  }, [])
+
+  const filtered = students.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
-  const selectedData = STUDENTS.find(s => s.id === selectedStudent)
+  const selectedData = students.find(s => s.id === selectedStudent)
   const currentChat = CHAT.filter(m => m.studentId === selectedStudent || m.type !== 'ai')
 
   const pendingCount = AUTO_MSGS.filter(m => !m.sent).length
