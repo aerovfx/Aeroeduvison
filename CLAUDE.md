@@ -15,6 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `158d767` (revision pixiai-00639-mac, 2026-05-29 — Fix /admin/payments 503: thêm Node handler /api/admin/payments/{list,stats,subscribers} + :id/approve|reject dùng lib/payment-orders+entitlements+email (approve sinh mã kích hoạt+email như luồng Telegram). Gate ADMIN qua _ADMIN_GUARD_PREFIXES. Verify live: endpoints → 401 không token (trước 503))
+- Last deployed commit: `522f641` (revision pixiai-00638-kon, 2026-05-29 — BẢO MẬT: gate admin overview/analytics/insights/operations endpoints. Trước đây các handler outer-scope (ngoài _adminAuth) trả 200 KHÔNG cần auth → lộ doanh thu/user/traffic/hành vi. Thêm middleware _ADMIN_GUARD_PREFIXES verify token+role ADMIN trước các route. Verify live: /api/admin/overview/full & analytics/overview → 401 không token. FE admin gọi qua api (Bearer) không ảnh hưởng)
 - Last deployed commit: `21972a4` (revision pixiai-00637-xar, 2026-05-29 — Fix /admin/overview 503: thêm Node handler GET /api/admin/overview/full TRƯỚC catch-all proxy (trước đây rớt xuống aero-backend cổng 8090 tắt → ECONNREFUSED). Trả data thật Postgres: kpis/enrollment/networkLoad/revenue(PaymentOrder PAID)/roleBreakdown/xpVelocity/sentiment/services; mỗi query try/catch riêng → luôn 200. Verify live HTTP 200: 156 user, avgMastery 71%, revenue 249k)
 - Last deployed commit: `769dfd3` (revision pixiai-00636-dab, 2026-05-29 — Module Toán thêm Ôn tập Flashcard /student/math/flashcards (SRS subject=Math): mặt trước đề bài LaTeX/TikZ, lật xem đáp án+giải thích, tự đánh giá Lại/Khó/Tốt/Dễ; deck 12 câu ưu tiên đến hạn. curriculum +allQuestions/questionById; MathJourney +nút vàng "Ôn tập Flashcard")
 - Last deployed commit: `b1c5db7` (revision pixiai-00635-dep, 2026-05-29 — Lồng LỊCH SỬ toán học Ai Cập→Mỹ vào từng cấp độ hành trình /student/math (10 chặng: 🏜️Ai Cập Lớp1-2 → 🏺Babylon → 🏛️Hy Lạp → 🗼Alexandria → 🕌Ấn Độ/Hồi giáo → 🎲Phục Hưng → 🍎Newton-Leibniz → 🎓Göttingen → ⚛️Einstein → 🤖IAS Princeton Mỹ Toán AI); MathStop +year+topicVi, thẻ hiện 🕰️mốc+🎯chủ đề+📚nhà toán học. UI Toán & Tiếng Anh: bỏ flex-1 → nút Tiếp/phản hồi dồn lên sát đáp án dễ bấm)
@@ -69,7 +71,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00637-xar — fix /admin/overview 503; trước đó 00636-dab Flashcard Toán, 00635-dep lịch sử Ai Cập→Mỹ + UI nút Tiếp)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00639-mac — fix /admin/payments 503; trước đó 00638-kon BẢO MẬT gate admin endpoints, 00637-xar fix /admin/overview 503)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
