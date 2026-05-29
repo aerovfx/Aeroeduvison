@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `c5ffdc4` (revision pixiai-00625-tah, 2026-05-29 — English palette tím-indigo thay xanh-Duolingo + MIC luyện nói (SpeechRecognition, xin quyền) + nhạc nền (MusicToggle, ở home/flashcard, không ở trang mic) · Pixel Agents thiết kế lại thành quiz-battle dùng ngân hàng đề (HS theo trình độ, GV theo môn dạy, fallback tích hợp) · Module TOÁN "Hành trình Toán học" /student/math: 9 chặng Alexandria→IAS Princeton, 45 câu trắc nghiệm có giải thích. iOS build 12 archived. /student/math verify HTTP 200)
 - Last deployed commit: `ee9f39a` (revision pixiai-00623-nuj, 2026-05-29 — Fix /teacher/environment-monitoring toàn "--": /api/iot/classroom/:id trước trả mọi sensor=null (FE truthy→set thẳng, mock chỉ chạy khi falsy) → nay trả tên lớp+sĩ số thật (ClassStudent)+camera status + chỉ số môi trường mô phỏng ổn-định-theo-lớp + 2 device ảo. Verify live: temp 24/humidity 63/AQI 91)
 - Last deployed commit: `05fa3b6` (revision pixiai-00622-hak, 2026-05-29 — Fix dữ liệu thật 5 trang: KG /dashboard/knowledge-graph (gỡ stub, implement KgNode/KgEdge thật + lib/kg-seed.cjs 46 nodes/51 edges Vật lí 11+Toán+Hoá, seed/expand/search/node thật — verify live 46 nodes) + /student/wishlist & /purchase-history (gỡ stub trả object→array, handler DB thật + bảng Wishlist) + /dashboard/contacts (GET /api/contacts/discover trả user thật, FE thay mock — verify 80 users) + /teacher/interaction-center (nạp HS thật qua /teacher/roster). Qua 3 deploy 00620→00622)
 - Last deployed commit: `dac729c` (revision pixiai-00619-gin, 2026-05-29 — Module Tiếng Anh "Hành trình Vũ trụ" kiểu Duolingo: lộ trình 11 hành tinh Trái Đất→Dải Ngân Hà (khoá tuần tự, tên lửa đánh dấu nhiệm vụ, crown sao), 104 từ vựng + bài tập tự sinh 6 dạng, phát âm Web Speech API native, flashcard+SRS, XP/streak/tim, nền 3D React Three Fiber (Stars+hành tinh quay, lazy+ErrorBoundary tự ẩn nếu thiếu WebGL). + Nền tảng IAP StoreKit (runbook + grantPlan) + bộ tài liệu nộp App Store. Client-side, /student/english)
@@ -56,7 +57,7 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `0/5` (vừa deploy pixiai-00623-nuj — fix Environment Monitoring trả data thật)
+- Commits since last deploy: `0/5` (vừa deploy pixiai-00625-tah — English palette/mic/nhạc + Pixel Agents quiz + Math journey; iOS build 12 archived)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
