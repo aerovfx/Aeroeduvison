@@ -14,6 +14,7 @@ import { useEnglishContent } from '@/lib/english/contentApi'
 import { speak, speakSlow } from '@/lib/english/speech'
 import { getDueCards, recordReview } from '@/lib/srs'
 import { ENG } from '@/lib/english/theme'
+import MusicToggle from '@/components/common/MusicToggle'
 
 const DECK_SIZE = 15
 
@@ -76,6 +77,7 @@ export default function EnglishFlashcards() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--ai-page-bg)', color: 'hsl(var(--foreground))' }}>
+      <MusicToggle top={68} right={14} zIndex={40} />
       {/* Header */}
       <div className="flex items-center gap-4 px-4 sm:px-8 pt-5 pb-2 max-w-xl mx-auto w-full">
         <button onClick={() => navigate('/student/english')} aria-label="Thoát" className="opacity-60 hover:opacity-100">

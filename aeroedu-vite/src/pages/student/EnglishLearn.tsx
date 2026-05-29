@@ -12,6 +12,7 @@ import { Flame, Heart, Star, Lock, Check, Layers, Rocket } from 'lucide-react'
 import { getJourney, journeyStats, allLessonsInOrder } from '@/lib/english/curriculum'
 import { getProgress, lessonStars, isLessonDone } from '@/lib/english/progress'
 import { useEnglishContent } from '@/lib/english/contentApi'
+import MusicToggle from '@/components/common/MusicToggle'
 
 // Cảnh 3D R3F nặng (three) → lazy, chỉ tải khi vào trang. Có ErrorBoundary nội bộ.
 const SpaceScene = lazy(() => import('@/components/english/SpaceScene'))
@@ -45,6 +46,8 @@ export default function EnglishLearn() {
   return (
     <div className="min-h-screen relative overflow-hidden text-white"
       style={{ background: 'radial-gradient(ellipse at top, #1b2a5e 0%, #0a0f24 55%, #05060f 100%)' }}>
+      {/* Nhạc nền (tái dùng track có sẵn) — nút bật/tắt nổi, ghi nhớ lựa chọn */}
+      <MusicToggle top={68} right={14} zIndex={40} />
       {/* Starfield CSS (fallback nhẹ, luôn có) */}
       <div className="pointer-events-none absolute inset-0">
         {stars.map((s, i) => (
