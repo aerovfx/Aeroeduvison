@@ -10333,7 +10333,7 @@ function _akVerify(token) {
 // (đăng ký phía sau dòng này). FE admin gọi qua axios `api` đã tự gắn Bearer
 // nên admin đăng nhập không bị ảnh hưởng. Endpoint proxy (students/payments/
 // teachers) KHÔNG nằm trong danh sách → giữ nguyên hành vi.
-const _ADMIN_GUARD_PREFIXES = ['/api/admin/overview', '/api/admin/analytics', '/api/admin/insights', '/api/admin/operations'];
+const _ADMIN_GUARD_PREFIXES = ['/api/admin/overview', '/api/admin/analytics', '/api/admin/insights', '/api/admin/operations', '/api/admin/payments'];
 app.use((req, res, next) => {
   if (!_ADMIN_GUARD_PREFIXES.some(p => req.path.startsWith(p))) return next();
   const auth = req.headers.authorization || '';
@@ -13909,6 +13909,147 @@ app.get('/api/admin/overview/full', async (req, res) => {
     });
   }
 });
+
+// ── Admin Payments — /admin/payments ─────────────────────────────────────────
+// Trang /admin/payments gọi /api/admin/payments/{list,stats,subscribers} +
+// approve/reject. Trước đây KHÔNG có handler Node → rớt xuống proxy aero-backend
+// (cổng 8090 tắt) → 503. Thêm handler Node dùng lib/payment-orders + entitlements.
+// Đã được gate ADMIN bởi middleware _ADMIN_GUARD_PREFIXES ('/api/admin/payments').
+{
+  const _payOrders = require('./lib/payment-orders.cjs');
+  const _payEnt = require('./lib/entitlements.cjs');
+  const _payEmail = require('./lib/email-sender.cjs');
+  const _payPublicUrl = process.env.PUBLIC_URL || 'https://inphysic.com';
+
+  // GET danh sách đơn (filter status/search)
+  app.get('/api/admin/payments/list', async (req, res) => {
+    try {
+      const orders = await _payOrders.listOrders({
+        status: req.query.status || null,
+        search: req.query.search || '',
+        limit: req.query.limit, offset: req.query.offset,
+      });
+      return res.json({ orders });
+    } catch (e) {
+      console.error('[admin:payments:list]', e.message);
+      return res.json({ orders: [] });
+    }
+  });
+
+  // GET thống kê doanh thu + count theo status
+  app.get('/api/admin/payments/stats', async (_req, res) => {
+    try {
+      const [stats, countByStatus] = await Promise.all([
+        _payOrders.getStats(),
+        _payOrders.countByStatus(),
+      ]);
+      return res.json({ ...stats, countByStatus, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      console.error('[admin:payments:stats]', e.message);
+      return res.json({
+        totalRevenue: 0, paidCount: 0, totalOrders: 0,
+        countByStatus: { PENDING: 0, AWAITING_REVIEW: 0, PAID: 0, REJECTED: 0 },
+        last30Days: [], byPlan: [], recentPaid: [], updatedAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  // GET người đăng ký — gom từ đơn PAID theo user (join User cho tên/ảnh/role)
+  app.get('/api/admin/payments/subscribers', async (_req, res) => {
+    try {
+      const pool = _getPool();
+      let rows = [];
+      try {
+        const r = await pool.query(`
+          SELECT po."userId",
+                 COALESCE(u.name, MAX(po."userName"))  AS name,
+                 COALESCE(u.email, MAX(po."userEmail")) AS email,
+                 u.image, u.role,
+                 COUNT(*)::int        AS order_count,
+                 SUM(po.amount)::float AS lifetime_spend,
+                 (array_agg(po."planId"   ORDER BY po."approvedAt" DESC))[1] AS plan_id,
+                 (array_agg(po."planName" ORDER BY po."approvedAt" DESC))[1] AS plan_name,
+                 MAX(po."approvedAt") AS last_approved
+          FROM "PaymentOrder" po
+          LEFT JOIN "User" u ON u.id = po."userId"
+          WHERE po.status = 'PAID'
+          GROUP BY po."userId", u.name, u.email, u.image, u.role
+          ORDER BY last_approved DESC NULLS LAST`);
+        rows = r.rows;
+      } catch (e) { console.warn('[admin:payments:subscribers]', e.message); }
+
+      const now = Date.now();
+      const subscribers = rows.map(r => {
+        const plan = _payOrders.getPlan(r.plan_id) || {};
+        const durationDays = plan.durationDays || 30;
+        const started = r.last_approved ? new Date(r.last_approved) : new Date(now);
+        const expires = new Date(started.getTime() + durationDays * 86400000);
+        const daysUsed = Math.max(0, Math.floor((now - started.getTime()) / 86400000));
+        const daysRemaining = Math.max(0, Math.ceil((expires.getTime() - now) / 86400000));
+        return {
+          userId: r.userId || null,
+          name: r.name || '(không tên)',
+          email: r.email || '',
+          image: r.image || null,
+          role: r.role || null,
+          activePlan: { id: r.plan_id, name: r.plan_name || plan.name || r.plan_id, priceVnd: plan.amount || 0, durationDays },
+          startedAt: started.toISOString(),
+          expiresAt: expires.toISOString(),
+          daysUsed,
+          daysRemaining,
+          percentUsed: durationDays > 0 ? Math.min(100, Math.round((daysUsed / durationDays) * 100)) : 0,
+          isExpiringSoon: daysRemaining > 0 && daysRemaining <= 7,
+          isExpired: expires.getTime() < now,
+          featuresAccessed: [],
+          lastActivityAt: null,
+          lifetimeSpend: r.lifetime_spend || 0,
+          orderCount: r.order_count || 0,
+        };
+      });
+      return res.json({ subscribers, total: subscribers.length });
+    } catch (e) {
+      console.error('[admin:payments:subscribers]', e.message);
+      return res.json({ subscribers: [], total: 0 });
+    }
+  });
+
+  // POST duyệt đơn → PAID + sinh mã kích hoạt + email (mirror onAdminCallback)
+  app.post('/api/admin/payments/:id/approve', async (req, res) => {
+    try {
+      const order = await _payOrders.getOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Không tìm thấy đơn' });
+      const updated = await _payOrders.setStatus(req.params.id, 'PAID');
+      // best-effort: sinh mã kích hoạt + gửi email (không chặn response nếu lỗi)
+      try {
+        const code = await _payEnt.generateActivationCode(updated);
+        if (updated.userEmail) {
+          await _payEmail.sendActivationEmail({
+            to: updated.userEmail, code: code.code, planName: updated.planName,
+            features: code.features.map(f => _payEnt.FEATURES[f] || f),
+            durationDays: code.durationDays, baseUrl: _payPublicUrl,
+          }).catch(e => console.warn('[admin:payments:approve] email fail:', e.message));
+        }
+      } catch (e) { console.warn('[admin:payments:approve] code fail:', e.message); }
+      return res.json({ ok: true, order: updated });
+    } catch (e) {
+      console.error('[admin:payments:approve]', e.message);
+      return res.status(500).json({ error: 'Duyệt đơn thất bại' });
+    }
+  });
+
+  // POST từ chối đơn → REJECTED
+  app.post('/api/admin/payments/:id/reject', async (req, res) => {
+    try {
+      const order = await _payOrders.getOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Không tìm thấy đơn' });
+      const updated = await _payOrders.setStatus(req.params.id, 'REJECTED');
+      return res.json({ ok: true, order: updated });
+    } catch (e) {
+      console.error('[admin:payments:reject]', e.message);
+      return res.status(500).json({ error: 'Từ chối đơn thất bại' });
+    }
+  });
+}
 
 app.get('/api/admin/operations/services-health', async (_req, res) => {
   const now = new Date().toISOString();
