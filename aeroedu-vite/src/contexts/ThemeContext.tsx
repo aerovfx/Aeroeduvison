@@ -119,9 +119,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  // Prevent flash before hydration
-  if (!mounted) return <>{children}</>;
-
+  // LƯU Ý: KHÔNG được `return <>{children}</>` khi chưa mounted — nếu thoát
+  // sớm mà không bọc <ThemeContext.Provider>, mọi component con gọi useTheme()
+  // ngay trong lần render đồng bộ ĐẦU TIÊN (vd <NativeBridge/> ở App.tsx) sẽ
+  // đọc context = undefined → throw "useTheme must be used inside <ThemeProvider>"
+  // → crash trắng màn hình (đặc biệt trên iOS Capacitor). App là Vite SPA
+  // (không SSR) nên không cần guard chống flash. Luôn render Provider.
+  // Trước hydrate dùng DEFAULT_SETTINGS (dark) → không truy cập window.
   const theme = resolveTheme(settings.mode);
 
   return (
