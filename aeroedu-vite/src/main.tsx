@@ -7,6 +7,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { registerPwa } from './lib/pwa-register'
 import './index.css'
 
@@ -110,7 +111,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       }}
     >
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <App />
+        {/* Global ErrorBoundary — bất kỳ crash render nào → hiện lỗi + stack
+            thay vì màn hình đen (đặc biệt quan trọng cho app native không có
+            console dễ truy cập). */}
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
         <Toaster
           position="top-right"
           toastOptions={{
