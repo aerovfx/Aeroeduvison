@@ -14044,6 +14044,158 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     }
   });
 
+  // ── AT-RISK: tính điểm RỦI RO học sinh (nghịch của hành vi) ───────────────
+  // riskScore 0-100 từ: bỏ học (recency) + điểm thi thấp + ít/không làm bài.
+  function _computeRisk(r, now) {
+    const DAY = 86400000;
+    const lastActive = [r.last_view, r.last_seen, r.lastLoginAt].filter(Boolean)
+      .map(d => new Date(d).getTime()).sort((a, b) => b - a)[0] || null;
+    const recencyDays = lastActive ? Math.floor((now - lastActive) / DAY) : null;
+    const factors = [];
+    let score = 0;
+    // 1) Không hoạt động (yếu tố chính)
+    if (recencyDays == null) { score += 45; factors.push({ factor: 'Chưa từng hoạt động', weight: 45, trend: 'declining' }); }
+    else if (recencyDays > 30) { score += 45; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 45, trend: 'declining' }); }
+    else if (recencyDays > 14) { score += 30; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 30, trend: 'declining' }); }
+    else if (recencyDays > 7) { score += 15; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 15, trend: 'stable' }); }
+    // 2) Điểm thi thấp
+    if (r.total_exams > 0) {
+      if (r.avg_pct < 50) { score += 25; factors.push({ factor: `Điểm TB thấp (${r.avg_pct}%)`, weight: 25, trend: 'declining' }); }
+      else if (r.avg_pct < 65) { score += 10; factors.push({ factor: `Điểm TB dưới TB (${r.avg_pct}%)`, weight: 10, trend: 'stable' }); }
+    } else {
+      score += 18; factors.push({ factor: 'Chưa làm bài thi nào', weight: 18, trend: 'declining' });
+    }
+    // 3) Ít hoạt động học
+    if ((r.active_days || 0) <= 1 && recencyDays != null) { score += 12; factors.push({ factor: 'Rất ít ngày hoạt động', weight: 12, trend: 'stable' }); }
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    const riskLevel = score >= 75 ? 'critical' : score >= 50 ? 'high' : score >= 30 ? 'medium' : 'low';
+    return { score, riskLevel, factors, recencyDays, lastActive };
+  }
+  const _RISK_RECS = [
+    { title: 'Giáo viên liên hệ động viên học sinh', expectedImpact: 35, confidence: 80 },
+    { title: 'Giao bài tập ngắn phù hợp trình độ', expectedImpact: 25, confidence: 70 },
+    { title: 'Gửi nhắc nhở/định hướng học tập', expectedImpact: 20, confidence: 65 },
+  ];
+
+  // GET /api/admin/at-risk — danh sách HS rủi ro
+  app.get('/api/admin/at-risk', async (req, res) => {
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      await _ensurePresence(pool);
+      const limit = Math.min(Math.max(1, Number(req.query.limit) || 200), 500);
+      const { rows } = await pool.query(`
+        WITH act AS (
+          SELECT user_id, MAX(created_at) AS last_view, COUNT(DISTINCT DATE(created_at))::int AS active_days
+          FROM "PageView" WHERE user_id IS NOT NULL AND created_at >= NOW() - INTERVAL '45 day' GROUP BY user_id
+        ), ex AS (
+          SELECT "studentId" AS uid, COUNT(*)::int AS total_exams, COALESCE(AVG(percentage),0)::int AS avg_pct
+          FROM "PracticeExam" WHERE "createdAt" >= NOW() - INTERVAL '60 day' GROUP BY "studentId"
+        )
+        SELECT u.id, u.name, u.image, u."createdAt", u."lastLoginAt",
+               act.last_view, COALESCE(act.active_days,0) AS active_days,
+               COALESCE(ex.total_exams,0) AS total_exams, COALESCE(ex.avg_pct,0) AS avg_pct,
+               up.last_seen,
+               (SELECT c.name FROM "ClassStudent" cs JOIN "Class" c ON c.id=cs.class_id WHERE cs.user_id=u.id LIMIT 1) AS class_name
+        FROM "User" u
+        LEFT JOIN act ON act.user_id = u.id
+        LEFT JOIN ex  ON ex.uid = u.id
+        LEFT JOIN "UserPresence" up ON up.user_id = u.id
+        WHERE u.role='STUDENT' AND COALESCE(u.banned,false)=false
+      `);
+      const now = Date.now();
+      const students = rows.map(r => {
+        const risk = _computeRisk(r, now);
+        return {
+          id: r.id, studentName: r.name || '(không tên)', avatar: r.image || '',
+          class: r.class_name || '—', riskScore: risk.score, riskLevel: risk.riskLevel,
+          factors: risk.factors, recommendations: _RISK_RECS,
+          status: 'new', createdAt: r.createdAt,
+          lastActive: risk.lastActive ? new Date(risk.lastActive).toISOString() : (r.createdAt || new Date().toISOString()),
+          emotionTag: risk.riskLevel === 'critical' ? '😟' : risk.riskLevel === 'high' ? '😕' : '🙂',
+        };
+      }).filter(s => s.riskScore >= 30) // chỉ hiện HS có rủi ro đáng kể
+        .sort((a, b) => b.riskScore - a.riskScore)
+        .slice(0, limit);
+      const breakdown = { critical: 0, high: 0, medium: 0, low: 0 };
+      for (const s of students) breakdown[s.riskLevel]++;
+      return res.json({ students, total: students.length, breakdown });
+    } catch (e) {
+      console.error('[admin:at-risk]', e.message);
+      return res.status(500).json({ error: 'Lỗi tải danh sách rủi ro: ' + e.message });
+    }
+  });
+
+  // GET /api/admin/at-risk/teachers — tổng hợp rủi ro theo giáo viên
+  app.get('/api/admin/at-risk/teachers', async (req, res) => {
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      await _ensurePresence(pool);
+      // HS theo từng GV (qua Class.teacher_id → ClassStudent.user_id → User)
+      const { rows } = await pool.query(`
+        WITH act AS (
+          SELECT user_id, MAX(created_at) AS last_view, COUNT(DISTINCT DATE(created_at))::int AS active_days
+          FROM "PageView" WHERE user_id IS NOT NULL AND created_at >= NOW() - INTERVAL '45 day' GROUP BY user_id
+        ), ex AS (
+          SELECT "studentId" AS uid, COUNT(*)::int AS total_exams, COALESCE(AVG(percentage),0)::int AS avg_pct
+          FROM "PracticeExam" WHERE "createdAt" >= NOW() - INTERVAL '60 day' GROUP BY "studentId"
+        )
+        SELECT c.teacher_id, su.id AS sid, su.name AS sname, su.email AS semail,
+               act.last_view, COALESCE(act.active_days,0) AS active_days,
+               COALESCE(ex.total_exams,0) AS total_exams, COALESCE(ex.avg_pct,0) AS avg_pct,
+               sup.last_seen, su."lastLoginAt", su."createdAt"
+        FROM "Class" c
+        JOIN "ClassStudent" cs ON cs.class_id = c.id AND cs.user_id IS NOT NULL
+        JOIN "User" su ON su.id = cs.user_id AND su.role='STUDENT' AND COALESCE(su.banned,false)=false
+        LEFT JOIN act ON act.user_id = su.id
+        LEFT JOIN ex  ON ex.uid = su.id
+        LEFT JOIN "UserPresence" sup ON sup.user_id = su.id
+      `);
+      const now = Date.now();
+      // teacher meta
+      const tq = await pool.query(`SELECT id, name, email, image, "lastLoginAt", COALESCE(banned,false) AS banned FROM "User" WHERE role='TEACHER'`);
+      const byTeacher = {};
+      for (const r of rows) {
+        const risk = _computeRisk(r, now);
+        const t = (byTeacher[r.teacher_id] ||= { students: [], riskSum: 0 });
+        t.students.push({
+          id: r.sid, name: r.sname || '(không tên)', email: r.semail || '',
+          riskScore: risk.score, riskLevel: risk.riskLevel,
+          lastActive: risk.lastActive ? new Date(risk.lastActive).toISOString() : (r.createdAt || new Date().toISOString()),
+        });
+        t.riskSum += risk.score;
+      }
+      const teachers = tq.rows.map(t => {
+        const g = byTeacher[t.id] || { students: [], riskSum: 0 };
+        const sts = g.students;
+        const atRisk = sts.filter(s => s.riskScore >= 50);
+        const active = sts.filter(s => s.riskScore < 30).length;
+        return {
+          id: t.id, name: t.name || '(không tên)', email: t.email || '', image: t.image || null,
+          lastLoginAt: t.lastLoginAt || null,
+          teacherStatus: t.banned ? 'banned' : (t.lastLoginAt && (now - new Date(t.lastLoginAt).getTime() <= 14 * 86400000) ? 'active' : 'inactive'),
+          studentsTotal: sts.length, studentsActive: active, studentsInactive: sts.length - active,
+          studentsAtRisk: atRisk.length,
+          studentsCritical: sts.filter(s => s.riskLevel === 'critical').length,
+          studentsHigh: sts.filter(s => s.riskLevel === 'high').length,
+          averageStudentRiskScore: sts.length ? Math.round(g.riskSum / sts.length) : 0,
+          atRiskStudents: atRisk.sort((a, b) => b.riskScore - a.riskScore).slice(0, 20),
+        };
+      }).sort((a, b) => b.studentsAtRisk - a.studentsAtRisk);
+      const summary = {
+        totalTeachers: teachers.length,
+        teachersWithAtRiskStudents: teachers.filter(t => t.studentsAtRisk > 0).length,
+        totalStudentsManaged: teachers.reduce((s, t) => s + t.studentsTotal, 0),
+        totalAtRiskStudents: teachers.reduce((s, t) => s + t.studentsAtRisk, 0),
+      };
+      return res.json({ teachers, summary });
+    } catch (e) {
+      console.error('[admin:at-risk:teachers]', e.message);
+      return res.status(500).json({ error: 'Lỗi tải rủi ro theo GV: ' + e.message });
+    }
+  });
+
   // GET /api/admin/users/:id — detail
   app.get('/api/admin/users/:id', async (req, res) => {
     const decoded = await _adminAuth(req, res); if (!decoded) return;
