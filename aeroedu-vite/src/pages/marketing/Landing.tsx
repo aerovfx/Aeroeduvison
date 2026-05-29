@@ -601,6 +601,7 @@ export default function Landing() {
                   background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 20, padding: 28, position: 'relative', overflow: 'hidden',
                   boxShadow: `0 4px 40px ${p.glow}`,
+                  display: 'flex', flexDirection: 'column', height: '100%',
                 }}>
                   {/* Glow corner */}
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 160, height: 160, borderRadius: '50%', background: `radial-gradient(circle, ${p.color}18, transparent 70%)`, pointerEvents: 'none' }} />
@@ -631,6 +632,7 @@ export default function Landing() {
                     background: `${p.color}18`, border: `1px solid ${p.color}33`,
                     color: p.color, textDecoration: 'none', fontSize: 13, fontWeight: 700,
                     transition: 'background .2s',
+                    marginTop: 'auto', alignSelf: 'flex-start',
                   }}
                     onMouseEnter={e => (e.currentTarget.style.background = `${p.color}2e`)}
                     onMouseLeave={e => (e.currentTarget.style.background = `${p.color}18`)}>
@@ -1069,6 +1071,7 @@ export default function Landing() {
             <div key={i} className="land-test-card" style={{
               background: C.card, border: `1px solid ${C.border}`,
               borderRadius: 16, padding: 24,
+              display: 'flex', flexDirection: 'column', height: '100%',
             }}>
               <p style={{
                 fontSize: 14, color: C.text, lineHeight: 1.75,
@@ -1076,7 +1079,8 @@ export default function Landing() {
               }}>
                 "{t.quote}"
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* Khối tác giả ghim đáy → thẳng hàng giữa các card dù trích dài ngắn khác nhau */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 'auto' }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%',
                   background: `${t.color}22`, border: `1px solid ${t.color}44`,
@@ -1473,7 +1477,7 @@ export default function Landing() {
       {/* ══ FOOTER ══ */}
       <footer style={{ borderTop: `1px solid ${C.border}`, background: 'rgba(2,4,18,0.9)', padding: '48px 24px 32px' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 40, marginBottom: 40 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 40, marginBottom: 40, alignItems: 'start' }}>
             {/* Brand */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -1500,6 +1504,8 @@ export default function Landing() {
                 { label: 'Quản trị',    path: '/admin/overview' },
                 { label: 'Lab 3D',      path: '/dashboard/labtwin' },
                 { label: 'AI Gia Sư',   path: '/ai-tutor' },
+                { label: 'Học Tiếng Anh', path: '/student/english' },
+                { label: 'Học Toán',    path: '/student/math' },
               ].map(l => (
                 <p key={l.label} style={{ marginBottom: 8 }}>
                   <Link to={l.path} style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
@@ -1531,11 +1537,14 @@ export default function Landing() {
 
             {/* Legal */}
             <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Pháp lý</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Pháp lý & Hỗ trợ</p>
               {[
                 { label: 'Chính sách bảo mật', path: '/cookies' },
                 { label: 'Điều khoản sử dụng', path: '/terms' },
                 { label: 'Liên hệ hỗ trợ',     path: '/contact-sales' },
+                { label: 'Tài liệu hướng dẫn', path: '/docs' },
+                { label: 'Tin tức',            path: '/news' },
+                { label: 'Khoá AI miễn phí',   path: '/free-courses/llm-mastery' },
               ].map(l => (
                 <p key={l.label} style={{ marginBottom: 8 }}>
                   <Link to={l.path} style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
