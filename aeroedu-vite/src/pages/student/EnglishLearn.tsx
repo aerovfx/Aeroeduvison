@@ -6,11 +6,14 @@
  * → ⭐ Alpha Centauri → 🌌 Dải Ngân Hà. Mỗi hành tinh là 1 chặng, mỗi "nhiệm vụ"
  * là 1 bài học (lesson). Tên lửa 🚀 đánh dấu nhiệm vụ hiện tại. Khoá tuần tự.
  */
-import { useMemo } from 'react'
+import { useMemo, Suspense, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Flame, Heart, Star, Lock, Check, Layers, Rocket } from 'lucide-react'
 import { JOURNEY, journeyStats, allLessonsInOrder } from '@/lib/english/curriculum'
 import { getProgress, lessonStars, isLessonDone } from '@/lib/english/progress'
+
+// Cảnh 3D R3F nặng (three) → lazy, chỉ tải khi vào trang. Có ErrorBoundary nội bộ.
+const SpaceScene = lazy(() => import('@/components/english/SpaceScene'))
 
 export default function EnglishLearn() {
   const navigate = useNavigate()
@@ -40,12 +43,16 @@ export default function EnglishLearn() {
   return (
     <div className="min-h-screen relative overflow-hidden text-white"
       style={{ background: 'radial-gradient(ellipse at top, #1b2a5e 0%, #0a0f24 55%, #05060f 100%)' }}>
-      {/* Starfield */}
+      {/* Starfield CSS (fallback nhẹ, luôn có) */}
       <div className="pointer-events-none absolute inset-0">
         {stars.map((s, i) => (
           <span key={i} className="absolute rounded-full bg-white en-twinkle"
             style={{ top: `${s.top}%`, left: `${s.left}%`, width: s.size, height: s.size, animationDelay: `${s.delay}s` }} />
         ))}
+      </div>
+      {/* Cảnh 3D vũ trụ (R3F) — phủ lên, tự ẩn nếu thiết bị không hỗ trợ WebGL */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <Suspense fallback={null}><SpaceScene /></Suspense>
       </div>
 
       {/* Header */}
