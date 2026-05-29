@@ -15,6 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
+- Last deployed commit: `c758d78` (revision pixiai-00632-xew, 2026-05-29 — IoT Lab thêm link công cụ còn thiếu: card "Mô phỏng mạch" (/dashboard/iot-lab/circuit-simulator) vào Quick Access grid, mở rộng lg:grid-cols-6→7)
 - Last deployed commit: `41bb875` (revision pixiai-00631-til, 2026-05-29 — Module Toán mở rộng TOÀN LỨA TUỔI: 10 chặng theo cấp độ Lớp 1–2→3–5→6–7→8–9→10→11→12→Đại học→Toán cho Vật lí→Toán cho AI, 50 câu trắc nghiệm giàu LaTeX (∫, ∇, ma trận, sigmoid/softmax/MSE/gradient descent, v=dx/dt, E=mc²) + giải thích. Thêm TikzFigure (tikzjax) render HÌNH VẼ LaTeX/TikZ trên nền trắng — 4 hình. /student/math HTTP 200)
 - Last deployed commit: `20037ca` (revision pixiai-00630-det, 2026-05-29 — Cập nhật email các trang Chính sách/Điều khoản: security@/privacy@/admin@inphysic.com → thegioithu2@gmail.com)
 - Last deployed commit: `b20fa2b` (revision pixiai-00629-jor, 2026-05-29 — Cập nhật liên hệ thật /contact-sales: email hello@/partner@inphysic.com → thegioithu2@gmail.com, hotline → 0909 933 936 (tel:+84909933936))

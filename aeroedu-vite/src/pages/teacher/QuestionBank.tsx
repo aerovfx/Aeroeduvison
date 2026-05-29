@@ -1317,7 +1317,7 @@ function QuestionCard({
                     }`}
                   >
                     <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span>
-                    {opt}
+                    <MathText as="span">{opt.replace(/<[^>]*>/g, ' ').replace(/^\s*[A-D][.)]\s*/, '').replace(/\s+/g, ' ').trim()}</MathText>
                   </div>
                 ))}
               </div>
