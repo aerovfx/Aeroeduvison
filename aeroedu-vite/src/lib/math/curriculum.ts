@@ -213,3 +213,16 @@ export function mathStats() {
   for (const s of JOURNEY) for (const l of s.lessons) { lessons++; questions += l.questions.length }
   return { stops: JOURNEY.length, lessons, questions }
 }
+
+/** Tất cả câu hỏi kèm bối cảnh chặng (dùng cho flashcard ôn tập). */
+export function allQuestions(): { q: MathQuestion; stop: MathStop }[] {
+  const out: { q: MathQuestion; stop: MathStop }[] = []
+  for (const s of JOURNEY) for (const l of s.lessons) for (const q of l.questions) out.push({ q, stop: s })
+  return out
+}
+/** Tra cứu câu hỏi theo id → { q, stop }. */
+export function questionById(): Record<string, { q: MathQuestion; stop: MathStop }> {
+  const map: Record<string, { q: MathQuestion; stop: MathStop }> = {}
+  for (const item of allQuestions()) map[item.q.id] = item
+  return map
+}

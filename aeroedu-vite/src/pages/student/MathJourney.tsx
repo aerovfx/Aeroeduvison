@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Heart, Star, Lock, Check, Compass, Play } from 'lucide-react'
+import { Flame, Heart, Star, Lock, Check, Compass, Play, Layers } from 'lucide-react'
 import { JOURNEY, mathStats, allLessonsInOrder } from '@/lib/math/curriculum'
 import { getProgress, lessonStars, isLessonDone } from '@/lib/math/progress'
 import MusicToggle from '@/components/common/MusicToggle'
@@ -52,9 +52,17 @@ export default function MathJourney() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
-        <p className="text-center text-sm opacity-70 mt-4 mb-6">
+        <p className="text-center text-sm opacity-70 mt-4 mb-4">
           Du hành theo dòng lịch sử toán học: từ <b>Ai Cập cổ đại</b> bên sông Nile → Hy Lạp, Ấn Độ, châu Âu → đến thánh địa hiện đại <b>Viện IAS Princeton (Mỹ)</b>. Mỗi chặng vừa là một cấp độ học, vừa là một nền văn minh toán học.
         </p>
+
+        {/* Ôn tập Flashcard */}
+        <button onClick={() => navigate('/student/math/flashcards')}
+          className="w-full mb-6 px-5 py-4 rounded-2xl font-bold flex items-center justify-between"
+          style={{ background: 'rgba(212,160,23,0.12)', border: '1px solid rgba(212,160,23,0.4)', color: '#d4a017' }}>
+          <span className="inline-flex items-center gap-2"><Layers className="w-5 h-5" /> Ôn tập Flashcard (câu đến hạn)</span>
+          <span className="opacity-70 text-sm">{stats.questions} câu →</span>
+        </button>
 
         {JOURNEY.map((stop, si) => {
           const lesson = stop.lessons[0]
