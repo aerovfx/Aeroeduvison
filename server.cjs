@@ -13730,6 +13730,164 @@ app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total
 app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
 
 // ── Admin Operations — probe services + resources ──
+// ── Admin Overview (Command Center) — /admin/overview ────────────────────────
+// Node handler trả dữ liệu THẬT từ Postgres (User/PageView/PracticeExam/
+// PaymentOrder) + tài nguyên hệ thống. Mỗi truy vấn bọc try/catch riêng nên
+// LUÔN trả 200 với default an toàn — không bao giờ 503 (trước đây không có
+// handler → rớt xuống proxy aero-backend cổng 8090 đã tắt → ECONNREFUSED).
+app.get('/api/admin/overview/full', async (req, res) => {
+  const os = require('os');
+  const range = ['today', 'week', 'month'].includes(String(req.query.range)) ? String(req.query.range) : 'week';
+  const days = range === 'today' ? 1 : range === 'week' ? 7 : 30;
+  const pool = _getPool();
+  const q = async (sql, fallback) => {
+    try { const r = await pool.query(sql); return r.rows; }
+    catch (e) { console.warn('[admin:overview]', e.message); return fallback; }
+  };
+  try {
+    // 1. Users + role breakdown
+    const users = (await q(`
+      SELECT COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE role='STUDENT')::int AS students,
+             COUNT(*) FILTER (WHERE role='TEACHER')::int AS teachers,
+             COUNT(*) FILTER (WHERE role='ADMIN')::int AS admins,
+             COUNT(*) FILTER (WHERE role='PARENT')::int AS parents
+      FROM "User"`, [{}]))[0] || {};
+
+    // 2. Active students (range) + engagement 7d
+    const act = (await q(`
+      SELECT COUNT(DISTINCT pv.user_id) FILTER (WHERE u.role='STUDENT' AND pv.created_at >= NOW() - INTERVAL '${days} day')::int AS active_students,
+             COUNT(DISTINCT pv.user_id) FILTER (WHERE pv.created_at >= NOW() - INTERVAL '7 day')::int AS active_7d
+      FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+      WHERE pv.user_id IS NOT NULL`, [{}]))[0] || {};
+
+    // 3. Avg mastery — PracticeExam 30d
+    const mastery = (await q(`
+      SELECT COALESCE(AVG(percentage),0)::int AS avg,
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE completed)::int AS completed
+      FROM "PracticeExam" WHERE "createdAt" >= NOW() - INTERVAL '30 day'`, [{}]))[0] || {};
+
+    // 4. Enrollment 8 tháng — User.createdAt
+    const enrollment = await q(`
+      SELECT TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS month, COUNT(*)::int AS students
+      FROM "User" WHERE "createdAt" >= NOW() - INTERVAL '8 month'
+      GROUP BY 1 ORDER BY 1`, []);
+
+    // 5. Network load — PageView theo giờ (30h)
+    const netRows = await q(`
+      SELECT TO_CHAR(DATE_TRUNC('hour', created_at), 'HH24:00') AS hour, COUNT(*)::int AS requests
+      FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 hour' AND session_id IS NOT NULL
+      GROUP BY DATE_TRUNC('hour', created_at) ORDER BY DATE_TRUNC('hour', created_at)`, []);
+    const maxReq = Math.max(1, ...netRows.map(n => n.requests || 0));
+    const networkLoad = netRows.map(n => ({ hour: n.hour, requests: n.requests || 0, percent: Math.round(((n.requests || 0) / maxReq) * 100) }));
+
+    // 6. Revenue — PaymentOrder (status='PAID')
+    const rev = (await q(`
+      SELECT COALESCE(SUM(amount) FILTER (WHERE status='PAID'),0)::float AS total,
+             COALESCE(SUM(amount) FILTER (WHERE status='PAID' AND "approvedAt" >= NOW() - INTERVAL '30 day'),0)::float AS last30,
+             COUNT(*) FILTER (WHERE status='PAID')::int AS paid_orders,
+             COUNT(DISTINCT "userId") FILTER (WHERE status='PAID')::int AS paid_users
+      FROM "PaymentOrder"`, [{}]))[0] || {};
+
+    // 7. Sentiment 7 ngày — FaceEmotionSample nếu có (cột emotion); fallback 0
+    const sentRows = await q(`
+      SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS date,
+             ROUND(AVG(CASE WHEN LOWER(emotion) IN ('happy','surprise','surprised','neutral') THEN 100 ELSE 0 END))::int AS positive
+      FROM "FaceEmotionSample" WHERE created_at >= NOW() - INTERVAL '7 day' GROUP BY 1`, []);
+    const sentMap = {};
+    for (const r of sentRows) sentMap[r.date] = r.positive;
+    const VI_DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const sentiment = [];
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date(Date.now() - i * 86400000);
+      const date = dt.toISOString().slice(0, 10);
+      sentiment.push({ date, dayShort: VI_DOW[dt.getDay()], positiveRatio: sentMap[date] ?? 0 });
+    }
+
+    // ── Derived KPIs / metrics ──
+    const totalUsers = users.total || 0;
+    const active7d = act.active_7d || 0;
+    const engagement = totalUsers > 0 ? Math.round((active7d / totalUsers) * 100) : 0;
+    const completionRate = (mastery.total || 0) > 0 ? Math.round(((mastery.completed || 0) / mastery.total) * 100) : 0;
+
+    const xpVelocity = [
+      { id: 'mastery', labelVi: 'Điểm TB luyện thi', labelEn: 'Avg Exam Score', value: mastery.avg || 0, color: '#10b981' },
+      { id: 'completion', labelVi: 'Tỉ lệ hoàn thành đề', labelEn: 'Exam Completion', value: completionRate, color: '#6366f1' },
+      { id: 'engagement', labelVi: 'Tương tác 7 ngày', labelEn: 'Engagement 7d', value: engagement, color: '#f59e0b' },
+    ];
+
+    // ── System resources + services ──
+    const uptimeS = process.uptime();
+    const upH = Math.floor(uptimeS / 3600), upM = Math.floor((uptimeS % 3600) / 60);
+    const uptimeText = `${upH}h ${upM}m`;
+    const mem = process.memoryUsage();
+    const moduleLoad = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+    const cpuPercent = Math.min(100, Math.round((os.loadavg()[0] / (os.cpus()?.length || 1)) * 100));
+
+    const dbStart = Date.now();
+    let dbUp = true;
+    try { await pool.query('SELECT 1'); } catch { dbUp = false; }
+    const services = [
+      { name: 'PostgreSQL (Neon)', icon: 'database', status: dbUp ? 'up' : 'down', latencyMs: Date.now() - dbStart },
+      { name: 'GCS Bucket (media)', icon: 'cloud', status: (process.env.GCS_BUCKET_MEDIA || process.env.GOOGLE_CLOUD_PROJECT_ID) ? 'up' : 'degraded' },
+      { name: 'Anthropic Claude', icon: 'sparkles', status: process.env.ANTHROPIC_API_KEY ? 'up' : 'down' },
+      { name: 'DeepSeek', icon: 'zap', status: process.env.DEEPSEEK_API_KEY ? 'up' : 'down' },
+      { name: 'Telegram Bot', icon: 'bot', status: process.env.TELEGRAM_BOT_TOKEN ? 'up' : 'down' },
+      { name: 'SMTP Email', icon: 'mail', status: process.env.SMTP_PASS ? 'up' : 'down' },
+      { name: 'fal.ai', icon: 'sparkles', status: process.env.FAL_API_KEY ? 'up' : 'down' },
+      { name: 'Redis Cache', icon: 'server', status: (process.env.REDIS_URL || process.env.REDIS_HOST) ? 'up' : 'degraded' },
+    ];
+    const up = services.filter(s => s.status === 'up').length;
+    const down = services.filter(s => s.status === 'down').length;
+    const degraded = services.filter(s => s.status === 'degraded').length;
+    const systemUptime = Math.round((up / services.length) * 100);
+
+    return res.json({
+      kpis: {
+        activeStudents: act.active_students || 0,
+        totalUsers,
+        avgMastery: mastery.avg || 0,
+        attendancePercent: engagement,
+        systemUptime, moduleLoad, cpuPercent, uptimeText,
+      },
+      enrollment,
+      sentiment,
+      xpVelocity,
+      revenue: {
+        total: rev.total || 0,
+        last30Days: rev.last30 || 0,
+        projectedQuarter: Math.round((rev.last30 || 0) * 3),
+        paidOrders: rev.paid_orders || 0,
+        paidUsers: rev.paid_users || 0,
+      },
+      services,
+      servicesSummary: { up, down, degraded, total: services.length, uptime: uptimeText },
+      networkLoad,
+      roleBreakdown: {
+        students: users.students || 0,
+        teachers: users.teachers || 0,
+        admins: users.admins || 0,
+        parents: users.parents || 0,
+      },
+      range,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error('[admin:overview:full]', e.message);
+    // Fallback an toàn — page vẫn render (không 503)
+    const uptimeS = process.uptime();
+    const upH = Math.floor(uptimeS / 3600), upM = Math.floor((uptimeS % 3600) / 60);
+    return res.json({
+      kpis: { activeStudents: 0, totalUsers: 0, avgMastery: 0, attendancePercent: 0, systemUptime: 0, moduleLoad: 0, cpuPercent: 0, uptimeText: `${upH}h ${upM}m` },
+      enrollment: [], sentiment: [], xpVelocity: [], revenue: { total: 0, last30Days: 0, projectedQuarter: 0, paidOrders: 0, paidUsers: 0 },
+      services: [], servicesSummary: { up: 0, down: 0, degraded: 0, total: 0, uptime: `${upH}h ${upM}m` },
+      networkLoad: [], roleBreakdown: { students: 0, teachers: 0, admins: 0, parents: 0 },
+      range, updatedAt: new Date().toISOString(),
+    });
+  }
+});
+
 app.get('/api/admin/operations/services-health', async (_req, res) => {
   const now = new Date().toISOString();
   const services = [];
