@@ -43,8 +43,16 @@ import { useState, useEffect, useRef } from 'react'
 import { MathInline, MathBlock } from './MathExtension'
 import { Spreadsheet } from './SpreadsheetExtension'
 
+import { extractTikzForJax } from '@/lib/tikz'
+
 const TIKZJAX_JS = 'https://tikzjax.com/v1/tikzjax.js'
 const TIKZJAX_CSS = 'https://tikzjax.com/v1/fonts.css'
+
+/** Bóc vỏ standalone (\documentclass…\end{document}) → mã tikzjax chạy được.
+ *  Nếu không có tikzpicture thì giữ nguyên (để báo lỗi). */
+function prepareTikzForJax(code: string): string {
+  return extractTikzForJax(code) || code
+}
 
 /** Nén ảnh → data URL base64 (tái dùng pattern instructor.service.uploadImage —
  *  GCS image endpoint hiện là stub 501 nên lưu inline; câu hỏi/giáo án ảnh nhỏ OK). */
@@ -696,7 +704,9 @@ function TikzInsertModal({ onClose, onInsert }: { onClose: () => void; onInsert:
     setStatus('rendering')
     const tikz = document.createElement('script')
     tikz.setAttribute('type', 'text/tikz'); tikz.setAttribute('data-show-console', 'false')
-    tikz.textContent = code
+    // tikzjax KHÔNG nhận \documentclass/\begin{document} → bóc vỏ standalone,
+    // chỉ giữ \usetikzlibrary + môi trường tikzpicture.
+    tikz.textContent = prepareTikzForJax(code)
     host.appendChild(tikz)
     const obs = new MutationObserver(() => { if (host.querySelector('svg')) { setStatus('done'); obs.disconnect() } })
     obs.observe(host, { childList: true, subtree: true })

@@ -95,6 +95,8 @@ export function QuestionRichEditor({
  * KaTeX rendered) — xem aeroedu-vite/src/index.css.
  */
 import { MathText } from '@/components/common/MathText'
+import TikzFigure from '@/components/common/TikzFigure'
+import { hasTikz, extractTikzForJax, stripTikzAndPreamble } from '@/lib/tikz'
 
 interface ViewProps {
   content: string
@@ -105,6 +107,23 @@ interface ViewProps {
 
 export function QuestionContentView({ content, className = '', as = 'div' }: ViewProps) {
   if (!content) return null
+
+  // GV dán/gõ mã TikZ (kể cả document standalone đầy đủ) thẳng vào nội dung →
+  // render thành HÌNH bằng tikzjax. Chỉ ở chế độ block (as='div'); span (list
+  // item) giữ nguyên text để không vỡ layout.
+  if (as === 'div' && hasTikz(content)) {
+    const tikz = extractTikzForJax(content)
+    const prose = stripTikzAndPreamble(content)
+    if (tikz) {
+      return (
+        <div className={`tiptap-display ${className}`}>
+          {prose && <MathText as="div" className="mb-2">{prose}</MathText>}
+          <TikzFigure code={tikz} />
+        </div>
+      )
+    }
+  }
+
   if (isHtml(content)) {
     const Tag = as as 'div' | 'span'
     return (
