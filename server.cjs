@@ -15820,8 +15820,17 @@ app.put('/api/english/curriculum', async (req, res) => {
   }
 });
 
-// ── /api/* → Rust aero-backend gateway ─────────────────────
-app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
+// ── /api/* → 404 JSON (đã gỡ proxy aero-backend) ───────────
+// Trước đây: app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api')) — proxy
+// tới Rust aero-backend (cổng 8090). Service này KHÔNG còn chạy (BACKEND_URL
+// không set → localhost:8090) nên mọi route thiếu handler đều ECONNREFUSED →
+// 503 khó hiểu + tốn latency chờ kết nối. Thay bằng 404 JSON rõ ràng, tức thì.
+// (Mọi endpoint thật đã được phục vụ bởi 424 handler Node phía trên. Các proxy
+//  /api/teacher, /api/media... vẫn giữ nguyên ở vị trí cũ, không bị ảnh hưởng.)
+// Nếu sau này khôi phục aero-backend: set BACKEND_URL + đặt lại dòng makeProxy.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Endpoint không tồn tại', method: req.method, path: req.originalUrl });
+});
 
 // ── /socket.io → WebSocket proxy ───────────────────────────
 app.use('/socket.io', createProxyMiddleware({
