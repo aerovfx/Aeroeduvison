@@ -12750,7 +12750,117 @@ app.get('/api/student/my-teachers', async (req, res) => {
     return res.json({ teachers, total: teachers.length });
   } catch (e) { console.error('[student:my-teachers]', e.message); return res.json({ teachers: [], total: 0 }); }
 });
-app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, subjects: [], streak: 0 }));
+// GET /api/student/progress-overview — dữ liệu THẬT cho /student/progress.
+// Trước đây stub trả {overall,subjects,streak:0} SAI shape → FE đọc
+// overview.examStats.count / weekly.reduce → CRASH trắng trang. Trả đúng
+// ProgressOverview {profile, examStats, streak, weekly, kgStats, keocoStats,
+// lessonsAssigned, generatedAt}. Optional auth: không token → shape rỗng hợp lệ.
+app.get('/api/student/progress-overview', async (req, res) => {
+  const DAY = 86400000;
+  const VI_DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const empty = {
+    success: true,
+    profile: { email: '', name: '', image: null, level: 1, totalXp: 0, mbtiType: null, createdAt: null },
+    examStats: { count: 0, avgScore: 0, recent: [] },
+    streak: { current: 0, longest: 0, lastActive: null },
+    weekly: Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.now() - (6 - i) * DAY);
+      return { date: d.toISOString().slice(0, 10), label: VI_DOW[d.getDay()], xp: 0, activities: 0 };
+    }),
+    kgStats: { topicsExplored: 0, votesGiven: 0, feedbackPosted: 0 },
+    keocoStats: { wins: 0, totalPlayed: 0 },
+    lessonsAssigned: 0,
+    generatedAt: new Date().toISOString(),
+  };
+  // optional auth
+  let uid = null;
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) { try { uid = _akVerify(auth.slice(7)).sub; } catch { /* anon */ } }
+  if (!uid) return res.json(empty);
+
+  try {
+    const pool = _getPool();
+    const q = async (sql, params, fb) => { try { return (await pool.query(sql, params)).rows; } catch (e) { console.warn('[progress]', e.message); return fb; } };
+
+    // profile
+    const urow = (await q(`SELECT email, name, image, "createdAt" FROM "User" WHERE id=$1`, [uid], [{}]))[0] || {};
+    let mbti = null;
+    try { const m = await pool.query(`SELECT result FROM "PersonalityTest" WHERE "userId"=$1 ORDER BY "createdAt" DESC LIMIT 1`, [uid]); mbti = m.rows[0]?.result || null; } catch { /* table optional */ }
+
+    // exam stats (PracticeExam.score thang 0-10)
+    const ex = (await q(`
+      SELECT COUNT(*)::int AS count,
+             COALESCE(AVG(COALESCE(score, percentage/10.0)),0)::float AS avg_score
+      FROM "PracticeExam" WHERE "studentId"=$1`, [uid], [{}]))[0] || {};
+    const recent = await q(`
+      SELECT id, subject, "examType", COALESCE(score, percentage/10.0)::float AS score, "createdAt"
+      FROM "PracticeExam" WHERE "studentId"=$1 ORDER BY "createdAt" DESC LIMIT 5`, [uid], []);
+
+    // active dates (PracticeExam ∪ PageView) 60 ngày → streak + weekly
+    const dates = await q(`
+      SELECT DISTINCT d FROM (
+        SELECT DATE("createdAt") AS d FROM "PracticeExam" WHERE "studentId"=$1 AND "createdAt" >= NOW() - INTERVAL '60 day'
+        UNION
+        SELECT DATE(created_at) AS d FROM "PageView" WHERE user_id=$1 AND created_at >= NOW() - INTERVAL '60 day'
+      ) t ORDER BY d DESC`, [uid], []);
+    const dateSet = new Set(dates.map(r => new Date(r.d).toISOString().slice(0, 10)));
+    // current streak
+    let current = 0;
+    for (let i = 0; ; i++) {
+      const ds = new Date(Date.now() - i * DAY).toISOString().slice(0, 10);
+      if (dateSet.has(ds)) current++;
+      else if (i === 0) continue; // hôm nay chưa hoạt động vẫn cho phép tính từ hôm qua
+      else break;
+    }
+    // longest streak
+    const sorted = [...dateSet].sort();
+    let longest = 0, run = 0, prev = null;
+    for (const ds of sorted) {
+      if (prev && (new Date(ds).getTime() - new Date(prev).getTime()) === DAY) run++;
+      else run = 1;
+      longest = Math.max(longest, run); prev = ds;
+    }
+
+    // weekly: exam attempts/day (xp = 20/exam) + activity days
+    const wk = await q(`
+      SELECT TO_CHAR(DATE("createdAt"),'YYYY-MM-DD') AS d, COUNT(*)::int AS n
+      FROM "PracticeExam" WHERE "studentId"=$1 AND "createdAt" >= NOW() - INTERVAL '7 day'
+      GROUP BY 1`, [uid], []);
+    const wkMap = {}; for (const r of wk) wkMap[r.d] = r.n;
+    const weekly = Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(Date.now() - (6 - i) * DAY);
+      const ds = dt.toISOString().slice(0, 10);
+      const n = wkMap[ds] || 0;
+      return { date: ds, label: VI_DOW[dt.getDay()], xp: n * 20, activities: n };
+    });
+
+    const totalXp = (ex.count || 0) * 20;
+    const lessonsAssigned = (await q(`SELECT COUNT(*)::int AS n FROM "AssignmentTarget" WHERE "studentId"=$1`, [uid], [{ n: 0 }]))[0]?.n || 0;
+
+    return res.json({
+      success: true,
+      profile: {
+        email: urow.email || '', name: urow.name || '', image: urow.image || null,
+        level: Math.max(1, Math.floor(totalXp / 200) + 1), totalXp,
+        mbtiType: mbti, createdAt: urow.createdAt || null,
+      },
+      examStats: {
+        count: ex.count || 0,
+        avgScore: Math.round((ex.avg_score || 0) * 10) / 10,
+        recent: recent.map(r => ({ id: r.id, title: `${r.subject || 'Đề'} · ${r.examType || ''}`.trim(), score: Math.round((r.score || 0) * 10) / 10, at: r.createdAt })),
+      },
+      streak: { current, longest, lastActive: sorted.length ? sorted[sorted.length - 1] : null },
+      weekly,
+      kgStats: { topicsExplored: 0, votesGiven: 0, feedbackPosted: 0 },
+      keocoStats: { wins: 0, totalPlayed: 0 },
+      lessonsAssigned,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error('[student:progress-overview]', e.message);
+    return res.json(empty);
+  }
+});
 app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
 
 // ── /api/student/exam-rooms — HS thấy phòng thi public + đã join ──
