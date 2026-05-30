@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
+import { tokenStore } from '@/services/api'
 
 const SESSION_KEY = 'aeroedu_session_id'
 // Bug fix sau deploy 199: ENDPOINT_BEACON dùng absolute /api/... cho
@@ -54,7 +55,7 @@ function getDemographics() {
 function sendBeacon(payload: Record<string, unknown>) {
   try {
     const body = JSON.stringify(payload)
-    const token = sessionStorage.getItem('aeroedu_access_token')
+    const token = tokenStore.getAccessToken()
     // Ưu tiên fetch keepalive: hỗ trợ Authorization header → BE biết user role.
     // sendBeacon không gửi headers tuỳ chỉnh được nên user_id luôn null khi
     // exit qua beacon — đó là lý do analytics thấy 0 unique users trước đây.
@@ -91,7 +92,7 @@ export function usePageTracking() {
     if (prevPathRef.current && prevPathRef.current !== currentPath) {
       const viewMs = Date.now() - enterTimeRef.current
       // Lấy access token từ tokenStore để BE biết user role (best-effort)
-      const token = sessionStorage.getItem('aeroedu_access_token')
+      const token = tokenStore.getAccessToken()
       sendBeacon({
         path: prevPathRef.current,
         referrer: prevReferrerRef.current,
@@ -159,7 +160,7 @@ export function usePageTracking() {
     const ping = () => {
       // Chỉ ping khi tab visible
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-      const token = sessionStorage.getItem('aeroedu_access_token')
+      const token = tokenStore.getAccessToken()
       // Chỉ ping cho user đã login (anonymous đã có PageView khi navigate)
       if (!token) return
       try {
