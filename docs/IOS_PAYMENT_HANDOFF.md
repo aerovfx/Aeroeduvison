@@ -54,13 +54,29 @@ KHÔNG được dùng VietQR/thanh toán ngoài (Apple Guideline 3.1.1).
    `aps-environment`). App ID `com.aeroedu.inphysic` mặc định đã bật IAP. Đã
    **build thử simulator: BUILD SUCCEEDED** (CordovaPluginPurchase + InAppPurchase.m
    compile/link OK, `xcodebuild -scheme App -destination 'generic/platform=iOS Simulator'`).
-3. ⏳ **Caveat JWS (chốt khi test device)**: native plugin v13 dùng **StoreKit 1**
-   (`SKPaymentQueue`, `InAppPurchase.m`) → transaction sẽ **KHÔNG** có
-   `jwsRepresentation`/`signedTransaction` (đó là StoreKit 2). Đường đúng là
-   `transactionId` → BE hỏi App Store Server API authoritative (đã cấu hình trong
-   `iap.ts` + BE). Khi test thật vẫn nên `console.log(t.nativePurchase)` để biết
-   field thực (`transactionId`, `appStoreReceipt`...) — nhưng KHÔNG chặn vì BE chạy
-   chỉ với `transactionId` khi đã nạp key.
+3. ✅ **Caveat JWS đã rà & làm chắc (2026-05-30)**: native plugin v13 dùng **StoreKit 1**
+   (`SKPaymentQueue`, `InAppPurchase.m`) → transaction **KHÔNG** có
+   `jwsRepresentation`/`signedTransaction` (đó là StoreKit 2), chỉ có `transactionId`.
+   - **HỆ QUẢ QUAN TRỌNG**: vì không có JWS, **không có đường xác thực keyless** cho
+     SK1 → **bắt buộc** nạp khoá App Store Server API **kể cả khi test sandbox**
+     (khác với giả định "sandbox decode JWS" ban đầu). App Store Server API
+     `GET /inApps/v1/transactions/{id}` chấp nhận transactionId của cả SK1 lẫn SK2.
+   - **Đã sửa BE** `lib/apple-iap.cjs > verifyTransaction`: SK1+không-key → lỗi RÕ
+     ("bắt buộc có khoá, kể cả sandbox"); API lỗi → surface đúng lỗi (không che bằng
+     "Thiếu signedTransaction"); giữ nguyên đường SK2-JWS-sandbox. 4 case test PASS.
+   - **Đã thêm FE log** `iap.ts > verifyOnServer`: `console.info` tên field
+     `nativePurchase` + transactionId (không log nội dung) → xác nhận field thực khi
+     test device.
+   - Khi test device, mở Safari Web Inspector xem log `[iap] nativePurchase keys:`
+     để chắc `transactionId` có giá trị.
+
+> ⚠️ **GAP đã biết — gia hạn/refund (notifications) chưa map user**: handler
+> `POST /api/iap/apple/notifications` lấy user qua `txn.appAccountToken`, nhưng FE
+> `iap.ts` **chưa set appAccountToken** lúc mua → renewal/refund có thể KHÔNG cộng/thu
+> đúng user. Hướng sửa (chưa làm): lúc verify đã lưu `originalTransactionId↔userKey`
+> (qua grantPlan txnId) → notifications nên TRA user theo `originalTransactionId` thay
+> vì dựa appAccountToken; hoặc set appAccountToken=UUID(userKey) lúc order. Lần mua đầu
+> (verify) KHÔNG ảnh hưởng — chỉ gia hạn tự động về sau.
 4. ⏳ Test sandbox trên **thiết bị thật** (KHÔNG simulator) — mục 5 runbook. Cần
    iPhone cắm máy + sandbox tester của thầy + đã nạp `APPLE_IAP_*` secrets.
 5. ⏳ Khi OK → deploy (`./deploy-cloudbuild.sh && gcloud run services update-traffic pixiai --region=asia-southeast1 --to-latest`).
