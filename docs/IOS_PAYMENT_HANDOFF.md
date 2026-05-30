@@ -39,16 +39,27 @@ KHÔNG được dùng VietQR/thanh toán ngoài (Apple Guideline 3.1.1).
 
 ## 2. CÒN LẠI (việc của session mới + việc của thầy)
 
-### CODE (làm trên máy Mac có Xcode — chưa làm được trong worktree headless này)
-1. `cd aeroedu-vite && npm i cordova-plugin-purchase --legacy-peer-deps && npx cap sync ios`
-2. Mở Xcode → target App → Signing & Capabilities → **+ In-App Purchase**.
-3. **Kiểm caveat JWS**: trong `iap.ts > verifyOnServer()` mình đoán field JWS ở
-   `nativePurchase.{jwsRepresentation|signedTransaction|transactionReceipt}`. Khi
-   test thật, `console.log(t.nativePurchase)` để xác nhận tên field StoreKit2 thực
-   tế của plugin v13 → chỉnh lại nếu khác (BE vẫn chạy chỉ với `transactionId` nếu
-   đã cấu hình key, nên không chặn).
-4. Test sandbox trên **thiết bị thật** (KHÔNG simulator) — mục 5 runbook.
-5. Khi OK → deploy (`./deploy-cloudbuild.sh && gcloud run services update-traffic pixiai --region=asia-southeast1 --to-latest`).
+### CODE (làm trên máy Mac có Xcode)
+1. ✅ **XONG (2026-05-30)** — `npm i cordova-plugin-purchase@13.16.1 --legacy-peer-deps`
+   + `npx cap sync ios`. Dự án iOS dùng **SPM** (không CocoaPods): Capacitor 8 tự
+   sinh wrapper SPM `ios/capacitor-cordova-ios-plugins/sources/CordovaPluginPurchase`
+   (thư mục **gitignore** — regenerate bằng `cap sync`) và thêm tham chiếu vào
+   `ios/App/CapApp-SPM/Package.swift`. Wrapper link sẵn framework `StoreKit`.
+2. ✅ **XONG (không cần thao tác)** — IAP **KHÔNG cần entitlement** (khác Apple Pay).
+   StoreKit đã được link qua SPM wrapper; `App.entitlements` giữ nguyên (chỉ
+   `aps-environment`). App ID `com.aeroedu.inphysic` mặc định đã bật IAP. Đã
+   **build thử simulator: BUILD SUCCEEDED** (CordovaPluginPurchase + InAppPurchase.m
+   compile/link OK, `xcodebuild -scheme App -destination 'generic/platform=iOS Simulator'`).
+3. ⏳ **Caveat JWS (chốt khi test device)**: native plugin v13 dùng **StoreKit 1**
+   (`SKPaymentQueue`, `InAppPurchase.m`) → transaction sẽ **KHÔNG** có
+   `jwsRepresentation`/`signedTransaction` (đó là StoreKit 2). Đường đúng là
+   `transactionId` → BE hỏi App Store Server API authoritative (đã cấu hình trong
+   `iap.ts` + BE). Khi test thật vẫn nên `console.log(t.nativePurchase)` để biết
+   field thực (`transactionId`, `appStoreReceipt`...) — nhưng KHÔNG chặn vì BE chạy
+   chỉ với `transactionId` khi đã nạp key.
+4. ⏳ Test sandbox trên **thiết bị thật** (KHÔNG simulator) — mục 5 runbook. Cần
+   iPhone cắm máy + sandbox tester của thầy + đã nạp `APPLE_IAP_*` secrets.
+5. ⏳ Khi OK → deploy (`./deploy-cloudbuild.sh && gcloud run services update-traffic pixiai --region=asia-southeast1 --to-latest`).
 
 ### THẦY (phía Apple — đường găng, làm trước, KHÔNG ai khác làm hộ được)
 - Ký **Paid Apps agreement** + nhập banking + tax (App Store Connect → Agreements).

@@ -89,7 +89,8 @@
 - Last deployed commit: `6cb2ce3` (revision pixiai-00588-fic, 2026-05-27 — 14-commit batch: Agile Scrum + KG path + Exam fix + 18 lab updates + Scratch Kids + CFD + StandingWaves + STEM·NEXUS sci-fi + DIY library + BioGrowth + ThermalGas + WfcBuilder + Aura routes + QR inline)
 - Last deployed commit: `1badf2b` (revision pixiai-00587-fex, 2026-05-26 — LabTwin 5 lab updates: Chemistry R3F particles + GeometryUnfold +3 shapes & edge labels + MotionSim Pro + PhysicsEngine2D + CircuitSimulator UI refresh)
 - Last deployed commit: `050f960` (revision pixiai-00489-sox, 2026-05-24 — HOTFIX batch 5: admin-users CRUD + admin-analytics 8ep + admin-operations + roster + fix-latex bulk)
-- Commits since last deploy: `1/5` (59fde1b feat(iap) Phase B — paywall Apple IAP FE: lib/capacitor/iap.ts CdvPurchase v13 qua global window.CdvPurchase + Pricing.tsx mua qua App Store/restore/giá StoreKit + BE verify nhận transactionId. CHƯA deploy — chờ tạo 7 product App Store Connect + cap sync mới test được)
+- Commits since last deploy: `2/5` (cài plugin native cordova-plugin-purchase@13.16.1 + npx cap sync ios: SPM project → Capacitor sinh wrapper CordovaPluginPurchase + link StoreKit + sửa Package.swift. Build simulator BUILD SUCCEEDED. IAP không cần entitlement. CÒN: test sandbox device + việc Apple của thầy)
+- Prev: `1/5` (59fde1b feat(iap) Phase B — paywall Apple IAP FE: lib/capacitor/iap.ts CdvPurchase v13 qua global window.CdvPurchase + Pricing.tsx mua qua App Store/restore/giá StoreKit + BE verify nhận transactionId. CHƯA deploy — chờ tạo 7 product App Store Connect + cap sync mới test được)
 - APNs push config (Cloud Run pixiai): secret APNS_AUTH_KEY mounted +
   APNS_KEY_ID=YA994F5C95, APNS_TEAM_ID=CGT5VR25M3, APNS_BUNDLE_ID=com.aeroedu.inphysic,
   APNS_PRODUCTION=true. IAM secretAccessor granted cho compute SA.
