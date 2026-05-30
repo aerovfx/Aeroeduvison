@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>15</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -73,6 +73,18 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+	</array>
+
+	<!-- Google Sign-In native: REVERSED_CLIENT_ID làm URL scheme cho OAuth redirect
+	     (ASWebAuthenticationSession quay về app). iOS client cho com.aeroedu.inphysic. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.667564078289-kmhvq5mogn90q3o0kfm49vgk6n9dpelc</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

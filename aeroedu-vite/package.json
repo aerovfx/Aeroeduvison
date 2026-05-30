@@ -28,6 +28,7 @@
     "@capacitor/push-notifications": "^8.1.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@capgo/capacitor-social-login": "^8.3.22",
     "@deck.gl/aggregation-layers": "^9.3.1",
     "@deck.gl/core": "^9.3.1",
     "@deck.gl/geo-layers": "^9.3.1",
