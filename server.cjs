@@ -1165,6 +1165,63 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── Apple In-App Purchase (StoreKit 2) — bán gói trong app iOS ──────────────
+  const appleIap = require('./lib/apple-iap.cjs');
+  const _iapPlanName = (planId) => (orders.getPlan ? (orders.getPlan(planId)?.name || planId) : planId);
+
+  // POST /api/iap/apple/verify — app gửi signedTransaction sau khi mua qua StoreKit.
+  // Verify (App Store Server API nếu cấu hình) → map productId→planId → grantPlan.
+  app.post('/api/iap/apple/verify', async (req, res) => {
+    const userKey = getUserKey(req);
+    if (!userKey) return res.status(401).json({ error: 'Đăng nhập trước khi mua' });
+    const signedTransaction = req.body?.signedTransaction || req.body?.jws;
+    if (!signedTransaction) return res.status(400).json({ error: 'Thiếu signedTransaction' });
+    try {
+      const r = await appleIap.verifyTransaction(signedTransaction);
+      await entitlements.grantPlan(userKey, r.planId, {
+        source: 'apple-iap',
+        txnId: r.originalTransactionId || r.transactionId,
+        expiresAt: r.expiresAtMs ? new Date(r.expiresAtMs).toISOString() : undefined,
+      });
+      console.log(`[iap] user=${userKey} ${r.productId}→${r.planId} txn=${r.transactionId} verified=${r.verified}`);
+      return res.json({ ok: true, planId: r.planId, planName: _iapPlanName(r.planId), expiresAt: r.expiresAtMs ? new Date(r.expiresAtMs).toISOString() : null, verified: r.verified });
+    } catch (e) {
+      console.error('[iap:verify]', e.message);
+      return res.status(400).json({ error: e.message });
+    }
+  });
+
+  // GET /api/iap/apple/products — bản đồ product↔plan + giá (app fallback nếu cần)
+  app.get('/api/iap/apple/products', (_req, res) => {
+    const map = appleIap.IAP_PRODUCT_PLAN_MAP;
+    const products = Object.entries(map).map(([productId, planId]) => {
+      const plan = orders.getPlan ? orders.getPlan(planId) : null;
+      return { productId, planId, name: plan?.name || planId, amountVnd: plan?.amount || null, durationDays: plan?.durationDays || null, audience: plan?.audience || null };
+    });
+    return res.json({ products, env: appleIap.ENV, configured: appleIap.isConfigured() });
+  });
+
+  // POST /api/iap/apple/notifications — App Store Server Notifications V2 (renew/refund/expire)
+  app.post('/api/iap/apple/notifications', async (req, res) => {
+    res.json({ ok: true }); // ack ngay
+    try {
+      const signedPayload = req.body?.signedPayload;
+      if (!signedPayload) return;
+      const n = appleIap.decodeNotification(signedPayload);
+      const txn = n.transaction;
+      if (!txn) return;
+      const planId = appleIap.IAP_PRODUCT_PLAN_MAP[txn.productId];
+      const userKey = txn.appAccountToken || null; // nếu app set appAccountToken=userKey lúc mua
+      console.log(`[iap:notify] ${n.notificationType}/${n.subtype || ''} product=${txn.productId} txn=${txn.transactionId}`);
+      if (!planId) return;
+      if (['REFUND', 'REVOKE'].includes(n.notificationType)) {
+        if (userKey) await entitlements.revokePlanBySource(userKey, 'apple-iap', txn.originalTransactionId || txn.transactionId).catch(() => {});
+      } else if (['DID_RENEW', 'SUBSCRIBED', 'DID_CHANGE_RENEWAL_STATUS'].includes(n.notificationType)) {
+        if (userKey) await entitlements.grantPlan(userKey, planId, { source: 'apple-iap', txnId: txn.originalTransactionId || txn.transactionId, expiresAt: txn.expiresDate ? new Date(txn.expiresDate).toISOString() : undefined }).catch(() => {});
+      }
+    } catch (e) { console.warn('[iap:notify]', e.message); }
+  });
+
   // Webhook entry (Telegram → server). Chỉ dùng nếu set TELEGRAM_USE_WEBHOOK=true
   // và setWebhook đã trỏ về URL này. Header X-Telegram-Bot-Api-Secret-Token được
   // verify nếu TELEGRAM_WEBHOOK_SECRET có set.
