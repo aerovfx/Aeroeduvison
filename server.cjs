@@ -14072,6 +14072,19 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     const riskLevel = score >= 75 ? 'critical' : score >= 50 ? 'high' : score >= 30 ? 'medium' : 'low';
     return { score, riskLevel, factors, recencyDays, lastActive };
   }
+  // Lưu trạng thái xử lý ca rủi ro (status/assignedTo) — at-risk tính on-the-fly
+  // nên cần bảng riêng để admin cập nhật & giữ lại.
+  let _atRiskCaseReady = false;
+  async function _ensureAtRiskCase(pool) {
+    if (_atRiskCaseReady) return;
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS "AtRiskCase" (
+        student_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'new',
+        assigned_to TEXT, note TEXT, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    } catch (e) { console.warn('[at-risk-case] ensure:', e.message); }
+    _atRiskCaseReady = true;
+  }
+
   // expectedImpact/confidence là PHÂN SỐ 0-1 (FE nhân 100 hiển thị %)
   const _RISK_RECS = [
     { title: 'Giáo viên liên hệ động viên học sinh', expectedImpact: 0.35, confidence: 0.80 },
@@ -14105,17 +14118,24 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
         LEFT JOIN "UserPresence" up ON up.user_id = u.id
         WHERE u.role='STUDENT' AND COALESCE(u.banned,false)=false
       `);
+      await _ensureAtRiskCase(pool);
+      const cases = {};
+      try {
+        const cr = await pool.query(`SELECT student_id, status, assigned_to FROM "AtRiskCase"`);
+        for (const c of cr.rows) cases[c.student_id] = c;
+      } catch { /* bảng trống */ }
       const now = Date.now();
       const students = rows.map(r => {
         const risk = _computeRisk(r, now);
         // avatar = CHỮ CÁI ĐẦU (FE hiển thị initials trong vòng tròn), KHÔNG phải URL ảnh
         const nm = (r.name || '').trim();
         const initials = nm ? nm.split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'HS';
+        const cs = cases[r.id];
         return {
           id: r.id, studentName: r.name || '(không tên)', avatar: initials,
           class: r.class_name || '—', riskScore: risk.score, riskLevel: risk.riskLevel,
           factors: risk.factors, recommendations: _RISK_RECS,
-          status: 'new', createdAt: r.createdAt,
+          status: cs?.status || 'new', assignedTo: cs?.assigned_to || undefined, createdAt: r.createdAt,
           lastActive: risk.lastActive ? new Date(risk.lastActive).toISOString() : (r.createdAt || new Date().toISOString()),
           emotionTag: risk.riskLevel === 'critical' ? '😟' : risk.riskLevel === 'high' ? '😕' : '🙂',
         };
@@ -14128,6 +14148,34 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     } catch (e) {
       console.error('[admin:at-risk]', e.message);
       return res.status(500).json({ error: 'Lỗi tải danh sách rủi ro: ' + e.message });
+    }
+  });
+
+  // PATCH /api/admin/at-risk/:studentId — cập nhật trạng thái xử lý ca rủi ro
+  // body: { status?: 'new'|'in_progress'|'resolved', assignedTo?: string }
+  app.patch('/api/admin/at-risk/:studentId', async (req, res) => {
+    const decoded = await _adminAuth(req, res); if (!decoded) return;
+    const sid = req.params.studentId;
+    const status = req.body?.status;
+    const assignedTo = req.body?.assignedTo;
+    if (status && !['new', 'in_progress', 'resolved'].includes(status)) return res.status(400).json({ error: 'status không hợp lệ' });
+    try {
+      const pool = _getPool();
+      await _ensureAtRiskCase(pool);
+      // upsert: chỉ ghi đè field được gửi
+      await pool.query(
+        `INSERT INTO "AtRiskCase"(student_id, status, assigned_to, "updatedAt")
+         VALUES ($1, COALESCE($2,'new'), $3, NOW())
+         ON CONFLICT (student_id) DO UPDATE SET
+           status = COALESCE($2, "AtRiskCase".status),
+           assigned_to = COALESCE($3, "AtRiskCase".assigned_to),
+           "updatedAt" = NOW()`,
+        [sid, status || null, assignedTo ?? null]);
+      const { rows } = await pool.query(`SELECT student_id, status, assigned_to FROM "AtRiskCase" WHERE student_id=$1`, [sid]);
+      return res.json({ ok: true, case: rows[0] });
+    } catch (e) {
+      console.error('[admin:at-risk:patch]', e.message);
+      return res.status(500).json({ error: 'Cập nhật thất bại: ' + e.message });
     }
   });
 

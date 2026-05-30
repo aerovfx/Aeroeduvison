@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ExportMenu } from '@/components/common/ExportMenu'
 import type { SheetData } from '@/lib/exportReport'
 import { api } from '@/services/api'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import {
   AlertTriangle, TrendingDown, TrendingUp, Minus,
   Brain, Play, CheckCircle, Clock, XCircle,
@@ -203,11 +204,17 @@ function trendIcon(trend: RiskFactor['trend']) {
 /* ─────────────────────────────────────────────────────────────
    Student card
 ───────────────────────────────────────────────────────────── */
-function StudentCard({ student }: { student: AtRiskStudent }) {
+function StudentCard({ student, onAction }: { student: AtRiskStudent; onAction: (id: string, patch: { status?: string; assignedTo?: string }) => Promise<void> }) {
   const [expanded, setExpanded] = useState(student.riskLevel === 'critical' || student.riskLevel === 'high')
+  const [busy, setBusy] = useState(false)
+  const navigate = useNavigate()
   const st = riskStyle(student.riskLevel)
   const stat = statusConfig(student.status)
   const StatIcon = stat.icon
+  const act = async (patch: { status?: string; assignedTo?: string }) => {
+    setBusy(true)
+    try { await onAction(student.id, patch) } finally { setBusy(false) }
+  }
 
   // score ring progress for SVG
   const r = 26
@@ -319,7 +326,7 @@ function StudentCard({ student }: { student: AtRiskStudent }) {
                   key={i}
                   className="w-full p-3.5 rounded-xl text-left border border-violet-500/20 bg-violet-500/[0.05]
                     hover:border-violet-500/40 hover:bg-violet-500/[0.10] hover:-translate-y-0.5 transition-all group"
-                  onClick={() => alert(`Thực hiện: ${rec.title}`)}
+                  onClick={() => { toast.success(`Đã ghi nhận can thiệp: ${rec.title}`); act({ status: 'in_progress' }) }}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm font-semibold text-white/85 group-hover:text-white transition-colors">
@@ -346,18 +353,28 @@ function StudentCard({ student }: { student: AtRiskStudent }) {
               ? <>Phụ trách: <span className="font-semibold text-white/70">{student.assignedTo}</span></>
               : <span className="italic text-white/30">Chưa phân công</span>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {student.status !== 'resolved' && (
               <>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                <button disabled={busy} onClick={() => act({ assignedTo: 'Admin' })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50
                   bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white/85 hover:bg-white/[0.08] transition-all">
-                  <UserCheck className="w-3.5 h-3.5" /> Phân công
+                  <UserCheck className="w-3.5 h-3.5" /> Phân công cho tôi
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
-                  bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white/85 hover:bg-white/[0.08] transition-all">
-                  <MessageSquare className="w-3.5 h-3.5" /> Nhắn tin
+                {student.status !== 'in_progress' && (
+                  <button disabled={busy} onClick={() => act({ status: 'in_progress' })}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50
+                    bg-amber-500/[0.12] border border-amber-500/25 text-amber-300 hover:bg-amber-500/20 transition-all">
+                    <Clock className="w-3.5 h-3.5" /> Đang xử lý
+                  </button>
+                )}
+                <button disabled={busy} onClick={() => act({ status: 'resolved' })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50
+                  bg-green-500/[0.12] border border-green-500/25 text-green-300 hover:bg-green-500/20 transition-all">
+                  <CheckCircle className="w-3.5 h-3.5" /> Đã giải quyết
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                <button onClick={() => navigate(`/admin/users?search=${encodeURIComponent(student.studentName)}`)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
                   text-white hover:opacity-90 transition-all"
                   style={{ background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)' }}>
                   <Eye className="w-3.5 h-3.5" /> Xem hồ sơ
@@ -365,10 +382,17 @@ function StudentCard({ student }: { student: AtRiskStudent }) {
               </>
             )}
             {student.status === 'resolved' && (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
-                bg-green-500/15 text-green-300 border border-green-500/25">
-                <CheckCircle className="w-3.5 h-3.5" /> Đã giải quyết
-              </span>
+              <>
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                  bg-green-500/15 text-green-300 border border-green-500/25">
+                  <CheckCircle className="w-3.5 h-3.5" /> Đã giải quyết
+                </span>
+                <button disabled={busy} onClick={() => act({ status: 'new' })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50
+                  bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white/85 transition-all">
+                  <RefreshCw className="w-3.5 h-3.5" /> Mở lại
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -412,6 +436,21 @@ export default function AtRisk() {
       setStudents([])
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  // ── Cập nhật trạng thái/phân công ca rủi ro (PATCH) + cập nhật tại chỗ ──
+  const handleStudentAction = useCallback(async (id: string, patch: { status?: string; assignedTo?: string }) => {
+    try {
+      await api.patch(`/admin/at-risk/${id}`, patch)
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, ...patch } as AtRiskStudent : s))
+      toast.success(patch.status === 'resolved' ? 'Đã đánh dấu giải quyết'
+        : patch.status === 'in_progress' ? 'Đã chuyển sang đang xử lý'
+        : patch.status === 'new' ? 'Đã mở lại ca'
+        : patch.assignedTo ? `Đã phân công cho ${patch.assignedTo}` : 'Đã cập nhật')
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      toast.error(err.response?.data?.error || 'Cập nhật thất bại')
     }
   }, [])
 
@@ -704,7 +743,7 @@ export default function AtRisk() {
           {/* ── Student cards ── */}
           <div className="space-y-4">
             {filtered.map(student => (
-              <StudentCard key={student.id} student={student} />
+              <StudentCard key={student.id} student={student} onAction={handleStudentAction} />
             ))}
 
             {filtered.length === 0 && students.length > 0 && (
