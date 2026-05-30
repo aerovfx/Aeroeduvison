@@ -1212,13 +1212,18 @@ function makeProxy(target, label, pathFilter) {
       const txn = n.transaction;
       if (!txn) return;
       const planId = appleIap.IAP_PRODUCT_PLAN_MAP[txn.productId];
-      const userKey = txn.appAccountToken || null; // nếu app set appAccountToken=userKey lúc mua
-      console.log(`[iap:notify] ${n.notificationType}/${n.subtype || ''} product=${txn.productId} txn=${txn.transactionId}`);
-      if (!planId) return;
-      if (['REFUND', 'REVOKE'].includes(n.notificationType)) {
-        if (userKey) await entitlements.revokePlanBySource(userKey, 'apple-iap', txn.originalTransactionId || txn.transactionId).catch(() => {});
+      const origTxnId = txn.originalTransactionId || txn.transactionId;
+      // Map về user: ưu tiên appAccountToken (nếu app từng set), fallback TRA theo
+      // originalTransactionId đã lưu lúc verify (grantPlan code = "apple-iap:<id>").
+      // originalTransactionId cố định suốt vòng đời subscription nên gia hạn vẫn map đúng.
+      let userKey = txn.appAccountToken || null;
+      if (!userKey) userKey = await entitlements.findUserKeyBySourceTxn('apple-iap', origTxnId).catch(() => null);
+      console.log(`[iap:notify] ${n.notificationType}/${n.subtype || ''} product=${txn.productId} txn=${txn.transactionId} user=${userKey || 'unknown'}`);
+      if (!planId || !userKey) return; // chưa từng verify giao dịch này → bỏ qua (user sẽ Restore)
+      if (['REFUND', 'REVOKE', 'EXPIRED', 'GRACE_PERIOD_EXPIRED'].includes(n.notificationType)) {
+        await entitlements.revokePlanBySource(userKey, 'apple-iap', origTxnId).catch(() => {});
       } else if (['DID_RENEW', 'SUBSCRIBED', 'DID_CHANGE_RENEWAL_STATUS'].includes(n.notificationType)) {
-        if (userKey) await entitlements.grantPlan(userKey, planId, { source: 'apple-iap', txnId: txn.originalTransactionId || txn.transactionId, expiresAt: txn.expiresDate ? new Date(txn.expiresDate).toISOString() : undefined }).catch(() => {});
+        await entitlements.grantPlan(userKey, planId, { source: 'apple-iap', txnId: origTxnId, expiresAt: txn.expiresDate ? new Date(txn.expiresDate).toISOString() : undefined }).catch(() => {});
       }
     } catch (e) { console.warn('[iap:notify]', e.message); }
   });

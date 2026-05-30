@@ -82,8 +82,13 @@ const pending = new Map<string, { resolve: () => void; reject: (e: Error) => voi
 /** Gọi server xác thực 1 giao dịch đã được Apple duyệt. */
 async function verifyOnServer(t: CdvTransaction): Promise<void> {
   const np = (t.nativePurchase || {}) as Record<string, unknown>
-  // StoreKit2: JWS có thể nằm ở nhiều field tuỳ phiên bản plugin — gửi kèm nếu có.
+  // cordova-plugin-purchase v13 trên iOS dùng StoreKit 1 → THƯỜNG chỉ có
+  // transactionId (KHÔNG có JWS). Vẫn dò các field JWS phòng khi plugin/StoreKit 2
+  // cấp — server ưu tiên transactionId (hỏi App Store Server API authoritative).
   const jws = (np.jwsRepresentation || np.signedTransaction || np.transactionReceipt || null) as string | null
+  // Debug device: chỉ log TÊN field + transactionId (không log nội dung receipt
+  // nhạy cảm) để xác nhận đúng field plugin trả về khi test sandbox thật.
+  try { console.info('[iap] nativePurchase keys:', Object.keys(np), '· transactionId:', t.transactionId, '· jws?', !!jws) } catch { /* noop */ }
   await api.post('/iap/apple/verify', {
     transactionId: t.transactionId,
     ...(jws ? { signedTransaction: jws } : {}),

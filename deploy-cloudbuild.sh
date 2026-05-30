@@ -172,6 +172,9 @@ ENV_VARS="NODE_ENV=production"
 # Pin các env quan trọng cho payment/ai mặc dù --update-env-vars merge,
 # để revision MỚI deploy lần đầu có sẵn (vd Cloud Build rebuild image).
 ENV_VARS="${ENV_VARS},AI_PREFERRED_PROVIDER=fal,TELEGRAM_USE_WEBHOOK=true"
+# Apple IAP (StoreKit): bundle + môi trường. KEY_ID/ISSUER_ID/PRIVATE_KEY qua Secret Manager.
+# Khi lên production App Store công khai → đổi APPLE_IAP_ENV=production.
+ENV_VARS="${ENV_VARS},APPLE_IAP_BUNDLE_ID=com.aeroedu.inphysic,APPLE_IAP_ENV=sandbox"
 
 # ── Step 5.5: Load VITE_* build-time env vars ──────────────────
 # Vite bakes `import.meta.env.VITE_*` into the bundle at BUILD time, not
@@ -287,7 +290,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --cpu-boost \
   --execution-environment=gen2 \
   --update-env-vars="${ENV_VARS}" \
-  --update-secrets="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest" \
+  --update-secrets="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest,APPLE_IAP_PRIVATE_KEY=apple-iap-private-key:latest,APPLE_IAP_KEY_ID=apple-iap-key-id:latest,APPLE_IAP_ISSUER_ID=apple-iap-issuer-id:latest" \
   --tag="t${TAG}" \
   --quiet
 
