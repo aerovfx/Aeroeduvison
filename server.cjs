@@ -11132,6 +11132,18 @@ app.post('/api/analytics/pageview', async (req, res) => {
        userId, typeof viewMs === 'number' ? Math.max(0, Math.min(viewMs, 86_400_000)) : null,
        referrer ? String(referrer).slice(0,500) : null]
     );
+    // ROBUST presence: user đăng nhập điều hướng → cập nhật luôn UserPresence
+    // (không phụ thuộc heartbeat / JS mới) → /admin/analytics thấy online ngay.
+    if (userId) {
+      try {
+        await _ensurePresence(pool);
+        await pool.query(
+          `INSERT INTO "UserPresence"(user_id, session_id, path, last_seen)
+           VALUES ($1,$2,$3,NOW())
+           ON CONFLICT (user_id) DO UPDATE SET session_id=EXCLUDED.session_id, path=EXCLUDED.path, last_seen=NOW()`,
+          [userId, sessionId ? String(sessionId).slice(0,60) : null, String(path).slice(0,500)]);
+      } catch { /* best-effort */ }
+    }
   } catch (e) {
     // Best-effort — không log mỗi request để tránh spam log
     if (Math.random() < 0.01) console.warn('[pageview]', e.message);
