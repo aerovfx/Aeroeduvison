@@ -14051,30 +14051,32 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
     const lastActive = [r.last_view, r.last_seen, r.lastLoginAt].filter(Boolean)
       .map(d => new Date(d).getTime()).sort((a, b) => b - a)[0] || null;
     const recencyDays = lastActive ? Math.floor((now - lastActive) / DAY) : null;
+    // weight là PHÂN SỐ 0-1 (FE nhân 100 để hiển thị %). Score 0-100.
     const factors = [];
     let score = 0;
     // 1) Không hoạt động (yếu tố chính)
-    if (recencyDays == null) { score += 45; factors.push({ factor: 'Chưa từng hoạt động', weight: 45, trend: 'declining' }); }
-    else if (recencyDays > 30) { score += 45; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 45, trend: 'declining' }); }
-    else if (recencyDays > 14) { score += 30; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 30, trend: 'declining' }); }
-    else if (recencyDays > 7) { score += 15; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 15, trend: 'stable' }); }
+    if (recencyDays == null) { score += 45; factors.push({ factor: 'Chưa từng hoạt động', weight: 0.45, trend: 'declining' }); }
+    else if (recencyDays > 30) { score += 45; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 0.45, trend: 'declining' }); }
+    else if (recencyDays > 14) { score += 30; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 0.30, trend: 'declining' }); }
+    else if (recencyDays > 7) { score += 15; factors.push({ factor: `Vắng ${recencyDays} ngày`, weight: 0.15, trend: 'stable' }); }
     // 2) Điểm thi thấp
     if (r.total_exams > 0) {
-      if (r.avg_pct < 50) { score += 25; factors.push({ factor: `Điểm TB thấp (${r.avg_pct}%)`, weight: 25, trend: 'declining' }); }
-      else if (r.avg_pct < 65) { score += 10; factors.push({ factor: `Điểm TB dưới TB (${r.avg_pct}%)`, weight: 10, trend: 'stable' }); }
+      if (r.avg_pct < 50) { score += 25; factors.push({ factor: `Điểm TB thấp (${r.avg_pct}%)`, weight: 0.25, trend: 'declining' }); }
+      else if (r.avg_pct < 65) { score += 10; factors.push({ factor: `Điểm TB dưới TB (${r.avg_pct}%)`, weight: 0.10, trend: 'stable' }); }
     } else {
-      score += 18; factors.push({ factor: 'Chưa làm bài thi nào', weight: 18, trend: 'declining' });
+      score += 18; factors.push({ factor: 'Chưa làm bài thi nào', weight: 0.18, trend: 'declining' });
     }
     // 3) Ít hoạt động học
-    if ((r.active_days || 0) <= 1 && recencyDays != null) { score += 12; factors.push({ factor: 'Rất ít ngày hoạt động', weight: 12, trend: 'stable' }); }
+    if ((r.active_days || 0) <= 1 && recencyDays != null) { score += 12; factors.push({ factor: 'Rất ít ngày hoạt động', weight: 0.12, trend: 'stable' }); }
     score = Math.max(0, Math.min(100, Math.round(score)));
     const riskLevel = score >= 75 ? 'critical' : score >= 50 ? 'high' : score >= 30 ? 'medium' : 'low';
     return { score, riskLevel, factors, recencyDays, lastActive };
   }
+  // expectedImpact/confidence là PHÂN SỐ 0-1 (FE nhân 100 hiển thị %)
   const _RISK_RECS = [
-    { title: 'Giáo viên liên hệ động viên học sinh', expectedImpact: 35, confidence: 80 },
-    { title: 'Giao bài tập ngắn phù hợp trình độ', expectedImpact: 25, confidence: 70 },
-    { title: 'Gửi nhắc nhở/định hướng học tập', expectedImpact: 20, confidence: 65 },
+    { title: 'Giáo viên liên hệ động viên học sinh', expectedImpact: 0.35, confidence: 0.80 },
+    { title: 'Giao bài tập ngắn phù hợp trình độ', expectedImpact: 0.25, confidence: 0.70 },
+    { title: 'Gửi nhắc nhở/định hướng học tập', expectedImpact: 0.20, confidence: 0.65 },
   ];
 
   // GET /api/admin/at-risk — danh sách HS rủi ro
@@ -14106,8 +14108,11 @@ app.get('/api/admin/users/:id/stats', async (req, res) => {
       const now = Date.now();
       const students = rows.map(r => {
         const risk = _computeRisk(r, now);
+        // avatar = CHỮ CÁI ĐẦU (FE hiển thị initials trong vòng tròn), KHÔNG phải URL ảnh
+        const nm = (r.name || '').trim();
+        const initials = nm ? nm.split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'HS';
         return {
-          id: r.id, studentName: r.name || '(không tên)', avatar: r.image || '',
+          id: r.id, studentName: r.name || '(không tên)', avatar: initials,
           class: r.class_name || '—', riskScore: risk.score, riskLevel: risk.riskLevel,
           factors: risk.factors, recommendations: _RISK_RECS,
           status: 'new', createdAt: r.createdAt,
