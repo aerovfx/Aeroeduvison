@@ -11,7 +11,11 @@ App iOS (Capacitor, bundle `com.aeroedu.inphysic`) publish lên App Store →
 bán gói đăng ký số → **bắt buộc** qua Apple In-App Purchase (StoreKit 2),
 KHÔNG được dùng VietQR/thanh toán ngoài (Apple Guideline 3.1.1).
 
-## 1. Đã làm xong (đã commit + push, branch `claude/elated-khayyam-41c9ed`)
+## 1. Đã làm xong (đã commit + push trên `main` = `origin/main`)
+
+> ⚠️ Lưu ý: code IAP nằm trên **`main`** (worktree `.claude/worktrees/elated-khayyam-41c9ed`
+> đang checkout `main`). Branch `claude/elated-khayyam-41c9ed` là nhánh CŨ (lỗi thời),
+> KHÔNG dùng. Pull `main` để có code mới nhất.
 
 ### Backend (đã deploy `pixiai-00664-woj`)
 - **`lib/apple-iap.cjs`** — verify giao dịch StoreKit 2:
