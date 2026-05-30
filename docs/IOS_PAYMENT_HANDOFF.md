@@ -70,13 +70,14 @@ KHÔNG được dùng VietQR/thanh toán ngoài (Apple Guideline 3.1.1).
    - Khi test device, mở Safari Web Inspector xem log `[iap] nativePurchase keys:`
      để chắc `transactionId` có giá trị.
 
-> ⚠️ **GAP đã biết — gia hạn/refund (notifications) chưa map user**: handler
-> `POST /api/iap/apple/notifications` lấy user qua `txn.appAccountToken`, nhưng FE
-> `iap.ts` **chưa set appAccountToken** lúc mua → renewal/refund có thể KHÔNG cộng/thu
-> đúng user. Hướng sửa (chưa làm): lúc verify đã lưu `originalTransactionId↔userKey`
-> (qua grantPlan txnId) → notifications nên TRA user theo `originalTransactionId` thay
-> vì dựa appAccountToken; hoặc set appAccountToken=UUID(userKey) lúc order. Lần mua đầu
-> (verify) KHÔNG ảnh hưởng — chỉ gia hạn tự động về sau.
+> ✅ **GAP gia hạn/refund ĐÃ FIX (2026-05-30)**: trước đây notifications map user qua
+> `txn.appAccountToken` (FE không set) → renewal/refund không cộng/thu đúng user. Nay:
+> `entitlements.findUserKeyBySourceTxn('apple-iap', originalTransactionId)` tra user từ
+> chính bản ghi đã lưu lúc verify (`grantPlan` lưu `code="apple-iap:<originalTransactionId>"`;
+> originalTransactionId cố định suốt vòng đời subscription). Handler ưu tiên appAccountToken
+> rồi fallback tra này; thêm xử lý `EXPIRED`/`GRACE_PERIOD_EXPIRED` → revoke. Test 5 case
+> PASS (mua → gia hạn giữ user → refund mất quyền). Giới hạn: nếu lần mua đầu chưa verify
+> (verify lỗi) thì notification chưa map được → user bấm "Khôi phục giao dịch" để verify lại.
 4. ⏳ Test sandbox trên **thiết bị thật** (KHÔNG simulator) — mục 5 runbook. Cần
    iPhone cắm máy + sandbox tester của thầy + đã nạp `APPLE_IAP_*` secrets.
 5. ⏳ Khi OK → deploy (`./deploy-cloudbuild.sh && gcloud run services update-traffic pixiai --region=asia-southeast1 --to-latest`).
