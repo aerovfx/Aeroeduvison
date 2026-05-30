@@ -95,19 +95,26 @@ APPLE_IAP_ENV        = sandbox            # đổi 'production' khi live
   → gia hạn / thu hồi entitlement.
 - Lib verify: `lib/apple-iap.cjs` (verify signedPayload JWS chain x5c, gọi App Store Server API).
 
-### 4.2 Frontend
-- `lib/capacitor/iap.ts` — wrapper plugin **`cordova-plugin-purchase`** (StoreKit 2): load
-  products, `order()`, lắng nghe `approved → verify(server) → finish`, `restorePurchases()`.
-- `pages/payment/Pricing.tsx` — khi `isNative()`: hiện giá lấy từ StoreKit + nút mua gọi IAP
-  (thay `POST /payment/orders`). Thêm nút **"Khôi phục mua hàng"** (Apple bắt buộc).
-- Ẩn `/payment/:id` (VietQR) + mọi CTA dẫn web khi native (anti-steering).
-- `AiSubscriptionGate` / `AIGate`: nút nâng cấp → mở paywall IAP trên iOS.
+### 4.2 Frontend ✅ ĐÃ XONG (Phase B)
+- `lib/capacitor/iap.ts` — wrapper plugin **`cordova-plugin-purchase`** v13 (CdvPurchase, StoreKit 2)
+  qua **global `window.CdvPurchase`** (KHÔNG import npm → web bundle không phình, no-op trên browser):
+  `initIap()` đăng ký 7 product + gắn `approved → POST /iap/apple/verify {transactionId} → finish`,
+  `buyPlan(planId)` (Promise resolve khi server cấp quyền), `restorePurchases()`, `getProductInfo()`.
+- `pages/payment/Pricing.tsx` — khi `isIapAvailable()`: hiện giá thật từ StoreKit + nút **"Mua qua App Store"**
+  gọi `buyPlan()` (thay `POST /payment/orders`); gói B2B `school-1y` → "Liên hệ tư vấn" (KHÔNG mở
+  thanh toán ngoài → tuân Apple 3.1.1). Thêm nút **"Khôi phục giao dịch đã mua"** (Apple bắt buộc).
+- BE `POST /api/iap/apple/verify` nhận **`transactionId` HOẶC `signedTransaction`** (CdvPurchase cấp
+  transactionId tin cậy; có key → hỏi App Store Server API authoritative).
 
-### 4.3 Plugin
+> ⏳ Còn lại (khi build app iOS trên máy Mac): cài plugin native + `cap sync` (mục 4.3),
+> rồi test sandbox trên thiết bị thật (mục 5). FE đã sẵn sàng — products tạo xong là chạy.
+
+### 4.3 Plugin (làm khi build iOS — chưa chạy trong worktree này)
 ```bash
 cd aeroedu-vite && npm i cordova-plugin-purchase --legacy-peer-deps
-npx cap sync ios
+npx cap sync ios   # nạp plugin vào project Xcode → window.CdvPurchase khả dụng trong WKWebView
 ```
+> Phải bật **In-App Purchase capability** trong Xcode (Signing & Capabilities) cho target App.
 
 ---
 

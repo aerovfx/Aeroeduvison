@@ -13,9 +13,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   Loader2, CheckCircle2, ShieldCheck, Zap, Star, Building2,
   GraduationCap, Users, BookOpen, Clock, AlertTriangle, Crown, Sparkles,
+  RotateCcw, Apple,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
+import {
+  isIapAvailable, planIsIapEligible, buyPlan, restorePurchases,
+  initIap, getProductInfo,
+} from '@/lib/capacitor/iap'
 
 interface Plan {
   id: string
@@ -117,6 +122,10 @@ export default function PricingPage() {
   const [activeTab, setActiveTab] = useState<Tab>('teacher')
   const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null)
   const [isAuthed, setIsAuthed] = useState(false)
+  // ── Apple IAP (chỉ khi chạy trong app iOS) ──
+  const native = isIapAvailable()
+  const [restoring, setRestoring] = useState(false)
+  const [iapPrices, setIapPrices] = useState<Record<string, string>>({})
 
   // Detect user role → pre-select tab
   useEffect(() => {
@@ -148,6 +157,26 @@ export default function PricingPage() {
       .finally(() => setLoading(false))
   }, [isAuthed])
 
+  // Nạp StoreKit products → lấy giá thật của Apple (đúng tiền tệ máy người dùng)
+  useEffect(() => {
+    if (!native) return
+    let cancelled = false
+    initIap().then(ok => {
+      if (!ok || cancelled) return
+      const prices: Record<string, string> = {}
+      for (const p of plans) {
+        if (!planIsIapEligible(p.id)) continue
+        const info = getProductInfo(p.id)
+        if (info?.price) prices[p.id] = info.price
+      }
+      if (!cancelled && Object.keys(prices).length) setIapPrices(prices)
+    }).catch(() => { /* IAP optional */ })
+    return () => { cancelled = true }
+  }, [native, plans])
+
+  const refreshSub = () =>
+    api.get('/payment/my-subscription').then(r => setSubStatus(r.data)).catch(() => { /* ignore */ })
+
   // Auto-jump to active subscription tab
   useEffect(() => {
     if (subStatus?.activeSubscription?.audience) {
@@ -166,6 +195,29 @@ export default function PricingPage() {
   const pendingOrder = subStatus?.pendingOrder || null
 
   const handleSelect = async (plan: Plan, mode: 'new' | 'renew' | 'upgrade') => {
+    // ── Trong app iOS: gói đủ điều kiện → BẮT BUỘC mua qua Apple IAP ──
+    // (Apple Guideline 3.1.1: nội dung số phải thanh toán qua StoreKit.)
+    if (native && planIsIapEligible(plan.id)) {
+      setCreating(plan.id)
+      try {
+        await buyPlan(plan.id)
+        toast.success('Mua thành công! Quyền truy cập đã được kích hoạt.')
+        await refreshSub()
+      } catch (err: unknown) {
+        const msg = (err as Error)?.message || 'Giao dịch không hoàn tất'
+        if (!/huỷ|cancel/i.test(msg)) toast.error(msg)
+      } finally {
+        setCreating(null)
+      }
+      return
+    }
+    // ── Trong app iOS nhưng gói KHÔNG bán qua IAP (school-1y B2B):
+    // KHÔNG mở luồng thanh toán ngoài (tránh vi phạm Apple 3.1.1) → liên hệ tư vấn.
+    if (native && !planIsIapEligible(plan.id)) {
+      navigate('/contact-sales')
+      return
+    }
+    // ── Web: luồng VietQR cũ ──
     setCreating(plan.id)
     try {
       const me = await api.get('/auth/me').catch(() => null)
@@ -181,6 +233,19 @@ export default function PricingPage() {
       toast.error(msg)
     } finally {
       setCreating(null)
+    }
+  }
+
+  const handleRestore = async () => {
+    setRestoring(true)
+    try {
+      await restorePurchases()
+      await refreshSub()
+      toast.success('Đã khôi phục giao dịch (nếu có).')
+    } catch (err: unknown) {
+      toast.error((err as Error)?.message || 'Không khôi phục được')
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -448,7 +513,7 @@ export default function PricingPage() {
                     fontSize: 34, fontWeight: 800,
                     color: isCurrent ? '#34d399' : isPopular ? tabColor : 'hsl(var(--foreground))',
                   }}>
-                    {fmt(plan.amount)}
+                    {native && iapPrices[plan.id] ? iapPrices[plan.id] : fmt(plan.amount)}
                   </div>
                   <div style={{ color: 'var(--ai-muted-text)', fontSize: 13, marginTop: 4 }}>
                     {plan.durationDays >= 365 ? '/ năm' : plan.durationDays === 30 ? '/ tháng' : `${plan.durationDays} ngày`}
@@ -506,7 +571,11 @@ export default function PricingPage() {
                   title={pendingOrder ? 'Hoàn tất đơn đang chờ duyệt trước' : undefined}
                 >
                   {creating === plan.id ? (
-                    <><Loader2 size={14} className="animate-spin" /> Đang tạo...</>
+                    <><Loader2 size={14} className="animate-spin" /> {native && planIsIapEligible(plan.id) ? 'Đang xử lý...' : 'Đang tạo...'}</>
+                  ) : native && planIsIapEligible(plan.id) ? (
+                    <><Apple size={14} /> {isCurrent ? 'Gia hạn qua App Store' : 'Mua qua App Store'}</>
+                  ) : native ? (
+                    <><Building2 size={14} /> Liên hệ tư vấn</>
                   ) : isCurrent ? (
                     <><Clock size={14} /> Gia hạn ngay</>
                   ) : isUpgrade ? (
@@ -521,6 +590,30 @@ export default function PricingPage() {
             )
           })}
         </div>
+
+        {/* ── Restore Purchases (Apple yêu cầu cho app có IAP) ── */}
+        {native && (
+          <div style={{ marginTop: 20, textAlign: 'center' }}>
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'transparent', border: '1px solid hsl(var(--border))',
+                color: 'hsl(var(--foreground)/0.8)', borderRadius: 10,
+                padding: '10px 18px', fontWeight: 600, fontSize: 13,
+                cursor: restoring ? 'not-allowed' : 'pointer', opacity: restoring ? 0.6 : 1,
+              }}
+            >
+              {restoring
+                ? <><Loader2 size={14} className="animate-spin" /> Đang khôi phục...</>
+                : <><RotateCcw size={14} /> Khôi phục giao dịch đã mua</>}
+            </button>
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ai-muted-text)' }}>
+              Thanh toán xử lý an toàn qua App Store của Apple. Có thể quản lý hoặc huỷ trong Cài đặt → Apple ID → Đăng ký.
+            </div>
+          </div>
+        )}
 
         {/* ── Lifetime spend (for logged in) ──────────────── */}
         {isAuthed && subStatus && subStatus.lifetimeSpend > 0 && (

@@ -1174,10 +1174,11 @@ function makeProxy(target, label, pathFilter) {
   app.post('/api/iap/apple/verify', async (req, res) => {
     const userKey = getUserKey(req);
     if (!userKey) return res.status(401).json({ error: 'Đăng nhập trước khi mua' });
-    const signedTransaction = req.body?.signedTransaction || req.body?.jws;
-    if (!signedTransaction) return res.status(400).json({ error: 'Thiếu signedTransaction' });
+    const signedTransaction = req.body?.signedTransaction || req.body?.jws || null;
+    const transactionId = req.body?.transactionId || req.body?.transaction_id || null;
+    if (!signedTransaction && !transactionId) return res.status(400).json({ error: 'Thiếu signedTransaction hoặc transactionId' });
     try {
-      const r = await appleIap.verifyTransaction(signedTransaction);
+      const r = await appleIap.verifyTransaction({ signedTransaction, transactionId });
       await entitlements.grantPlan(userKey, r.planId, {
         source: 'apple-iap',
         txnId: r.originalTransactionId || r.transactionId,
