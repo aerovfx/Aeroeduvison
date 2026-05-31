@@ -32,6 +32,8 @@ import type { CareerCommunityStats, CareerTestResult } from "@/types"
 import CareerDayPixelSim from "@/components/career/CareerDayPixelSim"
 import PixelOdyssey from "@/components/career/PixelOdyssey"
 import ScrollToTopButton from "@/components/common/ScrollToTopButton"
+import CareerEvolution from "@/components/career/CareerEvolution"
+import AdmissionsPanel from "@/components/career/AdmissionsPanel"
 
 /* ─── Inline replacements ─────────────────────────── */
 function PageHeader({
@@ -112,6 +114,19 @@ export default function CareerAdvisorPage() {
     queryKey: ["career-community-stats"],
     queryFn: () => careerService.getCommunityStats(),
     staleTime: 60_000,
+  })
+
+  // Auto-load lịch sử cá nhân khi mount → để CareerEvolution timeline có dữ liệu
+  // ngay không cần user bấm "Xem Lịch Sử". Cache 5 phút (luôn fresh enough).
+  useQuery({
+    queryKey: ["career-history", user?.id],
+    queryFn: async () => {
+      const data = await careerService.getMyHistory()
+      setHistory(data)
+      return data
+    },
+    staleTime: 300_000,
+    enabled: !!user,  // chỉ fetch khi đã login
   })
 
   const totalQuestions = allQuestions?.length ?? 0
@@ -337,6 +352,9 @@ export default function CareerAdvisorPage() {
                 </div>
               </div>
             </div>
+
+            {/* Hành trình hướng nghiệp — timeline + đánh giá nhất quán qua nhiều lần test */}
+            <CareerEvolution history={history} onOpenResult={restoreFromHistory} />
 
             {/* Pixel Odyssey — game khám phá nghề tương tác */}
             <PixelOdyssey />
@@ -1084,6 +1102,9 @@ export default function CareerAdvisorPage() {
                 <p className="text-xs text-white/50 leading-relaxed">{c.aiExposure.analysis}</p>
               </div>
             )}
+
+            {/* Điểm chuẩn ĐH 2024-2025 + gợi ý điểm cần đạt (calculator) */}
+            <AdmissionsPanel career={c} />
 
             {/* Education */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
