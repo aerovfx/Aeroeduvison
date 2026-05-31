@@ -160,10 +160,15 @@ export default function EmotionPage() {
     },
   })
 
-  const dominant = emotionConfig[stats.dominant as EmotionType] || emotionConfig.focused
-  const quality = qualityConfig[stats.studyQuality as keyof typeof qualityConfig] || qualityConfig.good
-  const weeklyData = stats.weeklyTrend || DEMO_WEEKLY
-  const records = stats.records || DEMO_RECORDS
+  // Defensive: BE có thể trả thiếu field (cũ chỉ có {success, groupBy, buckets, summary})
+  // → mọi field có thể undefined; fallback an toàn để không crash .toFixed/.map.
+  const s = (stats || {}) as any
+  const dominant = emotionConfig[s.dominant as EmotionType] || emotionConfig.focused
+  const quality = qualityConfig[s.studyQuality as keyof typeof qualityConfig] || qualityConfig.good
+  const weeklyData = Array.isArray(s.weeklyTrend) && s.weeklyTrend.length ? s.weeklyTrend : DEMO_WEEKLY
+  const records = Array.isArray(s.records) && s.records.length ? s.records : DEMO_RECORDS
+  const avgIntensity = Number.isFinite(s.averageIntensity) ? s.averageIntensity : 0
+  const focusRatio = Number.isFinite(s.focusRatio) ? s.focusRatio : 0
 
   return (
     <div className="p-6 animate-fade-in space-y-6 max-w-5xl mx-auto">
@@ -199,17 +204,17 @@ export default function EmotionPage() {
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Cường độ trung bình</p>
           <div className="flex items-end gap-1">
-            <span className="text-2xl font-bold text-foreground">{stats.averageIntensity.toFixed(1)}</span>
+            <span className="text-2xl font-bold text-foreground">{avgIntensity.toFixed(1)}</span>
             <span className="text-sm text-muted-foreground mb-0.5">/10</span>
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Tỷ lệ tập trung</p>
           <div className="flex items-end gap-1">
-            <span className="text-2xl font-bold text-foreground">{Math.round(stats.focusRatio * 100)}%</span>
+            <span className="text-2xl font-bold text-foreground">{Math.round(focusRatio * 100)}%</span>
           </div>
           <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${stats.focusRatio * 100}%` }} />
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${focusRatio * 100}%` }} />
           </div>
         </div>
         <div className={cn('rounded-xl p-4 border border-border', quality.bg)}>

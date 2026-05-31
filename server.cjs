@@ -15718,12 +15718,39 @@ app.get('/api/achievements/me', async (req, res) => {
 app.get('/api/achievements', (_req, res) => res.json({ achievements: [], total: 0 }));
 app.get('/api/transcript/history', (_req, res) => res.json({ transcripts: [], total: 0 }));
 app.get('/api/emotion', (_req, res) => res.json({ entries: [] }));
-// /api/emotion/stats — shape khớp EmotionStatsResponse interface ở EmotionMap.tsx
+// POST /api/emotion — log 1 bản ghi cảm xúc (student page)
+// Body: { emotion, intensity, note? } → trả về { id, emotion, intensity, note, timestamp }
+// Hiện chỉ echo (chưa persist) — đủ để FE invalidateQueries refresh. Khi có
+// bảng EmotionRecord thật sẽ INSERT vào đây.
+app.post('/api/emotion', express.json({ limit: '64kb' }), (req, res) => {
+  const { emotion, intensity, note } = req.body || {};
+  const VALID = ['happy','neutral','sad','stressed','excited','focused'];
+  if (!VALID.includes(emotion)) return res.status(400).json({ error: 'emotion không hợp lệ' });
+  const num = Number(intensity);
+  if (!Number.isFinite(num) || num < 1 || num > 10) return res.status(400).json({ error: 'intensity phải 1-10' });
+  return res.json({
+    id: require('crypto').randomUUID(),
+    emotion, intensity: num, note: note || '',
+    timestamp: new Date().toISOString(),
+  });
+});
+// /api/emotion/stats — union shape: vừa khớp EmotionStatsResponse (EmotionMap.tsx GV)
+// VỪA khớp EmotionStats (Emotion.tsx HS — { dominant, averageIntensity, focusRatio,
+// studyQuality, records, weeklyTrend }). Trước đây chỉ trả shape GV → HS đọc
+// stats.averageIntensity.toFixed(1) trên undefined → crash.
 app.get('/api/emotion/stats', (req, res) => {
   const groupBy = (req.query.groupBy === 'day') ? 'day' : 'hour';
-  const from = req.query.from || new Date(Date.now() - 24*60*60*1000).toISOString();
+  const days = Math.max(1, Math.min(90, Number(req.query.days) || 7));
+  const from = req.query.from || new Date(Date.now() - days*24*60*60*1000).toISOString();
   const to   = req.query.to   || new Date().toISOString();
+  // weeklyTrend rỗng — 7 ngày gần nhất (HS chưa log thì hiện 0)
+  const weeklyTrend = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(Date.now() - (6-i)*24*60*60*1000);
+    return { date: ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()],
+      happy: 0, focused: 0, stressed: 0, neutral: 0 };
+  });
   return res.json({
+    // ── shape GV (EmotionMap.tsx) ──
     success: true,
     groupBy,
     buckets: [],
@@ -15734,6 +15761,13 @@ app.get('/api/emotion/stats', (req, res) => {
       emotionDistribution: {},
       dominantEmotion: null,
     },
+    // ── shape HS (Emotion.tsx) — defaults an toàn cho FE đọc thẳng ──
+    dominant: 'neutral',
+    averageIntensity: 0,
+    focusRatio: 0,
+    studyQuality: 'average',
+    records: [],
+    weeklyTrend,
   });
 });
 // (real handlers at line ~4145 + IIFE ~4560 cover /api/assignments + /from-exam + /:id/targets)
