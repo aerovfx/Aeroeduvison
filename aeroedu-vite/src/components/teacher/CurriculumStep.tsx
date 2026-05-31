@@ -1,29 +1,32 @@
 /**
- * CurriculumStep — Mục lục khoá học (Chapter → Lesson builder)
+ * CurriculumStep — Mục lục khoá học (Section → Lecture builder, Udemy-style)
  *
- * Step 3/6 trong wizard CourseEditor. Cho phép teacher xây cấu trúc
- * khoá học (chương → bài học) TRƯỚC khi thêm video.
+ * Step 3/5 trong wizard CourseEditor. Cho phép teacher xây cấu trúc khoá học
+ * (chương → bài học) với UX kiểu Udemy: section card có quick-add chip toolbar
+ * ở dưới (📹 Bài giảng / 📝 Bài đọc / ❓ Quiz / ✏️ Bài tập / 📐 Đề luyện / 🧪 Lab).
  *
- *   ┌─────────────────────────────────────────────────────┐
- *   │ 📚 Mục lục khoá học                                 │
- *   │ [+ Thêm chương mới]                                  │
- *   │                                                       │
- *   │ ▼ Chương 1: Giới thiệu                  [edit][del] │
- *   │   ├─ 1.1 Tổng quan                       [edit][del]│
- *   │   ├─ 1.2 Phương pháp học                 [edit][del]│
- *   │   └─ [+ Thêm bài học]                                │
- *   │                                                       │
- *   │ ─── Tổng: 3 chương · 12 bài · ~6h ───                │
- *   └─────────────────────────────────────────────────────┘
+ *   ┌──────────────────────────────────────────────────────────────────┐
+ *   │ ⬇ ① Chương 1: Giới thiệu                          3 bài · 24p   │
+ *   │ ┌────────────────────────────────────────────────────────────┐  │
+ *   │ │ ✓ Bài 1.1 — Tổng quan          📹 Video · 12p   [Asset 3] │  │
+ *   │ │ ○ Bài 1.2 — Phương pháp học     📝 Bài đọc · 8p          │  │
+ *   │ └────────────────────────────────────────────────────────────┘  │
+ *   │ ➕ Thêm:                                                          │
+ *   │ [📹 Bài giảng] [❓ Quiz] [✏️ Bài tập] [📐 Đề luyện] [🧪 Lab]    │
+ *   └──────────────────────────────────────────────────────────────────┘
+ *   [          + Thêm chương mới          ]   ← ghim đáy
+ *
+ * KHÁC bản cũ: chip toolbar thay form "Thêm bài học" cồng kềnh; chương mới ghim
+ * đáy thay vì trên (giống Udemy → kéo xuống = mở rộng). Backend KHÔNG đổi.
  */
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   FolderPlus, BookOpen, Plus, Edit3, Trash2,
-  ChevronDown, ChevronUp, ArrowUp, ArrowDown, Save,
+  ChevronDown, ArrowUp, ArrowDown,
   Clock, Video, FileText, HelpCircle, ClipboardList,
   ChevronLeft, ChevronRight, Check, X, GripVertical,
-  Settings,
+  Settings, FlaskConical, ScrollText, Sparkles,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import {
@@ -36,15 +39,24 @@ import { cn } from '@/lib/utils'
 import LessonAssetEditor from './LessonAssetEditor'
 
 /* ─── Helpers ────────────────────────────────────────────── */
-const LESSON_TYPES: { value: LessonType; label: string; icon: any; color: string }[] = [
-  { value: 'video',      label: 'Video',      icon: Video,         color: 'text-purple-400' },
-  { value: 'reading',    label: 'Bài đọc',    icon: FileText,      color: 'text-blue-400'   },
-  { value: 'quiz',       label: 'Quiz',       icon: HelpCircle,    color: 'text-amber-400'  },
-  { value: 'assignment', label: 'Bài tập',    icon: ClipboardList, color: 'text-emerald-400'},
+
+// Quick-add chips: thứ tự ưu tiên Bài giảng → Quiz → Bài tập → Đề luyện → Lab → Bài đọc.
+// `accent` dùng cho hover ring + icon color; `kind` = LessonType + alias đặc biệt.
+type ChipKind = LessonType | 'practice-exam' | 'lab'
+const QUICK_ADD: { kind: ChipKind; label: string; icon: any; accent: string; tone: string }[] = [
+  { kind: 'video',         label: 'Bài giảng',  icon: Video,         accent: '#a855f7', tone: 'purple' },
+  { kind: 'quiz',          label: 'Quiz',       icon: HelpCircle,    accent: '#f59e0b', tone: 'amber' },
+  { kind: 'assignment',    label: 'Bài tập',    icon: ClipboardList, accent: '#10b981', tone: 'emerald' },
+  { kind: 'practice-exam', label: 'Đề luyện',   icon: ScrollText,    accent: '#0ea5e9', tone: 'sky' },
+  { kind: 'lab',           label: 'Phòng Lab',  icon: FlaskConical,  accent: '#06b6d4', tone: 'cyan' },
+  { kind: 'reading',       label: 'Bài đọc',    icon: FileText,      accent: '#60a5fa', tone: 'blue' },
 ]
 
-function getLessonIcon(type: LessonType) {
-  return LESSON_TYPES.find(t => t.value === type) || LESSON_TYPES[0]
+// Icon hiển thị trong lesson row — map ChipKind → icon + màu.
+function lessonChipMeta(type: LessonType, isExam?: boolean, isLab?: boolean) {
+  if (isExam) return QUICK_ADD.find(q => q.kind === 'practice-exam')!
+  if (isLab)  return QUICK_ADD.find(q => q.kind === 'lab')!
+  return QUICK_ADD.find(q => q.kind === type) || QUICK_ADD[0]
 }
 
 function formatTotalDuration(mins: number): string {
@@ -69,17 +81,16 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
   const [showChapterForm, setShowChapterForm] = useState(false)
   const [newChapterTitle, setNewChapterTitle] = useState('')
   const [newChapterDesc, setNewChapterDesc] = useState('')
-  // Lesson form state — keyed by chapterId
-  const [lessonForms, setLessonForms] = useState<Record<string, {
-    title: string; duration: string; type: LessonType; description: string
-  }>>({})
-  // Inline edit state — keyed by chapter/lesson id
+  // Active quick-add chip per chapter: { [chapterId]: ChipKind | null }
+  const [activeChip, setActiveChip] = useState<Record<string, ChipKind | null>>({})
+  const [lessonForms, setLessonForms] = useState<Record<string, { title: string; duration: string }>>({})
+  // Inline edit state
   const [editingChapter, setEditingChapter] = useState<string | null>(null)
   const [editingChapterTitle, setEditingChapterTitle] = useState('')
   const [editingLesson, setEditingLesson] = useState<string | null>(null)
   const [editingLessonTitle, setEditingLessonTitle] = useState('')
   const [editingLessonDuration, setEditingLessonDuration] = useState('')
-  // Asset editor modal — { lessonId, lessonTitle } | null
+  // Asset editor modal
   const [assetEditor, setAssetEditor] = useState<{ lessonId: string; lessonTitle: string } | null>(null)
 
   /* ── Data ── */
@@ -108,7 +119,6 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
       setShowChapterForm(false)
       setNewChapterTitle('')
       setNewChapterDesc('')
-      // Auto-expand the new chapter
       setExpanded(prev => ({ ...prev, [ch.id]: true }))
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Lỗi tạo chương'),
@@ -140,8 +150,8 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
     onSuccess: (_l, vars) => {
       qc.invalidateQueries({ queryKey: ['curriculum', courseId] })
       toast.success('Đã thêm bài học')
-      // Reset form for this chapter
-      setLessonForms(p => ({ ...p, [vars.chapterId]: { title: '', duration: '', type: 'video', description: '' }}))
+      setLessonForms(p => ({ ...p, [vars.chapterId]: { title: '', duration: '' } }))
+      setActiveChip(p => ({ ...p, [vars.chapterId]: null }))
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || 'Lỗi tạo bài học'),
   })
@@ -211,9 +221,7 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
     const newIdx = idx + dir
     if (newIdx < 0 || newIdx >= chapters.length) return
     const ids = chapters.map(c => c.id)
-    const tmp = ids[idx]
-    ids[idx] = ids[newIdx]
-    ids[newIdx] = tmp
+    const tmp = ids[idx]; ids[idx] = ids[newIdx]; ids[newIdx] = tmp
     reorderChaptersM.mutate(ids)
   }
 
@@ -222,39 +230,60 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
     const lessons = chapter.lessons || []
     if (newIdx < 0 || newIdx >= lessons.length) return
     const ids = lessons.map(l => l.id)
-    const tmp = ids[idx]
-    ids[idx] = ids[newIdx]
-    ids[newIdx] = tmp
+    const tmp = ids[idx]; ids[idx] = ids[newIdx]; ids[newIdx] = tmp
     reorderLessonsM.mutate({ chapterId: chapter.id, lessonIds: ids })
   }
 
   function getLessonForm(chapterId: string) {
-    return lessonForms[chapterId] || { title: '', duration: '', type: 'video' as LessonType, description: '' }
+    return lessonForms[chapterId] || { title: '', duration: '' }
   }
-  function updateLessonForm(chapterId: string, patch: Partial<typeof lessonForms[string]>) {
-    setLessonForms(p => ({
-      ...p,
-      [chapterId]: { ...getLessonForm(chapterId), ...patch },
-    }))
+  function updateLessonForm(chapterId: string, patch: Partial<{ title: string; duration: string }>) {
+    setLessonForms(p => ({ ...p, [chapterId]: { ...getLessonForm(chapterId), ...patch } }))
   }
+
+  /**
+   * Tạo lesson từ chip đang active. Map ChipKind → { LessonType backend, tagged title }:
+   *   practice-exam → assignment + title prefix [Đề luyện]
+   *   lab           → assignment + title prefix [Lab]
+   * Sau khi tạo, click "Asset" để gắn nội dung thật (file đề / link lab).
+   */
   function submitLessonForm(chapterId: string) {
+    const chip = activeChip[chapterId]
+    if (!chip) return
     const f = getLessonForm(chapterId)
-    if (!f.title.trim()) { toast.error('Thiếu tiêu đề bài học'); return }
+    const titleRaw = f.title.trim()
+    if (!titleRaw) { toast.error('Thiếu tiêu đề bài học'); return }
+    let backendType: LessonType = 'video'
+    let title = titleRaw
+    if (chip === 'practice-exam') { backendType = 'assignment'; title = titleRaw.startsWith('[Đề luyện]') ? titleRaw : `[Đề luyện] ${titleRaw}` }
+    else if (chip === 'lab')      { backendType = 'assignment'; title = titleRaw.startsWith('[Lab]') ? titleRaw : `[Lab] ${titleRaw}` }
+    else                          { backendType = chip as LessonType }
     createLessonM.mutate({
       chapterId,
       data: {
-        title: f.title,
+        title,
         duration: f.duration ? parseInt(f.duration, 10) : undefined,
-        type: f.type,
-        description: f.description || undefined,
+        type: backendType,
       },
     })
+  }
+
+  function openChip(chapterId: string, chip: ChipKind) {
+    setActiveChip(p => ({ ...p, [chapterId]: chip }))
+    // Reset form mỗi lần đổi loại
+    setLessonForms(p => ({ ...p, [chapterId]: { title: '', duration: '' } }))
+    // Tự mở chương nếu đang đóng
+    setExpanded(p => ({ ...p, [chapterId]: true }))
+  }
+
+  function closeChip(chapterId: string) {
+    setActiveChip(p => ({ ...p, [chapterId]: null }))
   }
 
   /* ── Render ── */
   return (
     <div className="space-y-5">
-      {/* Header / intro */}
+      {/* Header banner — concise Udemy-style intro */}
       <div className="rounded-xl bg-gradient-to-br from-purple-900/30 to-indigo-900/20 border border-purple-500/20 p-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
@@ -263,89 +292,43 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-semibold text-white mb-1">Mục lục khoá học</h3>
             <p className="text-xs text-gray-300/80 leading-relaxed">
-              Thiết kế cấu trúc khoá học trước khi thêm video. Mỗi chương gồm nhiều bài học (video, bài đọc, quiz, bài tập).
-              Cấu trúc rõ ràng giúp học viên theo dõi tiến trình tốt hơn.
+              Xây dựng cấu trúc khoá học theo chương → bài giảng. Mỗi chương có thanh công cụ nhanh ở dưới —
+              chọn loại bài muốn thêm (📹 Bài giảng · ❓ Quiz · ✏️ Bài tập · 📐 Đề luyện · 🧪 Lab · 📝 Bài đọc).
             </p>
           </div>
+          {chapters.length > 0 && (
+            <div className="hidden md:flex items-center gap-3 text-xs text-gray-300 self-center pr-1">
+              <span className="inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-purple-300" /><b className="text-white">{chapters.length}</b> chương</span>
+              <span className="text-gray-500">·</span>
+              <span className="inline-flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-blue-300" /><b className="text-white">{totalLessons}</b> bài</span>
+              <span className="text-gray-500">·</span>
+              <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-emerald-300" /><b className="text-white">{formatTotalDuration(totalDuration)}</b></span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* + Thêm chương button + form */}
-      {!showChapterForm ? (
-        <button
-          type="button"
-          onClick={() => setShowChapterForm(true)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-500/5 text-purple-300 text-sm font-medium transition-colors"
-        >
-          <FolderPlus className="w-4 h-4" />
-          Thêm chương mới
-        </button>
-      ) : (
-        <div className="rounded-xl bg-purple-900/20 border border-purple-500/30 p-4 space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
-            <FolderPlus className="w-4 h-4" />
-            Thêm chương mới
-          </h4>
-          <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">
-              Tiêu đề chương <span className="text-red-400">*</span>
-            </label>
-            <input
-              autoFocus
-              value={newChapterTitle}
-              onChange={(e) => setNewChapterTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newChapterTitle.trim()) {
-                  createChapterM.mutate({ title: newChapterTitle, description: newChapterDesc })
-                }
-                if (e.key === 'Escape') setShowChapterForm(false)
-              }}
-              placeholder="VD: Chương 1 — Giới thiệu Vật lý 11"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">
-              Mô tả ngắn (tuỳ chọn)
-            </label>
-            <textarea
-              value={newChapterDesc}
-              onChange={(e) => setNewChapterDesc(e.target.value)}
-              rows={2}
-              placeholder="Học viên sẽ học gì trong chương này?"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors resize-y"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => { setShowChapterForm(false); setNewChapterTitle(''); setNewChapterDesc('') }}
-              className="px-4 py-2 rounded-lg border border-white/20 text-gray-300 text-sm hover:border-white/40 transition-colors"
-            >
-              Huỷ
-            </button>
-            <button
-              type="button"
-              disabled={!newChapterTitle.trim() || createChapterM.isPending}
-              onClick={() => createChapterM.mutate({ title: newChapterTitle, description: newChapterDesc })}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              {createChapterM.isPending ? 'Đang tạo...' : 'Tạo chương'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* List */}
+      {/* ── Section list ─────────────────────────────────────────── */}
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-xl bg-white/5 animate-pulse" />)}
         </div>
-      ) : chapters.length === 0 ? (
-        <div className="rounded-xl bg-white/5 border border-dashed border-white/10 p-10 flex flex-col items-center gap-3 text-center">
-          <BookOpen className="w-10 h-10 text-gray-600" />
-          <p className="text-gray-400 text-sm">Chưa có chương nào. Tạo chương đầu tiên để bắt đầu xây dựng mục lục.</p>
+      ) : chapters.length === 0 && !showChapterForm ? (
+        <div className="rounded-2xl bg-white/[0.04] border border-dashed border-white/15 p-12 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-purple-300" />
+          </div>
+          <div>
+            <p className="text-white font-semibold mb-1">Bắt đầu xây mục lục khoá học</p>
+            <p className="text-gray-400 text-sm">Tạo chương đầu tiên — sau đó thêm bài giảng, quiz, bài tập, đề luyện hoặc phòng lab.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowChapterForm(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition-colors"
+          >
+            <FolderPlus className="w-4 h-4" /> Tạo chương đầu tiên
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -353,21 +336,23 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
             const isOpen = expanded[chapter.id] !== false  // default open
             const lessons = chapter.lessons || []
             const lessonForm = getLessonForm(chapter.id)
+            const chip = activeChip[chapter.id] || null
+            const chipMeta = chip ? QUICK_ADD.find(q => q.kind === chip) : null
             const chapterDuration = lessons.reduce((s, l) => s + (l.duration || 0), 0)
             return (
-              <div key={chapter.id} className="rounded-xl bg-white/5 border border-white/10 overflow-hidden transition-colors hover:border-white/20">
-                {/* Chapter header */}
-                <div className="flex items-center gap-2 px-3 py-3 bg-white/[0.02]">
+              <div key={chapter.id} className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden transition-colors hover:border-white/20">
+                {/* ── Section header ── */}
+                <div className="flex items-center gap-2 px-4 py-3 bg-white/[0.03] border-b border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => toggleExpand(chapter.id)}
-                    className="flex-shrink-0 p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                    className="flex-shrink-0 w-7 h-7 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
                     title={isOpen ? 'Thu gọn' : 'Mở rộng'}
                   >
-                    {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4 rotate-180" />}
+                    <ChevronDown className={cn('w-4 h-4 transition-transform', !isOpen && '-rotate-90')} />
                   </button>
 
-                  <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center justify-center">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-500/25 text-purple-200 text-xs font-bold flex items-center justify-center">
                     {chIdx + 1}
                   </span>
 
@@ -381,7 +366,7 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                         if (e.key === 'Escape') setEditingChapter(null)
                       }}
                       onBlur={saveEditChapter}
-                      className="flex-1 min-w-0 px-2 py-1 rounded bg-white/10 border border-purple-500/50 text-sm text-white outline-none"
+                      className="flex-1 min-w-0 px-2 py-1.5 rounded bg-white/10 border border-purple-500/50 text-sm text-white outline-none"
                     />
                   ) : (
                     <button
@@ -390,26 +375,28 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                       className="flex-1 min-w-0 text-left group/title"
                       title="Click để đổi tên chương"
                     >
-                      <p className="text-sm font-medium text-white truncate group-hover/title:text-purple-300 transition-colors">
-                        {chapter.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold hidden sm:inline">Chương {chIdx + 1}:</span>
+                        <p className="text-sm font-semibold text-white truncate group-hover/title:text-purple-300 transition-colors">
+                          {chapter.title}
+                        </p>
+                      </div>
                       {chapter.description && (
-                        <p className="text-xs text-gray-500 truncate">{chapter.description}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{chapter.description}</p>
                       )}
                     </button>
                   )}
 
-                  <div className="flex items-center gap-3 flex-shrink-0 text-xs text-gray-400">
-                    <span className="hidden sm:inline">{lessons.length} bài</span>
+                  <div className="hidden sm:flex items-center gap-3 flex-shrink-0 text-xs text-gray-400">
+                    <span>{lessons.length} bài</span>
                     {chapterDuration > 0 && (
-                      <span className="hidden sm:flex items-center gap-1">
+                      <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {formatTotalDuration(chapterDuration)}
                       </span>
                     )}
                   </div>
 
-                  {/* Reorder buttons */}
                   <div className="flex items-center gap-0.5 flex-shrink-0">
                     <button
                       type="button"
@@ -454,31 +441,38 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                   </div>
                 </div>
 
-                {/* Lessons + form */}
+                {/* ── Section body: lessons + quick-add toolbar ── */}
                 {isOpen && (
-                  <div className="px-3 pb-3 space-y-1.5">
-                    {/* Empty state — emphasize the next action when chapter has no lessons */}
-                    {lessons.length === 0 && (
-                      <div className="ml-7 mb-2 rounded-lg bg-blue-500/[0.06] border border-blue-500/30 px-3 py-2 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                  <div className="px-4 py-3 space-y-1.5">
+                    {lessons.length === 0 && !chip && (
+                      <div className="rounded-lg bg-blue-500/[0.06] border border-blue-500/25 px-3 py-2.5 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-300 flex-shrink-0" />
                         <p className="text-xs text-blue-200/90 flex-1">
-                          Chương này chưa có bài học. Dùng form dưới đây để thêm bài đầu tiên ↓
+                          Chương chưa có bài học — chọn loại bên dưới (📹 Bài giảng / ❓ Quiz / ✏️ Bài tập / 📐 Đề luyện / 🧪 Lab) để thêm.
                         </p>
                       </div>
                     )}
+
                     {lessons.map((lesson, lIdx) => {
-                      const lt = getLessonIcon(lesson.type)
-                      const Icon = lt.icon
+                      const isExam = lesson.title.startsWith('[Đề luyện]')
+                      const isLab  = lesson.title.startsWith('[Lab]')
+                      const meta = lessonChipMeta(lesson.type, isExam, isLab)
+                      const Icon = meta.icon
+                      const displayTitle = isExam ? lesson.title.replace(/^\[Đề luyện\]\s*/, '')
+                                         : isLab  ? lesson.title.replace(/^\[Lab\]\s*/, '')
+                                         : lesson.title
                       return (
                         <div
                           key={lesson.id}
-                          className="flex items-center gap-2 px-3 py-2 ml-7 rounded-lg bg-black/20 border border-white/[0.06] hover:border-white/15 transition-colors group"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/15 border border-white/[0.06] hover:border-white/15 transition-colors group"
                         >
                           <GripVertical className="w-3 h-3 text-gray-700 flex-shrink-0" />
-                          <span className="flex-shrink-0 w-6 text-[10px] text-gray-500 font-mono">
+                          <span className="flex-shrink-0 w-9 text-[10px] text-gray-500 font-mono">
                             {chIdx + 1}.{lIdx + 1}
                           </span>
-                          <Icon className={cn('w-3.5 h-3.5 flex-shrink-0', lt.color)} />
+                          <span className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center" style={{ background: `${meta.accent}22` }}>
+                            <Icon className="w-3.5 h-3.5" style={{ color: meta.accent }} />
+                          </span>
                           {editingLesson === lesson.id ? (
                             <div className="flex-1 min-w-0 flex items-center gap-1">
                               <input
@@ -523,7 +517,7 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                                 title="Click để đổi tên"
                               >
                                 <span className="text-xs text-white truncate block hover:text-purple-300 transition-colors">
-                                  {lesson.title}
+                                  {displayTitle}
                                 </span>
                               </button>
                               {lesson.duration ? (
@@ -532,10 +526,12 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                                   {lesson.duration}p
                                 </span>
                               ) : null}
-                              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full hidden sm:block flex-shrink-0', lt.color, 'bg-white/5')}>
-                                {lt.label}
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded-full hidden sm:block flex-shrink-0 font-medium"
+                                style={{ background: `${meta.accent}1f`, color: meta.accent }}
+                              >
+                                {meta.label}
                               </span>
-                              {/* Asset button — visible if blockCount > 0, else only on hover */}
                               <button
                                 type="button"
                                 onClick={() => setAssetEditor({ lessonId: lesson.id, lessonTitle: lesson.title })}
@@ -545,10 +541,10 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                                     ? 'bg-purple-500/20 text-purple-200 hover:bg-purple-500/30'
                                     : 'opacity-0 group-hover:opacity-100 bg-white/5 text-gray-400 hover:bg-purple-500/20 hover:text-purple-200'
                                 )}
-                                title="Quản lý asset của bài học (video/PDF/text/quiz...)"
+                                title="Quản lý nội dung của bài học (video/PDF/text/quiz...)"
                               >
                                 <Settings className="w-3 h-3" />
-                                Asset
+                                Nội dung
                                 {(lesson.blockCount ?? 0) > 0 && (
                                   <span className="ml-0.5 px-1 rounded-full bg-purple-600/40 text-purple-100 font-bold">
                                     {lesson.blockCount}
@@ -556,44 +552,10 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                                 )}
                               </button>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => moveLesson(chapter, lIdx, -1)}
-                                  disabled={lIdx === 0}
-                                  className="w-6 h-6 rounded hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-gray-400 hover:text-white"
-                                  title="Lên"
-                                >
-                                  <ArrowUp className="w-3 h-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => moveLesson(chapter, lIdx, 1)}
-                                  disabled={lIdx === lessons.length - 1}
-                                  className="w-6 h-6 rounded hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-gray-400 hover:text-white"
-                                  title="Xuống"
-                                >
-                                  <ArrowDown className="w-3 h-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => startEditLesson(lesson)}
-                                  className="w-6 h-6 rounded hover:bg-cyan-500/20 flex items-center justify-center text-cyan-400"
-                                  title="Sửa"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (window.confirm(`Xoá bài học "${lesson.title}"?`)) {
-                                      deleteLessonM.mutate(lesson.id)
-                                    }
-                                  }}
-                                  className="w-6 h-6 rounded hover:bg-red-500/20 flex items-center justify-center text-red-400"
-                                  title="Xoá"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                <button type="button" onClick={() => moveLesson(chapter, lIdx, -1)} disabled={lIdx === 0} className="w-6 h-6 rounded hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-gray-400 hover:text-white" title="Lên"><ArrowUp className="w-3 h-3" /></button>
+                                <button type="button" onClick={() => moveLesson(chapter, lIdx, 1)} disabled={lIdx === lessons.length - 1} className="w-6 h-6 rounded hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-gray-400 hover:text-white" title="Xuống"><ArrowDown className="w-3 h-3" /></button>
+                                <button type="button" onClick={() => startEditLesson(lesson)} className="w-6 h-6 rounded hover:bg-cyan-500/20 flex items-center justify-center text-cyan-400" title="Sửa"><Edit3 className="w-3 h-3" /></button>
+                                <button type="button" onClick={() => { if (window.confirm(`Xoá bài học "${lesson.title}"?`)) deleteLessonM.mutate(lesson.id) }} className="w-6 h-6 rounded hover:bg-red-500/20 flex items-center justify-center text-red-400" title="Xoá"><Trash2 className="w-3 h-3" /></button>
                               </div>
                             </>
                           )}
@@ -601,82 +563,168 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                       )
                     })}
 
-                    {/* Inline add-lesson form — emphasized với border bold + bg đậm hơn */}
-                    <div className="ml-7 rounded-lg bg-purple-500/[0.10] border-2 border-dashed border-purple-500/40 p-3 space-y-2 hover:border-purple-500/60 hover:bg-purple-500/[0.14] transition-all">
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-purple-500/30 flex items-center justify-center flex-shrink-0">
-                          <Plus className="w-3 h-3 text-purple-200" />
+                    {/* ── Inline form khi 1 chip đang active ── */}
+                    {chip && chipMeta && (
+                      <div
+                        className="rounded-lg border-2 border-dashed p-3 space-y-2 transition-colors"
+                        style={{ borderColor: `${chipMeta.accent}66`, background: `${chipMeta.accent}10` }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <chipMeta.icon className="w-4 h-4" style={{ color: chipMeta.accent }} />
+                            <span className="text-xs font-semibold" style={{ color: chipMeta.accent }}>
+                              Thêm {chipMeta.label}
+                              {chip === 'practice-exam' && <span className="ml-1 text-[10px] opacity-70">(gắn đề ở bước Nội dung)</span>}
+                              {chip === 'lab'           && <span className="ml-1 text-[10px] opacity-70">(gắn link Lab ở bước Nội dung)</span>}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => closeChip(chapter.id)}
+                            className="w-6 h-6 rounded hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                            title="Đóng"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <span className="text-xs font-semibold text-purple-200">📚 Thêm bài học vào chương này</span>
-                        <span className="text-[10px] text-purple-300/60 hidden sm:inline">(Enter để thêm nhanh)</span>
+                        <div className="grid sm:grid-cols-12 gap-2">
+                          <input
+                            autoFocus
+                            value={lessonForm.title}
+                            onChange={(e) => updateLessonForm(chapter.id, { title: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && lessonForm.title.trim()) submitLessonForm(chapter.id)
+                              if (e.key === 'Escape') closeChip(chapter.id)
+                            }}
+                            placeholder={`Tiêu đề ${chipMeta.label.toLowerCase()}…`}
+                            className="sm:col-span-9 rounded-lg bg-white/5 border border-white/10 focus:border-white/30 px-3 py-2 text-xs text-white placeholder-gray-500 outline-none transition-colors"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            value={lessonForm.duration}
+                            onChange={(e) => updateLessonForm(chapter.id, { duration: e.target.value })}
+                            placeholder="Thời lượng (phút)"
+                            className="sm:col-span-3 rounded-lg bg-white/5 border border-white/10 focus:border-white/30 px-3 py-2 text-xs text-white placeholder-gray-500 outline-none transition-colors"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => closeChip(chapter.id)}
+                            className="px-3 py-1.5 rounded-lg border border-white/15 text-gray-400 text-xs hover:border-white/30 transition-colors"
+                          >
+                            Huỷ
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!lessonForm.title.trim() || createLessonM.isPending}
+                            onClick={() => submitLessonForm(chapter.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                            style={{ background: chipMeta.accent }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            {createLessonM.isPending ? 'Đang thêm…' : `Thêm ${chipMeta.label}`}
+                          </button>
+                        </div>
                       </div>
-                      <div className="grid sm:grid-cols-12 gap-2">
-                        <input
-                          value={lessonForm.title}
-                          onChange={(e) => updateLessonForm(chapter.id, { title: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && lessonForm.title.trim()) submitLessonForm(chapter.id)
-                          }}
-                          placeholder="Tiêu đề bài học"
-                          className="sm:col-span-6 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-xs text-white placeholder-gray-500 outline-none transition-colors"
-                        />
-                        <select
-                          value={lessonForm.type}
-                          onChange={(e) => updateLessonForm(chapter.id, { type: e.target.value as LessonType })}
-                          className="sm:col-span-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-xs text-white outline-none transition-colors"
-                        >
-                          {LESSON_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
-                        <input
-                          type="number"
-                          min={0}
-                          value={lessonForm.duration}
-                          onChange={(e) => updateLessonForm(chapter.id, { duration: e.target.value })}
-                          placeholder="Thời lượng (phút)"
-                          className="sm:col-span-3 rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-xs text-white placeholder-gray-500 outline-none transition-colors"
-                        />
-                      </div>
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          disabled={!lessonForm.title.trim() || createLessonM.isPending}
-                          onClick={() => submitLessonForm(chapter.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
-                        >
-                          <Plus className="w-3 h-3" />
-                          {createLessonM.isPending ? 'Đang thêm...' : 'Thêm bài học'}
-                        </button>
-                      </div>
+                    )}
+
+                    {/* ── Quick-add chip toolbar (Udemy-style) ── */}
+                    <div className="pt-2 mt-1 border-t border-white/[0.06] flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-medium text-gray-400 pl-1 pr-1">➕ Thêm:</span>
+                      {QUICK_ADD.map(q => {
+                        const Icon = q.icon
+                        const active = chip === q.kind
+                        return (
+                          <button
+                            key={q.kind}
+                            type="button"
+                            onClick={() => (active ? closeChip(chapter.id) : openChip(chapter.id, q.kind))}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all',
+                              active
+                                ? 'text-white shadow-sm'
+                                : 'text-gray-300 border-white/10 hover:border-white/25 bg-white/[0.03] hover:bg-white/[0.06]',
+                            )}
+                            style={active ? { background: q.accent, borderColor: q.accent } : undefined}
+                            title={`Thêm ${q.label}`}
+                          >
+                            <Icon className="w-3.5 h-3.5" style={!active ? { color: q.accent } : undefined} />
+                            {q.label}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
               </div>
             )
           })}
+
+          {/* ── + Thêm chương — ghim ĐÁY danh sách (Udemy pattern) ── */}
+          {!showChapterForm ? (
+            <button
+              type="button"
+              onClick={() => setShowChapterForm(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl border-2 border-dashed border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-500/5 text-purple-300 text-sm font-semibold transition-colors"
+            >
+              <FolderPlus className="w-4 h-4" />
+              Thêm chương mới
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-purple-900/20 border border-purple-500/30 p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
+                <FolderPlus className="w-4 h-4" /> Thêm chương mới
+              </h4>
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Tiêu đề chương <span className="text-red-400">*</span></label>
+                <input
+                  autoFocus
+                  value={newChapterTitle}
+                  onChange={(e) => setNewChapterTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newChapterTitle.trim()) createChapterM.mutate({ title: newChapterTitle, description: newChapterDesc })
+                    if (e.key === 'Escape') setShowChapterForm(false)
+                  }}
+                  placeholder="VD: Chương 1 — Giới thiệu Vật lí 11"
+                  className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Mô tả ngắn (tuỳ chọn)</label>
+                <textarea
+                  value={newChapterDesc}
+                  onChange={(e) => setNewChapterDesc(e.target.value)}
+                  rows={2}
+                  placeholder="Học viên sẽ học gì trong chương này?"
+                  className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors resize-y"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowChapterForm(false); setNewChapterTitle(''); setNewChapterDesc('') }}
+                  className="px-4 py-2 rounded-lg border border-white/20 text-gray-300 text-sm hover:border-white/40 transition-colors"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={!newChapterTitle.trim() || createChapterM.isPending}
+                  onClick={() => createChapterM.mutate({ title: newChapterTitle, description: newChapterDesc })}
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {createChapterM.isPending ? 'Đang tạo...' : 'Tạo chương'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Stats footer */}
-      {chapters.length > 0 && (
-        <div className="rounded-xl bg-gradient-to-r from-white/5 via-purple-500/5 to-white/5 border border-white/10 px-4 py-3 flex items-center justify-center gap-6 text-xs text-gray-300">
-          <div className="flex items-center gap-1.5">
-            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-            <span><b className="text-white">{chapters.length}</b> chương</span>
-          </div>
-          <span className="text-gray-700">·</span>
-          <div className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-blue-400" />
-            <span><b className="text-white">{totalLessons}</b> bài học</span>
-          </div>
-          <span className="text-gray-700">·</span>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Tổng <b className="text-white">{formatTotalDuration(totalDuration)}</b></span>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom nav */}
+      {/* ── Bottom nav ── */}
       <div className="flex justify-between pt-2 border-t border-white/10">
         <button
           type="button"
@@ -685,28 +733,16 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
         >
           <ChevronLeft className="w-4 h-4" /> Quay lại
         </button>
-        <div className="flex gap-2">
-          {chapters.length > 0 && (
-            <button
-              type="button"
-              onClick={() => toast.success('Mục lục đã lưu (auto-save khi tạo/sửa)')}
-              className="hidden sm:flex items-center gap-2 px-5 py-3 rounded-lg border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 text-sm transition-colors"
-              title="Mục lục đã được auto-save khi bạn tạo/sửa"
-            >
-              <Save className="w-4 h-4" /> Đã lưu
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onNext}
-            className="flex items-center gap-2 px-7 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
-          >
-            Tiếp theo <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onNext}
+          className="flex items-center gap-2 px-7 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
+        >
+          Tiếp theo <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Asset editor modal — fullscreen, portal mounted to body */}
+      {/* Asset editor modal */}
       {assetEditor && (
         <LessonAssetEditor
           open
