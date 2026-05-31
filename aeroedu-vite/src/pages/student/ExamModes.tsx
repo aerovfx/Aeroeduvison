@@ -91,10 +91,17 @@ export default function ExamModesPage() {
       {/* Top bar */}
       <div className="px-6 py-4 flex items-center gap-3 border-b border-slate-200 bg-white sticky top-0 z-20">
         <button onClick={() => navigate(-1)}
-          className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition">
-          <ArrowLeft className="w-4 h-4" />
+          title="Quay lại trang trước"
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition">
+          <ArrowLeft className="w-4 h-4" /> Quay lại
         </button>
-        <h1 className="text-slate-800 font-bold text-base">Chọn chế độ làm bài</h1>
+        <h1 className="flex-1 text-slate-800 font-bold text-base truncate">Chọn chế độ làm bài</h1>
+        {/* Nút Thoát rõ ràng — luôn về trang DS đề (an toàn kể cả khi mở từ deep-link / QR / thông báo) */}
+        <button onClick={() => navigate('/student/exams')}
+          title="Thoát về danh sách đề thi"
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold transition">
+          <X className="w-4 h-4" /> Thoát
+        </button>
       </div>
 
       {/* Exam header strip */}

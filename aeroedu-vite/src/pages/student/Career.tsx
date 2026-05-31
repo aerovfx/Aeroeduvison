@@ -1610,7 +1610,7 @@ function exportStatsCsv(stats: CareerCommunityStats | undefined) {
 
   rows.push(['== Hoc sinh da hoan thanh gan day =='])
   rows.push(['Ten', 'Nam sinh', 'MBTI', 'Kieu tinh cach', 'Holland', 'Thoi diem'])
-  stats.recentTakers.forEach((r) =>
+  ;(stats.recentTakers ?? []).forEach((r) =>
     rows.push([
       r.userName,
       r.userYearOfBirth ?? '',
@@ -2000,7 +2000,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
           )}
 
           {/* Recent takers — những người đã làm bài gần đây */}
-          {stats.recentTakers.length > 0 && (
+          {(stats.recentTakers?.length ?? 0) > 0 && (
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="h-4 w-4 text-cyan-500" />
@@ -2021,7 +2021,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recentTakers.map((row, i) => (
+                    {(stats.recentTakers ?? []).map((row, i) => (
                       <tr
                         key={`${row.userName}-${i}`}
                         className="border-b border-white/[0.03] last:border-0 hover:bg-white/[0.02] transition-colors"

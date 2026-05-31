@@ -13132,7 +13132,7 @@ app.get('/api/student/exam-rooms', async (req, res) => {
         return res.json({ success: true, data: rows });
       }
       // community-stats — aggregate toàn bộ
-      const [totals, mbtiDist, hollandDist, topCareers, lastAt] = await Promise.all([
+      const [totals, mbtiDist, hollandDist, topCareers, lastAt, recent] = await Promise.all([
         pool.query(`
           SELECT COUNT(*)::int AS attempts,
                  COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS users
@@ -13153,6 +13153,18 @@ app.get('/api/student/exam-rooms', async (req, res) => {
           WHERE careers IS NOT NULL GROUP BY career ORDER BY count DESC LIMIT 10
         `).catch(() => ({ rows: [] })),
         pool.query(`SELECT MAX(created_at) AS at FROM "PersonalityTest"`).catch(() => ({ rows: [{ at: null }] })),
+        // recentTakers — danh sách 20 lượt làm bài gần nhất (FE đọc .recentTakers.length → trước đây
+        // bỏ field này gây crash "undefined is not an object (evaluating 't.recentTakers.length')").
+        pool.query(`
+          SELECT pt.user_name AS "userName", pt.user_year AS "userYearOfBirth",
+                 pt.mbti_type AS "mbtiType", pt.mbti_name AS "personalityName",
+                 pt.holland_code AS "hollandCode", pt.created_at AS "createdAt",
+                 u.image AS "userImage"
+          FROM "PersonalityTest" pt
+          LEFT JOIN "User" u ON u.id = pt.user_id
+          WHERE pt.mbti_type IS NOT NULL
+          ORDER BY pt.created_at DESC LIMIT 20
+        `).catch(() => ({ rows: [] })),
       ]);
       const totalAttempts = totals.rows[0]?.attempts || 0;
       const totalUsers = totals.rows[0]?.users || 0;
@@ -13170,6 +13182,15 @@ app.get('/api/student/exam-rooms', async (req, res) => {
         name: r.career, count: r.count,
         percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
       }));
+      const recentTakers = (recent.rows || []).map(r => ({
+        userName: r.userName || 'Học sinh ẩn danh',
+        userImage: r.userImage || null,
+        userYearOfBirth: r.userYearOfBirth || null,
+        mbtiType: r.mbtiType,
+        personalityName: r.personalityName || r.mbtiType,
+        hollandCode: r.hollandCode || '',
+        createdAt: r.createdAt,
+      }));
       return res.json({
         success: true,
         data: {
@@ -13178,6 +13199,7 @@ app.get('/api/student/exam-rooms', async (req, res) => {
           mbtiDistribution: mbti,
           hollandDistribution: holland,
           topCareers: careers,
+          recentTakers,
         }
       });
     } catch (e) { console.error('[personality:get]', e.message); return res.json({ success: false, data: null }); }
