@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Grid, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -112,9 +113,9 @@ export default function Aerodynamics() {
         <h1 className="text-3xl font-bold text-indigo-400 mb-2">Aerodynamics Wind Tunnel</h1>
       </div>
 
-      <Canvas className="w-full h-[70%]" camera={{ position: [0, 0, 12], fov: 60 }}>
+      <XRCanvas className="w-full h-[70%]" camera={{ position: [0, 0, 12], fov: 60 }}>
         {isPlaying && <Scene windSpeed={windSpeed} angleOfAttack={angleOfAttack} />}
-      </Canvas>
+      </XRCanvas>
 
       <div className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-indigo-500/30 p-6">
         <div className="max-w-7xl mx-auto">

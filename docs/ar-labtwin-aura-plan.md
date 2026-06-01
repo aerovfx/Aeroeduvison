@@ -6,6 +6,27 @@
 
 ---
 
+## ✅ Trạng thái triển khai (đã code)
+
+Đã hiện thực **MVP cross-platform** theo đường "snapshot model → AR" (đáng tin trên iOS — nhóm user chính):
+
+- **Module dùng chung** `aeroedu-vite/src/lib/ar/` + `src/components/ar/`:
+  - `arCapabilities.ts` — phát hiện WebXR/iOS/desktop.
+  - `exportModel.ts` — xuất cảnh THREE hiện tại → **GLB** (GLTFExporter) + **USDZ** (USDZExporter), nạp động, không thêm phụ thuộc npm.
+  - `ensureModelViewer.ts` — nạp `<model-viewer>` từ CDN một lần, lazy.
+  - `ARModelOverlay.tsx` — lớp phủ AR: Android→WebXR/Scene Viewer, iOS→Quick Look, Desktop→QR mở trên điện thoại.
+  - `ARLaunchButton.tsx` — nút "AR" nổi góc khung (như GeoGebra), xuất model + mở overlay, báo lỗi mềm nếu cảnh không xuất được.
+  - **`XRCanvas.tsx`** — drop-in thay `<Canvas>`: bắt `scene`, phủ nút AR. Đổi `<Canvas>`→`<XRCanvas>` là có AR.
+- **Đã wire AR vào**:
+  - LabTwin (6 lab R3F): `CircularMotion3D`, `GeometryUnfold`, `PeriodicTable`, `Chemistry`, `Aerodynamics`, `AirflowCFD`.
+  - Aura (toàn bộ sim R3F): `SimBasics`, `SimPhysics`, `SimShaders`, `SimEclipse` — **mọi `<Canvas>` đều thành `<XRCanvas>`**.
+  - Badge **"AR"** trên thẻ lab trong `LabsIndex` (5 lab đặt-được-trên-bàn).
+  - *Loại trừ*: `SimFpvDrone` (flight sim, đã có VR riêng, AR đặt-bàn không phù hợp).
+- **Cách hoạt động**: bấm AR → đóng băng cảnh hiện tại → GLB/USDZ → đặt lên mặt thật, chụm ngón phóng to, đi quanh xem.
+- **Hạn chế đã biết (v1)**: mô hình AR là *snapshot tĩnh* (không kéo slider trong AR); cảnh có ShaderMaterial tuỳ biến có thể không xuất USDZ → tự degrade về xem 3D. Đường **WebXR AR realtime** (giữ tương tác, Android/Quest) là nâng cấp Pha 2 ở dưới.
+
+---
+
 ## 1. Phân tích tính năng AR của GeoGebra (từ ảnh)
 
 Ảnh là **GeoGebra 3D Calculator** trên iPhone, đang dựng cảnh: hệ trục `x/y/z`, 2 mặt phẳng

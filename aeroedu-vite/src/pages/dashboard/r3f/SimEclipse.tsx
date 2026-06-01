@@ -13,6 +13,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { XRCanvas } from '../../../components/ar/XRCanvas'
 import { Stars, OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -380,14 +381,14 @@ export function SolarEclipseSim() {
     <div className="relative w-full h-full">
       <ViewModeToggle mode={mode} onChange={setMode} />
 
-      <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 40 }}>
+      <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 40 }}>
         <SolarEclipseScene
           mode={mode}
           playingRef={playingRef}
           speedRef={speedRef}
           progressRef={progressRef}
         />
-      </Canvas>
+      </XRCanvas>
 
       {/* Educational labels */}
       <div className="absolute top-3 right-3 flex flex-col gap-1 text-right text-[11px] text-white/40 pointer-events-none select-none">
@@ -666,14 +667,14 @@ export function LunarEclipseSim() {
     <div className="relative w-full h-full">
       <ViewModeToggle mode={mode} onChange={setMode} />
 
-      <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 45 }}>
+      <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 45 }}>
         <LunarEclipseScene
           mode={mode}
           playingRef={playingRef}
           speedRef={speedRef}
           progressRef={progressRef}
         />
-      </Canvas>
+      </XRCanvas>
 
       <div className="absolute top-3 right-3 flex flex-col gap-1 text-right text-[11px] text-white/40 pointer-events-none select-none">
         {mode === 'earth' ? (

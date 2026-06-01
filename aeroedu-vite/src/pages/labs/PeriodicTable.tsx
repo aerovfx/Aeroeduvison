@@ -15,6 +15,7 @@
  */
 import { useState, useMemo, useRef, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Stars } from '@react-three/drei'
 import { ChevronLeft, Atom } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -727,7 +728,7 @@ export default function PeriodicTable() {
                 Loading specimen…
               </div>
             }>
-              <Canvas
+              <XRCanvas
                 camera={{ position: [0, 2, 10], fov: 50 }}
                 gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
                 style={{ background: '#000' }}
@@ -744,7 +745,7 @@ export default function PeriodicTable() {
                   autoRotate
                   autoRotateSpeed={0.4}
                 />
-              </Canvas>
+              </XRCanvas>
             </Suspense>
           </div>
 

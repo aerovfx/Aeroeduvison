@@ -17,6 +17,7 @@
  */
 import { useRef, useState, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Grid, Text, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { Link } from 'react-router-dom'
@@ -418,7 +419,7 @@ export default function CircularMotion3D() {
           {/* 3D Canvas */}
           <div className="lg:col-span-3 space-y-3">
             <div className="rounded-2xl bg-slate-900/60 border border-white/[0.08] p-3 h-[560px]">
-              <Canvas
+              <XRCanvas
                 camera={{ position: [8, 6, 10], fov: 45 }}
                 dpr={[1, 1.5]}
                 gl={{ antialias: true, alpha: false }}>
@@ -450,7 +451,7 @@ export default function CircularMotion3D() {
                   minDistance={5} maxDistance={30}
                   enableDamping dampingFactor={0.1}
                 />
-              </Canvas>
+              </XRCanvas>
             </div>
 
             {/* Theory */}

@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, useEffect, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { XRCanvas } from '../../../components/ar/XRCanvas'
 import {
   OrbitControls,
   MeshTransmissionMaterial,
@@ -59,7 +60,7 @@ function SpinningBox({
 
 function InteractiveBoxSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 7], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 7], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[5, 5, 5]} intensity={1.5} />
@@ -69,7 +70,7 @@ function InteractiveBoxSim() {
       <SpinningBox position={[2.2, 0, 0]} color="#f59e0b" />
 
       <OrbitControls autoRotate autoRotateSpeed={0.5} />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -138,7 +139,7 @@ function WaterMolecule() {
 
 function WaterMoleculeSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 6], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 6], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[5, 5, 5]} intensity={1.5} />
@@ -146,7 +147,7 @@ function WaterMoleculeSim() {
       <WaterMolecule />
 
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -244,7 +245,7 @@ function Beaker({
 
 function ChemistryLabSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 6], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 6], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 1, 20]} />
       <ambientLight intensity={0.5} />
@@ -257,7 +258,7 @@ function ChemistryLabSim() {
       <Beaker position={[2, 0, 0]} liquidColor="#f59e0b" bubbleCount={5} />
 
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -279,7 +280,7 @@ function FrostedGlassSim() {
   )
 
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 4], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 4], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.7} />
       <directionalLight position={[5, 5, 5]} intensity={1.5} />
@@ -312,7 +313,7 @@ function FrostedGlassSim() {
 
       <Environment preset="city" />
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -364,7 +365,7 @@ function ShoeDisplay() {
 
 function ShoeDisplaySim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0.5, 4], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0.5, 4], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.6} />
       <spotLight position={[3, 3, 3]} intensity={1.5} angle={0.5} penumbra={1} />
@@ -375,7 +376,7 @@ function ShoeDisplaySim() {
 
       <Environment preset="studio" />
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -536,7 +537,7 @@ function DNAHelix() {
 
 function DnaHelixSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 9], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 9], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 12, 25]} />
       {/* Studio 3-point lighting cho material glow */}
@@ -549,7 +550,7 @@ function DnaHelixSim() {
       <DNAHelix />
 
       <OrbitControls enablePan={false} minDistance={4} maxDistance={18} autoRotate autoRotateSpeed={0.3} />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -685,7 +686,7 @@ function DNADetail() {
 
 function DnaDetailSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0.5, 8], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0.5, 8], fov: 45 }} gl={{ antialias: true }} dpr={[1, 2]}>
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 14, 28]} />
       <ambientLight intensity={0.35} />
@@ -697,7 +698,7 @@ function DnaDetailSim() {
       <DNADetail />
 
       <OrbitControls enablePan={false} minDistance={4} maxDistance={18} autoRotate autoRotateSpeed={0.25} />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -768,7 +769,7 @@ function Carousel() {
 
 function CarouselSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 1, 8], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 1, 8], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[5, 5, 5]} intensity={1.5} />
@@ -776,7 +777,7 @@ function CarouselSim() {
       <Carousel />
 
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
