@@ -23,7 +23,19 @@
   - Badge **"AR"** trên thẻ lab trong `LabsIndex` (5 lab đặt-được-trên-bàn).
   - *Loại trừ*: `SimFpvDrone` (flight sim, đã có VR riêng, AR đặt-bàn không phù hợp).
 - **Cách hoạt động**: bấm AR → đóng băng cảnh hiện tại → GLB/USDZ → đặt lên mặt thật, chụm ngón phóng to, đi quanh xem.
-- **Hạn chế đã biết (v1)**: mô hình AR là *snapshot tĩnh* (không kéo slider trong AR); cảnh có ShaderMaterial tuỳ biến có thể không xuất USDZ → tự degrade về xem 3D. Đường **WebXR AR realtime** (giữ tương tác, Android/Quest) là nâng cấp Pha 2 ở dưới.
+- **Pha 2 — WebXR AR realtime (ĐÃ code)**: trên thiết bị hỗ trợ `immersive-ar` (Android Chrome/Quest),
+  nút AR vào thẳng **AR realtime giữ tương tác** — cảnh R3F sống, animation/slider vẫn chạy:
+  - `ARRealtimeController.tsx` (đặt trong `<Canvas>`): nghe `sessionstart/sessionend`, đo bounding box
+    cảnh, **ẩn nền** (`scene.background = null`) để thấy camera thật, **dò mặt phẳng** bằng hit-test →
+    hiện reticle tím, **chạm để đặt** (thu nhỏ cảnh về ~0.4m, đáy chạm sàn). Tận dụng fiber v8 tự
+    truyền `XRFrame` vào `useFrame` — không thêm `@react-three/xr`.
+  - `XRCanvas` bắt thêm `gl`, có `enterRealtimeAR()` (requestSession hit-test + dom-overlay + setSession)
+    và nút **"✕ Thoát AR"** khi đang trong phiên.
+  - `ARLaunchButton` tự dò `immersive-ar`: hỗ trợ → realtime trước, **lỗi/không hỗ trợ → tự fallback**
+    sang đường model (GLB/USDZ/Quick Look/QR). iOS vẫn đi Quick Look như cũ.
+- **Hạn chế còn lại**: iOS vẫn là snapshot (Apple chưa mở WebXR AR); cảnh ShaderMaterial tuỳ biến có
+  thể không xuất USDZ → degrade về xem 3D. Realtime chưa kiểm thử trên thiết bị thật (cần điện thoại
+  Android có ARCore để xác nhận hit-test/placement).
 
 ---
 

@@ -4,31 +4,43 @@
  * Bấm → xuất cảnh THREE hiện tại sang GLB (+ USDZ cho iOS) → mở ARModelOverlay
  * để đặt mô hình lên mặt thật qua camera. Lazy: chỉ nạp model-viewer khi cần.
  */
-import { useCallback, useState, lazy, Suspense, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useState, lazy, Suspense, type MutableRefObject } from 'react'
 import type * as THREE from 'three'
 import { Box } from 'lucide-react'
 import { exportSceneToGLB, exportSceneToUSDZ } from '../../lib/ar/exportModel'
+import { detectAR } from '../../lib/ar/arCapabilities'
 
 const ARModelOverlay = lazy(() => import('./ARModelOverlay'))
 
 interface Props {
   sceneRef: MutableRefObject<THREE.Scene | null>
   title?: string
+  /** Vào AR realtime (WebXR). Có thì ưu tiên dùng khi thiết bị hỗ trợ. */
+  onRealtimeAR?: () => Promise<void>
 }
 
-export function ARLaunchButton({ sceneRef, title }: Props) {
+export function ARLaunchButton({ sceneRef, title, onRealtimeAR }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [model, setModel] = useState<{ glb: string; usdz?: string } | null>(null)
+  const [supportsRealtime, setSupportsRealtime] = useState(false)
 
-  const launch = useCallback(async () => {
+  useEffect(() => {
+    let alive = true
+    detectAR()
+      .then((c) => alive && setSupportsRealtime(c.webxrAR))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const exportModel = useCallback(async () => {
     const scene = sceneRef.current
     if (!scene) {
       setError('Cảnh 3D chưa sẵn sàng, thử lại sau giây lát.')
       return
     }
-    setBusy(true)
-    setError(null)
     try {
       const glbBlob = await exportSceneToGLB(scene)
       const glb = URL.createObjectURL(glbBlob)
@@ -56,6 +68,25 @@ export function ARLaunchButton({ sceneRef, title }: Props) {
       return null
     })
   }, [])
+
+  const launch = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      // Ưu tiên AR realtime (WebXR) khi thiết bị hỗ trợ; lỗi → quay về xuất model
+      if (supportsRealtime && onRealtimeAR) {
+        try {
+          await onRealtimeAR()
+          return
+        } catch {
+          /* WebXR thất bại (thiếu hit-test, từ chối quyền…) → fallback model */
+        }
+      }
+      await exportModel()
+    } finally {
+      setBusy(false)
+    }
+  }, [supportsRealtime, onRealtimeAR, exportModel])
 
   return (
     <>
