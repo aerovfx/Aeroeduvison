@@ -402,7 +402,11 @@ type GeoDef =
   | { kind: 'mid'; a: string; b: string }
   | { kind: 'translate'; from: string; a: string; b: string; perp: boolean }
   | { kind: 'inter'; a1: string; b1: string; a2: string; b2: string }
-  | { kind: 'interSS'; s1: string; s2: string; which: number } // giao 2 HÌNH (đường/tròn)
+  | { kind: 'interSS'; s1: string; s2: string; which: number }      // giao 2 HÌNH (đường/tròn)
+  | { kind: 'interLF'; s: string; f: string; which: number }        // giao ĐƯỜNG × đồ thị y=f(x)
+  | { kind: 'interFF'; f1: string; f2: string; which: number }      // giao 2 đồ thị y=f(x)
+// Ngữ cảnh hàm số (cho giao điểm với đồ thị): id hàng → f(x) + miền x
+type GeoCtx = { fnById: Map<string, (x: number) => number>; xMin: number; xMax: number }
 type GeoPoint = { id: string; x: number; y: number; def?: GeoDef }
 type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
 type GeoAngle = { id: string; s1: string; s2: string } // góc giữa 2 đoạn/đường
@@ -479,8 +483,35 @@ function shapeInter(s1: GeoShape, s2: GeoShape, R: (id: string) => Pt | null): P
   return list.sort((a, b) => a.x - b.x || a.y - b.y)
 }
 
+// Nghiệm của g(x)=0 trên [xMin,xMax] (đổi dấu + chia đôi); sắp tăng dần
+function rootsOf(g: (x: number) => number, xMin: number, xMax: number, N = 500): number[] {
+  const xs: number[] = []
+  let px = xMin, pv = g(xMin)
+  for (let i = 1; i <= N; i++) {
+    const x = xMin + ((xMax - xMin) * i) / N
+    const v = g(x)
+    if (Number.isFinite(pv) && Number.isFinite(v) && pv * v < 0) {
+      let lo = px, hi = x, flo = pv
+      for (let k = 0; k < 40; k++) {
+        const mid = (lo + hi) / 2, fm = g(mid)
+        if (!Number.isFinite(fm)) break
+        if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm }
+      }
+      xs.push((lo + hi) / 2)
+    }
+    px = x; pv = v
+  }
+  return xs
+}
+// Giao 1 đường (a,b) với đồ thị y=f(x) trên miền x → danh sách điểm
+function lineFuncInter(a: Pt, b: Pt, fn: (x: number) => number, xMin: number, xMax: number): Pt[] {
+  if (Math.abs(b.x - a.x) < 1e-9) { const y = fn(a.x); return Number.isFinite(y) ? [{ x: a.x, y }] : [] }
+  const m = (b.y - a.y) / (b.x - a.x), c = a.y - m * a.x
+  return rootsOf((x) => fn(x) - (m * x + c), xMin, xMax).map((x) => ({ x, y: fn(x) }))
+}
+
 // Tính toạ độ thực của mọi điểm (giải đệ quy điểm phái sinh, chống chu trình)
-function resolveGeo(points: GeoPoint[], shapes: GeoShape[] = []): Map<string, Pt | null> {
+function resolveGeo(points: GeoPoint[], shapes: GeoShape[] = [], ctx?: GeoCtx): Map<string, Pt | null> {
   const byId = new Map(points.map((p) => [p.id, p]))
   const shById = new Map(shapes.map((s) => [s.id, s]))
   const cache = new Map<string, Pt | null>()
@@ -510,6 +541,12 @@ function resolveGeo(points: GeoPoint[], shapes: GeoShape[] = []): Map<string, Pt
     } else if (d.kind === 'interSS') {
       const s1 = shById.get(d.s1), s2 = shById.get(d.s2)
       if (s1 && s2) { const list = shapeInter(s1, s2, R); v = list[d.which] ?? null }
+    } else if (d.kind === 'interLF' && ctx) {
+      const sh = shById.get(d.s), fn = ctx.fnById.get(d.f)
+      if (sh && fn) { const g = geomOf(sh, R); if (g && g.kind === 'l') { const list = lineFuncInter(g.a, g.b, fn, ctx.xMin, ctx.xMax); v = list[d.which] ?? null } }
+    } else if (d.kind === 'interFF' && ctx) {
+      const f1 = ctx.fnById.get(d.f1), f2 = ctx.fnById.get(d.f2)
+      if (f1 && f2) { const list = rootsOf((x) => f1(x) - f2(x), ctx.xMin, ctx.xMax).map((x) => ({ x, y: f1(x) })); v = list[d.which] ?? null }
     }
     visiting.delete(id)
     cache.set(id, v)
@@ -928,7 +965,12 @@ function Plot({
   const geoActive = !!geo && geo.tool !== 'move'
   const [dragPt, setDragPt] = useState<string | null>(null)
   // Toạ độ thực của mọi điểm (giải điểm phái sinh)
-  const geoResolved = useMemo(() => (geo ? resolveGeo(geo.points, geo.shapes) : null), [geo])
+  const geoResolved = useMemo(() => {
+    if (!geo) return null
+    const fnById = new Map(compiled.filter((c) => !c.ineq && !c.err).map((c) => [c.row.id, c.fn] as const))
+    return resolveGeo(geo.points, geo.shapes, { fnById, xMin: viewport.xMin, xMax: viewport.xMax })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo, compiled, viewport.xMin, viewport.xMax])
   const rp = (id: string) => geoResolved?.get(id) ?? null
   // Tìm điểm TỰ DO gần (px) để bắt kéo (điểm phái sinh không kéo trực tiếp)
   const nearbyPoint = (px: number, py: number): string | null => {
@@ -1542,11 +1584,26 @@ export default function GraphLab() {
   const [geoAngles, setGeoAngles] = useState<GeoAngle[]>([])
 
   const [geoSelShapes, setGeoSelShapes] = useState<string[]>([])
+  const [geoSelFuncs, setGeoSelFuncs] = useState<string[]>([])
   const handleGeoClick = (gx: number, gy: number) => {
     if (geoTool === 'move') return
-    const resolved = resolveGeo(geoPoints, geoShapes)
+    const fnById = new Map(compiled.filter((c) => !c.ineq && !c.err && c.row.visible).map((c) => [c.row.id, c.fn] as const))
+    const ctx: GeoCtx = { fnById, xMin: viewport.xMin, xMax: viewport.xMax }
+    const resolved = resolveGeo(geoPoints, geoShapes, ctx)
     const R = (id: string): Pt | null => resolved.get(id) ?? null
     const sx = viewport.xMax - viewport.xMin, sy = viewport.yMax - viewport.yMin
+    // Đồ thị y=f(x) gần điểm chạm nhất (so theo khoảng cách dọc chuẩn hoá)
+    const nearestFuncId = (): string | null => {
+      let best: string | null = null, bd = 0.03
+      for (const c of compiled) {
+        if (c.ineq || c.err || !c.row.visible) continue
+        const y = c.fn(gx)
+        if (!Number.isFinite(y)) continue
+        const d = Math.abs(y - gy) / sy
+        if (d < bd) { bd = d; best = c.row.id }
+      }
+      return best
+    }
     const nearestPointId = (): string | null => {
       const tx = sx * 0.025, ty = sy * 0.025
       for (const p of geoPoints) { const rp = resolved.get(p.id); if (rp && Math.abs(rp.x - gx) < tx && Math.abs(rp.y - gy) < ty) return p.id }
@@ -1607,22 +1664,54 @@ export default function GraphLab() {
       return
     }
 
-    // ── Giao điểm: chọn 2 HÌNH (đường/đoạn/tròn) ──
+    // ── Giao điểm: chọn 2 đối tượng (HÌNH đường/đoạn/tròn HOẶC đồ thị y=f(x)) ──
     if (geoTool === 'intersect') {
       const sid = nearestShapeId(['segment', 'line', 'circle'])
-      if (!sid) return
-      const sel = [...geoSelShapes, sid]
-      if (sel.length < 2) { setGeoSelShapes(sel); return }
-      setGeoSelShapes([])
-      if (sel[0] === sel[1]) return
-      const s1 = geoShapes.find((s) => s.id === sel[0]), s2 = geoShapes.find((s) => s.id === sel[1])
-      if (!s1 || !s2) return
-      const list = shapeInter(s1, s2, R)
+      const fid = nearestFuncId()
+      // chọn đối tượng gần hơn (ước lượng): nếu có cả hình lẫn hàm, ưu tiên hàm khi nó sát hơn
+      let pick: { t: 's' | 'f'; id: string } | null = null
+      if (sid && fid) {
+        const sh = geoShapes.find((s) => s.id === sid)!
+        const ds = distToShape(sh, R, { x: gx, y: gy }, sx, sy)
+        const fc = compiled.find((c) => c.row.id === fid)!
+        const df = Math.abs(fc.fn(gx) - gy) / sy
+        pick = df <= ds ? { t: 'f', id: fid } : { t: 's', id: sid }
+      } else if (sid) pick = { t: 's', id: sid }
+      else if (fid) pick = { t: 'f', id: fid }
+      if (!pick) return
+
+      const selS = pick.t === 's' ? [...geoSelShapes, pick.id] : [...geoSelShapes]
+      const selF = pick.t === 'f' ? [...geoSelFuncs, pick.id] : [...geoSelFuncs]
+      if (selS.length + selF.length < 2) { setGeoSelShapes(selS); setGeoSelFuncs(selF); return }
+      setGeoSelShapes([]); setGeoSelFuncs([])
+
+      let list: Pt[] = []
+      let def: (w: number) => GeoDef = (w) => ({ kind: 'interSS', s1: '', s2: '', which: w })
+      if (selS.length === 2) {
+        if (selS[0] === selS[1]) return
+        const s1 = geoShapes.find((s) => s.id === selS[0]), s2 = geoShapes.find((s) => s.id === selS[1])
+        if (!s1 || !s2) return
+        list = shapeInter(s1, s2, R)
+        def = (w) => ({ kind: 'interSS', s1: s1.id, s2: s2.id, which: w })
+      } else if (selS.length === 1 && selF.length === 1) {
+        const sh = geoShapes.find((s) => s.id === selS[0])
+        const fn = fnById.get(selF[0])
+        if (!sh || !fn) return
+        const g = geomOf(sh, R)
+        if (!g || g.kind !== 'l') return // chỉ hỗ trợ ĐƯỜNG × đồ thị
+        list = lineFuncInter(g.a, g.b, fn, viewport.xMin, viewport.xMax)
+        const sId = sh.id, fIdSel = selF[0]
+        def = (w) => ({ kind: 'interLF', s: sId, f: fIdSel, which: w })
+      } else if (selF.length === 2) {
+        if (selF[0] === selF[1]) return
+        const f1 = fnById.get(selF[0]), f2 = fnById.get(selF[1])
+        if (!f1 || !f2) return
+        list = rootsOf((x) => f1(x) - f2(x), viewport.xMin, viewport.xMax).map((x) => ({ x, y: f1(x) }))
+        const f1Id = selF[0], f2Id = selF[1]
+        def = (w) => ({ kind: 'interFF', f1: f1Id, f2: f2Id, which: w })
+      }
       if (!list.length) return
-      setGeoPoints((ps) => [
-        ...ps,
-        ...list.map((pt, w) => ({ id: mkId(), x: pt.x, y: pt.y, def: { kind: 'interSS', s1: s1.id, s2: s2.id, which: w } as GeoDef })),
-      ])
+      setGeoPoints((ps) => [...ps, ...list.map((pt, w) => ({ id: mkId(), x: pt.x, y: pt.y, def: def(w) }))])
       return
     }
 
@@ -1716,7 +1805,8 @@ export default function GraphLab() {
           (d.kind === 'mid' && (remP.has(d.a) || remP.has(d.b))) ||
           (d.kind === 'translate' && (remP.has(d.from) || remP.has(d.a) || remP.has(d.b))) ||
           (d.kind === 'inter' && (remP.has(d.a1) || remP.has(d.b1) || remP.has(d.a2) || remP.has(d.b2))) ||
-          (d.kind === 'interSS' && (remS.has(d.s1) || remS.has(d.s2)))
+          (d.kind === 'interSS' && (remS.has(d.s1) || remS.has(d.s2))) ||
+          (d.kind === 'interLF' && remS.has(d.s))
         if (refs) { remP.add(p.id); changed = true }
       }
     }
@@ -1724,9 +1814,9 @@ export default function GraphLab() {
     setGeoShapes((ss) => ss.filter((s) => !remS.has(s.id)))
     setGeoAngles((as) => as.filter((a) => !remS.has(a.s1) && !remS.has(a.s2)))
   }
-  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]); setGeoAngles([]) }
+  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]); setGeoSelFuncs([]); setGeoAngles([]) }
   const undoGeo = () => {
-    if (geoSelShapes.length) { setGeoSelShapes([]); return }
+    if (geoSelShapes.length || geoSelFuncs.length) { setGeoSelShapes([]); setGeoSelFuncs([]); return }
     if (geoPending.length) { setGeoPending([]); return }
     if (geoAngles.length) { setGeoAngles((a) => a.slice(0, -1)); return }
     if (geoShapes.length) { setGeoShapes((s) => s.slice(0, -1)); return }
@@ -2049,7 +2139,7 @@ export default function GraphLab() {
                 const Icon = t.icon
                 const active = geoTool === t.id
                 return (
-                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]); setGeoSelShapes([]) }} title={t.label}
+                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]); setGeoSelShapes([]); setGeoSelFuncs([]) }} title={t.label}
                     className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
                       active ? 'bg-cyan-500/25 text-cyan-100 ring-cyan-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
                     }`}>
@@ -2079,7 +2169,7 @@ export default function GraphLab() {
                 {geoTool === 'polygon' && 'Chạm lần lượt các đỉnh; chạm lại đỉnh đầu (≥3) để đóng đa giác.'}
                 {geoTool === 'circle' && 'Chạm tâm rồi chạm 1 điểm trên đường tròn (xác định bán kính).'}
                 {geoTool === 'midpoint' && 'Chạm 2 điểm → tạo trung điểm (tự cập nhật khi kéo).'}
-                {geoTool === 'intersect' && 'Chạm lần lượt 2 HÌNH (đường thẳng/đoạn/đường tròn) → giao điểm (đường–tròn, tròn–tròn cho tối đa 2 điểm).'}
+                {geoTool === 'intersect' && 'Chạm 2 đối tượng (đường/đoạn/tròn HOẶC đồ thị y=f(x)) → giao điểm. Hỗ trợ: đường×đường/tròn, đường×đồ thị, đồ thị×đồ thị.'}
                 {geoTool === 'parallel' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường thẳng qua điểm đó song song.'}
                 {geoTool === 'perpendicular' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường vuông góc với nó qua điểm đó.'}
                 {geoTool === 'angle' && 'Chạm 2 đoạn/đường → đo góc giữa chúng (cung + số đo độ).'}
