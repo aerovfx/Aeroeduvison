@@ -14,13 +14,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   GraduationCap, TrendingUp, TrendingDown, Minus, Info,
-  Sliders, MapPin, DollarSign, AlertCircle,
+  Sliders, MapPin, DollarSign, AlertCircle, Target, CheckCircle2, ArrowUpRight,
 } from 'lucide-react'
 import type { CareerDetail } from '@/lib/career-detail-data'
 import {
   findMajorsForCareer,
   evaluateAdmissionFit,
   cutoffTrend,
+  latestCutoff,
+  analyzeGap,
   type MajorAdmission,
   type UniversityCutoff,
 } from '@/lib/career-admissions-data'
@@ -69,9 +71,70 @@ function trendBadge(trend: MajorAdmission['trend']) {
 function CutoffTrendArrow({ u }: { u: UniversityCutoff }) {
   const t = cutoffTrend(u)
   if (!t) return null
-  if (t.direction === 'flat') return <span className="inline-flex items-center gap-0.5 text-[10px] text-white/45"><Minus className="w-2.5 h-2.5" /> ổn định</span>
-  if (t.direction === 'up')   return <span className="inline-flex items-center gap-0.5 text-[10px] text-red-300"><TrendingUp className="w-2.5 h-2.5" /> +{t.delta.toFixed(2)}</span>
-  return                            <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-300"><TrendingDown className="w-2.5 h-2.5" /> {t.delta.toFixed(2)}</span>
+  const span = `'${String(t.from).slice(2)}→'${String(t.to).slice(2)}`
+  if (t.direction === 'flat') return <span className="inline-flex items-center gap-0.5 text-[10px] text-white/45" title={span}><Minus className="w-2.5 h-2.5" /> ổn định</span>
+  if (t.direction === 'up')   return <span className="inline-flex items-center gap-0.5 text-[10px] text-red-300" title={span}><TrendingUp className="w-2.5 h-2.5" /> +{t.delta.toFixed(2)}</span>
+  return                            <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-300" title={span}><TrendingDown className="w-2.5 h-2.5" /> {t.delta.toFixed(2)}</span>
+}
+
+/** Card "Phân tích điểm còn thiếu" cho 1 ngành — câu trả lời cho "cần thêm bao nhiêu điểm". */
+function GapCard({ major, userPoints }: { major: MajorAdmission; userPoints: number }) {
+  const g = analyzeGap(major, userPoints)
+  if (g.totalSchools === 0) return null
+
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-indigo-500/[0.12] to-cyan-500/[0.08] border border-indigo-400/25 p-3.5 mb-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <Target className="w-4 h-4 text-cyan-300" />
+        <span className="text-[13px] font-bold text-white/90">Phân tích điểm còn thiếu</span>
+        <span className="ml-auto text-[11px] text-white/55">
+          Điểm bạn: <b className="text-cyan-300">{userPoints.toFixed(2)}</b>/30
+        </span>
+      </div>
+
+      {/* Đỗ được mấy trường */}
+      <div className="flex items-center gap-1.5 text-[12px]">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" />
+        <span className="text-white/75">
+          Đủ điểm <b className="text-emerald-300">{g.reachableCount}/{g.totalSchools}</b> trường
+          {g.bestReachable && (
+            <> — cao nhất: <b className="text-white/90">{g.bestReachable.u.name}</b> ({g.bestReachable.cutoff.toFixed(2)}đ ’{String(g.bestReachable.year).slice(2)})</>
+          )}
+        </span>
+      </div>
+
+      {/* Mục tiêu gần nhất */}
+      {g.nextTarget && (
+        <div className="flex items-start gap-1.5 text-[12px]">
+          <ArrowUpRight className="w-3.5 h-3.5 text-amber-300 flex-shrink-0 mt-0.5" />
+          <span className="text-white/75">
+            Để thêm <b className="text-white/90">{g.nextTarget.u.name}</b> ({g.nextTarget.cutoff.toFixed(2)}đ ’{String(g.nextTarget.year).slice(2)}):
+            cần thêm <b className="text-amber-300">+{g.nextTarget.gapTotal.toFixed(2)}đ</b> tổng
+            <span className="text-white/50"> ≈ +{g.nextTarget.gapPerSubject.toFixed(2)}đ/môn</span>
+          </span>
+        </div>
+      )}
+
+      {/* Mục tiêu top */}
+      {g.topTarget && g.topTarget.u.code !== g.nextTarget?.u.code && (
+        <div className="flex items-start gap-1.5 text-[12px]">
+          <TrendingUp className="w-3.5 h-3.5 text-rose-300 flex-shrink-0 mt-0.5" />
+          <span className="text-white/75">
+            Lên top <b className="text-white/90">{g.topTarget.u.name}</b> ({g.topTarget.cutoff.toFixed(2)}đ ’{String(g.topTarget.year).slice(2)}):
+            cần thêm <b className="text-rose-300">+{g.topTarget.gapTotal.toFixed(2)}đ</b> tổng
+            <span className="text-white/50"> ≈ +{g.topTarget.gapPerSubject.toFixed(2)}đ/môn</span>
+          </span>
+        </div>
+      )}
+
+      {!g.nextTarget && (
+        <div className="flex items-center gap-1.5 text-[12px] text-emerald-200">
+          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Tuyệt vời! Điểm hiện tại đủ cho mọi trường trong ngành này. Hãy nhắm nguyện vọng cao.</span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AdmissionsPanel({ career }: Props) {
@@ -80,6 +143,8 @@ export default function AdmissionsPanel({ career }: Props) {
 
   const majors = useMemo(() => findMajorsForCareer(career.name), [career.name])
   const transcript30 = transcriptTo30(input.transcriptAvg)
+  // Xét tuyển kết hợp thường lấy điểm cao hơn giữa thi & học bạ quy đổi
+  const bestUserPts = Math.max(input.examScore, transcript30)
 
   if (majors.length === 0) {
     return (
@@ -104,7 +169,7 @@ export default function AdmissionsPanel({ career }: Props) {
         <div className="flex-1">
           <h3 className="text-base font-bold text-white">Điểm chuẩn ĐH 2024-2025 & gợi ý điểm cần đạt</h3>
           <p className="text-xs text-white/45 mt-0.5">
-            Dữ liệu công khai năm 2024 — nguồn tham khảo, cần verify lại trên website chính thức của trường trước khi nộp.
+            Hiển thị điểm chuẩn năm gần nhất có dữ liệu (ưu tiên 2025) — nguồn tham khảo, cần verify lại trên website chính thức của trường trước khi nộp.
           </p>
         </div>
       </div>
@@ -172,29 +237,32 @@ export default function AdmissionsPanel({ career }: Props) {
               <span>{m.trend.note}</span>
             </p>
 
+            {/* Phân tích điểm còn thiếu */}
+            <GapCard major={m} userPoints={bestUserPts} />
+
             {/* Universities table */}
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-[10px] text-white/35 border-b border-white/[0.06]">
                     <th className="pb-2 text-left font-medium px-2">Trường</th>
-                    <th className="pb-2 text-center font-medium w-20">Khối</th>
-                    <th className="pb-2 text-right font-medium w-20">CC 2024</th>
-                    <th className="pb-2 text-right font-medium w-16">'23→'24</th>
+                    <th className="pb-2 text-center font-medium w-16">Khối</th>
+                    <th className="pb-2 text-right font-medium w-24">Điểm chuẩn</th>
+                    <th className="pb-2 text-right font-medium w-14">Xu hướng</th>
                     <th className="pb-2 text-right font-medium w-32 px-2">Khả năng đỗ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {m.universities.map((u) => {
-                    // Lấy điểm cao hơn giữa thi và học bạ (xét tuyển kết hợp thường lấy max)
-                    const bestUserPts = Math.max(input.examScore, transcript30)
-                    const fit = evaluateAdmissionFit(bestUserPts, u.cutoff2024)
+                    const lc = latestCutoff(u)
+                    const fit = evaluateAdmissionFit(bestUserPts, lc?.value ?? null)
                     return (
                       <tr key={u.code} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
                         <td className="py-2 px-2">
                           <p className="text-xs text-white/85 font-medium leading-tight">{u.name}</p>
                           <p className="text-[10px] text-white/40 flex items-center gap-0.5 mt-0.5">
                             <MapPin className="w-2.5 h-2.5" /> {u.location}
+                            {u.level === 'college' && <span className="ml-1 px-1 rounded bg-sky-500/20 text-sky-300 text-[9px] font-semibold">CĐ</span>}
                           </p>
                           {u.notes && <p className="text-[10px] text-amber-300/80 mt-1 italic">{u.notes}</p>}
                         </td>
@@ -202,8 +270,14 @@ export default function AdmissionsPanel({ career }: Props) {
                           {u.groups.join(', ')}
                         </td>
                         <td className="py-2 text-right">
-                          {u.cutoff2024 != null ? (
-                            <span className="text-sm font-bold text-white">{u.cutoff2024.toFixed(2)}</span>
+                          {lc ? (
+                            <>
+                              <span className="text-sm font-bold text-white">{lc.value.toFixed(2)}</span>
+                              <span className="text-[9px] text-white/40 ml-0.5">’{String(lc.year).slice(2)}</span>
+                              {lc.year === 2025 && u.cutoff2024 != null && (
+                                <p className="text-[9px] text-white/35 leading-none mt-0.5">’24: {u.cutoff2024.toFixed(2)}</p>
+                              )}
+                            </>
                           ) : (
                             <span className="text-[10px] text-white/35">—</span>
                           )}
@@ -235,8 +309,9 @@ export default function AdmissionsPanel({ career }: Props) {
       <div className="rounded-xl bg-amber-500/[0.08] border border-amber-500/25 px-3 py-2 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
         <p className="text-[11px] text-amber-100/90 leading-relaxed">
-          <b>Lưu ý:</b> Điểm chuẩn và xu hướng là số liệu công khai 2024 — mỗi mùa tuyển sinh trường công bố lại.
-          Trước khi nộp hồ sơ, hãy kiểm tra website chính thức của trường và bộ GD&ĐT (tuyensinh.moet.gov.vn) để có thông tin mới nhất.
+          <b>Lưu ý:</b> Điểm chuẩn và xu hướng là số liệu công khai (2023–2025) — mỗi mùa tuyển sinh trường công bố lại.
+          Điểm còn thiếu được tính theo công thức tham khảo (lấy max giữa điểm thi & học bạ quy đổi, chia 3 môn) — chỉ mang tính định hướng.
+          Trước khi nộp hồ sơ, hãy kiểm tra website chính thức của trường và Bộ GD&ĐT (tuyensinh.moet.gov.vn) để có thông tin mới nhất.
         </p>
       </div>
     </div>

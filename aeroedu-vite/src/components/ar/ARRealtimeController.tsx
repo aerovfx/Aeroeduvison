@@ -1,15 +1,15 @@
 /**
- * ARRealtimeController — WebXR `immersive-ar` realtime (Pha 2).
+ * ARRealtimeController — WebXR `immersive-ar` realtime (Pha 2 + chọn neo dễ).
  *
- * Đặt bên trong <Canvas>. Khi phiên AR bắt đầu (fiber tự chuyển sang vòng lặp XR
- * và truyền XRFrame vào useFrame):
- *   1. Đo bao đóng (bounding box) của nội dung cảnh, ẩn nền (để thấy camera thật).
- *   2. Dò mặt phẳng thật bằng hit-test → hiện vòng reticle tím trên sàn/bàn.
- *   3. Người dùng chạm (select) → thu nhỏ cảnh về ~0.4m và đặt lên điểm vừa chọn.
+ * Đặt bên trong <Canvas>. Khi phiên AR bắt đầu:
+ *   1. Đo bao đóng (bbox) của nội dung cảnh, ẩn nền (thấy camera thật).
+ *   2. Dò mặt phẳng thật bằng hit-test → reticle LUÔN hiện (vòng + chấm tâm).
+ *   3. CHẠM bất cứ đâu để đặt:
+ *        - có mặt phẳng → neo lên đúng điểm reticle;
+ *        - chưa thấy mặt phẳng → đặt ngay ~0.7m TRƯỚC MẶT (không còn "chạm trượt").
+ *      CHẠM LẠI để DI CHUYỂN vật sang chỗ mới (không cần thoát AR).
+ *   4. Chụm 2 ngón để phóng to/thu nhỏ.
  * Giữ NGUYÊN tương tác realtime (animation/slider vẫn chạy) vì cảnh R3F sống.
- *
- * Khác với đường model-viewer (snapshot tĩnh) — đây là cảnh động thực sự.
- * Chỉ kích hoạt khi đang trong phiên XR; ngoài AR gần như không tốn chi phí.
  */
 import { useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
@@ -17,13 +17,18 @@ import * as THREE from 'three'
 
 const RETICLE_NAME = 'ar-reticle'
 const TARGET_SIZE_M = 0.4 // kích thước thật mong muốn (~40cm trên bàn)
+const FALLBACK_DIST = 0.7 // mét — khoảng cách đặt trước mặt khi không tìm thấy mặt phẳng
+
+export type ArPhase = 'searching' | 'ready' | 'placed' | null
 
 interface Props {
   /** Báo tỉ lệ thật (cm cho 1 đơn vị cảnh) khi đặt/chỉnh; null khi thoát AR. */
   onPlacedScale?: (cmPerUnit: number | null) => void
+  /** Báo trạng thái neo để DOM hiện hướng dẫn: searching / ready / placed / null(thoát). */
+  onPhase?: (phase: ArPhase) => void
 }
 
-export function ARRealtimeController({ onPlacedScale }: Props = {}) {
+export function ARRealtimeController({ onPlacedScale, onPhase }: Props = {}) {
   const { gl, scene } = useThree()
   const reticle = useRef<THREE.Group>(null)
   const hitSource = useRef<any>(null)
@@ -36,15 +41,31 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
   const userScale = useRef(1)
   const pinchStartDist = useRef(0)
   const pinchStartScale = useRef(1)
+  // pose đầu (viewer) cập nhật mỗi frame — dùng cho đặt fallback trước mặt
+  const camPos = useRef(new THREE.Vector3())
+  const camQuat = useRef(new THREE.Quaternion())
+  const planeFound = useRef(false)
+  const lastPhase = useRef<ArPhase>(null)
 
   useEffect(() => {
     const xr: any = gl.xr
+
+    const emitPhase = () => {
+      const phase: ArPhase = placed.current ? 'placed' : planeFound.current ? 'ready' : 'searching'
+      if (phase !== lastPhase.current) {
+        lastPhase.current = phase
+        onPhase?.(phase)
+      }
+    }
 
     const measure = () => {
       const box = new THREE.Box3()
       scene.children.forEach((child) => {
         if (child.name === RETICLE_NAME) return
         if ((child as any).isLight) return
+        // Bỏ qua Points/starfield (vd drei <Stars> bán kính ~300) — nếu tính vào
+        // bbox sẽ phình to → cảnh thật bị thu nhỏ tí xíu.
+        if ((child as any).isPoints) return
         box.expandByObject(child)
       })
       if (box.isEmpty()) {
@@ -99,12 +120,16 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
       measure()
       scene.background = null // để thấy camera thật xuyên qua
       placed.current = false
+      planeFound.current = false
+      lastPhase.current = null
       hitSource.current = null
       userScale.current = 1
       placedPos.current = null
+      pinchStartDist.current = 0
       window.addEventListener('touchstart', onTouchStart, { passive: true })
       window.addEventListener('touchmove', onTouchMove, { passive: true })
       window.addEventListener('touchend', onTouchEnd, { passive: true })
+      emitPhase()
 
       const session: any = xr.getSession?.()
       if (!session?.requestReferenceSpace) return
@@ -121,20 +146,28 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
         )
         .catch(() => {})
 
+      // CHẠM để đặt / di chuyển. Bỏ qua khi đang chụm 2 ngón (tránh "teleport").
       const onSelect = () => {
-        const r = reticle.current
         const m = measured.current
-        if (!r || !r.visible || !m || placed.current) return
+        if (!m || pinchStartDist.current > 0) return
+        const r = reticle.current
         const pos = new THREE.Vector3()
-        const quat = new THREE.Quaternion()
-        const scl = new THREE.Vector3()
-        r.matrix.decompose(pos, quat, scl)
+        if (r && r.visible) {
+          // Neo lên đúng điểm reticle trên mặt phẳng
+          const q = new THREE.Quaternion()
+          const s = new THREE.Vector3()
+          r.matrix.decompose(pos, q, s)
+        } else {
+          // Fallback: đặt ~0.7m trước mặt (mặt phẳng chưa dò được)
+          const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat.current)
+          pos.copy(camPos.current).add(fwd.multiplyScalar(FALLBACK_DIST))
+        }
         baseK.current = TARGET_SIZE_M / m.maxDim
-        userScale.current = 1
+        if (!placed.current) userScale.current = 1 // lần đầu: cỡ chuẩn; di chuyển sau giữ nguyên cỡ
         placedPos.current = pos.clone()
         placed.current = true
-        r.visible = false
         applyPlacement()
+        emitPhase()
       }
       session.addEventListener?.('select', onSelect)
     }
@@ -148,10 +181,13 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
       if (reticle.current) reticle.current.visible = false
       hitSource.current = null
       placed.current = false
+      planeFound.current = false
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchmove', onTouchMove)
       window.removeEventListener('touchend', onTouchEnd)
       onPlacedScale?.(null)
+      lastPhase.current = null
+      onPhase?.(null)
     }
 
     xr.addEventListener?.('sessionstart', onStart)
@@ -163,15 +199,28 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
       window.removeEventListener('touchmove', onTouchMove)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [gl, scene, onPlacedScale])
+  }, [gl, scene, onPlacedScale, onPhase])
 
   useFrame((_state, _delta, frame: any) => {
-    if (!frame || placed.current) return
+    if (!frame) return
     const refSpace = (gl.xr as any).getReferenceSpace?.()
+    if (!refSpace) return
+
+    // Cập nhật pose đầu (cho đặt fallback trước mặt)
+    const vp = frame.getViewerPose?.(refSpace)
+    if (vp) {
+      const p = vp.transform.position
+      const o = vp.transform.orientation
+      camPos.current.set(p.x, p.y, p.z)
+      camQuat.current.set(o.x, o.y, o.z, o.w)
+    }
+
+    // Reticle LUÔN cập nhật (kể cả sau khi đặt) để còn chạm di chuyển
     const r = reticle.current
-    if (!refSpace || !r || !hitSource.current) return
+    if (!r || !hitSource.current) return
     const results = frame.getHitTestResults(hitSource.current)
-    if (results && results.length) {
+    const found = !!(results && results.length)
+    if (found) {
       const pose = results[0].getPose(refSpace)
       if (pose) {
         r.visible = true
@@ -180,13 +229,29 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
     } else {
       r.visible = false
     }
+    if (found !== planeFound.current) {
+      planeFound.current = found
+      // chỉ đổi phase khi chưa đặt (đặt rồi giữ 'placed')
+      if (!placed.current) {
+        const phase: ArPhase = found ? 'ready' : 'searching'
+        if (phase !== lastPhase.current) {
+          lastPhase.current = phase
+          onPhase?.(phase)
+        }
+      }
+    }
   })
 
   return (
     <group ref={reticle} name={RETICLE_NAME} visible={false} matrixAutoUpdate={false}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.05, 0.065, 32]} />
-        <meshBasicMaterial color="#7c3aed" toneMapped={false} />
+        <ringGeometry args={[0.06, 0.075, 40]} />
+        <meshBasicMaterial color="#22d3ee" toneMapped={false} transparent opacity={0.9} />
+      </mesh>
+      {/* chấm tâm cho dễ ngắm điểm neo */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.012, 24]} />
+        <meshBasicMaterial color="#a78bfa" toneMapped={false} />
       </mesh>
     </group>
   )

@@ -15,8 +15,9 @@
  * - Damping 0.85/step, run 200 iterations on data change
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
+import { XRCanvas } from '@/components/ar/XRCanvas'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Vector3, Color, Group, type Mesh } from 'three'
 import { type KgNode, type KgEdge, getNodeColor, NODE_TYPE_LABELS } from '@/services/knowledge-graph.service'
@@ -465,6 +466,8 @@ export default function KnowledgeGraph3D({
   // Auto-rotate MẶC ĐỊNH OFF — user bật khi muốn cinematic view.
   // Trước đây bật mặc định → user khó tìm node trung tâm.
   const [autoRotate, setAutoRotate] = useState(false)
+  // Đang trong phiên AR realtime → ẩn Stars/Bloom/nhãn (nặng + không hợp passthrough)
+  const [arPresenting, setArPresenting] = useState(false)
 
   // Reset selection khi center thay đổi (vừa re-load graph)
   useEffect(() => { setSelectedId(null) }, [centerId])
@@ -512,31 +515,35 @@ export default function KnowledgeGraph3D({
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-zinc-800">
-      <Canvas
+      <XRCanvas
+        arTitle="Cây tri thức 3D"
+        onPresentingChange={setArPresenting}
         camera={{ position: CAMERA_POS, fov: 50 }}
         gl={{ antialias: true, alpha: false }}
       >
-        <color attach="background" args={['#020617']} />
+        {!arPresenting && <color attach="background" args={['#020617']} />}
         <ambientLight intensity={0.3} />
         <pointLight position={[100, 100, 100]} intensity={0.5} color="#a78bfa" />
         <pointLight position={[-100, -50, -100]} intensity={0.3} color="#22d3ee" />
 
-        <Stars
-          radius={300}
-          depth={60}
-          count={2000}
-          factor={4}
-          saturation={0.5}
-          fade
-          speed={0.5}
-        />
+        {!arPresenting && (
+          <Stars
+            radius={300}
+            depth={60}
+            count={2000}
+            factor={4}
+            saturation={0.5}
+            fade
+            speed={0.5}
+          />
+        )}
 
         <NeuralNetwork
           nodes={memoNodes}
           edges={memoEdges}
           centerId={centerId}
           onNodeClick={onNodeClick}
-          showLabels={showLabels}
+          showLabels={showLabels && !arPresenting}
           selectedId={selectedId}
           onSelect={setSelectedId}
           autoRotate={autoRotate}
@@ -544,6 +551,7 @@ export default function KnowledgeGraph3D({
 
         <OrbitControls
           ref={controlsRef}
+          enabled={!arPresenting}
           target={CAMERA_TARGET}
           enablePan={false}
           enableZoom
@@ -556,15 +564,17 @@ export default function KnowledgeGraph3D({
         />
         <CameraResetter resetTick={resetTick} controlsRef={controlsRef} />
 
-        <EffectComposer>
-          <Bloom
-            intensity={1.2}
-            luminanceThreshold={0.3}
-            luminanceSmoothing={0.9}
-            radius={0.8}
-          />
-        </EffectComposer>
-      </Canvas>
+        {!arPresenting && (
+          <EffectComposer>
+            <Bloom
+              intensity={1.2}
+              luminanceThreshold={0.3}
+              luminanceSmoothing={0.9}
+              radius={0.8}
+            />
+          </EffectComposer>
+        )}
+      </XRCanvas>
 
       {/* ════════ Top-left: Center status badge ════════ */}
       <div className="absolute top-3 left-3 max-w-[260px] px-2.5 py-1.5 rounded-lg
