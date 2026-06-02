@@ -1485,6 +1485,18 @@ export default function GraphLab() {
   const updateCurve = (id: string, patch: Partial<CurveRow>) =>
     setCurveRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   const deleteCurve = (id: string) => setCurveRows((rs) => rs.filter((r) => r.id !== id))
+  const addCurveSpec = (s: { kind: CurveKind; ex?: string; ey?: string; er?: string; tMin?: number; tMax?: number }) =>
+    setCurveRows((rs) => [...rs, {
+      id: mkId(), kind: s.kind, ex: s.ex ?? '', ey: s.ey ?? '', er: s.er ?? '',
+      tMin: s.tMin ?? 0, tMax: s.tMax ?? TWO_PI, color: COLORS[(rs.length + 2) % COLORS.length], visible: true,
+    }])
+  const CURVE_PRESETS: { label: string; spec: Parameters<typeof addCurveSpec>[0] }[] = [
+    { label: 'Lissajous', spec: { kind: 'param', ex: '5*sin(3*t)', ey: '5*sin(2*t)' } },
+    { label: 'Trái tim', spec: { kind: 'param', ex: '16*sin(t)^3', ey: '13*cos(t) - 5*cos(2*t) - 2*cos(3*t) - cos(4*t)' } },
+    { label: 'Hoa hồng', spec: { kind: 'polar', er: '6*sin(3*t)' } },
+    { label: 'Cardioid', spec: { kind: 'polar', er: '4*(1 + cos(t))' } },
+    { label: 'Xoắn ốc', spec: { kind: 'polar', er: 't', tMax: 18.85 } },
+  ]
 
   const [geoMeasure, setGeoMeasure] = useState(false)
   const moveGeoPoint = (id: string, x: number, y: number) =>
@@ -1737,6 +1749,14 @@ export default function GraphLab() {
                           className="rounded-lg bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-400/40 hover:bg-fuchsia-500/25">+ r(θ)</button>
                 </div>
               </div>
+              <div className="flex flex-wrap gap-1">
+                {CURVE_PRESETS.map((p) => (
+                  <button key={p.label} onClick={() => addCurveSpec(p.spec)}
+                          className="rounded-md bg-slate-800/70 px-2 py-0.5 text-[10px] text-slate-300 ring-1 ring-slate-700 hover:bg-slate-700 hover:text-cyan-200">
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               {curveRows.map((row) => {
                 const c = compiledCurves.find((cc) => cc.row.id === row.id)
                 return (
@@ -1915,6 +1935,9 @@ export default function GraphLab() {
                 surfaces={compiledSurfaces
                   .filter((c) => c.row.visible && !c.err)
                   .map((c) => ({ fn: c.fn, color: c.row.color }))}
+                paramCurves={compiledCurves
+                  .filter((c) => c.row.visible && !c.err)
+                  .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
                 viewport={viewport}
               />
             </Suspense>

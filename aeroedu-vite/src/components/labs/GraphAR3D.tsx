@@ -15,12 +15,18 @@ import { XRCanvas } from '@/components/ar/XRCanvas'
 
 export interface PlotFn { fn: (x: number) => number; color: string }
 export interface PlotSurface { fn: (x: number, y: number) => number; color: string }
+export interface PlotParam {
+  kind: 'param' | 'polar'
+  fnX: (t: number) => number; fnY: (t: number) => number; fnR: (t: number) => number
+  tMin: number; tMax: number; color: string
+}
 
 interface Viewport { xMin: number; xMax: number; yMin: number; yMax: number }
 
 interface Props {
   functions: PlotFn[]
   surfaces?: PlotSurface[]
+  paramCurves?: PlotParam[]
   viewport: Viewport
 }
 
@@ -126,7 +132,42 @@ function SurfaceMesh({ surface, viewport }: { surface: PlotSurface; viewport: Vi
   )
 }
 
-function GraphScene({ functions, surfaces, viewport }: Props) {
+/* ── Đường tham số x(t),y(t) & cực r(θ): trong mặt X-Y, Z=0 ── */
+function ParamCurves({ curves, viewport }: { curves: PlotParam[]; viewport: Viewport }) {
+  const { xMin, xMax, yMin, yMax } = viewport
+  const out = useMemo(() => {
+    const xMid = (xMin + xMax) / 2, xHalf = (xMax - xMin) / 2 || 1
+    const yMid = (yMin + yMax) / 2, yHalf = (yMax - yMin) / 2 || 1
+    const N = 600
+    return curves.map((cv) => {
+      const segs: Seg[] = []
+      let cur: Seg = []
+      for (let i = 0; i <= N; i++) {
+        const t = cv.tMin + ((cv.tMax - cv.tMin) * i) / N
+        let X: number, Y: number
+        if (cv.kind === 'param') { try { X = cv.fnX(t); Y = cv.fnY(t) } catch { X = NaN; Y = NaN } }
+        else { let r: number; try { r = cv.fnR(t) } catch { r = NaN } X = r * Math.cos(t); Y = r * Math.sin(t) }
+        const nx = (X - xMid) / xHalf, ny = (Y - yMid) / yHalf
+        if (!Number.isFinite(X) || !Number.isFinite(Y) || Math.abs(nx) > OUT_OF_BOX || Math.abs(ny) > OUT_OF_BOX) {
+          if (cur.length > 1) segs.push(cur); cur = []; continue
+        }
+        cur.push([nx * H, ny * H, 0])
+      }
+      if (cur.length > 1) segs.push(cur)
+      return { color: cv.color, segs }
+    })
+  }, [curves, xMin, xMax, yMin, yMax])
+
+  return (
+    <>
+      {out.map((c, ci) => c.segs.map((s, si) => (
+        <Line key={`pc-${ci}-${si}`} points={s} color={c.color} lineWidth={3} />
+      )))}
+    </>
+  )
+}
+
+function GraphScene({ functions, surfaces, paramCurves, viewport }: Props) {
   return (
     <group>
       <ambientLight intensity={0.65} />
@@ -142,11 +183,12 @@ function GraphScene({ functions, surfaces, viewport }: Props) {
         <SurfaceMesh key={`s-${i}`} surface={s} viewport={viewport} />
       ))}
       <Curves functions={functions} viewport={viewport} />
+      <ParamCurves curves={paramCurves ?? []} viewport={viewport} />
     </group>
   )
 }
 
-export default function GraphAR3D({ functions, surfaces, viewport }: Props) {
+export default function GraphAR3D({ functions, surfaces, paramCurves, viewport }: Props) {
   const [presenting, setPresenting] = useState(false)
   return (
     <XRCanvas
@@ -156,7 +198,7 @@ export default function GraphAR3D({ functions, surfaces, viewport }: Props) {
       gl={{ antialias: true, alpha: true }}
       style={{ background: presenting ? 'transparent' : '#020617' }}
     >
-      <GraphScene functions={functions} surfaces={surfaces} viewport={viewport} />
+      <GraphScene functions={functions} surfaces={surfaces} paramCurves={paramCurves} viewport={viewport} />
       <OrbitControls enabled={!presenting} enablePan={false} minDistance={1} maxDistance={8} />
     </XRCanvas>
   )
