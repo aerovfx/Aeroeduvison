@@ -1594,57 +1594,177 @@ function VRButton({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer
   )
 }
 
+// ── Sci-fi HUD palette ──
+const HUD_C = '#5eead4'        // teal-cyan chính
+const HUD_DIM = 'rgba(94,234,212,0.45)'
+const HUD_BG = 'rgba(6,30,38,0.6)'
+
+/** Thước dọc (tốc độ / độ cao) kiểu HUD máy bay. */
+function HudTape({ value, label, unit, side }: { value: number; label: string; unit: string; side: 'left' | 'right' }) {
+  const H = 200, W = 64, step = 5, win = 20
+  const ticks: { v: number; y: number }[] = []
+  const startV = Math.ceil((value - win) / step) * step
+  for (let v = startV; v <= value + win; v += step) ticks.push({ v, y: H / 2 - ((v - value) / (win * 2)) * H })
+  const railX = side === 'left' ? W - 2 : 2
+  return (
+    <svg width={W} height={H} style={{ overflow: 'visible' }}>
+      <text x={railX} y={-8} fontSize={10} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'} style={{ letterSpacing: 1 }}>{label}</text>
+      <line x1={railX} y1={0} x2={railX} y2={H} stroke={HUD_DIM} strokeWidth={1.5} />
+      {ticks.map((t, i) => {
+        const major = Math.abs(Math.round(t.v) % 10) === 0
+        const len = major ? 14 : 7
+        const x2 = side === 'left' ? railX - len : railX + len
+        return (
+          <g key={i} opacity={0.7}>
+            <line x1={railX} y1={t.y} x2={x2} y2={t.y} stroke={HUD_C} strokeWidth={1} />
+            {major && <text x={side === 'left' ? railX - 18 : railX + 18} y={t.y + 3} fontSize={9} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'}>{Math.round(t.v)}</text>}
+          </g>
+        )
+      })}
+      <polygon
+        points={side === 'left'
+          ? `${railX},${H / 2} ${railX - 8},${H / 2 - 12} ${W - 56},${H / 2 - 12} ${W - 56},${H / 2 + 12} ${railX - 8},${H / 2 + 12}`
+          : `${railX},${H / 2} ${railX + 8},${H / 2 - 12} ${58},${H / 2 - 12} ${58},${H / 2 + 12} ${railX + 8},${H / 2 + 12}`}
+        fill={HUD_BG} stroke={HUD_C} strokeWidth={1.2}
+      />
+      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 4} fontSize={14} fontWeight="bold" fill="#fff" textAnchor="middle">{value.toFixed(0)}</text>
+      <text x={railX} y={H + 14} fontSize={8} fill={HUD_DIM} textAnchor={side === 'left' ? 'end' : 'start'}>{unit}</text>
+    </svg>
+  )
+}
+
+/** Dải la bàn ngang trên đỉnh. */
+function HudCompass({ heading }: { heading: number }) {
+  const W = 300, H = 34, win = 60
+  const marks: { d: number; x: number }[] = []
+  const start = Math.ceil((heading - win) / 15) * 15
+  for (let d = start; d <= heading + win; d += 15) {
+    let dd = ((d % 360) + 360) % 360
+    marks.push({ d: dd, x: W / 2 + ((d - heading) / win) * (W / 2) })
+  }
+  const card: Record<number, string> = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }
+  return (
+    <svg width={W} height={H} style={{ overflow: 'hidden' }}>
+      <line x1={0} y1={H - 2} x2={W} y2={H - 2} stroke={HUD_DIM} strokeWidth={1} />
+      {marks.map((m, i) => (
+        <g key={i} opacity={0.85}>
+          <line x1={m.x} y1={H - 2} x2={m.x} y2={card[m.d] ? H - 14 : H - 8} stroke={HUD_C} strokeWidth={card[m.d] ? 1.6 : 1} />
+          {card[m.d] && <text x={m.x} y={H - 18} fontSize={12} fontWeight="bold" fill={HUD_C} textAnchor="middle">{card[m.d]}</text>}
+        </g>
+      ))}
+      <polygon points={`${W / 2},2 ${W / 2 - 6},-6 ${W / 2 + 6},-6`} fill="#fbbf24" transform="translate(0,8)" />
+      <rect x={W / 2 - 22} y={0} width={44} height={15} fill={HUD_BG} stroke={HUD_C} strokeWidth={1} />
+      <text x={W / 2} y={11} fontSize={11} fontWeight="bold" fill="#fff" textAnchor="middle">{Math.round(heading)}°</text>
+    </svg>
+  )
+}
+
+/** Radar tròn góc dưới-phải: chấm mục tiêu quanh drone (forward = lên). */
+function HudRadar({ heading, rel }: { heading: number; rel: { x: number; z: number; color: string }[] }) {
+  const R = 56, range = 60
+  const yaw = (heading * Math.PI) / 180
+  const fx = Math.sin(yaw), fz = Math.cos(yaw)
+  return (
+    <svg width={R * 2} height={R * 2}>
+      <circle cx={R} cy={R} r={R - 2} fill="rgba(6,30,38,0.5)" stroke={HUD_DIM} strokeWidth={1} />
+      <circle cx={R} cy={R} r={(R - 2) * 0.6} fill="none" stroke={HUD_DIM} strokeWidth={0.6} />
+      <line x1={R} y1={4} x2={R} y2={R * 2 - 4} stroke={HUD_DIM} strokeWidth={0.5} />
+      <line x1={4} y1={R} x2={R * 2 - 4} y2={R} stroke={HUD_DIM} strokeWidth={0.5} />
+      {rel.map((t, i) => {
+        const right = t.x * fz - t.z * fx
+        const fwd = t.x * fx + t.z * fz
+        let px = R + (right / range) * (R - 6)
+        let py = R - (fwd / range) * (R - 6)
+        const d = Math.hypot(px - R, py - R)
+        if (d > R - 6) { px = R + ((px - R) / d) * (R - 6); py = R + ((py - R) / d) * (R - 6) }
+        return <circle key={i} cx={px} cy={py} r={3.5} fill={t.color} />
+      })}
+      <polygon points={`${R},${R - 6} ${R - 5},${R + 5} ${R + 5},${R + 5}`} fill={HUD_C} />
+    </svg>
+  )
+}
+
 function GameHUD({
-  telemetry, gamepadId, level, gateProgress, hoverProgress, timeRemaining,
+  telemetry, gamepadId, level, gateProgress, hoverProgress, timeRemaining, targets = [],
 }: {
   telemetry: DroneState | null; gamepadId: string | null; level: Level
   gateProgress: number; hoverProgress: number; timeRemaining: number
+  targets?: { x: number; z: number; color: string }[]
 }) {
   if (!telemetry) return null
-  const speed = telemetry.vel.length()
-  const battColor = telemetry.battery > 30 ? '#10b981' : telemetry.battery > 15 ? '#f59e0b' : '#ef4444'
+  const speed = telemetry.vel.length() * 3.6 // km/h cho cảm giác HUD
+  const heading = ((telemetry.yaw * 180) / Math.PI % 360 + 360) % 360
+  const battColor = telemetry.battery > 30 ? HUD_C : telemetry.battery > 15 ? '#f59e0b' : '#ef4444'
+  const rel = targets.map((t) => ({ x: t.x - telemetry.pos.x, z: t.z - telemetry.pos.z, color: t.color }))
   const objStr = level.type === 'hover' && level.hover
-    ? `Hover ${hoverProgress.toFixed(1)}/${level.hover.duration}s`
-    : `Gate ${gateProgress}/${(level.gates || []).length}`
+    ? `HOVER ${hoverProgress.toFixed(1)}/${level.hover.duration}s`
+    : level.type === 'cargo' && level.cargo
+      ? `CARGO ${gateProgress}` // gateProgress unused cho cargo; HUD cargo riêng ở GameScreen
+      : `GATE ${gateProgress}/${(level.gates || []).length}`
+  const bracket = (corner: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', width: 26, height: 26, borderColor: HUD_DIM, borderStyle: 'solid', ...corner,
+  })
   return (
     <div style={{
       position: 'absolute', inset: 0, pointerEvents: 'none',
-      fontFamily: 'monospace', color: '#22c55e', textShadow: '0 0 4px rgba(0,0,0,0.8)',
+      fontFamily: 'ui-monospace, monospace', color: HUD_C,
+      textShadow: '0 0 6px rgba(34,211,238,0.6)',
     }}>
-      {/* Top-left: alt + speed */}
-      <div style={{ position: 'absolute', top: 12, left: 16 }}>
-        <div style={{ fontSize: 10, opacity: 0.7 }}>ALT</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold' }}>{telemetry.pos.y.toFixed(1)}m</div>
-        <div style={{ fontSize: 10, opacity: 0.7, marginTop: 8 }}>SPEED</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold' }}>{speed.toFixed(1)} m/s</div>
+      {/* Khung góc HUD */}
+      <div style={bracket({ top: 14, left: 14, borderWidth: '2px 0 0 2px' })} />
+      <div style={bracket({ top: 14, right: 14, borderWidth: '2px 2px 0 0' })} />
+      <div style={bracket({ bottom: 14, left: 14, borderWidth: '0 0 2px 2px' })} />
+      <div style={bracket({ bottom: 14, right: 14, borderWidth: '0 2px 2px 0' })} />
+
+      {/* La bàn trên đỉnh */}
+      <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)' }}>
+        <HudCompass heading={heading} />
       </div>
-      {/* Top-center: objective + time */}
-      <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>{level.emoji} LEVEL {level.id} • {level.name.toUpperCase()}</div>
-        <div style={{ fontSize: 26, fontWeight: 'bold', marginTop: 2, color: '#fbbf24' }}>{objStr}</div>
-        <div style={{ fontSize: 14, marginTop: 4, color: timeRemaining < 10 ? '#ef4444' : '#22c55e' }}>
-          ⏱ {timeRemaining.toFixed(1)}s
+
+      {/* Thước tốc độ (trái) + độ cao (phải) */}
+      <div style={{ position: 'absolute', top: '50%', left: 26, transform: 'translateY(-50%)' }}>
+        <HudTape value={speed} label="SPD" unit="km/h" side="left" />
+      </div>
+      <div style={{ position: 'absolute', top: '50%', right: 26, transform: 'translateY(-50%)' }}>
+        <HudTape value={telemetry.pos.y} label="ALT" unit="m" side="right" />
+      </div>
+
+      {/* Tâm ngắm + ladder */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+        <svg width={120} height={70} style={{ overflow: 'visible' }}>
+          <circle cx={60} cy={35} r={5} fill="none" stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={18} y1={35} x2={48} y2={35} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={72} y1={35} x2={102} y2={35} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={48} y1={35} x2={52} y2={31} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={72} y1={35} x2={68} y2={31} stroke={HUD_C} strokeWidth={1.4} />
+        </svg>
+      </div>
+
+      {/* Objective + time — thanh trên */}
+      <div style={{ position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+        <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold' }}>{objStr}</div>
+        <div style={{ fontSize: 13, color: timeRemaining < 10 ? '#ef4444' : HUD_C }}>⏱ {timeRemaining.toFixed(1)}s</div>
+      </div>
+
+      {/* Pin — cột dọc bên trái ngoài */}
+      <div style={{ position: 'absolute', top: '50%', left: 96, transform: 'translateY(-50%)', textAlign: 'center' }}>
+        <div style={{ fontSize: 8, color: HUD_DIM, marginBottom: 3 }}>BATT</div>
+        <div style={{ width: 8, height: 120, background: 'rgba(255,255,255,0.12)', borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', border: `1px solid ${HUD_DIM}` }}>
+          <div style={{ width: '100%', height: `${telemetry.battery}%`, background: battColor }} />
         </div>
+        <div style={{ fontSize: 10, color: battColor, marginTop: 3, fontWeight: 'bold' }}>{telemetry.battery.toFixed(0)}%</div>
       </div>
-      {/* Top-right: battery */}
-      <div style={{ position: 'absolute', top: 12, right: 16, textAlign: 'right' }}>
-        <div style={{ fontSize: 10, opacity: 0.7 }}>BATTERY</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold', color: battColor }}>{telemetry.battery.toFixed(0)}%</div>
-        <div style={{ width: 80, height: 6, background: 'rgba(255,255,255,0.2)', marginTop: 4, borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ width: `${telemetry.battery}%`, height: '100%', background: battColor }} />
-        </div>
+
+      {/* Radar góc dưới-phải */}
+      <div style={{ position: 'absolute', bottom: 26, right: 26 }}>
+        <HudRadar heading={heading} rel={rel} />
+        <div style={{ textAlign: 'center', fontSize: 8, color: HUD_DIM, marginTop: 2 }}>RADAR {Math.round(speed)}km/h</div>
       </div>
-      {/* Bottom: input source */}
-      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', textAlign: 'center', fontSize: 11 }}>
-        <div style={{ opacity: 0.7 }}>
-          {gamepadId ? `🎮 ${gamepadId.slice(0, 40)}` : '⌨️ Bàn phím (W/S A/D ↑↓ ←→)'}
-        </div>
+
+      {/* Input source góc dưới-trái */}
+      <div style={{ position: 'absolute', bottom: 28, left: 50, fontSize: 10, color: HUD_DIM }}>
+        {gamepadId ? `🎮 ${gamepadId.slice(0, 24)}` : '⌨️/🕹️ READY'}
       </div>
-      {/* Crosshair */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        width: 30, height: 30, border: '1.5px solid rgba(34, 197, 94, 0.6)', borderRadius: '50%',
-      }} />
     </div>
   )
 }
@@ -2027,6 +2147,21 @@ function GameScreen({
   const guideDist = telemetry && guideTarget
     ? telemetry.pos.distanceTo(new THREE.Vector3(...guideTarget)) : null
 
+  // Chấm mục tiêu cho radar HUD
+  const radarTargets = useMemo(() => {
+    const t: { x: number; z: number; color: string }[] = []
+    if (level.type === 'gates' && level.gates) {
+      level.gates.forEach((g, i) => t.push({ x: g.pos[0], z: g.pos[2], color: i === gateProgress ? '#fbbf24' : i < gateProgress ? '#10b981' : '#ec4899' }))
+    } else if (level.type === 'hover') {
+      t.push({ x: 0, z: 0, color: '#fbbf24' })
+    } else if (level.type === 'cargo' && level.cargo) {
+      const pkg = level.cargo.packages[cargoIdx]
+      if (pkg) { const tgt = cargoCarrying ? pkg.drop : pkg.pickup; t.push({ x: tgt[0], z: tgt[2], color: cargoCarrying ? '#3b82f6' : '#22c55e' }) }
+      level.cargo.enemies?.forEach((e) => t.push({ x: e.center[0], z: e.center[2], color: '#ef4444' }))
+    }
+    return t
+  }, [level, gateProgress, cargoIdx, cargoCarrying])
+
   // Countdown timer
   useEffect(() => {
     const id = setInterval(() => {
@@ -2112,7 +2247,8 @@ function GameScreen({
           <GlCapture glRef={glRef} />
         </Canvas>
         <GameHUD telemetry={telemetry} gamepadId={gamepadId} level={level}
-          gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining} />
+          gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining}
+          targets={radarTargets} />
         <VRButton glRef={glRef} />
         {/* Âm thanh động cơ (WebAudio) */}
         <DroneSound inputsRef={inputsRef} muted={muted} />
