@@ -16,6 +16,7 @@
  */
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { Link } from 'react-router-dom'
@@ -677,7 +678,7 @@ export default function ChemistryLab() {
             {/* Center 3D Canvas */}
             <div className="lg:col-span-3">
               <div className="rounded-2xl bg-slate-900/60 border border-white/[0.08] p-3 h-[560px]">
-                <Canvas
+                <XRCanvas
                   camera={{ position: [3.5, 1.5, 4.5], fov: 45 }}
                   dpr={[1, 1.5]}
                   gl={{ antialias: true, alpha: false }}>
@@ -706,7 +707,7 @@ export default function ChemistryLab() {
                     minPolarAngle={0.3} maxPolarAngle={Math.PI / 2 - 0.05}
                     autoRotate autoRotateSpeed={0.5}
                   />
-                </Canvas>
+                </XRCanvas>
               </div>
               <div className="mt-3 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/20 p-3">
                 <p className="text-xs text-emerald-200/80 flex items-center gap-1.5">
@@ -757,14 +758,14 @@ export default function ChemistryLab() {
 
             <div className="lg:col-span-3">
               <div className="rounded-2xl bg-slate-900/60 border border-white/[0.08] p-3 h-[560px]">
-                <Canvas camera={{ position: [0, 0, 5], fov: 45 }} dpr={[1, 1.5]}>
+                <XRCanvas camera={{ position: [0, 0, 5], fov: 45 }} dpr={[1, 1.5]}>
                   <color attach="background" args={['#0a0f1f']} />
                   <ambientLight intensity={0.6} />
                   <pointLight position={[5, 5, 5]} intensity={1} />
                   <pointLight position={[-5, -5, 5]} intensity={0.5} color="#22d3ee" />
                   <MoleculeScene moleculeType={moleculeType} />
                   <OrbitControls enablePan={false} minDistance={3} maxDistance={10} />
-                </Canvas>
+                </XRCanvas>
               </div>
               <div className="mt-3 rounded-2xl bg-cyan-500/[0.06] border border-cyan-500/20 p-3">
                 <p className="text-xs text-cyan-200/80 flex items-center gap-1.5">

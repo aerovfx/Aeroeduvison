@@ -159,6 +159,8 @@ interface PopularLab {
   desc: string
   accent: 'indigo' | 'cyan' | 'emerald' | 'fuchsia' | 'amber' | 'rose'
   group: 'physics' | 'math' | 'chemistry' | 'electronics' | 'ai' | 'aero'
+  /** Lab có cảnh 3D → xem được trong Thực tế tăng cường (AR) trên điện thoại */
+  ar?: boolean
 }
 
 // POPULAR_LABS — sắp xếp lại theo nhóm domain, bỏ trùng lặp:
@@ -189,15 +191,15 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Graph Lab',          emoji: '📈', path: '/dashboard/labtwin/graph-lab',          desc: 'Máy tính đồ thị y = f(x)',     accent: 'cyan',     group: 'math' },
   { name: 'Fourier Epicycles',  emoji: '🌀', path: '/dashboard/labtwin/fourier-epicycles',  desc: 'Chuỗi Fourier vẽ sóng vuông',  accent: 'fuchsia',  group: 'math' },
   { name: 'Tròn ↔ Dao động',    emoji: '🎯', path: '/dashboard/labtwin/circular-shm',       desc: 'Hình chiếu CĐ tròn = SHM',     accent: 'cyan',     group: 'physics' },
-  { name: 'Tròn 3D + Helix',   emoji: '🌀', path: '/dashboard/labtwin/circular-motion-3d', desc: 'Helix 3D + chiếu lên XY/XZ/YZ', accent: 'cyan',     group: 'physics' },
-  { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math' },
-  { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math' },
+  { name: 'Tròn 3D + Helix',   emoji: '🌀', path: '/dashboard/labtwin/circular-motion-3d', desc: 'Helix 3D + chiếu lên XY/XZ/YZ', accent: 'cyan',     group: 'physics', ar: true },
+  { name: 'Periodic Table 3D',  emoji: '⚛️', path: '/dashboard/periodic-table',                  desc: 'Bảng tuần hoàn + nguyên tử R3F', accent: 'fuchsia', group: 'math', ar: true },
+  { name: 'Hình học không gian', emoji: '📐', path: '/dashboard/labtwin/geometry-unfold',   desc: 'Trải phẳng khối · diện tích · thể tích', accent: 'amber', group: 'math', ar: true },
 
   // ── Game RPG (1) ──
   { name: 'Pixel Office RPG',   emoji: '🎮', path: '/dashboard/labtwin/pixel-office-rpg', desc: 'AI agent VS Code · top-down pixel + chat', accent: 'fuchsia', group: 'ai' },
 
   // ── Hoá & Quang (2) ──
-  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry' },
+  { name: 'Chemistry Lab',      emoji: '🧪', path: '/dashboard/labtwin/chemistry-lab',      desc: 'Phản ứng · phương trình hoá',  accent: 'emerald',  group: 'chemistry', ar: true },
   { name: 'Optics Lab',         emoji: '🔬', path: '/dashboard/labtwin/optics-lab',         desc: 'Thấu kính · khúc xạ ánh sáng', accent: 'amber',    group: 'chemistry' },
 
   // ── Điện tử & IoT (3) ──
@@ -209,7 +211,7 @@ const POPULAR_LABS: PopularLab[] = [
   { name: 'Video Tracking',     emoji: '🎥', path: '/dashboard/labtwin/video-tracking',     desc: 'Tracking quỹ đạo từ video · NCC', accent: 'fuchsia', group: 'ai' },
 
   // ── Aero (1) ──
-  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero' },
+  { name: 'AirflowCFD 3D',      emoji: '💨', path: '/dashboard/labtwin/airflow-cfd',        desc: 'Dòng không khí qua vật thể 3D', accent: 'fuchsia', group: 'aero', ar: true },
 
   // 📌 Pixel Agents + Gesture Swarm đã chuyển sang Game Hub
   //    /dashboard/games/pixel-agents · /dashboard/games/gesture-swarm
@@ -482,6 +484,14 @@ export default function LabsIndexPage() {
                         <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-white/40 dark:bg-black/30 text-foreground/70">
                           {groupLabel[lab.group]}
                         </span>
+                        {lab.ar && (
+                          <span
+                            className="absolute top-6 left-1.5 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider font-bold bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow"
+                            title="Xem trong Thực tế tăng cường (AR) trên điện thoại"
+                          >
+                            AR
+                          </span>
+                        )}
                         <div className="text-3xl md:text-4xl mb-1.5 mt-1 group-hover:scale-125 transition-transform">
                           {lab.emoji}
                         </div>

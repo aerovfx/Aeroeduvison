@@ -14,6 +14,7 @@
  */
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Grid, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import {
@@ -1319,7 +1320,7 @@ export default function AirflowCFD() {
             className="relative rounded-lg overflow-hidden border border-slate-800 bg-gradient-to-br from-[#060a15] via-[#08101f] to-[#0b1327]"
             style={{ height: '72vh', minHeight: 520 }}
           >
-            <Canvas shadows camera={{ position: [7, 4, 10], fov: 48 }}>
+            <XRCanvas shadows camera={{ position: [7, 4, 10], fov: 48 }}>
               <Scene
                 shape={shapeKey}
                 U={U}
@@ -1336,7 +1337,7 @@ export default function AirflowCFD() {
                 animTimeRef={animTimeRef}
                 onAnimTimeChange={handleAnimTimeChange}
               />
-            </Canvas>
+            </XRCanvas>
 
             {/* Top overlay — iteration + LIVE */}
             <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">

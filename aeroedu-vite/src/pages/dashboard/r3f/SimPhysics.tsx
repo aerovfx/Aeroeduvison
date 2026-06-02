@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { XRCanvas } from '../../../components/ar/XRCanvas'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -48,7 +49,7 @@ function Pendulum({
 
 function PendulumSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
@@ -65,7 +66,7 @@ function PendulumSim() {
       <Pendulum length={3.0} phase={2.4} color="#22c55e" x={2} />
 
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -543,14 +544,14 @@ function SolarSystemScene() {
 
 function SolarSystemSim() {
   return (
-    <Canvas
+    <XRCanvas
       style={canvasStyle}
       camera={{ position: [0, 10, 20], fov: 50 }}
       gl={{ antialias: true }}
     >
       <color attach="background" args={[BG]} />
       <SolarSystemScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -645,7 +646,7 @@ function CollisionSim() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <Canvas
+      <XRCanvas
         style={canvasStyle}
         camera={{ position: [0, 0, 5], fov: 45 }}
         shadows={showShadows}
@@ -705,7 +706,7 @@ function CollisionSim() {
         ))}
 
         <OrbitControls enablePan={false} />
-      </Canvas>
+      </XRCanvas>
 
       {/* info badge */}
       <div
@@ -935,11 +936,11 @@ function ParticleField() {
 
 function ParticlesSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 60 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 60 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <ParticleField />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -1018,7 +1019,7 @@ function SwarmField() {
       }}
       onClick={handleCanvasClick}
     >
-      <Canvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 60 }}>
+      <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 8], fov: 60 }}>
         <color attach="background" args={[BG]} />
         <ambientLight intensity={0.5} />
         <points ref={ref}>
@@ -1027,7 +1028,7 @@ function SwarmField() {
           </bufferGeometry>
           <pointsMaterial size={0.05} color={color} sizeAttenuation transparent opacity={0.8} />
         </points>
-      </Canvas>
+      </XRCanvas>
       <div
         style={{
           position: 'absolute',
@@ -1094,13 +1095,13 @@ function AudioBars() {
 
 function AudioWaveSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 2, 12], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 2, 12], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <AudioBars />
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -1178,13 +1179,13 @@ function BoxField() {
 
 function InstancedBoxesSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 15], fov: 60 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 15], fov: 60 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <pointLight position={[5, 5, 5]} intensity={1} />
       <BoxField />
       <OrbitControls autoRotate autoRotateSpeed={0.3} />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -1235,13 +1236,13 @@ function FlowField() {
 
 function InstancedFlowSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [6, 3, 6], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [6, 3, 6], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <FlowField />
       <OrbitControls autoRotate />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -1407,13 +1408,13 @@ function ClothScene() {
 
 function ClothSimSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 1, 7], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 1, 7], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <ClothScene />
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -1600,13 +1601,13 @@ function FlagScene() {
 
 function FlagSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [2, 1, 7], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [2, 1, 7], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <FlagScene />
       <OrbitControls />
-    </Canvas>
+    </XRCanvas>
   )
 }
 

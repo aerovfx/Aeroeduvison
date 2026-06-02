@@ -20,6 +20,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { XRCanvas } from '../../components/ar/XRCanvas'
 import { OrbitControls, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import { ArrowLeft, Home, Play, RotateCcw, Box, Layers, Sparkles } from 'lucide-react'
@@ -1060,13 +1061,13 @@ export default function GeometryUnfold() {
           </div>
           <div className="flex-1 w-full rounded-2xl border border-white/10 overflow-hidden relative"
             style={{ background: 'radial-gradient(ellipse at center, #1a1d2e 0%, #0a0a14 70%, #050505 100%)', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
-            <Canvas
+            <XRCanvas
               camera={{ position: [0, 4, 14], fov: 45 }}
               gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
               dpr={[1, 1.5]}>
               <color attach="background" args={['#0a0a14']} />
               <GeometryScene shape={shape} dims={dims} t={unfoldPct} />
-            </Canvas>
+            </XRCanvas>
             {/* Hint overlay */}
             <div className="absolute bottom-2 right-3 text-[10px] text-white/30 uppercase tracking-[0.2em] font-mono pointer-events-none">
               Drag · Scroll · Zoom

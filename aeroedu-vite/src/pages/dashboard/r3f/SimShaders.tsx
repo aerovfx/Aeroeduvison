@@ -1,5 +1,6 @@
 import { useRef, useMemo, useEffect, useState } from 'react'
 import { Canvas, useFrame, useThree, extend } from '@react-three/fiber'
+import { XRCanvas } from '../../../components/ar/XRCanvas'
 import { OrbitControls, Stars, Sky, Environment, Float, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -64,10 +65,10 @@ function WaveScene() {
 
 function WaveShaderSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 5, 8], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 5, 8], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <WaveScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -144,10 +145,10 @@ function TerrainScene() {
 
 function TerrainSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 8, 8], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 8, 8], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <TerrainScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -181,10 +182,10 @@ function TerrainFlyScene() {
 
 function TerrainFlySim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 8, 8], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 8, 8], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <TerrainFlyScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -246,10 +247,10 @@ function OceanScene() {
 
 function OceanSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 5, 10], fov: 55 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 5, 10], fov: 55 }}>
       <color attach="background" args={[BG]} />
       <OceanScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -291,10 +292,10 @@ function OceanSunsetScene() {
 
 function OceanSunsetSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 2, 12], fov: 55 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 2, 12], fov: 55 }}>
       <color attach="background" args={[BG]} />
       <OceanSunsetScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -352,10 +353,10 @@ function GalaxyScene() {
 
 function GalaxySim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 8, 12], fov: 55 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 8, 12], fov: 55 }}>
       <color attach="background" args={[BG]} />
       <GalaxyScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -383,10 +384,10 @@ function GalaxyFieldScene() {
 
 function GalaxyFieldSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 5, 10], fov: 55 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 5, 10], fov: 55 }}>
       <color attach="background" args={[BG]} />
       <GalaxyFieldScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -449,10 +450,10 @@ function VoxelCityScene() {
 
 function VoxelCitySim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [8, 12, 12], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [8, 12, 12], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <VoxelCityScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -518,10 +519,10 @@ function CityNightScene() {
 
 function CityNightSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [8, 10, 12], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [8, 10, 12], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <CityNightScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -612,14 +613,14 @@ function RaymarchScene() {
 
 function RaymarchingSim() {
   return (
-    <Canvas
+    <XRCanvas
       style={canvasStyle}
       camera={{ position: [0, 0, 1], fov: 90, near: 0.01, far: 1000 }}
       orthographic={false}
     >
       <color attach="background" args={[BG]} />
       <RaymarchScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -680,14 +681,14 @@ function MetaballsScene() {
 
 function MetaballsSim() {
   return (
-    <Canvas
+    <XRCanvas
       style={canvasStyle}
       camera={{ position: [0, 0, 1], fov: 90, near: 0.01, far: 1000 }}
       orthographic={false}
     >
       <color attach="background" args={[BG]} />
       <MetaballsScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -727,11 +728,11 @@ function PortalScene() {
 
 function PortalSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 0, 5], fov: 50 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 5], fov: 50 }}>
       <color attach="background" args={[BG]} />
       <Stars radius={100} depth={50} count={5000} factor={4} />
       <PortalScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -786,10 +787,10 @@ function PrismScene() {
 
 function PrismSim() {
   return (
-    <Canvas style={canvasStyle} camera={{ position: [0, 2, 6], fov: 45 }}>
+    <XRCanvas style={canvasStyle} camera={{ position: [0, 2, 6], fov: 45 }}>
       <color attach="background" args={[BG]} />
       <PrismScene />
-    </Canvas>
+    </XRCanvas>
   )
 }
 
@@ -830,7 +831,7 @@ function ShoeConfigurator() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <Canvas style={canvasStyle} camera={{ position: [0, 0, 3], fov: 50 }}>
+      <XRCanvas style={canvasStyle} camera={{ position: [0, 0, 3], fov: 50 }}>
         <color attach="background" args={[BG]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
@@ -882,7 +883,7 @@ function ShoeConfigurator() {
         </group>
         <Environment preset="studio" />
         <OrbitControls autoRotate autoRotateSpeed={0.5} enableZoom={true} />
-      </Canvas>
+      </XRCanvas>
       <div
         style={{
           position: 'absolute',
