@@ -24,6 +24,7 @@ import {
   Plus, Eye, EyeOff, Trash2, ZoomIn, ZoomOut, Maximize2,
   Calculator, FunctionSquare, Hash, RotateCcw, Boxes, X,
   MousePointer2, Dot, Minus, Slash, Triangle, Circle as CircleIcon, Eraser,
+  CircleDot, Equal, Spline, CornerDownRight,
 } from 'lucide-react'
 
 // Lazy: chỉ nạp three/drei/AR khi user mở chế độ 3D
@@ -392,9 +393,67 @@ type EquationRow = {
 }
 
 // ── Dựng hình (điểm + nối) kiểu GeoGebra ──
-type GeoToolId = 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
-type GeoPoint = { id: string; x: number; y: number }
+type GeoToolId =
+  | 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
+  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular'
+// Điểm phái sinh: toạ độ tính từ điểm cha → tự cập nhật khi kéo cha
+type GeoDef =
+  | { kind: 'mid'; a: string; b: string }
+  | { kind: 'translate'; from: string; a: string; b: string; perp: boolean }
+  | { kind: 'inter'; a1: string; b1: string; a2: string; b2: string }
+type GeoPoint = { id: string; x: number; y: number; def?: GeoDef }
 type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
+
+// Giao 2 đường thẳng (p1p2) × (p3p4) — null nếu song song
+function lineIntersect(
+  p1: { x: number; y: number }, p2: { x: number; y: number },
+  p3: { x: number; y: number }, p4: { x: number; y: number },
+): { x: number; y: number } | null {
+  const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+  if (Math.abs(d) < 1e-12) return null
+  const a = p1.x * p2.y - p1.y * p2.x
+  const b = p3.x * p4.y - p3.y * p4.x
+  return {
+    x: (a * (p3.x - p4.x) - (p1.x - p2.x) * b) / d,
+    y: (a * (p3.y - p4.y) - (p1.y - p2.y) * b) / d,
+  }
+}
+
+// Tính toạ độ thực của mọi điểm (giải đệ quy điểm phái sinh, có chống chu trình)
+function resolveGeo(points: GeoPoint[]): Map<string, { x: number; y: number } | null> {
+  const byId = new Map(points.map((p) => [p.id, p]))
+  const cache = new Map<string, { x: number; y: number } | null>()
+  const visiting = new Set<string>()
+  const R = (id: string): { x: number; y: number } | null => {
+    if (cache.has(id)) return cache.get(id)!
+    const p = byId.get(id)
+    if (!p) { cache.set(id, null); return null }
+    if (!p.def) { const v = { x: p.x, y: p.y }; cache.set(id, v); return v }
+    if (visiting.has(id)) { cache.set(id, null); return null }
+    visiting.add(id)
+    let v: { x: number; y: number } | null = null
+    const d = p.def
+    if (d.kind === 'mid') {
+      const a = R(d.a), b = R(d.b)
+      if (a && b) v = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    } else if (d.kind === 'translate') {
+      const f = R(d.from), a = R(d.a), b = R(d.b)
+      if (f && a && b) {
+        let dx = b.x - a.x, dy = b.y - a.y
+        if (d.perp) { const t = dx; dx = -dy; dy = t }
+        v = { x: f.x + dx, y: f.y + dy }
+      }
+    } else if (d.kind === 'inter') {
+      const a1 = R(d.a1), b1 = R(d.b1), a2 = R(d.a2), b2 = R(d.b2)
+      if (a1 && b1 && a2 && b2) v = lineIntersect(a1, b1, a2, b2)
+    }
+    visiting.delete(id)
+    cache.set(id, v)
+    return v
+  }
+  for (const p of points) R(p.id)
+  return cache
+}
 const GEO_POINT_COLOR = '#3b82f6'
 const GEO_SHAPE_COLOR = '#fbbf24'
 const geoLabel = (i: number) => {
@@ -764,10 +823,14 @@ function Plot({
 
   const geoActive = !!geo && geo.tool !== 'move'
   const [dragPt, setDragPt] = useState<string | null>(null)
-  // Tìm điểm geo gần (px) để bắt kéo
+  // Toạ độ thực của mọi điểm (giải điểm phái sinh)
+  const geoResolved = useMemo(() => (geo ? resolveGeo(geo.points) : null), [geo])
+  const rp = (id: string) => geoResolved?.get(id) ?? null
+  // Tìm điểm TỰ DO gần (px) để bắt kéo (điểm phái sinh không kéo trực tiếp)
   const nearbyPoint = (px: number, py: number): string | null => {
     if (!geo) return null
     for (const p of geo.points) {
+      if (p.def) continue
       if (Math.hypot(xS(p.x) - px, yS(p.y) - py) < 12) return p.id
     }
     return null
@@ -1008,11 +1071,10 @@ function Plot({
 
         {/* ── Hình dựng (điểm + nối) ── */}
         {geo && (() => {
-          const gp = (id: string) => geo.points.find((p) => p.id === id)
           return (
             <g>
               {geo.shapes.map((sh) => {
-                const ps = sh.pts.map(gp).filter(Boolean) as GeoPoint[]
+                const ps = sh.pts.map(rp).filter(Boolean) as { x: number; y: number }[]
                 if (ps.length < 2) return null
                 if (sh.type === 'segment') {
                   return <line key={sh.id} x1={xS(ps[0].x)} y1={yS(ps[0].y)} x2={xS(ps[1].x)} y2={yS(ps[1].y)}
@@ -1041,7 +1103,7 @@ function Plot({
               })}
               {/* Số đo (độ dài / bán kính / diện tích) */}
               {geo.measure && geo.shapes.map((sh) => {
-                const ps = sh.pts.map(gp).filter(Boolean) as GeoPoint[]
+                const ps = sh.pts.map(rp).filter(Boolean) as { x: number; y: number }[]
                 if (ps.length < 2) return null
                 let label = '', lx = 0, ly = 0
                 if (sh.type === 'segment') {
@@ -1069,14 +1131,20 @@ function Plot({
                 )
               })}
 
-              {/* Điểm + nhãn */}
+              {/* Điểm + nhãn (điểm phái sinh: rỗng viền vàng, không kéo) */}
               {geo.points.map((p, i) => {
+                const r = rp(p.id)
+                if (!r) return null
                 const isPending = geo.pending.includes(p.id)
+                const derived = !!p.def
                 return (
                   <g key={p.id}>
-                    {isPending && <circle cx={xS(p.x)} cy={yS(p.y)} r={8} fill="none" stroke="#22d3ee" strokeWidth={2} />}
-                    <circle cx={xS(p.x)} cy={yS(p.y)} r={5} fill={GEO_POINT_COLOR} stroke="#0a0f1a" strokeWidth={2} />
-                    <text x={xS(p.x) + 9} y={yS(p.y) - 8} fill="#93c5fd" fontSize={13} fontWeight={700} fontFamily="monospace">
+                    {isPending && <circle cx={xS(r.x)} cy={yS(r.y)} r={8} fill="none" stroke="#22d3ee" strokeWidth={2} />}
+                    <circle cx={xS(r.x)} cy={yS(r.y)} r={derived ? 4 : 5}
+                            fill={derived ? '#0a0f1a' : GEO_POINT_COLOR}
+                            stroke={derived ? '#fbbf24' : '#0a0f1a'} strokeWidth={2} />
+                    <text x={xS(r.x) + 9} y={yS(r.y) - 8} fill={derived ? '#fcd34d' : '#93c5fd'}
+                          fontSize={13} fontWeight={700} fontFamily="monospace">
                       {geoLabel(i)}
                     </text>
                   </g>
@@ -1302,11 +1370,13 @@ export default function GraphLab() {
 
   const handleGeoClick = (gx: number, gy: number) => {
     if (geoTool === 'move') return
+    const resolved = resolveGeo(geoPoints)
     const thrX = (viewport.xMax - viewport.xMin) * 0.025
     const thrY = (viewport.yMax - viewport.yMin) * 0.025
     let nearId: string | null = null
     for (const p of geoPoints) {
-      if (Math.abs(p.x - gx) < thrX && Math.abs(p.y - gy) < thrY) { nearId = p.id; break }
+      const rp = resolved.get(p.id)
+      if (rp && Math.abs(rp.x - gx) < thrX && Math.abs(rp.y - gy) < thrY) { nearId = p.id; break }
     }
     // Đa giác: chạm lại điểm đầu (≥3 đỉnh) → đóng đa giác
     if (geoTool === 'polygon' && geoPending.length >= 3 && nearId && nearId === geoPending[0]) {
@@ -1317,16 +1387,36 @@ export default function GraphLab() {
     let id = nearId
     if (!id) { id = mkId(); const np: GeoPoint = { id, x: gx, y: gy }; setGeoPoints((ps) => [...ps, np]) }
     if (geoTool === 'point') { setGeoPending([]); return }
+    // toạ độ của 1 id (điểm mới tạo trong lần chạm này nằm tại gx,gy)
+    const coord = (pid: string) => (pid === id && !nearId ? { x: gx, y: gy } : (resolved.get(pid) ?? { x: gx, y: gy }))
     const next = [...geoPending, id]
+
     if ((geoTool === 'segment' || geoTool === 'line') && next.length === 2) {
-      setGeoShapes((s) => [...s, { id: mkId(), type: geoTool, pts: next, color: GEO_SHAPE_COLOR }])
-      setGeoPending([])
-      return
+      setGeoShapes((s) => [...s, { id: mkId(), type: geoTool, pts: next, color: GEO_SHAPE_COLOR }]); setGeoPending([]); return
     }
     if (geoTool === 'circle' && next.length === 2) {
-      setGeoShapes((s) => [...s, { id: mkId(), type: 'circle', pts: next, color: GEO_SHAPE_COLOR }])
-      setGeoPending([])
-      return
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'circle', pts: next, color: GEO_SHAPE_COLOR }]); setGeoPending([]); return
+    }
+    if (geoTool === 'midpoint' && next.length === 2) {
+      const [a, b] = next, ra = coord(a), rb = coord(b)
+      setGeoPoints((ps) => [...ps, { id: mkId(), x: (ra.x + rb.x) / 2, y: (ra.y + rb.y) / 2, def: { kind: 'mid', a, b } }])
+      setGeoPending([]); return
+    }
+    if ((geoTool === 'parallel' || geoTool === 'perpendicular') && next.length === 3) {
+      const [a, b, p] = next, perp = geoTool === 'perpendicular'
+      const ra = coord(a), rb = coord(b), rp = coord(p)
+      let dx = rb.x - ra.x, dy = rb.y - ra.y
+      if (perp) { const t = dx; dx = -dy; dy = t }
+      const hid = mkId()
+      setGeoPoints((ps) => [...ps, { id: hid, x: rp.x + dx, y: rp.y + dy, def: { kind: 'translate', from: p, a, b, perp } }])
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'line', pts: [p, hid], color: GEO_SHAPE_COLOR }])
+      setGeoPending([]); return
+    }
+    if (geoTool === 'intersect' && next.length === 4) {
+      const [a1, b1, a2, b2] = next
+      const inter = lineIntersect(coord(a1), coord(b1), coord(a2), coord(b2)) ?? { x: gx, y: gy }
+      setGeoPoints((ps) => [...ps, { id: mkId(), x: inter.x, y: inter.y, def: { kind: 'inter', a1, b1, a2, b2 } }])
+      setGeoPending([]); return
     }
     setGeoPending(next)
   }
@@ -1591,6 +1681,10 @@ export default function GraphLab() {
                 { id: 'line', icon: Slash, label: 'Đường thẳng' },
                 { id: 'polygon', icon: Triangle, label: 'Đa giác' },
                 { id: 'circle', icon: CircleIcon, label: 'Đường tròn' },
+                { id: 'midpoint', icon: CircleDot, label: 'Trung điểm' },
+                { id: 'intersect', icon: Spline, label: 'Giao điểm' },
+                { id: 'parallel', icon: Equal, label: 'Song song' },
+                { id: 'perpendicular', icon: CornerDownRight, label: 'Vuông góc' },
               ] as { id: GeoToolId; icon: typeof Dot; label: string }[]).map((t) => {
                 const Icon = t.icon
                 const active = geoTool === t.id
@@ -1624,6 +1718,10 @@ export default function GraphLab() {
                 {geoTool === 'line' && 'Chạm 2 điểm để vẽ đường thẳng đi qua chúng.'}
                 {geoTool === 'polygon' && 'Chạm lần lượt các đỉnh; chạm lại đỉnh đầu (≥3) để đóng đa giác.'}
                 {geoTool === 'circle' && 'Chạm tâm rồi chạm 1 điểm trên đường tròn (xác định bán kính).'}
+                {geoTool === 'midpoint' && 'Chạm 2 điểm → tạo trung điểm (tự cập nhật khi kéo).'}
+                {geoTool === 'intersect' && 'Chạm 4 điểm: 2 điểm đường 1, rồi 2 điểm đường 2 → giao điểm.'}
+                {geoTool === 'parallel' && 'Chạm 2 điểm (A,B) định hướng, rồi điểm P → đường thẳng qua P song song AB.'}
+                {geoTool === 'perpendicular' && 'Chạm 2 điểm (A,B) định hướng, rồi điểm P → đường vuông góc AB qua P.'}
                 {geoPending.length > 0 && <b className="ml-1 text-cyan-300">· đã chọn {geoPending.length} điểm</b>}
               </div>
             )}
