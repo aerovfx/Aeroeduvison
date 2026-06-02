@@ -23,6 +23,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Eye, EyeOff, Trash2, ZoomIn, ZoomOut, Maximize2,
   Calculator, FunctionSquare, Hash, RotateCcw, Boxes, X,
+  MousePointer2, Dot, Minus, Slash, Triangle, Circle as CircleIcon, Eraser,
 } from 'lucide-react'
 
 // Lazy: chỉ nạp three/drei/AR khi user mở chế độ 3D
@@ -390,6 +391,17 @@ type EquationRow = {
   visible: boolean
 }
 
+// ── Dựng hình (điểm + nối) kiểu GeoGebra ──
+type GeoToolId = 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
+type GeoPoint = { id: string; x: number; y: number }
+type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
+const GEO_POINT_COLOR = '#3b82f6'
+const GEO_SHAPE_COLOR = '#fbbf24'
+const geoLabel = (i: number) => {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  return i < 26 ? L[i] : L[i % 26] + Math.floor(i / 26)
+}
+
 const COLORS = [
   '#22d3ee', '#fbbf24', '#a3e635', '#f472b6',
   '#a78bfa', '#fb923c', '#34d399', '#f87171',
@@ -456,12 +468,19 @@ function formatTick(v: number): string {
 }
 
 function Plot({
-  compiled, viewport, onViewportChange, height = 560,
+  compiled, viewport, onViewportChange, height = 560, geo,
 }: {
   compiled: Compiled[]
   viewport: { xMin: number; xMax: number; yMin: number; yMax: number }
   onViewportChange: (v: { xMin: number; xMax: number; yMin: number; yMax: number }) => void
   height?: number
+  geo?: {
+    tool: GeoToolId
+    points: GeoPoint[]
+    shapes: GeoShape[]
+    pending: string[]
+    onClick: (gx: number, gy: number) => void
+  }
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 800, h: height })
@@ -741,10 +760,18 @@ function Plot({
     })
   }, [compiled, xMin, xMax, yMin, yMax, w, h])
 
+  const geoActive = !!geo && geo.tool !== 'move'
+
   // Mouse interactions
   const onMouseDown = (e: React.MouseEvent) => {
+    if (geoActive) return // đang dựng hình → không pan
     const r = ref.current!.getBoundingClientRect()
     setDragging({ x0: e.clientX - r.left, y0: e.clientY - r.top, v0: viewport })
+  }
+  const onPlotClick = (e: React.MouseEvent) => {
+    if (!geoActive || !geo) return
+    const r = ref.current!.getBoundingClientRect()
+    geo.onClick(xInv(e.clientX - r.left), yInv(e.clientY - r.top))
   }
   const onMouseMove = (e: React.MouseEvent) => {
     const r = ref.current!.getBoundingClientRect()
@@ -800,6 +827,7 @@ function Plot({
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
+        onClick={onPlotClick}
         /* wheel handled via native non-passive listener in useEffect */
       >
         {/* Minor gridlines */}
@@ -959,6 +987,56 @@ function Plot({
               textAnchor="end" fontFamily="monospace" fontStyle="italic">x</text>
         <text x={xMin <= 0 && xMax >= 0 ? xS(0) + 8 : 14} y={14}
               fill='var(--td-muted)' fontSize={11} fontFamily="monospace" fontStyle="italic">y</text>
+
+        {/* ── Hình dựng (điểm + nối) ── */}
+        {geo && (() => {
+          const gp = (id: string) => geo.points.find((p) => p.id === id)
+          return (
+            <g>
+              {geo.shapes.map((sh) => {
+                const ps = sh.pts.map(gp).filter(Boolean) as GeoPoint[]
+                if (ps.length < 2) return null
+                if (sh.type === 'segment') {
+                  return <line key={sh.id} x1={xS(ps[0].x)} y1={yS(ps[0].y)} x2={xS(ps[1].x)} y2={yS(ps[1].y)}
+                               stroke={sh.color} strokeWidth={2.2} />
+                }
+                if (sh.type === 'line') {
+                  const ax = xS(ps[0].x), ay = yS(ps[0].y), bx = xS(ps[1].x), by = yS(ps[1].y)
+                  const dx = bx - ax, dy = by - ay
+                  const K = 4000
+                  return <line key={sh.id} x1={ax - dx * K} y1={ay - dy * K} x2={bx + dx * K} y2={by + dy * K}
+                               stroke={sh.color} strokeWidth={2.2} />
+                }
+                if (sh.type === 'circle') {
+                  const cx = ps[0].x, cy = ps[0].y
+                  const r = Math.hypot(ps[1].x - cx, ps[1].y - cy)
+                  const pts: string[] = []
+                  for (let k = 0; k <= 72; k++) {
+                    const th = (k / 72) * Math.PI * 2
+                    pts.push(`${xS(cx + r * Math.cos(th)).toFixed(1)},${yS(cy + r * Math.sin(th)).toFixed(1)}`)
+                  }
+                  return <polyline key={sh.id} points={pts.join(' ')} fill="none" stroke={sh.color} strokeWidth={2.2} />
+                }
+                // polygon
+                const d = ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.x).toFixed(1)},${yS(p.y).toFixed(1)}`).join(' ') + ' Z'
+                return <path key={sh.id} d={d} fill={`${sh.color}33`} stroke={sh.color} strokeWidth={2.2} />
+              })}
+              {/* Điểm + nhãn */}
+              {geo.points.map((p, i) => {
+                const isPending = geo.pending.includes(p.id)
+                return (
+                  <g key={p.id}>
+                    {isPending && <circle cx={xS(p.x)} cy={yS(p.y)} r={8} fill="none" stroke="#22d3ee" strokeWidth={2} />}
+                    <circle cx={xS(p.x)} cy={yS(p.y)} r={5} fill={GEO_POINT_COLOR} stroke="#0a0f1a" strokeWidth={2} />
+                    <text x={xS(p.x) + 9} y={yS(p.y) - 8} fill="#93c5fd" fontSize={13} fontWeight={700} fontFamily="monospace">
+                      {geoLabel(i)}
+                    </text>
+                  </g>
+                )
+              })}
+            </g>
+          )
+        })()}
       </svg>
 
       {/* Cursor readout */}
@@ -1167,6 +1245,49 @@ export default function GraphLab() {
     setSurfaceRows((rs) => rs.filter((r) => r.id !== id))
   const toggleSurface = (id: string) =>
     setSurfaceRows((rs) => rs.map((r) => (r.id === id ? { ...r, visible: !r.visible } : r)))
+
+  // ── Dựng hình: điểm + nối (Đoạn thẳng / Đường thẳng / Đa giác / Đường tròn) ──
+  const [geoTool, setGeoTool] = useState<GeoToolId>('move')
+  const [geoPoints, setGeoPoints] = useState<GeoPoint[]>([])
+  const [geoShapes, setGeoShapes] = useState<GeoShape[]>([])
+  const [geoPending, setGeoPending] = useState<string[]>([])
+
+  const handleGeoClick = (gx: number, gy: number) => {
+    if (geoTool === 'move') return
+    const thrX = (viewport.xMax - viewport.xMin) * 0.025
+    const thrY = (viewport.yMax - viewport.yMin) * 0.025
+    let nearId: string | null = null
+    for (const p of geoPoints) {
+      if (Math.abs(p.x - gx) < thrX && Math.abs(p.y - gy) < thrY) { nearId = p.id; break }
+    }
+    // Đa giác: chạm lại điểm đầu (≥3 đỉnh) → đóng đa giác
+    if (geoTool === 'polygon' && geoPending.length >= 3 && nearId && nearId === geoPending[0]) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'polygon', pts: [...geoPending], color: GEO_SHAPE_COLOR }])
+      setGeoPending([])
+      return
+    }
+    let id = nearId
+    if (!id) { id = mkId(); const np: GeoPoint = { id, x: gx, y: gy }; setGeoPoints((ps) => [...ps, np]) }
+    if (geoTool === 'point') { setGeoPending([]); return }
+    const next = [...geoPending, id]
+    if ((geoTool === 'segment' || geoTool === 'line') && next.length === 2) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: geoTool, pts: next, color: GEO_SHAPE_COLOR }])
+      setGeoPending([])
+      return
+    }
+    if (geoTool === 'circle' && next.length === 2) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'circle', pts: next, color: GEO_SHAPE_COLOR }])
+      setGeoPending([])
+      return
+    }
+    setGeoPending(next)
+  }
+  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]) }
+  const undoGeo = () => {
+    if (geoPending.length) { setGeoPending([]); return }
+    if (geoShapes.length) { setGeoShapes((s) => s.slice(0, -1)); return }
+    setGeoPoints((p) => p.slice(0, -1))
+  }
 
   const compiled: Compiled[] = useMemo(
     () => rows.map((row) => {
@@ -1409,11 +1530,52 @@ export default function GraphLab() {
 
           {/* Main area */}
           <section className="space-y-3 min-w-0">
+            {/* Thanh công cụ dựng hình (điểm + nối) */}
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-slate-900/60 px-2.5 py-2">
+              <span className="text-[11px] font-bold text-slate-400 mr-1">Dựng hình:</span>
+              {([
+                { id: 'move', icon: MousePointer2, label: 'Di chuyển' },
+                { id: 'point', icon: Dot, label: 'Điểm' },
+                { id: 'segment', icon: Minus, label: 'Đoạn thẳng' },
+                { id: 'line', icon: Slash, label: 'Đường thẳng' },
+                { id: 'polygon', icon: Triangle, label: 'Đa giác' },
+                { id: 'circle', icon: CircleIcon, label: 'Đường tròn' },
+              ] as { id: GeoToolId; icon: typeof Dot; label: string }[]).map((t) => {
+                const Icon = t.icon
+                const active = geoTool === t.id
+                return (
+                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]) }} title={t.label}
+                    className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
+                      active ? 'bg-cyan-500/25 text-cyan-100 ring-cyan-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
+                    }`}>
+                    <Icon size={13} /> <span className="hidden sm:inline">{t.label}</span>
+                  </button>
+                )
+              })}
+              <span className="flex-1" />
+              <button onClick={undoGeo} title="Hoàn tác" className="p-1.5 rounded-lg bg-slate-800/70 ring-1 ring-slate-700 hover:bg-slate-700 text-slate-300">
+                <RotateCcw size={13} />
+              </button>
+              <button onClick={clearGeo} title="Xoá hết hình" className="flex items-center gap-1 rounded-lg bg-rose-500/15 px-2 py-1 text-[11px] font-semibold text-rose-200 ring-1 ring-rose-400/40 hover:bg-rose-500/25">
+                <Eraser size={13} /> <span className="hidden sm:inline">Xoá hình</span>
+              </button>
+            </div>
+            {geoTool !== 'move' && (
+              <div className="rounded-lg bg-cyan-500/10 border border-cyan-400/25 px-3 py-1.5 text-[11px] text-cyan-100">
+                {geoTool === 'point' && 'Chạm lên đồ thị để tạo điểm mới (A, B, C…).'}
+                {geoTool === 'segment' && 'Chạm 2 điểm để nối thành đoạn thẳng (chạm chỗ trống sẽ tạo điểm mới).'}
+                {geoTool === 'line' && 'Chạm 2 điểm để vẽ đường thẳng đi qua chúng.'}
+                {geoTool === 'polygon' && 'Chạm lần lượt các đỉnh; chạm lại đỉnh đầu (≥3) để đóng đa giác.'}
+                {geoTool === 'circle' && 'Chạm tâm rồi chạm 1 điểm trên đường tròn (xác định bán kính).'}
+                {geoPending.length > 0 && <b className="ml-1 text-cyan-300">· đã chọn {geoPending.length} điểm</b>}
+              </div>
+            )}
             <Plot
               compiled={compiled}
               viewport={viewport}
               onViewportChange={setViewport}
               height={560}
+              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, onClick: handleGeoClick }}
             />
 
             {/* Viewport info + legend */}
