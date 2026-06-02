@@ -43,6 +43,41 @@ const EYES: Record<Mood, { pupilY: number; sparkle: boolean; brow: 'none' | 'hap
 }
 const LED: Record<Mood, string> = { idle: '#22d3ee', happy: '#34d399', celebrate: '#fbbf24', think: '#a78bfa', sad: '#fb923c' }
 
+// ── Phát giọng nói: ưu tiên Google Cloud TTS (/api/tts), fallback Web Speech ──
+let _ttsAudio: HTMLAudioElement | null = null
+let _ttsBlocked = false // /api/tts trả 501 → khỏi gọi lại, dùng luôn trình duyệt
+async function googleTTS(text: string, lang: 'vi' | 'en'): Promise<boolean> {
+  if (_ttsBlocked) return false
+  try {
+    const res = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`)
+    if (!res.ok) { if (res.status === 501) _ttsBlocked = true; return false }
+    if (!(res.headers.get('content-type') || '').includes('audio')) return false
+    const url = URL.createObjectURL(await res.blob())
+    if (_ttsAudio) { try { _ttsAudio.pause() } catch { /* */ } }
+    _ttsAudio = new Audio(url)
+    _ttsAudio.onended = () => URL.revokeObjectURL(url)
+    await _ttsAudio.play()
+    return true
+  } catch { return false }
+}
+function webSpeech(text: string, lang: 'vi' | 'en') {
+  try {
+    if (!window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang === 'en' ? 'en-US' : 'vi-VN'
+    u.rate = 1.05; u.pitch = 1.25
+    window.speechSynthesis.speak(u)
+  } catch { /* ignore */ }
+}
+async function speakOut(text: string) {
+  const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang') === 'en') ? 'en' : 'vi'
+  const clean = text.replace(/[^\p{L}\p{N} .,!?…]/gu, '').trim()
+  if (!clean) return
+  const ok = await googleTTS(clean, lang)
+  if (!ok) webSpeech(clean, lang)
+}
+
 export default function Mascot() {
   const [pathname, setPathname] = useState(typeof window !== 'undefined' ? window.location.pathname : '')
   const [mood, setMood] = useState<Mood>('idle')
@@ -64,16 +99,8 @@ export default function Mascot() {
     lastActivity.current = Date.now()
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current)
     bubbleTimer.current = setTimeout(() => setBubble(null), ms)
-    // Giọng nói (TTS) — tuỳ chọn, theo ngôn ngữ đang chọn
-    if (voice && typeof window !== 'undefined' && window.speechSynthesis) {
-      try {
-        window.speechSynthesis.cancel()
-        const u = new SpeechSynthesisUtterance(text.replace(/[^\p{L}\p{N} .,!?…]/gu, ''))
-        u.lang = localStorage.getItem('lang') === 'en' ? 'en-US' : 'vi-VN'
-        u.rate = 1.05; u.pitch = 1.25
-        window.speechSynthesis.speak(u)
-      } catch { /* ignore */ }
-    }
+    // Giọng nói (tuỳ chọn): Google TTS → fallback giọng trình duyệt
+    if (voice) speakOut(text)
   }, [voice])
 
   const react = useCallback((event: MascotEvent, payload: MascotPayload = {}) => {

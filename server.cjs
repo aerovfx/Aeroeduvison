@@ -133,6 +133,10 @@ app.use(express.json({ limit: '50mb' }));
 const broker = require('./lib/broker.cjs');
 app.use('/api/broker', broker.expressRouter());
 
+// Google Cloud TTS cho mascot Aero (VI/EN) — /api/tts?lang=&text=
+const tts = require('./lib/tts.cjs');
+app.get('/api/tts', tts.handler);
+
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN NODE.JS AUTH — active when AUTH_SERVICE_URL is not set
 // Handles: /api/auth/login, /api/auth/google, /api/auth/me, /api/auth/logout
