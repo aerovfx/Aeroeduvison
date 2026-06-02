@@ -45,6 +45,10 @@ export function ARRealtimeController({ onPlacedScale }: Props = {}) {
       scene.children.forEach((child) => {
         if (child.name === RETICLE_NAME) return
         if ((child as any).isLight) return
+        // Bỏ qua Points/starfield (vd drei <Stars> bán kính ~300) — nếu tính vào
+        // bbox sẽ phình to → cảnh thật bị thu nhỏ tí xíu. Particle nền không nên
+        // quyết định kích thước đặt.
+        if ((child as any).isPoints) return
         box.expandByObject(child)
       })
       if (box.isEmpty()) {

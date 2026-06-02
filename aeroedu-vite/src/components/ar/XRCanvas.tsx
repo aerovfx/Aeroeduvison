@@ -12,7 +12,7 @@
  *
  * Áp dụng cho mọi lab LabTwin và mọi mô phỏng Aura có cảnh 3D.
  */
-import { useCallback, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { Canvas } from '@react-three/fiber'
 import type * as THREE from 'three'
 import { ARLaunchButton } from './ARLaunchButton'
@@ -25,6 +25,8 @@ export interface XRCanvasProps extends CanvasProps {
   arTitle?: string
   /** Tắt nút AR cho cảnh không phù hợp (mặc định bật) */
   arEnabled?: boolean
+  /** Báo trạng thái đang trong phiên AR realtime — để cảnh ẩn bớt hiệu ứng nặng (Stars/Bloom/nhãn) */
+  onPresentingChange?: (presenting: boolean) => void
 }
 
 export function XRCanvas({
@@ -32,6 +34,7 @@ export function XRCanvas({
   onCreated,
   arTitle,
   arEnabled = true,
+  onPresentingChange,
   ...rest
 }: XRCanvasProps) {
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -39,6 +42,8 @@ export function XRCanvas({
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [presenting, setPresenting] = useState(false)
   const [cmPerUnit, setCmPerUnit] = useState<number | null>(null)
+
+  useEffect(() => { onPresentingChange?.(presenting) }, [presenting, onPresentingChange])
 
   const handlePlacedScale = useCallback((v: number | null) => {
     setCmPerUnit((prev) => {
