@@ -19,6 +19,13 @@ const RETICLE_NAME = 'ar-reticle'
 const TARGET_SIZE_M = 0.4 // kích thước thật mong muốn (~40cm trên bàn)
 const FALLBACK_DIST = 0.7 // mét — khoảng cách đặt trước mặt khi không tìm thấy mặt phẳng
 
+// Khung góc vuông kiểu GeoGebra: 4 góc, mỗi góc 2 thanh chữ L nằm phẳng trên mặt
+const RET_HALF = 0.12 // nửa cạnh khung (m)
+const RET_LEG = 0.05 // chiều dài mỗi chân chữ L
+const RET_W = 0.012 // bề rộng thanh
+const RET_H = 0.004 // độ dày (theo trục Y — mỏng để nằm sát mặt)
+const RET_CORNERS = [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ sx, sz })))
+
 export type ArPhase = 'searching' | 'ready' | 'placed' | null
 
 interface Props {
@@ -244,14 +251,25 @@ export function ARRealtimeController({ onPlacedScale, onPhase }: Props = {}) {
 
   return (
     <group ref={reticle} name={RETICLE_NAME} visible={false} matrixAutoUpdate={false}>
+      {/* Khung 4 góc vuông (┏ ┓ ┗ ┛) nằm phẳng trên mặt phẳng — kiểu GeoGebra */}
+      {RET_CORNERS.map(({ sx, sz }, i) => (
+        <group key={i}>
+          {/* chân theo trục X */}
+          <mesh position={[sx * (RET_HALF - RET_LEG / 2), 0, sz * RET_HALF]}>
+            <boxGeometry args={[RET_LEG, RET_H, RET_W]} />
+            <meshBasicMaterial color="#ffffff" toneMapped={false} />
+          </mesh>
+          {/* chân theo trục Z */}
+          <mesh position={[sx * RET_HALF, 0, sz * (RET_HALF - RET_LEG / 2)]}>
+            <boxGeometry args={[RET_W, RET_H, RET_LEG]} />
+            <meshBasicMaterial color="#ffffff" toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+      {/* chấm tâm mờ để ngắm chính xác điểm neo */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.06, 0.075, 40]} />
-        <meshBasicMaterial color="#22d3ee" toneMapped={false} transparent opacity={0.9} />
-      </mesh>
-      {/* chấm tâm cho dễ ngắm điểm neo */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.012, 24]} />
-        <meshBasicMaterial color="#a78bfa" toneMapped={false} />
+        <circleGeometry args={[0.009, 24]} />
+        <meshBasicMaterial color="#22d3ee" toneMapped={false} transparent opacity={0.85} />
       </mesh>
     </group>
   )

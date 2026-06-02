@@ -23,6 +23,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Eye, EyeOff, Trash2, ZoomIn, ZoomOut, Maximize2,
   Calculator, FunctionSquare, Hash, RotateCcw, Boxes, X,
+  MousePointer2, Dot, Minus, Slash, Triangle, Circle as CircleIcon, Eraser,
+  CircleDot, Equal, Spline, CornerDownRight, Compass,
 } from 'lucide-react'
 
 // Lazy: chỉ nạp three/drei/AR khi user mở chế độ 3D
@@ -227,6 +229,7 @@ function evalNode(n: Node, x: number, y: number = 0): number {
     case 'var':
       if (n.v === 'x') return x
       if (n.v === 'y') return y
+      if (n.v === 't') return x // tham số t (đồ thị tham số/cực) truyền qua x
       if (n.v in CONSTANTS) return CONSTANTS[n.v]
       throw new Error(`Biến không biết: ${n.v}`)
     case 'neg': return -evalNode(n.a, x, y)
@@ -274,6 +277,24 @@ function compileFunction(src: string): { ok: true; eval: (x: number) => number }
       ok: true,
       eval: (x: number) => {
         try { return evalNode(node, x) } catch { return NaN }
+      },
+    }
+  } catch (e) {
+    return { ok: false, err: (e as Error).message }
+  }
+}
+
+// Compile hàm 2 biến z = f(x, y) cho chế độ mặt 3D.
+function compileSurface(src: string): { ok: true; eval: (x: number, y: number) => number } | { ok: false; err: string } {
+  try {
+    let s = normalizeMathSrc(src.trim())
+    s = s.replace(/^\s*z\s*=\s*/i, '').replace(/^\s*f\s*\(\s*x\s*,\s*y\s*\)\s*=\s*/i, '')
+    if (!s) return { ok: false, err: 'Biểu thức rỗng' }
+    const node = parse(s)
+    return {
+      ok: true,
+      eval: (x: number, y: number) => {
+        try { return evalNode(node, x, y) } catch { return NaN }
       },
     }
   } catch (e) {
@@ -372,6 +393,206 @@ type EquationRow = {
   visible: boolean
 }
 
+// ── Dựng hình (điểm + nối) kiểu GeoGebra ──
+type GeoToolId =
+  | 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
+  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular' | 'delete' | 'angle'
+// Điểm phái sinh: toạ độ tính từ điểm cha/hình cha → tự cập nhật khi kéo
+type GeoDef =
+  | { kind: 'mid'; a: string; b: string }
+  | { kind: 'translate'; from: string; a: string; b: string; perp: boolean }
+  | { kind: 'inter'; a1: string; b1: string; a2: string; b2: string }
+  | { kind: 'interSS'; s1: string; s2: string; which: number }      // giao 2 HÌNH (đường/tròn)
+  | { kind: 'interLF'; s: string; f: string; which: number }        // giao ĐƯỜNG × đồ thị y=f(x)
+  | { kind: 'interFF'; f1: string; f2: string; which: number }      // giao 2 đồ thị y=f(x)
+// Ngữ cảnh hàm số (cho giao điểm với đồ thị): id hàng → f(x) + miền x
+type GeoCtx = { fnById: Map<string, (x: number) => number>; xMin: number; xMax: number }
+type GeoPoint = { id: string; x: number; y: number; def?: GeoDef }
+type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
+type GeoAngle = { id: string; s1: string; s2: string } // góc giữa 2 đoạn/đường
+type Pt = { x: number; y: number }
+
+// Đỉnh chung của 2 shape (theo id điểm) + 2 điểm còn lại; null nếu không chung đỉnh
+function sharedVertex(s1: GeoShape, s2: GeoShape): { v: string; r1: string; r2: string } | null {
+  const [a, b] = s1.pts, [c, d] = s2.pts
+  if (a === c) return { v: a, r1: b, r2: d }
+  if (a === d) return { v: a, r1: b, r2: c }
+  if (b === c) return { v: b, r1: a, r2: d }
+  if (b === d) return { v: b, r1: a, r2: c }
+  return null
+}
+
+// Giao 2 đường thẳng (p1p2) × (p3p4) — null nếu song song
+function lineIntersect(p1: Pt, p2: Pt, p3: Pt, p4: Pt): Pt | null {
+  const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+  if (Math.abs(d) < 1e-12) return null
+  const a = p1.x * p2.y - p1.y * p2.x
+  const b = p3.x * p4.y - p3.y * p4.x
+  return {
+    x: (a * (p3.x - p4.x) - (p1.x - p2.x) * b) / d,
+    y: (a * (p3.y - p4.y) - (p1.y - p2.y) * b) / d,
+  }
+}
+// Giao đường thẳng (p1p2) với đường tròn (tâm c, bán kính r) → 0–2 điểm
+function lineCircle(p1: Pt, p2: Pt, c: Pt, r: number): Pt[] {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y
+  const fx = p1.x - c.x, fy = p1.y - c.y
+  const a = dx * dx + dy * dy
+  if (a < 1e-12) return []
+  const b = 2 * (fx * dx + fy * dy), cc = fx * fx + fy * fy - r * r
+  let disc = b * b - 4 * a * cc
+  if (disc < 0) return []
+  disc = Math.sqrt(disc)
+  const t1 = (-b - disc) / (2 * a), t2 = (-b + disc) / (2 * a)
+  const res: Pt[] = [{ x: p1.x + t1 * dx, y: p1.y + t1 * dy }]
+  if (Math.abs(t1 - t2) > 1e-9) res.push({ x: p1.x + t2 * dx, y: p1.y + t2 * dy })
+  return res
+}
+// Giao 2 đường tròn → 0–2 điểm
+function circleCircle(c1: Pt, r1: number, c2: Pt, r2: number): Pt[] {
+  const dx = c2.x - c1.x, dy = c2.y - c1.y
+  const d = Math.hypot(dx, dy)
+  if (d < 1e-9 || d > r1 + r2 || d < Math.abs(r1 - r2)) return []
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d)
+  const h2 = r1 * r1 - a * a
+  const h = h2 > 0 ? Math.sqrt(h2) : 0
+  const xm = c1.x + (a * dx) / d, ym = c1.y + (a * dy) / d
+  const rx = (-dy * h) / d, ry = (dx * h) / d
+  const res: Pt[] = [{ x: xm + rx, y: ym + ry }]
+  if (h > 1e-9) res.push({ x: xm - rx, y: ym - ry })
+  return res
+}
+// Hình học của 1 shape (đường hoặc tròn) từ điểm đã giải
+function geomOf(sh: GeoShape, R: (id: string) => Pt | null): { kind: 'l'; a: Pt; b: Pt } | { kind: 'c'; c: Pt; r: number } | null {
+  const ps = sh.pts.map(R)
+  if (ps.length < 2 || ps.some((p) => !p)) return null
+  const p = ps as Pt[]
+  if (sh.type === 'circle') return { kind: 'c', c: p[0], r: Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y) }
+  if (sh.type === 'segment' || sh.type === 'line') return { kind: 'l', a: p[0], b: p[1] }
+  return null
+}
+// Danh sách giao điểm của 2 shape (sắp xếp ổn định theo x,y)
+function shapeInter(s1: GeoShape, s2: GeoShape, R: (id: string) => Pt | null): Pt[] {
+  const g1 = geomOf(s1, R), g2 = geomOf(s2, R)
+  if (!g1 || !g2) return []
+  let list: Pt[] = []
+  if (g1.kind === 'l' && g2.kind === 'l') { const p = lineIntersect(g1.a, g1.b, g2.a, g2.b); list = p ? [p] : [] }
+  else if (g1.kind === 'l' && g2.kind === 'c') list = lineCircle(g1.a, g1.b, g2.c, g2.r)
+  else if (g1.kind === 'c' && g2.kind === 'l') list = lineCircle(g2.a, g2.b, g1.c, g1.r)
+  else if (g1.kind === 'c' && g2.kind === 'c') list = circleCircle(g1.c, g1.r, g2.c, g2.r)
+  return list.sort((a, b) => a.x - b.x || a.y - b.y)
+}
+
+// Nghiệm của g(x)=0 trên [xMin,xMax] (đổi dấu + chia đôi); sắp tăng dần
+function rootsOf(g: (x: number) => number, xMin: number, xMax: number, N = 500): number[] {
+  const xs: number[] = []
+  let px = xMin, pv = g(xMin)
+  for (let i = 1; i <= N; i++) {
+    const x = xMin + ((xMax - xMin) * i) / N
+    const v = g(x)
+    if (Number.isFinite(pv) && Number.isFinite(v) && pv * v < 0) {
+      let lo = px, hi = x, flo = pv
+      for (let k = 0; k < 40; k++) {
+        const mid = (lo + hi) / 2, fm = g(mid)
+        if (!Number.isFinite(fm)) break
+        if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm }
+      }
+      xs.push((lo + hi) / 2)
+    }
+    px = x; pv = v
+  }
+  return xs
+}
+// Giao 1 đường (a,b) với đồ thị y=f(x) trên miền x → danh sách điểm
+function lineFuncInter(a: Pt, b: Pt, fn: (x: number) => number, xMin: number, xMax: number): Pt[] {
+  if (Math.abs(b.x - a.x) < 1e-9) { const y = fn(a.x); return Number.isFinite(y) ? [{ x: a.x, y }] : [] }
+  const m = (b.y - a.y) / (b.x - a.x), c = a.y - m * a.x
+  return rootsOf((x) => fn(x) - (m * x + c), xMin, xMax).map((x) => ({ x, y: fn(x) }))
+}
+
+// Tính toạ độ thực của mọi điểm (giải đệ quy điểm phái sinh, chống chu trình)
+function resolveGeo(points: GeoPoint[], shapes: GeoShape[] = [], ctx?: GeoCtx): Map<string, Pt | null> {
+  const byId = new Map(points.map((p) => [p.id, p]))
+  const shById = new Map(shapes.map((s) => [s.id, s]))
+  const cache = new Map<string, Pt | null>()
+  const visiting = new Set<string>()
+  const R = (id: string): Pt | null => {
+    if (cache.has(id)) return cache.get(id)!
+    const p = byId.get(id)
+    if (!p) { cache.set(id, null); return null }
+    if (!p.def) { const v = { x: p.x, y: p.y }; cache.set(id, v); return v }
+    if (visiting.has(id)) { cache.set(id, null); return null }
+    visiting.add(id)
+    let v: Pt | null = null
+    const d = p.def
+    if (d.kind === 'mid') {
+      const a = R(d.a), b = R(d.b)
+      if (a && b) v = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    } else if (d.kind === 'translate') {
+      const f = R(d.from), a = R(d.a), b = R(d.b)
+      if (f && a && b) {
+        let dx = b.x - a.x, dy = b.y - a.y
+        if (d.perp) { const t = dx; dx = -dy; dy = t }
+        v = { x: f.x + dx, y: f.y + dy }
+      }
+    } else if (d.kind === 'inter') {
+      const a1 = R(d.a1), b1 = R(d.b1), a2 = R(d.a2), b2 = R(d.b2)
+      if (a1 && b1 && a2 && b2) v = lineIntersect(a1, b1, a2, b2)
+    } else if (d.kind === 'interSS') {
+      const s1 = shById.get(d.s1), s2 = shById.get(d.s2)
+      if (s1 && s2) { const list = shapeInter(s1, s2, R); v = list[d.which] ?? null }
+    } else if (d.kind === 'interLF' && ctx) {
+      const sh = shById.get(d.s), fn = ctx.fnById.get(d.f)
+      if (sh && fn) { const g = geomOf(sh, R); if (g && g.kind === 'l') { const list = lineFuncInter(g.a, g.b, fn, ctx.xMin, ctx.xMax); v = list[d.which] ?? null } }
+    } else if (d.kind === 'interFF' && ctx) {
+      const f1 = ctx.fnById.get(d.f1), f2 = ctx.fnById.get(d.f2)
+      if (f1 && f2) { const list = rootsOf((x) => f1(x) - f2(x), ctx.xMin, ctx.xMax).map((x) => ({ x, y: f1(x) })); v = list[d.which] ?? null }
+    }
+    visiting.delete(id)
+    cache.set(id, v)
+    return v
+  }
+  for (const p of points) R(p.id)
+  return cache
+}
+
+// Khoảng cách (đã chuẩn hoá theo viewport) từ điểm tới 1 shape — để chạm chọn hình
+function distToShape(sh: GeoShape, R: (id: string) => Pt | null, g: Pt, sx: number, sy: number): number {
+  const geo = geomOf(sh, R)
+  if (!geo) return Infinity
+  const nx = (a: Pt) => a.x / sx, ny = (a: Pt) => a.y / sy
+  const gx = g.x / sx, gy = g.y / sy
+  if (geo.kind === 'c') {
+    const dr = Math.hypot(g.x - geo.c.x, g.y - geo.c.y) / ((sx + sy) / 2)
+    const rr = geo.r / ((sx + sy) / 2)
+    return Math.abs(dr - rr)
+  }
+  // đường thẳng: khoảng cách vuông góc (toạ độ chuẩn hoá)
+  const ax = nx(geo.a), ay = ny(geo.a), bx = nx(geo.b), by = ny(geo.b)
+  const dx = bx - ax, dy = by - ay
+  const L2 = dx * dx + dy * dy
+  if (L2 < 1e-12) return Math.hypot(gx - ax, gy - ay)
+  return Math.abs((gx - ax) * dy - (gy - ay) * dx) / Math.sqrt(L2)
+}
+
+const GEO_POINT_COLOR = '#3b82f6'
+const GEO_SHAPE_COLOR = '#fbbf24'
+const TWO_PI = 6.2832
+
+
+// ── Đường cong tham số x(t),y(t) & cực r(θ) ──
+type CurveKind = 'param' | 'polar'
+type CurveRow = {
+  id: string; kind: CurveKind
+  ex: string; ey: string; er: string // param dùng ex,ey · polar dùng er (biến t)
+  tMin: number; tMax: number
+  color: string; visible: boolean
+}
+const geoLabel = (i: number) => {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  return i < 26 ? L[i] : L[i % 26] + Math.floor(i / 26)
+}
+
 const COLORS = [
   '#22d3ee', '#fbbf24', '#a3e635', '#f472b6',
   '#a78bfa', '#fb923c', '#34d399', '#f87171',
@@ -438,12 +659,30 @@ function formatTick(v: number): string {
 }
 
 function Plot({
-  compiled, viewport, onViewportChange, height = 560,
+  compiled, viewport, onViewportChange, height = 560, geo,
 }: {
   compiled: Compiled[]
   viewport: { xMin: number; xMax: number; yMin: number; yMax: number }
   onViewportChange: (v: { xMin: number; xMax: number; yMin: number; yMax: number }) => void
   height?: number
+  geo?: {
+    tool: GeoToolId
+    points: GeoPoint[]
+    shapes: GeoShape[]
+    angles: GeoAngle[]
+    pending: string[]
+    selShapes: string[]
+    measure: boolean
+    onClick: (gx: number, gy: number) => void
+    onMovePoint: (id: string, x: number, y: number) => void
+  }
+  curves?: {
+    kind: CurveKind
+    fnX: (t: number) => number
+    fnY: (t: number) => number
+    fnR: (t: number) => number
+    tMin: number; tMax: number; color: string
+  }[]
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 800, h: height })
@@ -723,15 +962,48 @@ function Plot({
     })
   }, [compiled, xMin, xMax, yMin, yMax, w, h])
 
+  const geoActive = !!geo && geo.tool !== 'move'
+  const [dragPt, setDragPt] = useState<string | null>(null)
+  // Toạ độ thực của mọi điểm (giải điểm phái sinh)
+  const geoResolved = useMemo(() => {
+    if (!geo) return null
+    const fnById = new Map(compiled.filter((c) => !c.ineq && !c.err).map((c) => [c.row.id, c.fn] as const))
+    return resolveGeo(geo.points, geo.shapes, { fnById, xMin: viewport.xMin, xMax: viewport.xMax })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo, compiled, viewport.xMin, viewport.xMax])
+  const rp = (id: string) => geoResolved?.get(id) ?? null
+  // Tìm điểm TỰ DO gần (px) để bắt kéo (điểm phái sinh không kéo trực tiếp)
+  const nearbyPoint = (px: number, py: number): string | null => {
+    if (!geo) return null
+    for (const p of geo.points) {
+      if (p.def) continue
+      if (Math.hypot(xS(p.x) - px, yS(p.y) - py) < 12) return p.id
+    }
+    return null
+  }
+
   // Mouse interactions
   const onMouseDown = (e: React.MouseEvent) => {
     const r = ref.current!.getBoundingClientRect()
-    setDragging({ x0: e.clientX - r.left, y0: e.clientY - r.top, v0: viewport })
+    const px = e.clientX - r.left, py = e.clientY - r.top
+    if (geoActive) return // đang dựng hình → không pan, đặt qua onClick
+    // Tool Di chuyển: kéo điểm nếu bấm trúng, ngược lại pan
+    if (geo && geo.tool === 'move') {
+      const hit = nearbyPoint(px, py)
+      if (hit) { setDragPt(hit); return }
+    }
+    setDragging({ x0: px, y0: py, v0: viewport })
+  }
+  const onPlotClick = (e: React.MouseEvent) => {
+    if (!geoActive || !geo) return
+    const r = ref.current!.getBoundingClientRect()
+    geo.onClick(xInv(e.clientX - r.left), yInv(e.clientY - r.top))
   }
   const onMouseMove = (e: React.MouseEvent) => {
     const r = ref.current!.getBoundingClientRect()
     const px = e.clientX - r.left, py = e.clientY - r.top
     setCursor({ x: xInv(px), y: yInv(py) })
+    if (dragPt && geo) { geo.onMovePoint(dragPt, xInv(px), yInv(py)); return }
     if (dragging) {
       const dx = px - dragging.x0, dy = py - dragging.y0
       const rx = (dragging.v0.xMax - dragging.v0.xMin) / w
@@ -744,8 +1016,8 @@ function Plot({
       })
     }
   }
-  const onMouseUp = () => setDragging(null)
-  const onMouseLeave = () => { setDragging(null); setCursor(null) }
+  const onMouseUp = () => { setDragging(null); setDragPt(null) }
+  const onMouseLeave = () => { setDragging(null); setDragPt(null); setCursor(null) }
 
   // Native non-passive wheel listener — React onWheel mặc định passive
   // → e.preventDefault() bị bỏ qua + cảnh báo console. Phải attach qua
@@ -782,6 +1054,7 @@ function Plot({
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
+        onClick={onPlotClick}
         /* wheel handled via native non-passive listener in useEffect */
       >
         {/* Minor gridlines */}
@@ -941,6 +1214,159 @@ function Plot({
               textAnchor="end" fontFamily="monospace" fontStyle="italic">x</text>
         <text x={xMin <= 0 && xMax >= 0 ? xS(0) + 8 : 14} y={14}
               fill='var(--td-muted)' fontSize={11} fontFamily="monospace" fontStyle="italic">y</text>
+
+        {/* ── Đường cong tham số x(t),y(t) & cực r(θ) ── */}
+        {curves?.map((cv, ci) => {
+          const N = 600
+          const segs: string[] = []
+          let cur = ''
+          let prev: [number, number] | null = null
+          for (let i = 0; i <= N; i++) {
+            const t = cv.tMin + ((cv.tMax - cv.tMin) * i) / N
+            let X: number, Y: number
+            if (cv.kind === 'param') { X = cv.fnX(t); Y = cv.fnY(t) }
+            else { const r = cv.fnR(t); X = r * Math.cos(t); Y = r * Math.sin(t) }
+            if (!Number.isFinite(X) || !Number.isFinite(Y)) { if (cur) segs.push(cur); cur = ''; prev = null; continue }
+            const px = xS(X), py = yS(Y)
+            if (prev && Math.hypot(px - prev[0], py - prev[1]) > Math.max(w, h)) { if (cur) segs.push(cur); cur = '' }
+            cur += (cur ? ' L' : 'M') + `${px.toFixed(1)},${py.toFixed(1)}`
+            prev = [px, py]
+          }
+          if (cur) segs.push(cur)
+          return <path key={`cv${ci}`} d={segs.join(' ')} fill="none" stroke={cv.color} strokeWidth={2.2} />
+        })}
+
+        {/* ── Hình dựng (điểm + nối) ── */}
+        {geo && (() => {
+          return (
+            <g>
+              {geo.shapes.map((sh) => {
+                const ps = sh.pts.map(rp).filter(Boolean) as { x: number; y: number }[]
+                if (ps.length < 2) return null
+                const sel = geo.selShapes.includes(sh.id)
+                const col = sel ? '#22d3ee' : sh.color
+                const sw = sel ? 3.6 : 2.2
+                if (sh.type === 'segment') {
+                  return <line key={sh.id} x1={xS(ps[0].x)} y1={yS(ps[0].y)} x2={xS(ps[1].x)} y2={yS(ps[1].y)}
+                               stroke={col} strokeWidth={sw} />
+                }
+                if (sh.type === 'line') {
+                  const ax = xS(ps[0].x), ay = yS(ps[0].y), bx = xS(ps[1].x), by = yS(ps[1].y)
+                  const dx = bx - ax, dy = by - ay
+                  const K = 4000
+                  return <line key={sh.id} x1={ax - dx * K} y1={ay - dy * K} x2={bx + dx * K} y2={by + dy * K}
+                               stroke={col} strokeWidth={sw} />
+                }
+                if (sh.type === 'circle') {
+                  const cx = ps[0].x, cy = ps[0].y
+                  const r = Math.hypot(ps[1].x - cx, ps[1].y - cy)
+                  const pts: string[] = []
+                  for (let k = 0; k <= 72; k++) {
+                    const th = (k / 72) * Math.PI * 2
+                    pts.push(`${xS(cx + r * Math.cos(th)).toFixed(1)},${yS(cy + r * Math.sin(th)).toFixed(1)}`)
+                  }
+                  return <polyline key={sh.id} points={pts.join(' ')} fill="none" stroke={col} strokeWidth={sw} />
+                }
+                // polygon
+                const d = ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.x).toFixed(1)},${yS(p.y).toFixed(1)}`).join(' ') + ' Z'
+                return <path key={sh.id} d={d} fill={`${sh.color}33`} stroke={col} strokeWidth={sw} />
+              })}
+              {/* Số đo (độ dài / bán kính / diện tích) */}
+              {geo.measure && geo.shapes.map((sh) => {
+                const ps = sh.pts.map(rp).filter(Boolean) as { x: number; y: number }[]
+                if (ps.length < 2) return null
+                let label = '', lx = 0, ly = 0
+                if (sh.type === 'segment') {
+                  label = Math.hypot(ps[1].x - ps[0].x, ps[1].y - ps[0].y).toFixed(2)
+                  lx = (ps[0].x + ps[1].x) / 2; ly = (ps[0].y + ps[1].y) / 2
+                } else if (sh.type === 'circle') {
+                  const r = Math.hypot(ps[1].x - ps[0].x, ps[1].y - ps[0].y)
+                  label = `r=${r.toFixed(2)} · S=${(Math.PI * r * r).toFixed(2)}`
+                  lx = ps[0].x; ly = ps[0].y
+                } else if (sh.type === 'polygon') {
+                  let area = 0, per = 0
+                  for (let i = 0; i < ps.length; i++) {
+                    const a = ps[i], b = ps[(i + 1) % ps.length]
+                    area += a.x * b.y - b.x * a.y; per += Math.hypot(b.x - a.x, b.y - a.y)
+                  }
+                  area = Math.abs(area) / 2
+                  label = `S=${area.toFixed(2)} · P=${per.toFixed(2)}`
+                  lx = ps.reduce((s, p) => s + p.x, 0) / ps.length
+                  ly = ps.reduce((s, p) => s + p.y, 0) / ps.length
+                } else return null
+                return (
+                  <text key={`m-${sh.id}`} x={xS(lx)} y={yS(ly)} fill="#fde68a" fontSize={11}
+                        fontWeight={700} fontFamily="monospace" textAnchor="middle"
+                        stroke="#0a0f1a" strokeWidth={3} paintOrder="stroke">{label}</text>
+                )
+              })}
+
+              {/* Góc giữa 2 đoạn/đường */}
+              {geo.angles.map((an) => {
+                const s1 = geo.shapes.find((s) => s.id === an.s1)
+                const s2 = geo.shapes.find((s) => s.id === an.s2)
+                if (!s1 || !s2) return null
+                const e1a = rp(s1.pts[0]), e1b = rp(s1.pts[1]), e2a = rp(s2.pts[0]), e2b = rp(s2.pts[1])
+                if (!e1a || !e1b || !e2a || !e2b) return null
+                const sv = sharedVertex(s1, s2)
+                let V: Pt | null, d1: Pt, d2: Pt
+                if (sv) {
+                  V = rp(sv.v); const r1 = rp(sv.r1), r2 = rp(sv.r2)
+                  if (!V || !r1 || !r2) return null
+                  d1 = { x: r1.x - V.x, y: r1.y - V.y }; d2 = { x: r2.x - V.x, y: r2.y - V.y }
+                } else {
+                  V = lineIntersect(e1a, e1b, e2a, e2b)
+                  if (!V) return null
+                  d1 = { x: e1b.x - e1a.x, y: e1b.y - e1a.y }; d2 = { x: e2b.x - e2a.x, y: e2b.y - e2a.y }
+                }
+                const m1 = Math.hypot(d1.x, d1.y), m2 = Math.hypot(d2.x, d2.y)
+                if (m1 < 1e-9 || m2 < 1e-9) return null
+                const deg = (Math.acos(Math.max(-1, Math.min(1, (d1.x * d2.x + d1.y * d2.y) / (m1 * m2)))) * 180) / Math.PI
+                const vx = xS(V.x), vy = yS(V.y)
+                const a1 = Math.atan2(yS(V.y + d1.y) - vy, xS(V.x + d1.x) - vx)
+                const a2 = Math.atan2(yS(V.y + d2.y) - vy, xS(V.x + d2.x) - vx)
+                let diff = a2 - a1
+                while (diff <= -Math.PI) diff += 2 * Math.PI
+                while (diff > Math.PI) diff -= 2 * Math.PI
+                const rad = 28
+                const x1 = vx + rad * Math.cos(a1), y1 = vy + rad * Math.sin(a1)
+                const x2 = vx + rad * Math.cos(a2), y2 = vy + rad * Math.sin(a2)
+                const sweep = diff > 0 ? 1 : 0
+                const mid = a1 + diff / 2
+                return (
+                  <g key={an.id}>
+                    <path d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${rad},${rad} 0 0 ${sweep} ${x2.toFixed(1)},${y2.toFixed(1)}`}
+                          fill="none" stroke="#34d399" strokeWidth={2} />
+                    <text x={vx + (rad + 14) * Math.cos(mid)} y={vy + (rad + 14) * Math.sin(mid)}
+                          fill="#6ee7b7" fontSize={12} fontWeight={700} fontFamily="monospace"
+                          textAnchor="middle" dominantBaseline="middle"
+                          stroke="#0a0f1a" strokeWidth={3} paintOrder="stroke">{deg.toFixed(1)}°</text>
+                  </g>
+                )
+              })}
+
+              {/* Điểm + nhãn (điểm phái sinh: rỗng viền vàng, không kéo) */}
+              {geo.points.map((p, i) => {
+                const r = rp(p.id)
+                if (!r) return null
+                const isPending = geo.pending.includes(p.id)
+                const derived = !!p.def
+                return (
+                  <g key={p.id}>
+                    {isPending && <circle cx={xS(r.x)} cy={yS(r.y)} r={8} fill="none" stroke="#22d3ee" strokeWidth={2} />}
+                    <circle cx={xS(r.x)} cy={yS(r.y)} r={derived ? 4 : 5}
+                            fill={derived ? '#0a0f1a' : GEO_POINT_COLOR}
+                            stroke={derived ? '#fbbf24' : '#0a0f1a'} strokeWidth={2} />
+                    <text x={xS(r.x) + 9} y={yS(r.y) - 8} fill={derived ? '#fcd34d' : '#93c5fd'}
+                          fontSize={13} fontWeight={700} fontFamily="monospace">
+                      {geoLabel(i)}
+                    </text>
+                  </g>
+                )
+              })}
+            </g>
+          )
+        })()}
       </svg>
 
       {/* Cursor readout */}
@@ -1130,6 +1556,272 @@ export default function GraphLab() {
   const [kbOpen, setKbOpen] = useState(true)
   const [viewport, setViewport] = useState({ xMin: -10, xMax: 10, yMin: -10, yMax: 10 })
   const [ar3dOpen, setAr3dOpen] = useState(false)
+  // Mặt 3D z = f(x, y) — chỉ dùng trong overlay 3D
+  const [surfaceRows, setSurfaceRows] = useState<EquationRow[]>([
+    { id: mkId(), src: 'x^2 - y^2', color: COLORS[4], visible: true },
+  ])
+  const compiledSurfaces = useMemo(
+    () => surfaceRows.map((row) => {
+      const r = compileSurface(row.src)
+      return { row, fn: r.ok ? r.eval : (() => NaN), err: r.ok ? null : r.err }
+    }),
+    [surfaceRows],
+  )
+  const addSurface = () =>
+    setSurfaceRows((rs) => [...rs, { id: mkId(), src: '', color: COLORS[(rs.length + 4) % COLORS.length], visible: true }])
+  const updateSurface = (id: string, src: string) =>
+    setSurfaceRows((rs) => rs.map((r) => (r.id === id ? { ...r, src } : r)))
+  const deleteSurface = (id: string) =>
+    setSurfaceRows((rs) => rs.filter((r) => r.id !== id))
+  const toggleSurface = (id: string) =>
+    setSurfaceRows((rs) => rs.map((r) => (r.id === id ? { ...r, visible: !r.visible } : r)))
+
+  // ── Dựng hình: điểm + nối (Đoạn thẳng / Đường thẳng / Đa giác / Đường tròn) ──
+  const [geoTool, setGeoTool] = useState<GeoToolId>('move')
+  const [geoPoints, setGeoPoints] = useState<GeoPoint[]>([])
+  const [geoShapes, setGeoShapes] = useState<GeoShape[]>([])
+  const [geoPending, setGeoPending] = useState<string[]>([])
+  const [geoAngles, setGeoAngles] = useState<GeoAngle[]>([])
+
+  const [geoSelShapes, setGeoSelShapes] = useState<string[]>([])
+  const [geoSelFuncs, setGeoSelFuncs] = useState<string[]>([])
+  const handleGeoClick = (gx: number, gy: number) => {
+    if (geoTool === 'move') return
+    const fnById = new Map(compiled.filter((c) => !c.ineq && !c.err && c.row.visible).map((c) => [c.row.id, c.fn] as const))
+    const ctx: GeoCtx = { fnById, xMin: viewport.xMin, xMax: viewport.xMax }
+    const resolved = resolveGeo(geoPoints, geoShapes, ctx)
+    const R = (id: string): Pt | null => resolved.get(id) ?? null
+    const sx = viewport.xMax - viewport.xMin, sy = viewport.yMax - viewport.yMin
+    // Đồ thị y=f(x) gần điểm chạm nhất (so theo khoảng cách dọc chuẩn hoá)
+    const nearestFuncId = (): string | null => {
+      let best: string | null = null, bd = 0.03
+      for (const c of compiled) {
+        if (c.ineq || c.err || !c.row.visible) continue
+        const y = c.fn(gx)
+        if (!Number.isFinite(y)) continue
+        const d = Math.abs(y - gy) / sy
+        if (d < bd) { bd = d; best = c.row.id }
+      }
+      return best
+    }
+    const nearestPointId = (): string | null => {
+      const tx = sx * 0.025, ty = sy * 0.025
+      for (const p of geoPoints) { const rp = resolved.get(p.id); if (rp && Math.abs(rp.x - gx) < tx && Math.abs(rp.y - gy) < ty) return p.id }
+      return null
+    }
+    const nearestShapeId = (kinds: GeoShape['type'][]): string | null => {
+      let best: string | null = null, bd = 0.02
+      for (const sh of geoShapes) {
+        if (!kinds.includes(sh.type)) continue
+        const d = distToShape(sh, R, { x: gx, y: gy }, sx, sy)
+        if (d < bd) { bd = d; best = sh.id }
+      }
+      return best
+    }
+
+    // ── Xoá: chạm điểm (ưu tiên) hoặc hình ──
+    if (geoTool === 'delete') {
+      const pid = nearestPointId()
+      if (pid) { removeGeo(pid, undefined); return }
+      const sid = nearestShapeId(['segment', 'line', 'circle', 'polygon'])
+      if (sid) { removeGeo(undefined, sid); return }
+      return
+    }
+
+    // ── Đo góc: chọn 2 ĐOẠN/ĐƯỜNG ──
+    if (geoTool === 'angle') {
+      const sid = nearestShapeId(['segment', 'line'])
+      if (!sid) return
+      const sel = [...geoSelShapes, sid]
+      if (sel.length < 2) { setGeoSelShapes(sel); return }
+      setGeoSelShapes([])
+      if (sel[0] !== sel[1]) setGeoAngles((as) => [...as, { id: mkId(), s1: sel[0], s2: sel[1] }])
+      return
+    }
+
+    // ── Song song / Vuông góc: chọn 1 ĐƯỜNG rồi 1 ĐIỂM ──
+    if (geoTool === 'parallel' || geoTool === 'perpendicular') {
+      if (geoSelShapes.length === 0) {
+        const sid = nearestShapeId(['segment', 'line'])
+        if (sid) setGeoSelShapes([sid])
+        return
+      }
+      const base = geoShapes.find((s) => s.id === geoSelShapes[0])
+      if (!base || base.pts.length < 2) { setGeoSelShapes([]); return }
+      let pid = nearestPointId()
+      const isNew = !pid
+      if (!pid) { pid = mkId(); const id2 = pid; setGeoPoints((ps) => [...ps, { id: id2, x: gx, y: gy }]) }
+      const [a, b] = base.pts
+      const ra = R(a) ?? { x: 0, y: 0 }, rb = R(b) ?? { x: 0, y: 0 }
+      const rp = isNew ? { x: gx, y: gy } : (R(pid) ?? { x: gx, y: gy })
+      const perp = geoTool === 'perpendicular'
+      let dx = rb.x - ra.x, dy = rb.y - ra.y
+      if (perp) { const t = dx; dx = -dy; dy = t }
+      const hid = mkId()
+      setGeoPoints((ps) => [...ps, { id: hid, x: rp.x + dx, y: rp.y + dy, def: { kind: 'translate', from: pid!, a, b, perp } }])
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'line', pts: [pid!, hid], color: GEO_SHAPE_COLOR }])
+      setGeoSelShapes([])
+      return
+    }
+
+    // ── Giao điểm: chọn 2 đối tượng (HÌNH đường/đoạn/tròn HOẶC đồ thị y=f(x)) ──
+    if (geoTool === 'intersect') {
+      const sid = nearestShapeId(['segment', 'line', 'circle'])
+      const fid = nearestFuncId()
+      // chọn đối tượng gần hơn (ước lượng): nếu có cả hình lẫn hàm, ưu tiên hàm khi nó sát hơn
+      let pick: { t: 's' | 'f'; id: string } | null = null
+      if (sid && fid) {
+        const sh = geoShapes.find((s) => s.id === sid)!
+        const ds = distToShape(sh, R, { x: gx, y: gy }, sx, sy)
+        const fc = compiled.find((c) => c.row.id === fid)!
+        const df = Math.abs(fc.fn(gx) - gy) / sy
+        pick = df <= ds ? { t: 'f', id: fid } : { t: 's', id: sid }
+      } else if (sid) pick = { t: 's', id: sid }
+      else if (fid) pick = { t: 'f', id: fid }
+      if (!pick) return
+
+      const selS = pick.t === 's' ? [...geoSelShapes, pick.id] : [...geoSelShapes]
+      const selF = pick.t === 'f' ? [...geoSelFuncs, pick.id] : [...geoSelFuncs]
+      if (selS.length + selF.length < 2) { setGeoSelShapes(selS); setGeoSelFuncs(selF); return }
+      setGeoSelShapes([]); setGeoSelFuncs([])
+
+      let list: Pt[] = []
+      let def: (w: number) => GeoDef = (w) => ({ kind: 'interSS', s1: '', s2: '', which: w })
+      if (selS.length === 2) {
+        if (selS[0] === selS[1]) return
+        const s1 = geoShapes.find((s) => s.id === selS[0]), s2 = geoShapes.find((s) => s.id === selS[1])
+        if (!s1 || !s2) return
+        list = shapeInter(s1, s2, R)
+        def = (w) => ({ kind: 'interSS', s1: s1.id, s2: s2.id, which: w })
+      } else if (selS.length === 1 && selF.length === 1) {
+        const sh = geoShapes.find((s) => s.id === selS[0])
+        const fn = fnById.get(selF[0])
+        if (!sh || !fn) return
+        const g = geomOf(sh, R)
+        if (!g || g.kind !== 'l') return // chỉ hỗ trợ ĐƯỜNG × đồ thị
+        list = lineFuncInter(g.a, g.b, fn, viewport.xMin, viewport.xMax)
+        const sId = sh.id, fIdSel = selF[0]
+        def = (w) => ({ kind: 'interLF', s: sId, f: fIdSel, which: w })
+      } else if (selF.length === 2) {
+        if (selF[0] === selF[1]) return
+        const f1 = fnById.get(selF[0]), f2 = fnById.get(selF[1])
+        if (!f1 || !f2) return
+        list = rootsOf((x) => f1(x) - f2(x), viewport.xMin, viewport.xMax).map((x) => ({ x, y: f1(x) }))
+        const f1Id = selF[0], f2Id = selF[1]
+        def = (w) => ({ kind: 'interFF', f1: f1Id, f2: f2Id, which: w })
+      }
+      if (!list.length) return
+      setGeoPoints((ps) => [...ps, ...list.map((pt, w) => ({ id: mkId(), x: pt.x, y: pt.y, def: def(w) }))])
+      return
+    }
+
+    // ── Công cụ theo ĐIỂM (point/segment/line/polygon/circle/midpoint) ──
+    const thrX = sx * 0.025, thrY = sy * 0.025
+    let nearId: string | null = null
+    for (const p of geoPoints) {
+      const rp = resolved.get(p.id)
+      if (rp && Math.abs(rp.x - gx) < thrX && Math.abs(rp.y - gy) < thrY) { nearId = p.id; break }
+    }
+    if (geoTool === 'polygon' && geoPending.length >= 3 && nearId && nearId === geoPending[0]) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'polygon', pts: [...geoPending], color: GEO_SHAPE_COLOR }])
+      setGeoPending([])
+      return
+    }
+    let id = nearId
+    if (!id) { id = mkId(); const np: GeoPoint = { id, x: gx, y: gy }; setGeoPoints((ps) => [...ps, np]) }
+    if (geoTool === 'point') { setGeoPending([]); return }
+    const coord = (pid: string) => (pid === id && !nearId ? { x: gx, y: gy } : (resolved.get(pid) ?? { x: gx, y: gy }))
+    const next = [...geoPending, id]
+    if ((geoTool === 'segment' || geoTool === 'line') && next.length === 2) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: geoTool, pts: next, color: GEO_SHAPE_COLOR }]); setGeoPending([]); return
+    }
+    if (geoTool === 'circle' && next.length === 2) {
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'circle', pts: next, color: GEO_SHAPE_COLOR }]); setGeoPending([]); return
+    }
+    if (geoTool === 'midpoint' && next.length === 2) {
+      const [a, b] = next, ra = coord(a), rb = coord(b)
+      setGeoPoints((ps) => [...ps, { id: mkId(), x: (ra.x + rb.x) / 2, y: (ra.y + rb.y) / 2, def: { kind: 'mid', a, b } }])
+      setGeoPending([]); return
+    }
+    setGeoPending(next)
+  }
+  // Đường cong tham số / cực
+  const [curveRows, setCurveRows] = useState<CurveRow[]>([
+    { id: mkId(), kind: 'param', ex: '3*cos(t)', ey: '3*sin(t)', er: '', tMin: 0, tMax: TWO_PI, color: COLORS[2], visible: true },
+  ])
+  const compiledCurves = useMemo(
+    () => curveRows.map((row) => {
+      if (row.kind === 'param') {
+        const fx = compileFunction(row.ex), fy = compileFunction(row.ey)
+        return {
+          row, fnX: fx.ok ? fx.eval : () => NaN, fnY: fy.ok ? fy.eval : () => NaN, fnR: () => NaN,
+          err: !fx.ok ? fx.err : (!fy.ok ? fy.err : null),
+        }
+      }
+      const fr = compileFunction(row.er)
+      return { row, fnX: () => NaN, fnY: () => NaN, fnR: fr.ok ? fr.eval : () => NaN, err: fr.ok ? null : fr.err }
+    }),
+    [curveRows],
+  )
+  const addCurve = (kind: CurveKind) =>
+    setCurveRows((rs) => [...rs, {
+      id: mkId(), kind, ex: 'cos(t)', ey: 'sin(t)', er: '1 + cos(t)',
+      tMin: 0, tMax: TWO_PI, color: COLORS[(rs.length + 2) % COLORS.length], visible: true,
+    }])
+  const updateCurve = (id: string, patch: Partial<CurveRow>) =>
+    setCurveRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const deleteCurve = (id: string) => setCurveRows((rs) => rs.filter((r) => r.id !== id))
+  const addCurveSpec = (s: { kind: CurveKind; ex?: string; ey?: string; er?: string; tMin?: number; tMax?: number }) =>
+    setCurveRows((rs) => [...rs, {
+      id: mkId(), kind: s.kind, ex: s.ex ?? '', ey: s.ey ?? '', er: s.er ?? '',
+      tMin: s.tMin ?? 0, tMax: s.tMax ?? TWO_PI, color: COLORS[(rs.length + 2) % COLORS.length], visible: true,
+    }])
+  const CURVE_PRESETS: { label: string; spec: Parameters<typeof addCurveSpec>[0] }[] = [
+    { label: 'Lissajous', spec: { kind: 'param', ex: '5*sin(3*t)', ey: '5*sin(2*t)' } },
+    { label: 'Trái tim', spec: { kind: 'param', ex: '16*sin(t)^3', ey: '13*cos(t) - 5*cos(2*t) - 2*cos(3*t) - cos(4*t)' } },
+    { label: 'Hoa hồng', spec: { kind: 'polar', er: '6*sin(3*t)' } },
+    { label: 'Cardioid', spec: { kind: 'polar', er: '4*(1 + cos(t))' } },
+    { label: 'Xoắn ốc', spec: { kind: 'polar', er: 't', tMax: 18.85 } },
+  ]
+
+  const [geoMeasure, setGeoMeasure] = useState(false)
+  const moveGeoPoint = (id: string, x: number, y: number) =>
+    setGeoPoints((ps) => ps.map((p) => (p.id === id ? { ...p, x, y } : p)))
+  // Xoá 1 điểm/hình + lan toả các phần phụ thuộc (hình dùng điểm đã xoá, điểm phái sinh tham chiếu…)
+  const removeGeo = (pid?: string, sid?: string) => {
+    const remP = new Set<string>(), remS = new Set<string>()
+    if (pid) remP.add(pid)
+    if (sid) remS.add(sid)
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const s of geoShapes) {
+        if (!remS.has(s.id) && s.pts.some((x) => remP.has(x))) { remS.add(s.id); changed = true }
+      }
+      for (const p of geoPoints) {
+        if (remP.has(p.id) || !p.def) continue
+        const d = p.def
+        const refs =
+          (d.kind === 'mid' && (remP.has(d.a) || remP.has(d.b))) ||
+          (d.kind === 'translate' && (remP.has(d.from) || remP.has(d.a) || remP.has(d.b))) ||
+          (d.kind === 'inter' && (remP.has(d.a1) || remP.has(d.b1) || remP.has(d.a2) || remP.has(d.b2))) ||
+          (d.kind === 'interSS' && (remS.has(d.s1) || remS.has(d.s2))) ||
+          (d.kind === 'interLF' && remS.has(d.s))
+        if (refs) { remP.add(p.id); changed = true }
+      }
+    }
+    setGeoPoints((ps) => ps.filter((p) => !remP.has(p.id)))
+    setGeoShapes((ss) => ss.filter((s) => !remS.has(s.id)))
+    setGeoAngles((as) => as.filter((a) => !remS.has(a.s1) && !remS.has(a.s2)))
+  }
+  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]); setGeoSelFuncs([]); setGeoAngles([]) }
+  const undoGeo = () => {
+    if (geoSelShapes.length || geoSelFuncs.length) { setGeoSelShapes([]); setGeoSelFuncs([]); return }
+    if (geoPending.length) { setGeoPending([]); return }
+    if (geoAngles.length) { setGeoAngles((a) => a.slice(0, -1)); return }
+    if (geoShapes.length) { setGeoShapes((s) => s.slice(0, -1)); return }
+    setGeoPoints((p) => p.slice(0, -1))
+  }
 
   const compiled: Compiled[] = useMemo(
     () => rows.map((row) => {
@@ -1361,6 +2053,61 @@ export default function GraphLab() {
               </div>
             </div>
 
+            {/* Đường cong tham số / cực */}
+            <div className="rounded-2xl border border-border bg-slate-900/60 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tham số · Cực</div>
+                <div className="flex gap-1">
+                  <button onClick={() => addCurve('param')} title="Thêm đường tham số x(t), y(t)"
+                          className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/40 hover:bg-emerald-500/25">+ x(t),y(t)</button>
+                  <button onClick={() => addCurve('polar')} title="Thêm đường cực r(θ)"
+                          className="rounded-lg bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-400/40 hover:bg-fuchsia-500/25">+ r(θ)</button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {CURVE_PRESETS.map((p) => (
+                  <button key={p.label} onClick={() => addCurveSpec(p.spec)}
+                          className="rounded-md bg-slate-800/70 px-2 py-0.5 text-[10px] text-slate-300 ring-1 ring-slate-700 hover:bg-slate-700 hover:text-cyan-200">
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {curveRows.map((row) => {
+                const c = compiledCurves.find((cc) => cc.row.id === row.id)
+                return (
+                  <div key={row.id} className="rounded-xl bg-slate-900/40 border border-border p-2 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: row.color }} />
+                      <span className="text-[10px] font-bold text-slate-300">{row.kind === 'param' ? 'Tham số' : 'Cực'}</span>
+                      <button onClick={() => updateCurve(row.id, { visible: !row.visible })} className="ml-auto text-slate-400 hover:text-foreground" title={row.visible ? 'Ẩn' : 'Hiện'}>
+                        {row.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                      <button onClick={() => deleteCurve(row.id)} className="text-slate-500 hover:text-rose-400" title="Xóa"><Trash2 size={13} /></button>
+                    </div>
+                    {row.kind === 'param' ? (
+                      <div className="flex gap-1">
+                        <label className="flex items-center gap-1 flex-1 min-w-0"><span className="text-[10px] font-mono text-slate-500">x=</span>
+                          <input value={row.ex} onChange={(e) => updateCurve(row.id, { ex: e.target.value })} spellCheck={false} placeholder="3*cos(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                        <label className="flex items-center gap-1 flex-1 min-w-0"><span className="text-[10px] font-mono text-slate-500">y=</span>
+                          <input value={row.ey} onChange={(e) => updateCurve(row.id, { ey: e.target.value })} spellCheck={false} placeholder="3*sin(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-1"><span className="text-[10px] font-mono text-slate-500">r=</span>
+                        <input value={row.er} onChange={(e) => updateCurve(row.id, { er: e.target.value })} spellCheck={false} placeholder="1 + cos(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                    )}
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <span>t∈[</span>
+                      <input type="number" value={row.tMin} step={0.5} onChange={(e) => updateCurve(row.id, { tMin: parseFloat(e.target.value) || 0 })} className="w-12 bg-transparent border-b border-border text-foreground outline-none" />
+                      <span>,</span>
+                      <input type="number" value={row.tMax} step={0.5} onChange={(e) => updateCurve(row.id, { tMax: parseFloat(e.target.value) || 0 })} className="w-12 bg-transparent border-b border-border text-foreground outline-none" />
+                      <span>] (θ dùng biến t)</span>
+                    </div>
+                    {c?.err && <div className="text-[10px] text-rose-400 font-mono">⚠ {c.err}</div>}
+                  </div>
+                )
+              })}
+            </div>
+
             {/* Keyboard toggle */}
             <button
               onClick={() => setKbOpen((o) => !o)}
@@ -1372,11 +2119,74 @@ export default function GraphLab() {
 
           {/* Main area */}
           <section className="space-y-3 min-w-0">
+            {/* Thanh công cụ dựng hình (điểm + nối) */}
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-slate-900/60 px-2.5 py-2">
+              <span className="text-[11px] font-bold text-slate-400 mr-1">Dựng hình:</span>
+              {([
+                { id: 'move', icon: MousePointer2, label: 'Di chuyển' },
+                { id: 'point', icon: Dot, label: 'Điểm' },
+                { id: 'segment', icon: Minus, label: 'Đoạn thẳng' },
+                { id: 'line', icon: Slash, label: 'Đường thẳng' },
+                { id: 'polygon', icon: Triangle, label: 'Đa giác' },
+                { id: 'circle', icon: CircleIcon, label: 'Đường tròn' },
+                { id: 'midpoint', icon: CircleDot, label: 'Trung điểm' },
+                { id: 'intersect', icon: Spline, label: 'Giao điểm' },
+                { id: 'parallel', icon: Equal, label: 'Song song' },
+                { id: 'perpendicular', icon: CornerDownRight, label: 'Vuông góc' },
+                { id: 'angle', icon: Compass, label: 'Đo góc' },
+                { id: 'delete', icon: Trash2, label: 'Xoá' },
+              ] as { id: GeoToolId; icon: typeof Dot; label: string }[]).map((t) => {
+                const Icon = t.icon
+                const active = geoTool === t.id
+                return (
+                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]); setGeoSelShapes([]); setGeoSelFuncs([]) }} title={t.label}
+                    className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
+                      active ? 'bg-cyan-500/25 text-cyan-100 ring-cyan-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
+                    }`}>
+                    <Icon size={13} /> <span className="hidden sm:inline">{t.label}</span>
+                  </button>
+                )
+              })}
+              <span className="flex-1" />
+              <button onClick={() => setGeoMeasure((m) => !m)} title="Hiện số đo (độ dài, bán kính, diện tích)"
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
+                  geoMeasure ? 'bg-emerald-500/25 text-emerald-100 ring-emerald-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
+                }`}>
+                <Hash size={13} /> <span className="hidden sm:inline">Đo</span>
+              </button>
+              <button onClick={undoGeo} title="Hoàn tác" className="p-1.5 rounded-lg bg-slate-800/70 ring-1 ring-slate-700 hover:bg-slate-700 text-slate-300">
+                <RotateCcw size={13} />
+              </button>
+              <button onClick={clearGeo} title="Xoá hết hình" className="flex items-center gap-1 rounded-lg bg-rose-500/15 px-2 py-1 text-[11px] font-semibold text-rose-200 ring-1 ring-rose-400/40 hover:bg-rose-500/25">
+                <Eraser size={13} /> <span className="hidden sm:inline">Xoá hình</span>
+              </button>
+            </div>
+            {geoTool !== 'move' && (
+              <div className="rounded-lg bg-cyan-500/10 border border-cyan-400/25 px-3 py-1.5 text-[11px] text-cyan-100">
+                {geoTool === 'point' && 'Chạm lên đồ thị để tạo điểm mới (A, B, C…).'}
+                {geoTool === 'segment' && 'Chạm 2 điểm để nối thành đoạn thẳng (chạm chỗ trống sẽ tạo điểm mới).'}
+                {geoTool === 'line' && 'Chạm 2 điểm để vẽ đường thẳng đi qua chúng.'}
+                {geoTool === 'polygon' && 'Chạm lần lượt các đỉnh; chạm lại đỉnh đầu (≥3) để đóng đa giác.'}
+                {geoTool === 'circle' && 'Chạm tâm rồi chạm 1 điểm trên đường tròn (xác định bán kính).'}
+                {geoTool === 'midpoint' && 'Chạm 2 điểm → tạo trung điểm (tự cập nhật khi kéo).'}
+                {geoTool === 'intersect' && 'Chạm 2 đối tượng (đường/đoạn/tròn HOẶC đồ thị y=f(x)) → giao điểm. Hỗ trợ: đường×đường/tròn, đường×đồ thị, đồ thị×đồ thị.'}
+                {geoTool === 'parallel' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường thẳng qua điểm đó song song.'}
+                {geoTool === 'perpendicular' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường vuông góc với nó qua điểm đó.'}
+                {geoTool === 'angle' && 'Chạm 2 đoạn/đường → đo góc giữa chúng (cung + số đo độ).'}
+                {geoTool === 'delete' && 'Chạm 1 điểm hoặc 1 hình để xoá (tự xoá kèm các phần phụ thuộc).'}
+                {geoPending.length > 0 && <b className="ml-1 text-cyan-300">· đã chọn {geoPending.length} điểm</b>}
+                {geoSelShapes.length > 0 && <b className="ml-1 text-amber-300">· đã chọn {geoSelShapes.length} hình</b>}
+              </div>
+            )}
             <Plot
               compiled={compiled}
               viewport={viewport}
               onViewportChange={setViewport}
               height={560}
+              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, angles: geoAngles, pending: geoPending, selShapes: geoSelShapes, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
+              curves={compiledCurves
+                .filter((c) => c.row.visible && !c.err)
+                .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
             />
 
             {/* Viewport info + legend */}
@@ -1428,7 +2238,7 @@ export default function GraphLab() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-white">Đồ thị 3D — Thực tế tăng cường</div>
               <div className="text-[11px] text-slate-400 truncate">
-                Xoay để xem 3D · bấm nút <b className="text-cyan-300">AR</b> để đặt đồ thị lên bàn (Android/Quest realtime · iPhone Quick Look)
+                Đường cong y=f(x) + mặt cong <b className="text-fuchsia-300">z=f(x,y)</b> · xoay để xem · nút <b className="text-cyan-300">AR</b> đặt lên bàn
               </div>
             </div>
             <button onClick={() => setAr3dOpen(false)}
@@ -1442,14 +2252,60 @@ export default function GraphLab() {
                 functions={compiled
                   .filter((c) => c.row.visible && !c.err && !c.ineq)
                   .map((c) => ({ fn: c.fn, color: c.row.color }))}
+                surfaces={compiledSurfaces
+                  .filter((c) => c.row.visible && !c.err)
+                  .map((c) => ({ fn: c.fn, color: c.row.color }))}
+                paramCurves={compiledCurves
+                  .filter((c) => c.row.visible && !c.err)
+                  .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
                 viewport={viewport}
               />
             </Suspense>
-            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).length === 0 && (
+
+            {/* Panel nhập mặt z=f(x,y) */}
+            <div className="absolute top-3 left-3 w-[250px] max-w-[80vw] rounded-xl bg-slate-900/85 border border-white/10 backdrop-blur p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-fuchsia-300">Mặt 3D · z = f(x, y)</span>
+                <button onClick={addSurface}
+                        className="flex items-center gap-1 rounded-lg bg-fuchsia-500/20 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-400/40 hover:bg-fuchsia-500/30">
+                  <Plus size={11} /> Thêm
+                </button>
+              </div>
+              {surfaceRows.map((row) => {
+                const c = compiledSurfaces.find((s) => s.row.id === row.id)
+                return (
+                  <div key={row.id} className="rounded-lg bg-white/5 px-2 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: row.color }} />
+                      <span className="text-[10px] font-mono text-slate-400">z=</span>
+                      <input
+                        value={row.src}
+                        onChange={(e) => updateSurface(row.id, e.target.value)}
+                        placeholder="x^2 - y^2"
+                        spellCheck={false}
+                        className="flex-1 min-w-0 bg-transparent text-xs font-mono text-white outline-none"
+                      />
+                      <button onClick={() => toggleSurface(row.id)} className="text-slate-400 hover:text-white" title={row.visible ? 'Ẩn' : 'Hiện'}>
+                        {row.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                      <button onClick={() => deleteSurface(row.id)} className="text-slate-500 hover:text-rose-400" title="Xóa">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {c?.err && <div className="mt-0.5 text-[10px] text-rose-400 font-mono">⚠ {c.err}</div>}
+                  </div>
+                )
+              })}
+              <div className="text-[10px] text-slate-500 leading-snug">
+                Ví dụ: <span className="font-mono text-fuchsia-200">x^2 - y^2</span> · <span className="font-mono text-fuchsia-200">sin(x)*cos(y)</span> · <span className="font-mono text-fuchsia-200">sin(sqrt(x^2+y^2))</span>
+              </div>
+            </div>
+
+            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).length === 0 &&
+             compiledSurfaces.filter((c) => c.row.visible && !c.err).length === 0 && (
               <div className="absolute inset-0 grid place-items-center pointer-events-none">
                 <div className="rounded-xl bg-slate-900/80 border border-white/10 px-4 py-3 text-center text-slate-300 text-sm max-w-xs">
-                  Chưa có hàm số y = f(x) nào hiển thị. Thêm một hàm (vd <span className="font-mono text-cyan-300">x^2</span>) rồi mở lại 3D.
-                  <div className="text-[11px] text-slate-500 mt-1">(Bất phương trình chưa hỗ trợ ở chế độ 3D)</div>
+                  Chưa có gì để vẽ. Thêm hàm <span className="font-mono text-cyan-300">y=f(x)</span> ở ngoài, hoặc mặt <span className="font-mono text-fuchsia-300">z=f(x,y)</span> ở panel trái.
                 </div>
               </div>
             )}
