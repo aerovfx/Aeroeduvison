@@ -396,20 +396,19 @@ type EquationRow = {
 // ── Dựng hình (điểm + nối) kiểu GeoGebra ──
 type GeoToolId =
   | 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
-  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular'
-// Điểm phái sinh: toạ độ tính từ điểm cha → tự cập nhật khi kéo cha
+  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular' | 'delete'
+// Điểm phái sinh: toạ độ tính từ điểm cha/hình cha → tự cập nhật khi kéo
 type GeoDef =
   | { kind: 'mid'; a: string; b: string }
   | { kind: 'translate'; from: string; a: string; b: string; perp: boolean }
   | { kind: 'inter'; a1: string; b1: string; a2: string; b2: string }
+  | { kind: 'interSS'; s1: string; s2: string; which: number } // giao 2 HÌNH (đường/tròn)
 type GeoPoint = { id: string; x: number; y: number; def?: GeoDef }
 type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
+type Pt = { x: number; y: number }
 
 // Giao 2 đường thẳng (p1p2) × (p3p4) — null nếu song song
-function lineIntersect(
-  p1: { x: number; y: number }, p2: { x: number; y: number },
-  p3: { x: number; y: number }, p4: { x: number; y: number },
-): { x: number; y: number } | null {
+function lineIntersect(p1: Pt, p2: Pt, p3: Pt, p4: Pt): Pt | null {
   const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
   if (Math.abs(d) < 1e-12) return null
   const a = p1.x * p2.y - p1.y * p2.x
@@ -419,20 +418,70 @@ function lineIntersect(
     y: (a * (p3.y - p4.y) - (p1.y - p2.y) * b) / d,
   }
 }
+// Giao đường thẳng (p1p2) với đường tròn (tâm c, bán kính r) → 0–2 điểm
+function lineCircle(p1: Pt, p2: Pt, c: Pt, r: number): Pt[] {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y
+  const fx = p1.x - c.x, fy = p1.y - c.y
+  const a = dx * dx + dy * dy
+  if (a < 1e-12) return []
+  const b = 2 * (fx * dx + fy * dy), cc = fx * fx + fy * fy - r * r
+  let disc = b * b - 4 * a * cc
+  if (disc < 0) return []
+  disc = Math.sqrt(disc)
+  const t1 = (-b - disc) / (2 * a), t2 = (-b + disc) / (2 * a)
+  const res: Pt[] = [{ x: p1.x + t1 * dx, y: p1.y + t1 * dy }]
+  if (Math.abs(t1 - t2) > 1e-9) res.push({ x: p1.x + t2 * dx, y: p1.y + t2 * dy })
+  return res
+}
+// Giao 2 đường tròn → 0–2 điểm
+function circleCircle(c1: Pt, r1: number, c2: Pt, r2: number): Pt[] {
+  const dx = c2.x - c1.x, dy = c2.y - c1.y
+  const d = Math.hypot(dx, dy)
+  if (d < 1e-9 || d > r1 + r2 || d < Math.abs(r1 - r2)) return []
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d)
+  const h2 = r1 * r1 - a * a
+  const h = h2 > 0 ? Math.sqrt(h2) : 0
+  const xm = c1.x + (a * dx) / d, ym = c1.y + (a * dy) / d
+  const rx = (-dy * h) / d, ry = (dx * h) / d
+  const res: Pt[] = [{ x: xm + rx, y: ym + ry }]
+  if (h > 1e-9) res.push({ x: xm - rx, y: ym - ry })
+  return res
+}
+// Hình học của 1 shape (đường hoặc tròn) từ điểm đã giải
+function geomOf(sh: GeoShape, R: (id: string) => Pt | null): { kind: 'l'; a: Pt; b: Pt } | { kind: 'c'; c: Pt; r: number } | null {
+  const ps = sh.pts.map(R)
+  if (ps.length < 2 || ps.some((p) => !p)) return null
+  const p = ps as Pt[]
+  if (sh.type === 'circle') return { kind: 'c', c: p[0], r: Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y) }
+  if (sh.type === 'segment' || sh.type === 'line') return { kind: 'l', a: p[0], b: p[1] }
+  return null
+}
+// Danh sách giao điểm của 2 shape (sắp xếp ổn định theo x,y)
+function shapeInter(s1: GeoShape, s2: GeoShape, R: (id: string) => Pt | null): Pt[] {
+  const g1 = geomOf(s1, R), g2 = geomOf(s2, R)
+  if (!g1 || !g2) return []
+  let list: Pt[] = []
+  if (g1.kind === 'l' && g2.kind === 'l') { const p = lineIntersect(g1.a, g1.b, g2.a, g2.b); list = p ? [p] : [] }
+  else if (g1.kind === 'l' && g2.kind === 'c') list = lineCircle(g1.a, g1.b, g2.c, g2.r)
+  else if (g1.kind === 'c' && g2.kind === 'l') list = lineCircle(g2.a, g2.b, g1.c, g1.r)
+  else if (g1.kind === 'c' && g2.kind === 'c') list = circleCircle(g1.c, g1.r, g2.c, g2.r)
+  return list.sort((a, b) => a.x - b.x || a.y - b.y)
+}
 
-// Tính toạ độ thực của mọi điểm (giải đệ quy điểm phái sinh, có chống chu trình)
-function resolveGeo(points: GeoPoint[]): Map<string, { x: number; y: number } | null> {
+// Tính toạ độ thực của mọi điểm (giải đệ quy điểm phái sinh, chống chu trình)
+function resolveGeo(points: GeoPoint[], shapes: GeoShape[] = []): Map<string, Pt | null> {
   const byId = new Map(points.map((p) => [p.id, p]))
-  const cache = new Map<string, { x: number; y: number } | null>()
+  const shById = new Map(shapes.map((s) => [s.id, s]))
+  const cache = new Map<string, Pt | null>()
   const visiting = new Set<string>()
-  const R = (id: string): { x: number; y: number } | null => {
+  const R = (id: string): Pt | null => {
     if (cache.has(id)) return cache.get(id)!
     const p = byId.get(id)
     if (!p) { cache.set(id, null); return null }
     if (!p.def) { const v = { x: p.x, y: p.y }; cache.set(id, v); return v }
     if (visiting.has(id)) { cache.set(id, null); return null }
     visiting.add(id)
-    let v: { x: number; y: number } | null = null
+    let v: Pt | null = null
     const d = p.def
     if (d.kind === 'mid') {
       const a = R(d.a), b = R(d.b)
@@ -447,6 +496,9 @@ function resolveGeo(points: GeoPoint[]): Map<string, { x: number; y: number } | 
     } else if (d.kind === 'inter') {
       const a1 = R(d.a1), b1 = R(d.b1), a2 = R(d.a2), b2 = R(d.b2)
       if (a1 && b1 && a2 && b2) v = lineIntersect(a1, b1, a2, b2)
+    } else if (d.kind === 'interSS') {
+      const s1 = shById.get(d.s1), s2 = shById.get(d.s2)
+      if (s1 && s2) { const list = shapeInter(s1, s2, R); v = list[d.which] ?? null }
     }
     visiting.delete(id)
     cache.set(id, v)
@@ -455,9 +507,30 @@ function resolveGeo(points: GeoPoint[]): Map<string, { x: number; y: number } | 
   for (const p of points) R(p.id)
   return cache
 }
+
+// Khoảng cách (đã chuẩn hoá theo viewport) từ điểm tới 1 shape — để chạm chọn hình
+function distToShape(sh: GeoShape, R: (id: string) => Pt | null, g: Pt, sx: number, sy: number): number {
+  const geo = geomOf(sh, R)
+  if (!geo) return Infinity
+  const nx = (a: Pt) => a.x / sx, ny = (a: Pt) => a.y / sy
+  const gx = g.x / sx, gy = g.y / sy
+  if (geo.kind === 'c') {
+    const dr = Math.hypot(g.x - geo.c.x, g.y - geo.c.y) / ((sx + sy) / 2)
+    const rr = geo.r / ((sx + sy) / 2)
+    return Math.abs(dr - rr)
+  }
+  // đường thẳng: khoảng cách vuông góc (toạ độ chuẩn hoá)
+  const ax = nx(geo.a), ay = ny(geo.a), bx = nx(geo.b), by = ny(geo.b)
+  const dx = bx - ax, dy = by - ay
+  const L2 = dx * dx + dy * dy
+  if (L2 < 1e-12) return Math.hypot(gx - ax, gy - ay)
+  return Math.abs((gx - ax) * dy - (gy - ay) * dx) / Math.sqrt(L2)
+}
+
 const GEO_POINT_COLOR = '#3b82f6'
 const GEO_SHAPE_COLOR = '#fbbf24'
 const TWO_PI = 6.2832
+
 
 // ── Đường cong tham số x(t),y(t) & cực r(θ) ──
 type CurveKind = 'param' | 'polar'
@@ -549,6 +622,7 @@ function Plot({
     points: GeoPoint[]
     shapes: GeoShape[]
     pending: string[]
+    selShapes: string[]
     measure: boolean
     onClick: (gx: number, gy: number) => void
     onMovePoint: (id: string, x: number, y: number) => void
@@ -842,7 +916,7 @@ function Plot({
   const geoActive = !!geo && geo.tool !== 'move'
   const [dragPt, setDragPt] = useState<string | null>(null)
   // Toạ độ thực của mọi điểm (giải điểm phái sinh)
-  const geoResolved = useMemo(() => (geo ? resolveGeo(geo.points) : null), [geo])
+  const geoResolved = useMemo(() => (geo ? resolveGeo(geo.points, geo.shapes) : null), [geo])
   const rp = (id: string) => geoResolved?.get(id) ?? null
   // Tìm điểm TỰ DO gần (px) để bắt kéo (điểm phái sinh không kéo trực tiếp)
   const nearbyPoint = (px: number, py: number): string | null => {
@@ -1115,16 +1189,19 @@ function Plot({
               {geo.shapes.map((sh) => {
                 const ps = sh.pts.map(rp).filter(Boolean) as { x: number; y: number }[]
                 if (ps.length < 2) return null
+                const sel = geo.selShapes.includes(sh.id)
+                const col = sel ? '#22d3ee' : sh.color
+                const sw = sel ? 3.6 : 2.2
                 if (sh.type === 'segment') {
                   return <line key={sh.id} x1={xS(ps[0].x)} y1={yS(ps[0].y)} x2={xS(ps[1].x)} y2={yS(ps[1].y)}
-                               stroke={sh.color} strokeWidth={2.2} />
+                               stroke={col} strokeWidth={sw} />
                 }
                 if (sh.type === 'line') {
                   const ax = xS(ps[0].x), ay = yS(ps[0].y), bx = xS(ps[1].x), by = yS(ps[1].y)
                   const dx = bx - ax, dy = by - ay
                   const K = 4000
                   return <line key={sh.id} x1={ax - dx * K} y1={ay - dy * K} x2={bx + dx * K} y2={by + dy * K}
-                               stroke={sh.color} strokeWidth={2.2} />
+                               stroke={col} strokeWidth={sw} />
                 }
                 if (sh.type === 'circle') {
                   const cx = ps[0].x, cy = ps[0].y
@@ -1134,11 +1211,11 @@ function Plot({
                     const th = (k / 72) * Math.PI * 2
                     pts.push(`${xS(cx + r * Math.cos(th)).toFixed(1)},${yS(cy + r * Math.sin(th)).toFixed(1)}`)
                   }
-                  return <polyline key={sh.id} points={pts.join(' ')} fill="none" stroke={sh.color} strokeWidth={2.2} />
+                  return <polyline key={sh.id} points={pts.join(' ')} fill="none" stroke={col} strokeWidth={sw} />
                 }
                 // polygon
                 const d = ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.x).toFixed(1)},${yS(p.y).toFixed(1)}`).join(' ') + ' Z'
-                return <path key={sh.id} d={d} fill={`${sh.color}33`} stroke={sh.color} strokeWidth={2.2} />
+                return <path key={sh.id} d={d} fill={`${sh.color}33`} stroke={col} strokeWidth={sw} />
               })}
               {/* Số đo (độ dài / bán kính / diện tích) */}
               {geo.measure && geo.shapes.map((sh) => {
@@ -1407,17 +1484,87 @@ export default function GraphLab() {
   const [geoShapes, setGeoShapes] = useState<GeoShape[]>([])
   const [geoPending, setGeoPending] = useState<string[]>([])
 
+  const [geoSelShapes, setGeoSelShapes] = useState<string[]>([])
   const handleGeoClick = (gx: number, gy: number) => {
     if (geoTool === 'move') return
-    const resolved = resolveGeo(geoPoints)
-    const thrX = (viewport.xMax - viewport.xMin) * 0.025
-    const thrY = (viewport.yMax - viewport.yMin) * 0.025
+    const resolved = resolveGeo(geoPoints, geoShapes)
+    const R = (id: string): Pt | null => resolved.get(id) ?? null
+    const sx = viewport.xMax - viewport.xMin, sy = viewport.yMax - viewport.yMin
+    const nearestPointId = (): string | null => {
+      const tx = sx * 0.025, ty = sy * 0.025
+      for (const p of geoPoints) { const rp = resolved.get(p.id); if (rp && Math.abs(rp.x - gx) < tx && Math.abs(rp.y - gy) < ty) return p.id }
+      return null
+    }
+    const nearestShapeId = (kinds: GeoShape['type'][]): string | null => {
+      let best: string | null = null, bd = 0.02
+      for (const sh of geoShapes) {
+        if (!kinds.includes(sh.type)) continue
+        const d = distToShape(sh, R, { x: gx, y: gy }, sx, sy)
+        if (d < bd) { bd = d; best = sh.id }
+      }
+      return best
+    }
+
+    // ── Xoá: chạm điểm (ưu tiên) hoặc hình ──
+    if (geoTool === 'delete') {
+      const pid = nearestPointId()
+      if (pid) { removeGeo(pid, undefined); return }
+      const sid = nearestShapeId(['segment', 'line', 'circle', 'polygon'])
+      if (sid) { removeGeo(undefined, sid); return }
+      return
+    }
+
+    // ── Song song / Vuông góc: chọn 1 ĐƯỜNG rồi 1 ĐIỂM ──
+    if (geoTool === 'parallel' || geoTool === 'perpendicular') {
+      if (geoSelShapes.length === 0) {
+        const sid = nearestShapeId(['segment', 'line'])
+        if (sid) setGeoSelShapes([sid])
+        return
+      }
+      const base = geoShapes.find((s) => s.id === geoSelShapes[0])
+      if (!base || base.pts.length < 2) { setGeoSelShapes([]); return }
+      let pid = nearestPointId()
+      const isNew = !pid
+      if (!pid) { pid = mkId(); const id2 = pid; setGeoPoints((ps) => [...ps, { id: id2, x: gx, y: gy }]) }
+      const [a, b] = base.pts
+      const ra = R(a) ?? { x: 0, y: 0 }, rb = R(b) ?? { x: 0, y: 0 }
+      const rp = isNew ? { x: gx, y: gy } : (R(pid) ?? { x: gx, y: gy })
+      const perp = geoTool === 'perpendicular'
+      let dx = rb.x - ra.x, dy = rb.y - ra.y
+      if (perp) { const t = dx; dx = -dy; dy = t }
+      const hid = mkId()
+      setGeoPoints((ps) => [...ps, { id: hid, x: rp.x + dx, y: rp.y + dy, def: { kind: 'translate', from: pid!, a, b, perp } }])
+      setGeoShapes((s) => [...s, { id: mkId(), type: 'line', pts: [pid!, hid], color: GEO_SHAPE_COLOR }])
+      setGeoSelShapes([])
+      return
+    }
+
+    // ── Giao điểm: chọn 2 HÌNH (đường/đoạn/tròn) ──
+    if (geoTool === 'intersect') {
+      const sid = nearestShapeId(['segment', 'line', 'circle'])
+      if (!sid) return
+      const sel = [...geoSelShapes, sid]
+      if (sel.length < 2) { setGeoSelShapes(sel); return }
+      setGeoSelShapes([])
+      if (sel[0] === sel[1]) return
+      const s1 = geoShapes.find((s) => s.id === sel[0]), s2 = geoShapes.find((s) => s.id === sel[1])
+      if (!s1 || !s2) return
+      const list = shapeInter(s1, s2, R)
+      if (!list.length) return
+      setGeoPoints((ps) => [
+        ...ps,
+        ...list.map((pt, w) => ({ id: mkId(), x: pt.x, y: pt.y, def: { kind: 'interSS', s1: s1.id, s2: s2.id, which: w } as GeoDef })),
+      ])
+      return
+    }
+
+    // ── Công cụ theo ĐIỂM (point/segment/line/polygon/circle/midpoint) ──
+    const thrX = sx * 0.025, thrY = sy * 0.025
     let nearId: string | null = null
     for (const p of geoPoints) {
       const rp = resolved.get(p.id)
       if (rp && Math.abs(rp.x - gx) < thrX && Math.abs(rp.y - gy) < thrY) { nearId = p.id; break }
     }
-    // Đa giác: chạm lại điểm đầu (≥3 đỉnh) → đóng đa giác
     if (geoTool === 'polygon' && geoPending.length >= 3 && nearId && nearId === geoPending[0]) {
       setGeoShapes((s) => [...s, { id: mkId(), type: 'polygon', pts: [...geoPending], color: GEO_SHAPE_COLOR }])
       setGeoPending([])
@@ -1426,10 +1573,8 @@ export default function GraphLab() {
     let id = nearId
     if (!id) { id = mkId(); const np: GeoPoint = { id, x: gx, y: gy }; setGeoPoints((ps) => [...ps, np]) }
     if (geoTool === 'point') { setGeoPending([]); return }
-    // toạ độ của 1 id (điểm mới tạo trong lần chạm này nằm tại gx,gy)
     const coord = (pid: string) => (pid === id && !nearId ? { x: gx, y: gy } : (resolved.get(pid) ?? { x: gx, y: gy }))
     const next = [...geoPending, id]
-
     if ((geoTool === 'segment' || geoTool === 'line') && next.length === 2) {
       setGeoShapes((s) => [...s, { id: mkId(), type: geoTool, pts: next, color: GEO_SHAPE_COLOR }]); setGeoPending([]); return
     }
@@ -1439,22 +1584,6 @@ export default function GraphLab() {
     if (geoTool === 'midpoint' && next.length === 2) {
       const [a, b] = next, ra = coord(a), rb = coord(b)
       setGeoPoints((ps) => [...ps, { id: mkId(), x: (ra.x + rb.x) / 2, y: (ra.y + rb.y) / 2, def: { kind: 'mid', a, b } }])
-      setGeoPending([]); return
-    }
-    if ((geoTool === 'parallel' || geoTool === 'perpendicular') && next.length === 3) {
-      const [a, b, p] = next, perp = geoTool === 'perpendicular'
-      const ra = coord(a), rb = coord(b), rp = coord(p)
-      let dx = rb.x - ra.x, dy = rb.y - ra.y
-      if (perp) { const t = dx; dx = -dy; dy = t }
-      const hid = mkId()
-      setGeoPoints((ps) => [...ps, { id: hid, x: rp.x + dx, y: rp.y + dy, def: { kind: 'translate', from: p, a, b, perp } }])
-      setGeoShapes((s) => [...s, { id: mkId(), type: 'line', pts: [p, hid], color: GEO_SHAPE_COLOR }])
-      setGeoPending([]); return
-    }
-    if (geoTool === 'intersect' && next.length === 4) {
-      const [a1, b1, a2, b2] = next
-      const inter = lineIntersect(coord(a1), coord(b1), coord(a2), coord(b2)) ?? { x: gx, y: gy }
-      setGeoPoints((ps) => [...ps, { id: mkId(), x: inter.x, y: inter.y, def: { kind: 'inter', a1, b1, a2, b2 } }])
       setGeoPending([]); return
     }
     setGeoPending(next)
@@ -1501,8 +1630,34 @@ export default function GraphLab() {
   const [geoMeasure, setGeoMeasure] = useState(false)
   const moveGeoPoint = (id: string, x: number, y: number) =>
     setGeoPoints((ps) => ps.map((p) => (p.id === id ? { ...p, x, y } : p)))
-  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]) }
+  // Xoá 1 điểm/hình + lan toả các phần phụ thuộc (hình dùng điểm đã xoá, điểm phái sinh tham chiếu…)
+  const removeGeo = (pid?: string, sid?: string) => {
+    const remP = new Set<string>(), remS = new Set<string>()
+    if (pid) remP.add(pid)
+    if (sid) remS.add(sid)
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const s of geoShapes) {
+        if (!remS.has(s.id) && s.pts.some((x) => remP.has(x))) { remS.add(s.id); changed = true }
+      }
+      for (const p of geoPoints) {
+        if (remP.has(p.id) || !p.def) continue
+        const d = p.def
+        const refs =
+          (d.kind === 'mid' && (remP.has(d.a) || remP.has(d.b))) ||
+          (d.kind === 'translate' && (remP.has(d.from) || remP.has(d.a) || remP.has(d.b))) ||
+          (d.kind === 'inter' && (remP.has(d.a1) || remP.has(d.b1) || remP.has(d.a2) || remP.has(d.b2))) ||
+          (d.kind === 'interSS' && (remS.has(d.s1) || remS.has(d.s2)))
+        if (refs) { remP.add(p.id); changed = true }
+      }
+    }
+    setGeoPoints((ps) => ps.filter((p) => !remP.has(p.id)))
+    setGeoShapes((ss) => ss.filter((s) => !remS.has(s.id)))
+  }
+  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]) }
   const undoGeo = () => {
+    if (geoSelShapes.length) { setGeoSelShapes([]); return }
     if (geoPending.length) { setGeoPending([]); return }
     if (geoShapes.length) { setGeoShapes((s) => s.slice(0, -1)); return }
     setGeoPoints((p) => p.slice(0, -1))
@@ -1818,11 +1973,12 @@ export default function GraphLab() {
                 { id: 'intersect', icon: Spline, label: 'Giao điểm' },
                 { id: 'parallel', icon: Equal, label: 'Song song' },
                 { id: 'perpendicular', icon: CornerDownRight, label: 'Vuông góc' },
+                { id: 'delete', icon: Trash2, label: 'Xoá' },
               ] as { id: GeoToolId; icon: typeof Dot; label: string }[]).map((t) => {
                 const Icon = t.icon
                 const active = geoTool === t.id
                 return (
-                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]) }} title={t.label}
+                  <button key={t.id} onClick={() => { setGeoTool(t.id); setGeoPending([]); setGeoSelShapes([]) }} title={t.label}
                     className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
                       active ? 'bg-cyan-500/25 text-cyan-100 ring-cyan-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
                     }`}>
@@ -1852,10 +2008,12 @@ export default function GraphLab() {
                 {geoTool === 'polygon' && 'Chạm lần lượt các đỉnh; chạm lại đỉnh đầu (≥3) để đóng đa giác.'}
                 {geoTool === 'circle' && 'Chạm tâm rồi chạm 1 điểm trên đường tròn (xác định bán kính).'}
                 {geoTool === 'midpoint' && 'Chạm 2 điểm → tạo trung điểm (tự cập nhật khi kéo).'}
-                {geoTool === 'intersect' && 'Chạm 4 điểm: 2 điểm đường 1, rồi 2 điểm đường 2 → giao điểm.'}
-                {geoTool === 'parallel' && 'Chạm 2 điểm (A,B) định hướng, rồi điểm P → đường thẳng qua P song song AB.'}
-                {geoTool === 'perpendicular' && 'Chạm 2 điểm (A,B) định hướng, rồi điểm P → đường vuông góc AB qua P.'}
+                {geoTool === 'intersect' && 'Chạm lần lượt 2 HÌNH (đường thẳng/đoạn/đường tròn) → giao điểm (đường–tròn, tròn–tròn cho tối đa 2 điểm).'}
+                {geoTool === 'parallel' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường thẳng qua điểm đó song song.'}
+                {geoTool === 'perpendicular' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường vuông góc với nó qua điểm đó.'}
+                {geoTool === 'delete' && 'Chạm 1 điểm hoặc 1 hình để xoá (tự xoá kèm các phần phụ thuộc).'}
                 {geoPending.length > 0 && <b className="ml-1 text-cyan-300">· đã chọn {geoPending.length} điểm</b>}
+                {geoSelShapes.length > 0 && <b className="ml-1 text-amber-300">· đã chọn {geoSelShapes.length} hình</b>}
               </div>
             )}
             <Plot
@@ -1863,7 +2021,7 @@ export default function GraphLab() {
               viewport={viewport}
               onViewportChange={setViewport}
               height={560}
-              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
+              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, selShapes: geoSelShapes, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
               curves={compiledCurves
                 .filter((c) => c.row.visible && !c.err)
                 .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
