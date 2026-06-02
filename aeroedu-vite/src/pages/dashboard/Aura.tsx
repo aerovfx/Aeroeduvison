@@ -1009,6 +1009,13 @@ export default function AuraPage() {
                     >
                       {sim.category}
                     </span>
+                    <span
+                      className="px-2 py-0.5 rounded-md text-[0.6rem] font-bold text-white"
+                      style={{ background: 'linear-gradient(135deg,#7c3aed,#3b82f6)' }}
+                      title="Xem trong Thực tế tăng cường (AR) trên điện thoại"
+                    >
+                      AR
+                    </span>
                     <span className="px-2 py-0.5 rounded-md text-[0.6rem] text-white/30 border border-white/[0.06]">
                       {sim.difficulty}
                     </span>

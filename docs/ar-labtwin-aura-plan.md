@@ -33,9 +33,14 @@
     và nút **"✕ Thoát AR"** khi đang trong phiên.
   - `ARLaunchButton` tự dò `immersive-ar`: hỗ trợ → realtime trước, **lỗi/không hỗ trợ → tự fallback**
     sang đường model (GLB/USDZ/Quick Look/QR). iOS vẫn đi Quick Look như cũ.
+- **Cử chỉ + tỉ lệ thật (ĐÃ code)**: sau khi đặt, **chụm 2 ngón để phóng to/thu nhỏ** (clamp 0.2×–6×),
+  cảnh neo đáy tại điểm đã chọn. Badge **"📐 1 đơn vị ≈ N cm"** hiển thị tỉ lệ thật realtime (giống
+  badge "1 : 1.33 cm" của GeoGebra) — `ARRealtimeController` báo `cmPerUnit` lên `XRCanvas` qua
+  `onPlacedScale`.
+- **Badge "AR" trên catalog Aura (ĐÃ code)**: mọi sim trong lưới `/dashboard/aura` (trừ FPV) gắn nhãn AR.
 - **Hạn chế còn lại**: iOS vẫn là snapshot (Apple chưa mở WebXR AR); cảnh ShaderMaterial tuỳ biến có
-  thể không xuất USDZ → degrade về xem 3D. Realtime chưa kiểm thử trên thiết bị thật (cần điện thoại
-  Android có ARCore để xác nhận hit-test/placement).
+  thể không xuất USDZ → degrade về xem 3D. Realtime + pinch chưa kiểm thử trên thiết bị thật (cần điện
+  thoại Android có ARCore để xác nhận hit-test/placement/cử chỉ).
 
 ---
 

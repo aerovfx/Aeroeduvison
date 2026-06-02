@@ -18,13 +18,24 @@ import * as THREE from 'three'
 const RETICLE_NAME = 'ar-reticle'
 const TARGET_SIZE_M = 0.4 // kích thước thật mong muốn (~40cm trên bàn)
 
-export function ARRealtimeController() {
+interface Props {
+  /** Báo tỉ lệ thật (cm cho 1 đơn vị cảnh) khi đặt/chỉnh; null khi thoát AR. */
+  onPlacedScale?: (cmPerUnit: number | null) => void
+}
+
+export function ARRealtimeController({ onPlacedScale }: Props = {}) {
   const { gl, scene } = useThree()
   const reticle = useRef<THREE.Group>(null)
   const hitSource = useRef<any>(null)
   const placed = useRef(false)
   const measured = useRef<{ center: THREE.Vector3; minY: number; maxDim: number } | null>(null)
   const saved = useRef<{ pos: THREE.Vector3; scl: THREE.Vector3; bg: any } | null>(null)
+  // trạng thái đặt + cử chỉ chụm ngón (pinch) để phóng to/thu nhỏ
+  const placedPos = useRef<THREE.Vector3 | null>(null)
+  const baseK = useRef(1)
+  const userScale = useRef(1)
+  const pinchStartDist = useRef(0)
+  const pinchStartScale = useRef(1)
 
   useEffect(() => {
     const xr: any = gl.xr
@@ -51,6 +62,34 @@ export function ARRealtimeController() {
       }
     }
 
+    // Áp tỉ lệ + vị trí: neo đáy cảnh tại điểm đã chọn, đổi kích thước theo userScale
+    const applyPlacement = () => {
+      const m = measured.current
+      const p = placedPos.current
+      if (!m || !p) return
+      const k = baseK.current * userScale.current
+      scene.scale.setScalar(k)
+      scene.position.set(p.x - m.center.x * k, p.y - m.minY * k, p.z - m.center.z * k)
+      onPlacedScale?.(k * 100) // cm cho 1 đơn vị cảnh
+    }
+
+    const touchDist = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const onTouchStart = (e: TouchEvent) => {
+      if (!placed.current || e.touches.length !== 2) return
+      pinchStartDist.current = touchDist(e.touches)
+      pinchStartScale.current = userScale.current
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (!placed.current || e.touches.length !== 2 || pinchStartDist.current <= 0) return
+      const ratio = touchDist(e.touches) / pinchStartDist.current
+      userScale.current = THREE.MathUtils.clamp(pinchStartScale.current * ratio, 0.2, 6)
+      applyPlacement()
+    }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchStartDist.current = 0
+    }
+
     const onStart = () => {
       saved.current = {
         pos: scene.position.clone(),
@@ -61,6 +100,11 @@ export function ARRealtimeController() {
       scene.background = null // để thấy camera thật xuyên qua
       placed.current = false
       hitSource.current = null
+      userScale.current = 1
+      placedPos.current = null
+      window.addEventListener('touchstart', onTouchStart, { passive: true })
+      window.addEventListener('touchmove', onTouchMove, { passive: true })
+      window.addEventListener('touchend', onTouchEnd, { passive: true })
 
       const session: any = xr.getSession?.()
       if (!session?.requestReferenceSpace) return
@@ -80,21 +124,17 @@ export function ARRealtimeController() {
       const onSelect = () => {
         const r = reticle.current
         const m = measured.current
-        if (!r || !r.visible || !m) return
+        if (!r || !r.visible || !m || placed.current) return
         const pos = new THREE.Vector3()
         const quat = new THREE.Quaternion()
         const scl = new THREE.Vector3()
         r.matrix.decompose(pos, quat, scl)
-        const k = TARGET_SIZE_M / m.maxDim
-        scene.scale.setScalar(k)
-        // căn tâm theo X/Z, đáy chạm mặt sàn theo Y
-        scene.position.set(
-          pos.x - m.center.x * k,
-          pos.y - m.minY * k,
-          pos.z - m.center.z * k,
-        )
+        baseK.current = TARGET_SIZE_M / m.maxDim
+        userScale.current = 1
+        placedPos.current = pos.clone()
         placed.current = true
         r.visible = false
+        applyPlacement()
       }
       session.addEventListener?.('select', onSelect)
     }
@@ -108,6 +148,10 @@ export function ARRealtimeController() {
       if (reticle.current) reticle.current.visible = false
       hitSource.current = null
       placed.current = false
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
+      onPlacedScale?.(null)
     }
 
     xr.addEventListener?.('sessionstart', onStart)
@@ -115,8 +159,11 @@ export function ARRealtimeController() {
     return () => {
       xr.removeEventListener?.('sessionstart', onStart)
       xr.removeEventListener?.('sessionend', onEnd)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [gl, scene])
+  }, [gl, scene, onPlacedScale])
 
   useFrame((_state, _delta, frame: any) => {
     if (!frame || placed.current) return

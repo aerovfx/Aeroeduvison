@@ -38,6 +38,15 @@ export function XRCanvas({
   const glRef = useRef<THREE.WebGLRenderer | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [presenting, setPresenting] = useState(false)
+  const [cmPerUnit, setCmPerUnit] = useState<number | null>(null)
+
+  const handlePlacedScale = useCallback((v: number | null) => {
+    setCmPerUnit((prev) => {
+      if (v === null) return null
+      const rounded = Math.round(v * 10) / 10
+      return prev === rounded ? prev : rounded
+    })
+  }, [])
 
   /** Vào AR realtime qua WebXR. Ném lỗi nếu không khả dụng → caller fallback model. */
   const enterRealtimeAR = useCallback(async () => {
@@ -77,7 +86,7 @@ export function XRCanvas({
         }}
       >
         {children}
-        {arEnabled && <ARRealtimeController />}
+        {arEnabled && <ARRealtimeController onPlacedScale={handlePlacedScale} />}
       </Canvas>
 
       {arEnabled && !presenting && (
@@ -105,6 +114,28 @@ export function XRCanvas({
         >
           ✕ Thoát AR
         </button>
+      )}
+
+      {presenting && cmPerUnit !== null && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 40,
+            padding: '8px 14px',
+            borderRadius: 999,
+            background: 'rgba(15,23,42,0.82)',
+            color: '#e2e8f0',
+            fontSize: 13,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+          }}
+        >
+          📐 1 đơn vị ≈ {cmPerUnit.toFixed(1)} cm · chụm 2 ngón để chỉnh
+        </div>
       )}
     </div>
   )
