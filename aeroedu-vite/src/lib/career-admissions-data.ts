@@ -10,7 +10,13 @@
  * Cấu trúc:
  *   MAJORS[]: 20 ngành lớn × 3-5 trường top (~80 records)
  *   CAREER_MAJOR_MAP: careerId/career-name → majorIds liên quan
- *   TREND_2026: nhận định xu hướng (hot/ổn định/bão hoà)
+ *   Mỗi trường: cutoff2025 (gần nhất) / cutoff2024 / cutoff2023 + xu hướng
+ *
+ * Helper:
+ *   latestCutoff(u)      — điểm chuẩn năm gần nhất có dữ liệu
+ *   evaluateAdmissionFit — đánh giá khả năng đỗ theo điểm user
+ *   analyzeGap(major,pts)— "cần thêm bao nhiêu điểm" tới mục tiêu gần/top
+ *   cutoffTrend(u)       — xu hướng 2 năm gần nhất
  *
  * Khối thi quy ước (Bộ GD&ĐT):
  *   A00 = Toán+Lý+Hoá   A01 = Toán+Lý+Anh
@@ -31,12 +37,16 @@ export interface UniversityCutoff {
   location: string
   /** Khối thi áp dụng cho ngành này */
   groups: SubjectGroup[]
+  /** Điểm chuẩn THPT 2025 (thang 30) — năm gần nhất, null nếu chưa cập nhật */
+  cutoff2025?: number | null
   /** Điểm chuẩn THPT 2024 (thang 30) — null nếu chưa công bố / xét riêng */
   cutoff2024: number | null
   /** Điểm chuẩn THPT 2023 (để FE so sánh xu hướng) */
   cutoff2023: number | null
   /** Điểm xét học bạ 2024 (thang 30, nếu trường có phương thức này) */
   transcriptCutoff2024?: number | null
+  /** Bậc đào tạo — mặc định 'university'. 'college' = Cao đẳng. */
+  level?: 'university' | 'college'
   /** Lưu ý ngắn (xét tuyển kết hợp, IELTS, năng khiếu, ...) */
   notes?: string
 }
@@ -502,10 +512,85 @@ export function evaluateAdmissionFit(
   return                  { fit: 'unrealistic', delta, label: `Thiếu ${(-delta).toFixed(2)} điểm — cân nhắc PA khác`, color: '#ef4444' }
 }
 
-/** Đánh dấu xu hướng cutoff 2023 → 2024 (∆ điểm). */
-export function cutoffTrend(u: UniversityCutoff): { direction: 'up' | 'down' | 'flat'; delta: number } | null {
-  if (u.cutoff2024 == null || u.cutoff2023 == null) return null
-  const delta = +(u.cutoff2024 - u.cutoff2023).toFixed(2)
-  if (Math.abs(delta) < 0.3) return { direction: 'flat', delta }
-  return { direction: delta > 0 ? 'up' : 'down', delta }
+/**
+ * Điểm chuẩn năm GẦN NHẤT có dữ liệu (ưu tiên 2025 → 2024 → 2023).
+ * Đây là mốc dùng để đánh giá khả năng đỗ & tính điểm còn thiếu.
+ */
+export function latestCutoff(u: UniversityCutoff): { year: 2025 | 2024 | 2023; value: number } | null {
+  if (u.cutoff2025 != null) return { year: 2025, value: u.cutoff2025 }
+  if (u.cutoff2024 != null) return { year: 2024, value: u.cutoff2024 }
+  if (u.cutoff2023 != null) return { year: 2023, value: u.cutoff2023 }
+  return null
+}
+
+/**
+ * Đánh dấu xu hướng giữa 2 năm GẦN NHẤT có dữ liệu (∆ điểm).
+ * Ưu tiên 2024→2025; nếu thiếu 2025 thì 2023→2024.
+ */
+export function cutoffTrend(
+  u: UniversityCutoff,
+): { direction: 'up' | 'down' | 'flat'; delta: number; from: number; to: number } | null {
+  let from: number | null = null
+  let to: number | null = null
+  let fromYear = 0
+  let toYear = 0
+  if (u.cutoff2025 != null && u.cutoff2024 != null) {
+    from = u.cutoff2024; to = u.cutoff2025; fromYear = 2024; toYear = 2025
+  } else if (u.cutoff2024 != null && u.cutoff2023 != null) {
+    from = u.cutoff2023; to = u.cutoff2024; fromYear = 2023; toYear = 2024
+  }
+  if (from == null || to == null) return null
+  const delta = +(to - from).toFixed(2)
+  const direction = Math.abs(delta) < 0.3 ? 'flat' : delta > 0 ? 'up' : 'down'
+  return { direction, delta, from: fromYear, to: toYear }
+}
+
+/**
+ * Phân tích điểm còn thiếu cho 1 ngành: với điểm hiện tại của user,
+ * đỗ được mấy trường, trường dễ nhất chưa với tới cần thêm bao nhiêu,
+ * và trường top cần thêm bao nhiêu — quy ra cả điểm/môn (chia 3 môn).
+ */
+export interface GapAnalysis {
+  totalSchools: number
+  /** Số trường user đã đủ điểm (>= cutoff năm gần nhất) */
+  reachableCount: number
+  /** Trường thấp điểm nhất mà user CHƯA với tới (mục tiêu gần nhất) */
+  nextTarget?: { u: UniversityCutoff; cutoff: number; year: number; gapTotal: number; gapPerSubject: number }
+  /** Trường cao điểm nhất trong ngành (mục tiêu top) */
+  topTarget?: { u: UniversityCutoff; cutoff: number; year: number; gapTotal: number; gapPerSubject: number }
+  /** Trường cao nhất user đã đủ điểm (để khích lệ) */
+  bestReachable?: { u: UniversityCutoff; cutoff: number; year: number }
+}
+
+export function analyzeGap(major: MajorAdmission, userPoints: number): GapAnalysis {
+  const rows = major.universities
+    .map((u) => ({ u, lc: latestCutoff(u) }))
+    .filter((r): r is { u: UniversityCutoff; lc: { year: 2025 | 2024 | 2023; value: number } } => r.lc != null)
+    .sort((a, b) => a.lc.value - b.lc.value) // tăng dần theo điểm chuẩn
+
+  const reachable = rows.filter((r) => userPoints >= r.lc.value)
+  const notReached = rows.filter((r) => userPoints < r.lc.value)
+
+  const mkGap = (r: { u: UniversityCutoff; lc: { year: number; value: number } }) => {
+    const gapTotal = +(r.lc.value - userPoints).toFixed(2)
+    return {
+      u: r.u, cutoff: r.lc.value, year: r.lc.year,
+      gapTotal, gapPerSubject: +(gapTotal / 3).toFixed(2),
+    }
+  }
+
+  const result: GapAnalysis = {
+    totalSchools: rows.length,
+    reachableCount: reachable.length,
+  }
+  if (notReached.length) result.nextTarget = mkGap(notReached[0])           // thấp điểm nhất chưa với tới
+  if (rows.length) {
+    const top = rows[rows.length - 1]
+    if (userPoints < top.lc.value) result.topTarget = mkGap(top)            // top, nếu chưa đủ
+  }
+  if (reachable.length) {
+    const best = reachable[reachable.length - 1]
+    result.bestReachable = { u: best.u, cutoff: best.lc.value, year: best.lc.year }
+  }
+  return result
 }
