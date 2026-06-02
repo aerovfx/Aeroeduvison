@@ -28,6 +28,7 @@ import * as THREE from 'three'
 import { QRCodeSVG } from 'qrcode.react'
 import { tokenStore } from '@/services/api'
 import { useBroker } from '@/lib/broker-client'
+import { fetchOsmBuildings, type OsmBox } from '@/lib/osm-buildings'
 
 // ── Multiplayer (Thách đấu) helpers ──
 type Peer = { name: string; pos: [number, number, number]; yaw: number; pitch: number; roll: number; t: number }
@@ -129,6 +130,7 @@ interface Level {
     enemies?: Array<{ center: Vec3; radius: number; speed: number }>
     poles?: Array<{ pos: Vec3; h: number }>
   }
+  map?: { lat: number; lon: number; radius?: number }                  // bay trên bản đồ thật (OSM)
   hint: string
 }
 
@@ -206,6 +208,19 @@ const LEVELS: Level[] = [
       ],
     },
     hint: 'Bay tới bãi XANH (LẤY) chậm lại để gắp kiện → bay tới bãi XANH DƯƠNG (THẢ). Né drone đỏ và cọc. Theo mũi tên chỉ đường.',
+  },
+  {
+    id: 7, name: 'Bản đồ thật', emoji: '🗺️', difficulty: 'pro',
+    description: 'Bay qua cổng giữa thành phố thật (OpenStreetMap) — toà nhà dựng từ địa hình thực',
+    timeLimit: 150, reward: 2500, type: 'gates',
+    map: { lat: 21.0285, lon: 105.8542, radius: 700 }, // Hồ Gươm, Hà Nội
+    gates: [
+      { pos: [0, 30, -70], r: 3 },
+      { pos: [90, 45, -150], r: 3 },
+      { pos: [-80, 55, -240], r: 3 },
+      { pos: [40, 40, -330], r: 3 },
+    ],
+    hint: 'Toà nhà là box từ OpenStreetMap quanh Hồ Gươm. Bay cao trên nóc nhà, né công trình, qua các cổng. Bản đồ tải vài giây lần đầu.',
   },
 ]
 
@@ -898,8 +913,8 @@ function LevelEnvironment({ level, currentGate }: { level: Level; currentGate: n
       {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
       <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
 
-      {/* Per-level scenery (terrain + obstacles) */}
-      <LevelScenery levelId={level.id} />
+      {/* Per-level scenery (bỏ khi bay bản đồ thật để nhường chỗ cho OSM city) */}
+      {!level.map && <LevelScenery levelId={level.id} />}
 
       {/* Gates — current gate sáng vàng glow, qua rồi xanh, chưa tới hồng */}
       {(level.gates || []).map((g, i) => {
@@ -1369,6 +1384,84 @@ function PeerDrones({ peersRef }: { peersRef: React.MutableRefObject<Map<string,
     return () => clearInterval(it)
   }, [peersRef])
   return <>{ids.map((id) => <PeerGhost key={id} id={id} peersRef={peersRef} />)}</>
+}
+
+// ═════════════════════════════════════════════════════════════
+// OSM CITY — box công trình từ OpenStreetMap + tile culling
+// Chia bản đồ thành ô vuông (tile), chỉ dựng ô quanh drone (trong tầm nhìn).
+// 1 InstancedMesh → 1 draw call; chỉ rebuild khi drone sang ô mới.
+// ═════════════════════════════════════════════════════════════
+function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4 }: {
+  boxes: OsmBox[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  tile?: number
+  viewTiles?: number
+}) {
+  const MAX = 5000
+  const meshRef = useRef<THREE.InstancedMesh>(null)
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const lastKey = useRef('')
+  const tiles = useMemo(() => {
+    const m = new Map<string, OsmBox[]>()
+    for (const b of boxes) {
+      const k = `${Math.floor(b.cx / tile)}_${Math.floor(b.cz / tile)}`
+      let a = m.get(k); if (!a) { a = []; m.set(k, a) }
+      a.push(b)
+    }
+    return m
+  }, [boxes, tile])
+  useEffect(() => { if (meshRef.current) meshRef.current.count = 0; lastKey.current = '' }, [boxes])
+  useFrame(() => {
+    const dp = posRef.current
+    const tx = Math.floor(dp.x / tile), tz = Math.floor(dp.z / tile)
+    const key = `${tx}_${tz}`
+    if (key === lastKey.current) return // chưa sang ô mới → khỏi rebuild
+    lastKey.current = key
+    const mesh = meshRef.current
+    if (!mesh) return
+    let n = 0
+    for (let i = -viewTiles; i <= viewTiles && n < MAX; i++) {
+      for (let j = -viewTiles; j <= viewTiles && n < MAX; j++) {
+        const arr = tiles.get(`${tx + i}_${tz + j}`)
+        if (!arr) continue
+        for (const b of arr) {
+          if (n >= MAX) break
+          dummy.position.set(b.cx, b.h / 2, b.cz)
+          dummy.scale.set(Math.max(2, b.w), b.h, Math.max(2, b.d))
+          dummy.rotation.set(0, 0, 0)
+          dummy.updateMatrix()
+          mesh.setMatrixAt(n, dummy.matrix)
+          n++
+        }
+      }
+    }
+    mesh.count = n
+    mesh.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX]} castShadow receiveShadow>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#7b8794" roughness={0.85} metalness={0.05} />
+    </instancedMesh>
+  )
+}
+function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus }: {
+  lat: number; lon: number; radius?: number
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onStatus?: (s: 'loading' | 'ready' | 'empty' | 'error') => void
+}) {
+  const [boxes, setBoxes] = useState<OsmBox[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    onStatus?.('loading')
+    fetchOsmBuildings(lat, lon, radius)
+      .then((b) => { if (!alive) return; setBoxes(b); onStatus?.(b.length ? 'ready' : 'empty') })
+      .catch(() => alive && onStatus?.('error'))
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lon, radius])
+  if (!boxes || !boxes.length) return null
+  return <OsmCity boxes={boxes} posRef={posRef} />
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -2293,6 +2386,7 @@ function GameScreen({
   }, [room, topic, myCid, myName, publish])
 
   const [muted, setMuted] = useState(false)
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'empty' | 'error' | null>(null)
   const [showSticks, setShowSticks] = useState(isMobile())
   const [showHint, setShowHint] = useState(true)
   const [cargoIdx, setCargoIdx] = useState(0)
@@ -2408,6 +2502,11 @@ function GameScreen({
               posRef={dronePosRef} rotRef={droneRotRef} />
           </Suspense>
           {room && <PeerDrones peersRef={peersRef} />}
+          {level.map && (
+            <Suspense fallback={null}>
+              <OsmCityLoader lat={level.map.lat} lon={level.map.lon} radius={level.map.radius} posRef={dronePosRef} onStatus={setMapStatus} />
+            </Suspense>
+          )}
           <WaypointGuide posRef={dronePosRef} target={guideTarget} />
           {level.type === 'cargo' && level.cargo && (
             <>
@@ -2467,6 +2566,19 @@ function GameScreen({
             background: 'rgba(249,115,22,0.85)', color: '#1c1917', padding: '4px 12px',
             borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace',
           }}>⚔️ PHÒNG {room} · {peerCount} đối thủ</div>
+        )}
+
+        {/* Trạng thái tải bản đồ thật (OSM) */}
+        {level.map && mapStatus && mapStatus !== 'ready' && (
+          <div style={{
+            position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+            background: 'rgba(15,23,42,0.9)', color: '#7dd3fc', padding: '6px 14px', borderRadius: 999,
+            fontSize: 12, fontFamily: 'monospace',
+          }}>
+            {mapStatus === 'loading' && '🗺️ Đang tải bản đồ OpenStreetMap…'}
+            {mapStatus === 'empty' && '🗺️ Không có dữ liệu công trình ở khu vực này'}
+            {mapStatus === 'error' && '⚠️ Lỗi tải bản đồ (mạng/Overpass) — bay không có toà nhà'}
+          </div>
         )}
 
         {/* Flash đỏ khi va chạm */}
