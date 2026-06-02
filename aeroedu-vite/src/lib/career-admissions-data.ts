@@ -1,11 +1,15 @@
 /**
  * career-admissions-data.ts — Điểm chuẩn ĐH VN 2024-2025 + xu hướng ngành.
  *
- * NGUỒN tham khảo: tổng hợp công khai từ websites trường (HUST, UEH, VNU,
- * UEH-IS, FTU, HUS, HMU, NEU, USTH, ULSA, HVN, BKHN, ĐH Bách Khoa TP.HCM,
- * Tuyển sinh số / chính sách 2024). Đây là CON SỐ THAM KHẢO — mỗi mùa
- * tuyển sinh trường công bố lại; trước khi nộp hồ sơ nên verify trên
- * website chính thức của trường.
+ * NGUỒN tham khảo: tổng hợp công khai từ websites trường + báo lớn.
+ *   - Điểm 2025 (thang 30, điểm thi THPT): baochinhphu.vn, xaydungchinhsach.chinhphu.vn,
+ *     vietnamnet.vn, vnexpress.net, tuoitre.vn, thanhnien.vn, nhandan.vn, laodong.vn,
+ *     giaoduc.net.vn, daibieunhandan.vn + .edu.vn (uet/usth/huce/hust...). Tra cứu 2026-06.
+ *   - Trường xét THANG KHÁC (BKHCM thang 100; AJC/HAU/HOU/CĐ thang 40 có môn ×2 / năng khiếu)
+ *     → KHÔNG điền cutoff2025 thang-30 (để null, fallback 2024) + ghi rõ ở `notes`.
+ *   - CĐ: quy đổi thang 40 → 30 (×0.75) để tính cùng hệ; đánh dấu level:'college'.
+ * Đây là CON SỐ THAM KHẢO — mỗi mùa tuyển sinh trường công bố lại; trước khi nộp
+ * hồ sơ nên verify trên website chính thức của trường.
  *
  * Cấu trúc:
  *   MAJORS[]: 20 ngành lớn × 3-5 trường top (~80 records)
@@ -81,16 +85,20 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 12, max: 25 },
     universities: [
       { code: 'BKHN', name: 'ĐH Bách Khoa Hà Nội (HUST)', location: 'Hà Nội',
-        groups: ['A00','A01'], cutoff2024: 28.53, cutoff2023: 28.80,
-        notes: 'CNTT Việt-Nhật / IT2: cao nhất' },
+        groups: ['A00','A01'], cutoff2025: 28.83, cutoff2024: 28.53, cutoff2023: 28.80,
+        notes: 'IT2 (Kỹ thuật máy tính) 2025 = 28.83; KHDL&AI IT-E10 = 29.39' },
       { code: 'BKHCM', name: 'ĐH Bách Khoa TP.HCM', location: 'TP.HCM',
-        groups: ['A00','A01'], cutoff2024: 27.50, cutoff2023: 27.30 },
+        groups: ['A00','A01'], cutoff2024: 27.50, cutoff2023: 27.30,
+        notes: '2025 xét thang 100 (KHMT 85.41) — không quy về thang 30' },
       { code: 'UET', name: 'ĐH Công Nghệ — ĐHQG Hà Nội', location: 'Hà Nội',
-        groups: ['A00','A01'], cutoff2024: 27.55, cutoff2023: 27.25 },
+        groups: ['A00','A01'], cutoff2025: 28.19, cutoff2024: 27.55, cutoff2023: 27.25 },
       { code: 'PTIT', name: 'Học viện Công nghệ BCVT (PTIT)', location: 'Hà Nội',
-        groups: ['A00','A01','D01'], cutoff2024: 26.10, cutoff2023: 26.59 },
+        groups: ['A00','A01','D01'], cutoff2025: 25.80, cutoff2024: 26.10, cutoff2023: 26.59 },
       { code: 'UIT', name: 'ĐH CNTT — ĐHQG TP.HCM', location: 'TP.HCM',
         groups: ['A00','A01'], cutoff2024: 27.30, cutoff2023: 27.10 },
+      { code: 'CKC', name: 'CĐ Kỹ thuật Cao Thắng', location: 'TP.HCM', level: 'college',
+        groups: ['A00','A01'], cutoff2025: 19.13, cutoff2024: null, cutoff2023: null,
+        notes: 'Bậc CĐ — CNTT 2025 = 25.5/40 (Toán ×2) ≈ 19.13/30; xét học bạ 24' },
     ],
   },
 
@@ -102,13 +110,13 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 8, max: 15 },
     universities: [
       { code: 'HMU', name: 'ĐH Y Hà Nội', location: 'Hà Nội',
-        groups: ['B00'], cutoff2024: 28.27, cutoff2023: 27.73 },
+        groups: ['B00'], cutoff2025: 28.13, cutoff2024: 28.27, cutoff2023: 27.73 },
       { code: 'PNU', name: 'ĐH Y Dược TP.HCM', location: 'TP.HCM',
-        groups: ['B00'], cutoff2024: 27.80, cutoff2023: 27.34 },
+        groups: ['B00'], cutoff2025: 27.34, cutoff2024: 27.80, cutoff2023: 27.34 },
       { code: 'VMU', name: 'ĐH Y Dược — ĐHQG Hà Nội', location: 'Hà Nội',
-        groups: ['B00'], cutoff2024: 27.30, cutoff2023: 26.50 },
+        groups: ['B00'], cutoff2025: 27.43, cutoff2024: 27.30, cutoff2023: 26.50 },
       { code: 'HUE-MED', name: 'ĐH Y Dược Huế', location: 'Huế',
-        groups: ['B00'], cutoff2024: 26.55, cutoff2023: 26.00 },
+        groups: ['B00'], cutoff2025: 25.17, cutoff2024: 26.55, cutoff2023: 26.00 },
     ],
   },
 
@@ -120,9 +128,9 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 7, max: 12 },
     universities: [
       { code: 'HUP', name: 'ĐH Dược Hà Nội', location: 'Hà Nội',
-        groups: ['A00'], cutoff2024: 26.18, cutoff2023: 25.05 },
+        groups: ['A00'], cutoff2025: 24.50, cutoff2024: 26.18, cutoff2023: 25.05 },
       { code: 'HCMP', name: 'ĐH Y Dược TP.HCM (Dược)', location: 'TP.HCM',
-        groups: ['A00','B00'], cutoff2024: 25.50, cutoff2023: 25.00 },
+        groups: ['A00','B00'], cutoff2025: 23.65, cutoff2024: 25.50, cutoff2023: 25.00 },
     ],
   },
 
@@ -134,15 +142,16 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 8, max: 14 },
     universities: [
       { code: 'NEU', name: 'ĐH Kinh tế Quốc dân (NEU)', location: 'Hà Nội',
-        groups: ['A00','A01','D01','D07'], cutoff2024: 27.50, cutoff2023: 27.10,
-        notes: 'Ngành Logistics/Marketing/QTKD cao nhất' },
+        groups: ['A00','A01','D01','D07'], cutoff2025: 28.83, cutoff2024: 27.50, cutoff2023: 27.10,
+        notes: 'Cao nhất trường 2025 (TMĐT) 28.83; QTKD/Logistics ~27–28.7' },
       { code: 'FTU', name: 'ĐH Ngoại Thương (FTU)', location: 'Hà Nội/TP.HCM',
-        groups: ['A00','A01','D01','D07'], cutoff2024: 28.50, cutoff2023: 27.45,
-        notes: 'TOP đầu khối kinh tế — Kinh doanh quốc tế' },
+        groups: ['A00','A01','D01','D07'], cutoff2025: 28.00, cutoff2024: 28.50, cutoff2023: 27.45,
+        notes: 'Thuần THPT cao nhất 28.0 (KDQT); CT tiên tiến kết hợp CCNN tới 28.5' },
       { code: 'UEH', name: 'ĐH Kinh tế TP.HCM (UEH)', location: 'TP.HCM',
-        groups: ['A00','A01','D01','D07'], cutoff2024: 27.00, cutoff2023: 26.80 },
+        groups: ['A00','A01','D01','D07'], cutoff2025: 27.70, cutoff2024: 27.00, cutoff2023: 26.80,
+        notes: 'Cao nhất trường 2025 (Logistics) 27.70' },
       { code: 'UEB', name: 'ĐH Kinh tế — ĐHQG Hà Nội', location: 'Hà Nội',
-        groups: ['A00','A01','D01'], cutoff2024: 25.50, cutoff2023: 25.00 },
+        groups: ['A00','A01','D01'], cutoff2025: 25.72, cutoff2024: 25.50, cutoff2023: 25.00 },
     ],
   },
 
@@ -156,7 +165,8 @@ export const MAJORS: MajorAdmission[] = [
       { code: 'NEU', name: 'ĐH Kinh tế Quốc dân (NEU) — TC-NH', location: 'Hà Nội',
         groups: ['A00','A01','D01'], cutoff2024: 27.10, cutoff2023: 26.60 },
       { code: 'BANKING', name: 'Học viện Ngân hàng (HVNH)', location: 'Hà Nội',
-        groups: ['A00','A01','D01'], cutoff2024: 25.93, cutoff2023: 25.80 },
+        groups: ['A00','A01','D01'], cutoff2025: 26.50, cutoff2024: 25.93, cutoff2023: 25.80,
+        notes: 'TC-NH 2025 = 26.5 (D01 gốc); C00/C03 +2.5; cao nhất trường Luật KT 26.97' },
       { code: 'UEH', name: 'ĐH Kinh tế TP.HCM — TC-NH', location: 'TP.HCM',
         groups: ['A00','A01','D01'], cutoff2024: 25.80, cutoff2023: 25.60 },
     ],
@@ -187,11 +197,12 @@ export const MAJORS: MajorAdmission[] = [
     universities: [
       { code: 'AJC', name: 'Học viện Báo chí & Tuyên truyền', location: 'Hà Nội',
         groups: ['C00','D01','D14'], cutoff2024: 28.25, cutoff2023: 28.50,
-        notes: 'C00 cao nhất, Báo Multimedia hot' },
+        notes: '2025 ngành Báo nhiều CN xét thang 40 (Báo TH 35.96/40); ngành thang 30 ~23–25' },
       { code: 'USSH-HN', name: 'ĐH KHXH&NV — ĐHQG Hà Nội', location: 'Hà Nội',
-        groups: ['C00','D01','D14'], cutoff2024: 28.83, cutoff2023: 28.78 },
+        groups: ['C00','D01','D14'], cutoff2024: 28.83, cutoff2023: 28.78,
+        notes: 'Báo chí 2025 ≥28 (C00); cao nhất trường QHCC 28.95' },
       { code: 'USSH-HCM', name: 'ĐH KHXH&NV — ĐHQG TP.HCM', location: 'TP.HCM',
-        groups: ['C00','D01','D14'], cutoff2024: 28.00, cutoff2023: 27.50 },
+        groups: ['C00','D01','D14'], cutoff2025: 28.55, cutoff2024: 28.00, cutoff2023: 27.50 },
     ],
   },
 
@@ -203,11 +214,12 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 7, max: 13 },
     universities: [
       { code: 'HLU', name: 'ĐH Luật Hà Nội', location: 'Hà Nội',
-        groups: ['A00','A01','C00','D01'], cutoff2024: 27.36, cutoff2023: 26.50 },
+        groups: ['A00','A01','C00','D01'], cutoff2025: 25.55, cutoff2024: 27.36, cutoff2023: 26.50,
+        notes: 'Luật KT 2025 = 25.55 (D01 gốc); C00 quy đổi 28.79' },
       { code: 'VNU-LAW', name: 'Khoa Luật — ĐHQG Hà Nội', location: 'Hà Nội',
-        groups: ['A00','A01','C00','D01'], cutoff2024: 26.20, cutoff2023: 25.80 },
+        groups: ['A00','A01','C00','D01'], cutoff2025: 24.20, cutoff2024: 26.20, cutoff2023: 25.80 },
       { code: 'HCMU-LAW', name: 'ĐH Luật TP.HCM', location: 'TP.HCM',
-        groups: ['A00','A01','C00','D01'], cutoff2024: 26.55, cutoff2023: 26.00 },
+        groups: ['A00','A01','C00','D01'], cutoff2025: 24.44, cutoff2024: 26.55, cutoff2023: 26.00 },
     ],
   },
 
@@ -219,10 +231,11 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 6, max: 11 },
     universities: [
       { code: 'HNUE', name: 'ĐH Sư phạm Hà Nội (HNUE)', location: 'Hà Nội',
-        groups: ['A00','A01','B00','C00','D01'], cutoff2024: 28.83, cutoff2023: 28.50,
-        notes: 'SP Lịch sử — Địa lý 29.30; SP Toán 28.61' },
+        groups: ['A00','A01','B00','C00','D01'], cutoff2025: 29.06, cutoff2024: 28.83, cutoff2023: 28.50,
+        notes: 'Cao nhất 2025: SP Lịch sử 29.06' },
       { code: 'HCMUE', name: 'ĐH Sư phạm TP.HCM', location: 'TP.HCM',
-        groups: ['A00','A01','B00','C00','D01'], cutoff2024: 28.60, cutoff2023: 28.15 },
+        groups: ['A00','A01','B00','C00','D01'], cutoff2025: 29.38, cutoff2024: 28.60, cutoff2023: 28.15,
+        notes: 'Cao nhất 2025: SP Hóa học 29.38; SP Ngữ văn 29.07' },
       { code: 'TNU', name: 'ĐH Thái Nguyên — SP', location: 'Thái Nguyên',
         groups: ['A00','C00','D01'], cutoff2024: 26.00, cutoff2023: 25.50 },
     ],
@@ -255,6 +268,9 @@ export const MAJORS: MajorAdmission[] = [
         groups: ['A00','A01'], cutoff2024: 26.42, cutoff2023: 25.80 },
       { code: 'BKHCM', name: 'BK TP.HCM — Cơ khí', location: 'TP.HCM',
         groups: ['A00','A01'], cutoff2024: 25.80, cutoff2023: 25.40 },
+      { code: 'CKC', name: 'CĐ Kỹ thuật Cao Thắng — Công nghệ ô tô', location: 'TP.HCM', level: 'college',
+        groups: ['A00','A01'], cutoff2025: 20.25, cutoff2024: null, cutoff2023: null,
+        notes: 'Bậc CĐ — Công nghệ ô tô 2025 = 27/40 (Toán ×2) ≈ 20.25/30' },
     ],
   },
 
@@ -335,7 +351,8 @@ export const MAJORS: MajorAdmission[] = [
       { code: 'NEU-LOG', name: 'NEU — Logistics & QLCCƯ', location: 'Hà Nội',
         groups: ['A00','A01','D01'], cutoff2024: 27.65, cutoff2023: 27.40 },
       { code: 'UEH-LOG', name: 'UEH — Kinh doanh quốc tế / Log', location: 'TP.HCM',
-        groups: ['A00','A01','D01'], cutoff2024: 27.20, cutoff2023: 27.00 },
+        groups: ['A00','A01','D01'], cutoff2025: 27.70, cutoff2024: 27.20, cutoff2023: 27.00,
+        notes: 'Logistics & QLCCƯ 2025 = 27.70 (cao nhất trường)' },
     ],
   },
 
@@ -347,7 +364,8 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 6, max: 12 },
     universities: [
       { code: 'HOU', name: 'ĐH Mở Hà Nội — Du lịch', location: 'Hà Nội',
-        groups: ['C00','D01','D14'], cutoff2024: 25.20, cutoff2023: 24.80 },
+        groups: ['C00','D01','D14'], cutoff2024: 25.20, cutoff2023: 24.80,
+        notes: '2025 ngành Du lịch xét thang 40 (NN ×2): QTDVDL&LH 30.53/40' },
       { code: 'HCMUE-TOUR', name: 'ĐH Văn Hiến / Tôn Đức Thắng — DL', location: 'TP.HCM',
         groups: ['C00','D01'], cutoff2024: 23.00, cutoff2023: 22.50 },
     ],
@@ -375,15 +393,15 @@ export const MAJORS: MajorAdmission[] = [
     startingSalary: { min: 15, max: 30 },
     universities: [
       { code: 'BKHN-CS', name: 'BKHN — KHMT / Data Science (IT1)', location: 'Hà Nội',
-        groups: ['A00','A01'], cutoff2024: 28.53, cutoff2023: 28.80,
-        notes: 'Hàng năm cao nhất khối A của BKHN' },
+        groups: ['A00','A01'], cutoff2025: 29.19, cutoff2024: 28.53, cutoff2023: 28.80,
+        notes: 'KHMT IT1 2025 = 29.19; KHDL&AI IT-E10 = 29.39 (cao nhất trường)' },
       { code: 'BKHCM-CS', name: 'BK TP.HCM — KHMT', location: 'TP.HCM',
         groups: ['A00','A01'], cutoff2024: 27.85, cutoff2023: 27.50 },
       { code: 'UET-CS', name: 'UET — KHMT', location: 'Hà Nội',
         groups: ['A00','A01'], cutoff2024: 28.10, cutoff2023: 27.40 },
       { code: 'USTH', name: 'ĐH KH&CN Hà Nội (USTH) — Data', location: 'Hà Nội',
-        groups: ['A00','A01','D07'], cutoff2024: 25.50, cutoff2023: 25.00,
-        notes: 'Học bằng tiếng Anh' },
+        groups: ['A00','A01','D07'], cutoff2025: 24.51, cutoff2024: 25.50, cutoff2023: 25.00,
+        notes: 'Học bằng tiếng Anh; Khoa học dữ liệu 2025 = 24.51' },
     ],
   },
 
@@ -399,8 +417,8 @@ export const MAJORS: MajorAdmission[] = [
       { code: 'BKHN-SEC', name: 'BKHN — ATTT (IT-E15)', location: 'Hà Nội',
         groups: ['A00','A01'], cutoff2024: 27.55, cutoff2023: 27.20 },
       { code: 'KMA', name: 'Học viện Kỹ thuật mật mã', location: 'Hà Nội',
-        groups: ['A00','A01'], cutoff2024: 25.80, cutoff2023: 25.30,
-        notes: 'Có hệ quân sự + dân sự' },
+        groups: ['A00','A01'], cutoff2025: 24.42, cutoff2024: 25.80, cutoff2023: 25.30,
+        notes: 'Có hệ quân sự + dân sự; ATTT 2025 = 24.42 (HN), 23.2 (TP.HCM)' },
     ],
   },
 ]
