@@ -229,6 +229,7 @@ function evalNode(n: Node, x: number, y: number = 0): number {
     case 'var':
       if (n.v === 'x') return x
       if (n.v === 'y') return y
+      if (n.v === 't') return x // tham số t (đồ thị tham số/cực) truyền qua x
       if (n.v in CONSTANTS) return CONSTANTS[n.v]
       throw new Error(`Biến không biết: ${n.v}`)
     case 'neg': return -evalNode(n.a, x, y)
@@ -456,6 +457,16 @@ function resolveGeo(points: GeoPoint[]): Map<string, { x: number; y: number } | 
 }
 const GEO_POINT_COLOR = '#3b82f6'
 const GEO_SHAPE_COLOR = '#fbbf24'
+const TWO_PI = 6.2832
+
+// ── Đường cong tham số x(t),y(t) & cực r(θ) ──
+type CurveKind = 'param' | 'polar'
+type CurveRow = {
+  id: string; kind: CurveKind
+  ex: string; ey: string; er: string // param dùng ex,ey · polar dùng er (biến t)
+  tMin: number; tMax: number
+  color: string; visible: boolean
+}
 const geoLabel = (i: number) => {
   const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   return i < 26 ? L[i] : L[i % 26] + Math.floor(i / 26)
@@ -542,6 +553,13 @@ function Plot({
     onClick: (gx: number, gy: number) => void
     onMovePoint: (id: string, x: number, y: number) => void
   }
+  curves?: {
+    kind: CurveKind
+    fnX: (t: number) => number
+    fnY: (t: number) => number
+    fnR: (t: number) => number
+    tMin: number; tMax: number; color: string
+  }[]
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 800, h: height })
@@ -1069,6 +1087,27 @@ function Plot({
         <text x={xMin <= 0 && xMax >= 0 ? xS(0) + 8 : 14} y={14}
               fill='var(--td-muted)' fontSize={11} fontFamily="monospace" fontStyle="italic">y</text>
 
+        {/* ── Đường cong tham số x(t),y(t) & cực r(θ) ── */}
+        {curves?.map((cv, ci) => {
+          const N = 600
+          const segs: string[] = []
+          let cur = ''
+          let prev: [number, number] | null = null
+          for (let i = 0; i <= N; i++) {
+            const t = cv.tMin + ((cv.tMax - cv.tMin) * i) / N
+            let X: number, Y: number
+            if (cv.kind === 'param') { X = cv.fnX(t); Y = cv.fnY(t) }
+            else { const r = cv.fnR(t); X = r * Math.cos(t); Y = r * Math.sin(t) }
+            if (!Number.isFinite(X) || !Number.isFinite(Y)) { if (cur) segs.push(cur); cur = ''; prev = null; continue }
+            const px = xS(X), py = yS(Y)
+            if (prev && Math.hypot(px - prev[0], py - prev[1]) > Math.max(w, h)) { if (cur) segs.push(cur); cur = '' }
+            cur += (cur ? ' L' : 'M') + `${px.toFixed(1)},${py.toFixed(1)}`
+            prev = [px, py]
+          }
+          if (cur) segs.push(cur)
+          return <path key={`cv${ci}`} d={segs.join(' ')} fill="none" stroke={cv.color} strokeWidth={2.2} />
+        })}
+
         {/* ── Hình dựng (điểm + nối) ── */}
         {geo && (() => {
           return (
@@ -1420,6 +1459,33 @@ export default function GraphLab() {
     }
     setGeoPending(next)
   }
+  // Đường cong tham số / cực
+  const [curveRows, setCurveRows] = useState<CurveRow[]>([
+    { id: mkId(), kind: 'param', ex: '3*cos(t)', ey: '3*sin(t)', er: '', tMin: 0, tMax: TWO_PI, color: COLORS[2], visible: true },
+  ])
+  const compiledCurves = useMemo(
+    () => curveRows.map((row) => {
+      if (row.kind === 'param') {
+        const fx = compileFunction(row.ex), fy = compileFunction(row.ey)
+        return {
+          row, fnX: fx.ok ? fx.eval : () => NaN, fnY: fy.ok ? fy.eval : () => NaN, fnR: () => NaN,
+          err: !fx.ok ? fx.err : (!fy.ok ? fy.err : null),
+        }
+      }
+      const fr = compileFunction(row.er)
+      return { row, fnX: () => NaN, fnY: () => NaN, fnR: fr.ok ? fr.eval : () => NaN, err: fr.ok ? null : fr.err }
+    }),
+    [curveRows],
+  )
+  const addCurve = (kind: CurveKind) =>
+    setCurveRows((rs) => [...rs, {
+      id: mkId(), kind, ex: 'cos(t)', ey: 'sin(t)', er: '1 + cos(t)',
+      tMin: 0, tMax: TWO_PI, color: COLORS[(rs.length + 2) % COLORS.length], visible: true,
+    }])
+  const updateCurve = (id: string, patch: Partial<CurveRow>) =>
+    setCurveRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const deleteCurve = (id: string) => setCurveRows((rs) => rs.filter((r) => r.id !== id))
+
   const [geoMeasure, setGeoMeasure] = useState(false)
   const moveGeoPoint = (id: string, x: number, y: number) =>
     setGeoPoints((ps) => ps.map((p) => (p.id === id ? { ...p, x, y } : p)))
@@ -1660,6 +1726,53 @@ export default function GraphLab() {
               </div>
             </div>
 
+            {/* Đường cong tham số / cực */}
+            <div className="rounded-2xl border border-border bg-slate-900/60 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tham số · Cực</div>
+                <div className="flex gap-1">
+                  <button onClick={() => addCurve('param')} title="Thêm đường tham số x(t), y(t)"
+                          className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/40 hover:bg-emerald-500/25">+ x(t),y(t)</button>
+                  <button onClick={() => addCurve('polar')} title="Thêm đường cực r(θ)"
+                          className="rounded-lg bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-400/40 hover:bg-fuchsia-500/25">+ r(θ)</button>
+                </div>
+              </div>
+              {curveRows.map((row) => {
+                const c = compiledCurves.find((cc) => cc.row.id === row.id)
+                return (
+                  <div key={row.id} className="rounded-xl bg-slate-900/40 border border-border p-2 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: row.color }} />
+                      <span className="text-[10px] font-bold text-slate-300">{row.kind === 'param' ? 'Tham số' : 'Cực'}</span>
+                      <button onClick={() => updateCurve(row.id, { visible: !row.visible })} className="ml-auto text-slate-400 hover:text-foreground" title={row.visible ? 'Ẩn' : 'Hiện'}>
+                        {row.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                      <button onClick={() => deleteCurve(row.id)} className="text-slate-500 hover:text-rose-400" title="Xóa"><Trash2 size={13} /></button>
+                    </div>
+                    {row.kind === 'param' ? (
+                      <div className="flex gap-1">
+                        <label className="flex items-center gap-1 flex-1 min-w-0"><span className="text-[10px] font-mono text-slate-500">x=</span>
+                          <input value={row.ex} onChange={(e) => updateCurve(row.id, { ex: e.target.value })} spellCheck={false} placeholder="3*cos(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                        <label className="flex items-center gap-1 flex-1 min-w-0"><span className="text-[10px] font-mono text-slate-500">y=</span>
+                          <input value={row.ey} onChange={(e) => updateCurve(row.id, { ey: e.target.value })} spellCheck={false} placeholder="3*sin(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-1"><span className="text-[10px] font-mono text-slate-500">r=</span>
+                        <input value={row.er} onChange={(e) => updateCurve(row.id, { er: e.target.value })} spellCheck={false} placeholder="1 + cos(t)" className="w-full min-w-0 bg-transparent text-xs font-mono text-foreground outline-none border-b border-border" /></label>
+                    )}
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <span>t∈[</span>
+                      <input type="number" value={row.tMin} step={0.5} onChange={(e) => updateCurve(row.id, { tMin: parseFloat(e.target.value) || 0 })} className="w-12 bg-transparent border-b border-border text-foreground outline-none" />
+                      <span>,</span>
+                      <input type="number" value={row.tMax} step={0.5} onChange={(e) => updateCurve(row.id, { tMax: parseFloat(e.target.value) || 0 })} className="w-12 bg-transparent border-b border-border text-foreground outline-none" />
+                      <span>] (θ dùng biến t)</span>
+                    </div>
+                    {c?.err && <div className="text-[10px] text-rose-400 font-mono">⚠ {c.err}</div>}
+                  </div>
+                )
+              })}
+            </div>
+
             {/* Keyboard toggle */}
             <button
               onClick={() => setKbOpen((o) => !o)}
@@ -1731,6 +1844,9 @@ export default function GraphLab() {
               onViewportChange={setViewport}
               height={560}
               geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
+              curves={compiledCurves
+                .filter((c) => c.row.visible && !c.err)
+                .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
             />
 
             {/* Viewport info + legend */}
