@@ -88,6 +88,39 @@ async function geocodePlace(q: string): Promise<{ name: string; lat: number; lon
   } catch { return [] }
 }
 
+// RNG có seed → mọi người chơi cùng phòng thấy phần thưởng/mother ship GIỐNG NHAU
+function seedFrom(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
+function mulberry32(a: number) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
+
+// Điểm tích luỹ + cấp độ người chơi (localStorage)
+function getPoints(): number { try { return parseInt(localStorage.getItem('drone_points') || '0', 10) || 0 } catch { return 0 } }
+function addPoints(d: number): number { try { const v = Math.max(0, getPoints() + d); localStorage.setItem('drone_points', String(v)); return v } catch { return Math.max(0, d) } }
+function playerLevel(points: number): number { return Math.floor(Math.sqrt(Math.max(0, points) / 120)) + 1 }
+
+type PickupType = 'battery' | 'points' | 'cargo' | 'upgrade' | 'drone'
+interface PickupItem { type: PickupType; pos: Vec3 }
+const PICKUP_INFO: Record<PickupType, { color: string; label: string; score: number }> = {
+  battery: { color: '#22c55e', label: 'BAT', score: 0 },
+  points: { color: '#fbbf24', label: '+50', score: 50 },
+  cargo: { color: '#b45309', label: 'BOX', score: 80 },
+  upgrade: { color: '#a855f7', label: 'UP', score: 20 },
+  drone: { color: '#22d3ee', label: 'NEW', score: 30 },
+}
+function generatePickups(seedStr: string, count = 14): PickupItem[] {
+  const rnd = mulberry32(seedFrom('pk' + seedStr))
+  const bag: PickupType[] = ['battery', 'battery', 'points', 'points', 'points', 'cargo', 'cargo', 'upgrade', 'upgrade', 'drone']
+  const out: PickupItem[] = []
+  for (let i = 0; i < count; i++) out.push({ type: bag[Math.floor(rnd() * bag.length)], pos: [(rnd() - 0.5) * 300, 6 + rnd() * 40, -(rnd() * 460) - 20] })
+  return out
+}
+interface MotherShipSpec { pos: Vec3 }
+function generateMotherships(seedStr: string, count = 3): MotherShipSpec[] {
+  const rnd = mulberry32(seedFrom('ms' + seedStr))
+  const out: MotherShipSpec[] = []
+  for (let i = 0; i < count; i++) out.push({ pos: [(rnd() - 0.5) * 260, 32 + rnd() * 26, -(rnd() * 420) - 40] })
+  return out
+}
+
 // ═════════════════════════════════════════════════════════════
 // DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
 // ═════════════════════════════════════════════════════════════
@@ -1032,6 +1065,10 @@ function DroneRig({
   onCrash: () => void
   posRef?: React.MutableRefObject<THREE.Vector3>
   rotRef?: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
+  rechargeRef?: React.MutableRefObject<number>          // >0 = nạp pin (phần thưởng trạm sạc)
+  boostRef?: React.MutableRefObject<{ mult: number; until: number }>  // tăng lực đẩy tạm thời
+  sizeMult?: number   // kích thước drone theo cấp độ người chơi
+  rangeMult?: number  // tầm bay / lực đẩy theo cấp độ
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const stateRef = useRef<DroneState>({
@@ -1069,7 +1106,11 @@ function DroneRig({
     const orient = yawQ.clone().multiply(pitchQ).multiply(rollQ)
     const thrustVec = new THREE.Vector3(0, 1, 0).applyQuaternion(orient)
     const throttleMag = Math.max(0, (sm.throttle + 1) / 2)
-    s.vel.addScaledVector(thrustVec, throttleMag * PHYSICS.thrustGain * dt)
+    // Nạp pin (trạm sạc / mother ship) + boost (nâng cấp) + tầm bay theo cấp độ
+    if (rechargeRef && rechargeRef.current > 0) { s.battery = Math.min(100, s.battery + rechargeRef.current); rechargeRef.current = 0 }
+    const boostMult = boostRef && performance.now() < boostRef.current.until ? boostRef.current.mult : 1
+    const thrust = PHYSICS.thrustGain * boostMult * (rangeMult ?? 1)
+    s.vel.addScaledVector(thrustVec, throttleMag * thrust * dt)
     s.vel.y -= PHYSICS.gravity * dt
     s.vel.multiplyScalar(PHYSICS.airDrag ** (dt * 60))
     s.pos.addScaledVector(s.vel, dt)
@@ -1128,7 +1169,7 @@ function DroneRig({
 
   const propSpeed = Math.max(0.1, (inputs.current.throttle + 1) / 2)
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} scale={sizeMult ?? 1}>
       {model.gltfUrl ? (
         // GLTF model — Suspense fallback ở caller, primitive sẽ mount khi load xong
         <GltfDrone url={model.gltfUrl} scale={model.scale}
@@ -1431,6 +1472,76 @@ function PeerDrones({ peersRef }: { peersRef: React.MutableRefObject<Map<string,
     return () => clearInterval(it)
   }, [peersRef])
   return <>{ids.map((id) => <PeerGhost key={id} id={id} peersRef={peersRef} />)}</>
+}
+
+// ═════════════════════════════════════════════════════════════
+// PHẦN THƯỞNG (pickups) + MOTHER SHIP (trạm sạc bay)
+// ═════════════════════════════════════════════════════════════
+function PickupShape({ type }: { type: PickupType }) {
+  const info = PICKUP_INFO[type]
+  return (
+    <group>
+      {type === 'battery' && <mesh><cylinderGeometry args={[0.3, 0.3, 0.7, 12]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.5} /></mesh>}
+      {type === 'points' && <mesh><octahedronGeometry args={[0.45]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} metalness={0.6} /></mesh>}
+      {type === 'cargo' && <mesh><boxGeometry args={[0.6, 0.6, 0.6]} /><meshStandardMaterial color={info.color} /></mesh>}
+      {type === 'upgrade' && <mesh><coneGeometry args={[0.35, 0.7, 6]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} /></mesh>}
+      {type === 'drone' && <mesh><torusGeometry args={[0.35, 0.12, 10, 20]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} /></mesh>}
+      <Text position={[0, 0.7, 0]} fontSize={0.3} color={info.color} anchorX="center" outlineWidth={0.02} outlineColor="#000">{info.label}</Text>
+    </group>
+  )
+}
+function Pickups({ items, posRef, onCollect }: {
+  items: PickupItem[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onCollect: (type: PickupType) => void
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const taken = useRef<Set<number>>(new Set())
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    items.forEach((it, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      if (taken.current.has(i)) { if (g.visible) g.visible = false; return }
+      g.rotation.y += dt * 1.6
+      g.position.y = it.pos[1] + Math.sin(performance.now() / 420 + i) * 0.25
+      if (Math.hypot(dp.x - it.pos[0], dp.y - g.position.y, dp.z - it.pos[2]) < 1.7) {
+        taken.current.add(i); g.visible = false; onCollect(it.type)
+      }
+    })
+  })
+  return <>{items.map((it, i) => <group key={i} ref={(el) => { refs.current[i] = el }} position={it.pos}><PickupShape type={it.type} /></group>)}</>
+}
+function MotherShips({ specs, posRef, onNear }: {
+  specs: MotherShipSpec[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onNear: () => void
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const lastTick = useRef(0)
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    let near = false
+    specs.forEach((sp, i) => {
+      const g = refs.current[i]
+      if (g) { g.position.y = sp.pos[1] + Math.sin(performance.now() / 1200 + i) * 0.6; g.rotation.y += dt * 0.15 }
+      if (Math.hypot(dp.x - sp.pos[0], dp.y - sp.pos[1], dp.z - sp.pos[2]) < 16) near = true
+    })
+    if (near) { const now = performance.now(); if (now - lastTick.current > 200) { lastTick.current = now; onNear() } }
+  })
+  return (
+    <>
+      {specs.map((sp, i) => (
+        <group key={i} ref={(el) => { refs.current[i] = el }} position={sp.pos}>
+          <mesh castShadow><cylinderGeometry args={[6, 7, 1.6, 6]} /><meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} /></mesh>
+          <mesh position={[0, 0.9, 0]}><cylinderGeometry args={[2.4, 4, 1.2, 6]} /><meshStandardMaterial color="#475569" metalness={0.6} /></mesh>
+          <mesh position={[0, -0.9, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[5, 7, 24]} /><meshBasicMaterial color="#22d3ee" transparent opacity={0.5} side={THREE.DoubleSide} /></mesh>
+          <pointLight position={[0, -1, 0]} color="#22d3ee" intensity={2} distance={20} />
+          <Text position={[0, 2.4, 0]} fontSize={0.9} color="#22d3ee" anchorX="center" outlineWidth={0.04} outlineColor="#000">⬡ TRẠM SẠC</Text>
+        </group>
+      ))}
+    </>
+  )
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -2408,6 +2519,31 @@ function GameScreen({
   const gamepadId = useGamepadInput(inputsRef)
   const dronePosRef = useRef(new THREE.Vector3(0, 0.5, 0))
   const droneRotRef = useRef({ yaw: 0, pitch: 0, roll: 0 })
+  // Phần thưởng / nâng cấp / cấp độ
+  const rechargeRef = useRef(0)
+  const boostRef = useRef({ mult: 1, until: 0 })
+  const [points] = useState(() => getPoints())
+  const lvlNum = playerLevel(points)
+  const sizeMult = 1 + (lvlNum - 1) * 0.08
+  const rangeMult = 1 + (lvlNum - 1) * 0.06
+  const [runScore, setRunScore] = useState(0)
+  const [collectMsg, setCollectMsg] = useState<string | null>(null)
+  const [modelOverride, setModelOverride] = useState<DroneModel | null>(null)
+  const [boostOn, setBoostOn] = useState(false)
+  const seedStr = room || `lvl${level.id}`
+  const pickups = useMemo(() => generatePickups(seedStr), [seedStr])
+  const motherships = useMemo(() => generateMotherships(seedStr), [seedStr])
+  const onCollect = useCallback((type: PickupType) => {
+    playPickup()
+    const info = PICKUP_INFO[type]
+    if (type === 'battery') rechargeRef.current = 100
+    else if (type === 'upgrade') { boostRef.current = { mult: 1.6, until: performance.now() + 9000 }; setBoostOn(true); setTimeout(() => setBoostOn(false), 9000) }
+    else if (type === 'drone') setModelOverride(DRONE_MODELS[Math.floor(Math.random() * DRONE_MODELS.length)])
+    if (info.score) setRunScore((s) => s + info.score)
+    setCollectMsg(type === 'battery' ? '🔋 Sạc đầy pin!' : type === 'upgrade' ? '⚡ Tăng tốc 9s!' : type === 'drone' ? '🚁 Drone mới!' : `+${info.score} điểm`)
+    setTimeout(() => setCollectMsg(null), 1400)
+  }, [])
+  const onMotherNear = useCallback(() => { rechargeRef.current = Math.max(rechargeRef.current, 1.5) }, [])
   // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
   const peersRef = useRef<Map<string, Peer>>(new Map())
   const raceRef = useRef<Map<string, { name: string; time: number }>>(new Map())
@@ -2451,9 +2587,15 @@ function GameScreen({
   // Trong phòng: thắng = về đích nhanh nhất; KHÔNG thoát ngay (xem bảng + bay tiếp)
   const completeRef = useRef<(s: boolean, e: number) => void>(() => {})
   completeRef.current = (success: boolean, elapsed: number) => {
-    if (room) { if (success) finishRace(elapsed); return }
+    if (room) { if (success) { finishRace(elapsed); addPoints(60 + runScore) } return }
+    if (success) addPoints(40 + runScore) // nhiệm vụ: cộng điểm
     onComplete(success, elapsed)
   }
+  // Thoát giữa chừng trận thách đấu (chưa về đích) → TRỪ điểm
+  const handleAbort = useCallback(() => {
+    if (room && !finishedRef.current) addPoints(-30)
+    onAbort()
+  }, [room, onAbort])
 
   useEffect(() => {
     if (!room) return
@@ -2586,10 +2728,13 @@ function GameScreen({
         >
           <LevelEnvironment level={level} currentGate={gateProgress} />
           <Suspense fallback={null}>
-            <DroneRig inputs={inputsRef} level={level} model={model} onTelemetry={onTelemetry}
+            <DroneRig inputs={inputsRef} level={level} model={modelOverride || model} onTelemetry={onTelemetry}
               onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash}
-              posRef={dronePosRef} rotRef={droneRotRef} />
+              posRef={dronePosRef} rotRef={droneRotRef}
+              rechargeRef={rechargeRef} boostRef={boostRef} sizeMult={sizeMult} rangeMult={rangeMult} />
           </Suspense>
+          <Pickups items={pickups} posRef={dronePosRef} onCollect={onCollect} />
+          <MotherShips specs={motherships} posRef={dronePosRef} onNear={onMotherNear} />
           {room && <PeerDrones peersRef={peersRef} />}
           {level.map && (
             <Suspense fallback={null}>
@@ -2680,7 +2825,7 @@ function GameScreen({
               <div style={{ fontSize: 28 }}>🏁 VỀ ĐÍCH!</div>
               <div style={{ fontSize: 15, color: '#7dd3fc', margin: '6px 0' }}>Hạng {(raceBoard.findIndex((r) => r.me) + 1) || '-'} · {myFinishTime.toFixed(2)}s</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Bay tiếp để xem bảng hoặc rời phòng</div>
-              <button onClick={onAbort} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>Rời phòng →</button>
+              <button onClick={handleAbort} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>Rời phòng →</button>
             </div>
           </div>
         )}
@@ -2696,6 +2841,58 @@ function GameScreen({
             {mapStatus === 'empty' && '🗺️ Không có dữ liệu công trình ở khu vực này'}
             {mapStatus === 'error' && '⚠️ Lỗi tải bản đồ (mạng/Overpass) — bay không có toà nhà'}
           </div>
+        )}
+
+        {/* Bảng chỉ số Drone (kiểu game đua xe) */}
+        <div style={{
+          position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+          display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(8,30,38,0.78)',
+          border: '1px solid rgba(34,211,238,0.3)', borderRadius: 12, padding: '8px 14px', fontFamily: 'monospace',
+        }}>
+          {(() => {
+            const spd = telemetry ? telemetry.vel.length() * 3.6 : 0
+            const maxSpd = 90 * rangeMult
+            const bar = (label: string, frac: number, col: string) => (
+              <div style={{ textAlign: 'center', minWidth: 46 }}>
+                <div style={{ fontSize: 8, color: '#7dd3fc', marginBottom: 3 }}>{label}</div>
+                <div style={{ width: 44, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, height: '100%', background: col }} />
+                </div>
+              </div>
+            )
+            return (
+              <>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>CẤP</div>
+                  <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{lvlNum}</div>
+                </div>
+                {bar('TỐC ĐỘ', spd / maxSpd, '#22d3ee')}
+                {bar('PIN', (telemetry?.battery ?? 0) / 100, telemetry && telemetry.battery < 20 ? '#ef4444' : '#22c55e')}
+                {bar('TẦM BAY', (rangeMult - 1) / 0.6 + 0.2, '#a855f7')}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>BOOST</div>
+                  <div style={{ fontSize: 14, color: boostOn ? '#a855f7' : '#475569' }}>{boostOn ? '⚡ON' : '—'}</div>
+                </div>
+                <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: 10 }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐIỂM MÀN</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: '#fde68a' }}>{runScore}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>TỔNG</div>
+                  <div style={{ fontSize: 14, color: '#cbd5e1' }}>{points + runScore}</div>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+
+        {/* Toast nhận thưởng */}
+        {collectMsg && (
+          <div style={{
+            position: 'absolute', top: '32%', left: '50%', transform: 'translateX(-50%)', zIndex: 11,
+            background: 'rgba(168,85,247,0.9)', color: '#fff', padding: '8px 18px', borderRadius: 999,
+            fontSize: 15, fontWeight: 'bold', fontFamily: 'monospace', pointerEvents: 'none',
+          }}>{collectMsg}</div>
         )}
 
         {/* Flash đỏ khi va chạm */}
@@ -2735,7 +2932,7 @@ function GameScreen({
           cursor: 'pointer', fontSize: 14, zIndex: 10,
         }}>🕹️</button>
         {/* Abort button top-left of canvas */}
-        <button onClick={onAbort} style={{
+        <button onClick={handleAbort} style={{
           position: 'absolute', top: 12, right: 110, padding: '6px 12px',
           background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)',
           color: '#fca5a5', borderRadius: 6, cursor: 'pointer', fontSize: 12, zIndex: 10,
