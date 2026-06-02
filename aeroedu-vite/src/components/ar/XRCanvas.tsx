@@ -42,6 +42,7 @@ export function XRCanvas({
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [presenting, setPresenting] = useState(false)
   const [cmPerUnit, setCmPerUnit] = useState<number | null>(null)
+  const [arPhase, setArPhase] = useState<'searching' | 'ready' | 'placed' | null>(null)
 
   useEffect(() => { onPresentingChange?.(presenting) }, [presenting, onPresentingChange])
 
@@ -91,7 +92,7 @@ export function XRCanvas({
         }}
       >
         {children}
-        {arEnabled && <ARRealtimeController onPlacedScale={handlePlacedScale} />}
+        {arEnabled && <ARRealtimeController onPlacedScale={handlePlacedScale} onPhase={setArPhase} />}
       </Canvas>
 
       {arEnabled && !presenting && (
@@ -140,6 +141,32 @@ export function XRCanvas({
           }}
         >
           📐 1 đơn vị ≈ {cmPerUnit.toFixed(1)} cm · chụm 2 ngón để chỉnh
+        </div>
+      )}
+
+      {presenting && arPhase && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 70,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 40,
+            maxWidth: '88%',
+            padding: '9px 16px',
+            borderRadius: 14,
+            background: arPhase === 'ready' ? 'rgba(8,145,178,0.92)' : 'rgba(15,23,42,0.85)',
+            color: '#f1f5f9',
+            fontSize: 13,
+            fontWeight: 600,
+            textAlign: 'center',
+            lineHeight: 1.35,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+          }}
+        >
+          {arPhase === 'searching' && '🔍 Di chuyển điện thoại hướng vào mặt bàn/sàn để tìm mặt phẳng — hoặc chạm để đặt ngay trước mặt'}
+          {arPhase === 'ready' && '👆 Chạm màn hình để đặt lên điểm đã ngắm'}
+          {arPhase === 'placed' && '✓ Đã đặt — chạm chỗ khác để di chuyển · chụm 2 ngón để phóng to/thu nhỏ'}
         </div>
       )}
     </div>
