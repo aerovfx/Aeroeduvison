@@ -479,7 +479,9 @@ function Plot({
     points: GeoPoint[]
     shapes: GeoShape[]
     pending: string[]
+    measure: boolean
     onClick: (gx: number, gy: number) => void
+    onMovePoint: (id: string, x: number, y: number) => void
   }
 }) {
   const ref = useRef<SVGSVGElement>(null)
@@ -761,12 +763,27 @@ function Plot({
   }, [compiled, xMin, xMax, yMin, yMax, w, h])
 
   const geoActive = !!geo && geo.tool !== 'move'
+  const [dragPt, setDragPt] = useState<string | null>(null)
+  // Tìm điểm geo gần (px) để bắt kéo
+  const nearbyPoint = (px: number, py: number): string | null => {
+    if (!geo) return null
+    for (const p of geo.points) {
+      if (Math.hypot(xS(p.x) - px, yS(p.y) - py) < 12) return p.id
+    }
+    return null
+  }
 
   // Mouse interactions
   const onMouseDown = (e: React.MouseEvent) => {
-    if (geoActive) return // đang dựng hình → không pan
     const r = ref.current!.getBoundingClientRect()
-    setDragging({ x0: e.clientX - r.left, y0: e.clientY - r.top, v0: viewport })
+    const px = e.clientX - r.left, py = e.clientY - r.top
+    if (geoActive) return // đang dựng hình → không pan, đặt qua onClick
+    // Tool Di chuyển: kéo điểm nếu bấm trúng, ngược lại pan
+    if (geo && geo.tool === 'move') {
+      const hit = nearbyPoint(px, py)
+      if (hit) { setDragPt(hit); return }
+    }
+    setDragging({ x0: px, y0: py, v0: viewport })
   }
   const onPlotClick = (e: React.MouseEvent) => {
     if (!geoActive || !geo) return
@@ -777,6 +794,7 @@ function Plot({
     const r = ref.current!.getBoundingClientRect()
     const px = e.clientX - r.left, py = e.clientY - r.top
     setCursor({ x: xInv(px), y: yInv(py) })
+    if (dragPt && geo) { geo.onMovePoint(dragPt, xInv(px), yInv(py)); return }
     if (dragging) {
       const dx = px - dragging.x0, dy = py - dragging.y0
       const rx = (dragging.v0.xMax - dragging.v0.xMin) / w
@@ -789,8 +807,8 @@ function Plot({
       })
     }
   }
-  const onMouseUp = () => setDragging(null)
-  const onMouseLeave = () => { setDragging(null); setCursor(null) }
+  const onMouseUp = () => { setDragging(null); setDragPt(null) }
+  const onMouseLeave = () => { setDragging(null); setDragPt(null); setCursor(null) }
 
   // Native non-passive wheel listener — React onWheel mặc định passive
   // → e.preventDefault() bị bỏ qua + cảnh báo console. Phải attach qua
@@ -1021,6 +1039,36 @@ function Plot({
                 const d = ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.x).toFixed(1)},${yS(p.y).toFixed(1)}`).join(' ') + ' Z'
                 return <path key={sh.id} d={d} fill={`${sh.color}33`} stroke={sh.color} strokeWidth={2.2} />
               })}
+              {/* Số đo (độ dài / bán kính / diện tích) */}
+              {geo.measure && geo.shapes.map((sh) => {
+                const ps = sh.pts.map(gp).filter(Boolean) as GeoPoint[]
+                if (ps.length < 2) return null
+                let label = '', lx = 0, ly = 0
+                if (sh.type === 'segment') {
+                  label = Math.hypot(ps[1].x - ps[0].x, ps[1].y - ps[0].y).toFixed(2)
+                  lx = (ps[0].x + ps[1].x) / 2; ly = (ps[0].y + ps[1].y) / 2
+                } else if (sh.type === 'circle') {
+                  const r = Math.hypot(ps[1].x - ps[0].x, ps[1].y - ps[0].y)
+                  label = `r=${r.toFixed(2)} · S=${(Math.PI * r * r).toFixed(2)}`
+                  lx = ps[0].x; ly = ps[0].y
+                } else if (sh.type === 'polygon') {
+                  let area = 0, per = 0
+                  for (let i = 0; i < ps.length; i++) {
+                    const a = ps[i], b = ps[(i + 1) % ps.length]
+                    area += a.x * b.y - b.x * a.y; per += Math.hypot(b.x - a.x, b.y - a.y)
+                  }
+                  area = Math.abs(area) / 2
+                  label = `S=${area.toFixed(2)} · P=${per.toFixed(2)}`
+                  lx = ps.reduce((s, p) => s + p.x, 0) / ps.length
+                  ly = ps.reduce((s, p) => s + p.y, 0) / ps.length
+                } else return null
+                return (
+                  <text key={`m-${sh.id}`} x={xS(lx)} y={yS(ly)} fill="#fde68a" fontSize={11}
+                        fontWeight={700} fontFamily="monospace" textAnchor="middle"
+                        stroke="#0a0f1a" strokeWidth={3} paintOrder="stroke">{label}</text>
+                )
+              })}
+
               {/* Điểm + nhãn */}
               {geo.points.map((p, i) => {
                 const isPending = geo.pending.includes(p.id)
@@ -1282,6 +1330,9 @@ export default function GraphLab() {
     }
     setGeoPending(next)
   }
+  const [geoMeasure, setGeoMeasure] = useState(false)
+  const moveGeoPoint = (id: string, x: number, y: number) =>
+    setGeoPoints((ps) => ps.map((p) => (p.id === id ? { ...p, x, y } : p)))
   const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]) }
   const undoGeo = () => {
     if (geoPending.length) { setGeoPending([]); return }
@@ -1553,6 +1604,12 @@ export default function GraphLab() {
                 )
               })}
               <span className="flex-1" />
+              <button onClick={() => setGeoMeasure((m) => !m)} title="Hiện số đo (độ dài, bán kính, diện tích)"
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ring-1 transition ${
+                  geoMeasure ? 'bg-emerald-500/25 text-emerald-100 ring-emerald-400/60' : 'bg-slate-800/70 text-slate-300 ring-slate-700 hover:bg-slate-700'
+                }`}>
+                <Hash size={13} /> <span className="hidden sm:inline">Đo</span>
+              </button>
               <button onClick={undoGeo} title="Hoàn tác" className="p-1.5 rounded-lg bg-slate-800/70 ring-1 ring-slate-700 hover:bg-slate-700 text-slate-300">
                 <RotateCcw size={13} />
               </button>
@@ -1575,7 +1632,7 @@ export default function GraphLab() {
               viewport={viewport}
               onViewportChange={setViewport}
               height={560}
-              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, onClick: handleGeoClick }}
+              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
             />
 
             {/* Viewport info + legend */}
