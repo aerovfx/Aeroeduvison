@@ -916,7 +916,7 @@ const PHYSICS = {
 }
 
 function DroneRig({
-  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash,
+  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash, posRef,
 }: {
   inputs: React.MutableRefObject<ControlInputs>
   level: Level
@@ -925,6 +925,7 @@ function DroneRig({
   onGatePass: (idx: number) => void
   onHoverProgress: (secondsHeld: number) => void
   onCrash: () => void
+  posRef?: React.MutableRefObject<THREE.Vector3>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const stateRef = useRef<DroneState>({
@@ -934,19 +935,34 @@ function DroneRig({
   const hoverHeldRef = useRef(0)
   const lastGateCheckedRef = useRef(-1)
   const { camera } = useThree()
+  // Làm mượt kiểu UE5: input low-pass + camera lerp + FOV theo tốc độ
+  const inSmooth = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
+  const camLook = useRef(new THREE.Vector3(0, 0.5, 1))
+  const smooth = (dt: number, tau: number) => 1 - Math.exp(-dt / tau)
 
-  useFrame((_state, dt) => {
+  useFrame((_state, dtRaw) => {
+    const dt = Math.min(dtRaw, 1 / 30) // clamp để không giật khi frame rớt
     const s = stateRef.current
     const i = inputs.current
-    s.yaw += i.yaw * PHYSICS.yawRate * dt
-    s.pitch = i.pitch * 0.5
-    s.roll = i.roll * 0.5
+    const sm = inSmooth.current
+    // Input low-pass → cảm giác mượt, không "bụp" như UE5 (frame-independent)
+    const ai = smooth(dt, 0.12)
+    sm.throttle += (i.throttle - sm.throttle) * ai
+    sm.yaw += (i.yaw - sm.yaw) * ai
+    sm.pitch += (i.pitch - sm.pitch) * ai
+    sm.roll += (i.roll - sm.roll) * ai
+
+    s.yaw += sm.yaw * PHYSICS.yawRate * dt
+    // pitch/roll tiến mượt về góc mục tiêu (ease) thay vì gán tức thì
+    const ab = smooth(dt, 0.10)
+    s.pitch += (sm.pitch * 0.5 - s.pitch) * (ab + (1 - ab) * 0) // ease tới target
+    s.roll += (sm.roll * 0.5 - s.roll) * ab
     const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw)
     const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s.pitch)
     const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), s.roll)
     const orient = yawQ.clone().multiply(pitchQ).multiply(rollQ)
     const thrustVec = new THREE.Vector3(0, 1, 0).applyQuaternion(orient)
-    const throttleMag = Math.max(0, (i.throttle + 1) / 2)
+    const throttleMag = Math.max(0, (sm.throttle + 1) / 2)
     s.vel.addScaledVector(thrustVec, throttleMag * PHYSICS.thrustGain * dt)
     s.vel.y -= PHYSICS.gravity * dt
     s.vel.multiplyScalar(PHYSICS.airDrag ** (dt * 60))
@@ -960,14 +976,25 @@ function DroneRig({
     }
     if (s.pos.y > PHYSICS.maxAltitude) { s.pos.y = PHYSICS.maxAltitude; s.vel.y = Math.min(0, s.vel.y) }
     if (s.battery > 0) s.battery = Math.max(0, s.battery - throttleMag * PHYSICS.batteryDrain * dt)
+    if (posRef) posRef.current.copy(s.pos)
 
     if (groupRef.current) {
       groupRef.current.position.copy(s.pos)
       groupRef.current.quaternion.copy(orient)
     }
+    // Camera mượt: lerp vị trí + điểm nhìn, FOV "punch" theo tốc độ (cảm giác UE5)
     const camOffset = new THREE.Vector3(0, 0.05, 0).applyQuaternion(orient)
-    camera.position.copy(s.pos).add(camOffset)
-    camera.lookAt(s.pos.clone().add(new THREE.Vector3(0, 0, 1).applyQuaternion(orient)))
+    const desiredPos = s.pos.clone().add(camOffset)
+    camera.position.lerp(desiredPos, smooth(dt, 0.05))
+    const lookTarget = s.pos.clone().add(new THREE.Vector3(0, 0, 1).applyQuaternion(orient))
+    camLook.current.lerp(lookTarget, smooth(dt, 0.05))
+    camera.lookAt(camLook.current)
+    const cam = camera as THREE.PerspectiveCamera
+    if (cam.isPerspectiveCamera) {
+      const targetFov = 88 + Math.min(22, s.vel.length() * 0.7)
+      cam.fov += (targetFov - cam.fov) * smooth(dt, 0.25)
+      cam.updateProjectionMatrix()
+    }
 
     // ── Level objective check ──
     if (level.type === 'hover' && level.hover) {
@@ -1237,6 +1264,117 @@ function MobileTouchSticks({ inputsRef }: { inputsRef: React.MutableRefObject<Co
       />
     </>
   )
+}
+
+// ═════════════════════════════════════════════════════════════
+// MŨI TÊN CHỈ ĐƯỜNG (3D) — bay tới mục tiêu kế tiếp
+// ═════════════════════════════════════════════════════════════
+function WaypointGuide({ posRef, target, color = '#22d3ee' }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  target: [number, number, number] | null
+  color?: string
+}) {
+  const arrowRef = useRef<THREE.Group>(null)
+  const beaconRef = useRef<THREE.Group>(null)
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_s, dt) => {
+    const a = arrowRef.current, b = beaconRef.current
+    if (!target) { if (a) a.visible = false; if (b) b.visible = false; return }
+    const tp = tmp.set(target[0], target[1], target[2])
+    const dp = posRef.current
+    const dir = tp.clone().sub(dp)
+    const dist = dir.length()
+    if (a) {
+      a.visible = dist > 1.5
+      if (dist > 0.001) {
+        dir.normalize()
+        a.position.copy(dp).addScaledVector(dir, 2.6)
+        a.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
+        const pulse = 1 + Math.sin(performance.now() / 180) * 0.12
+        a.scale.setScalar(pulse)
+      }
+    }
+    if (b) { b.visible = true; b.position.set(tp.x, 0, tp.z) }
+  })
+  return (
+    <>
+      {/* Mũi tên trôi phía trước, chỉ về mục tiêu */}
+      <group ref={arrowRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.28]}>
+          <coneGeometry args={[0.2, 0.42, 18]} />
+          <meshBasicMaterial color={color} transparent opacity={0.92} toneMapped={false} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.34, 14]} />
+          <meshBasicMaterial color={color} transparent opacity={0.7} toneMapped={false} />
+        </mesh>
+      </group>
+      {/* Cột sáng tại mục tiêu */}
+      <group ref={beaconRef}>
+        <mesh position={[0, 40, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 80, 12]} />
+          <meshBasicMaterial color="#fbbf24" transparent opacity={0.16} toneMapped={false} />
+        </mesh>
+      </group>
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// ÂM THANH ĐỘNG CƠ DRONE — WebAudio, phản ứng theo throttle
+// ═════════════════════════════════════════════════════════════
+function DroneSound({ inputsRef, muted }: {
+  inputsRef: React.MutableRefObject<ControlInputs>
+  muted: boolean
+}) {
+  useEffect(() => {
+    if (muted) return
+    const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined
+    if (!AC) return
+    let ctx: AudioContext | null = null
+    let raf = 0
+    let stopped = false
+    const build = () => {
+      if (ctx) return
+      ctx = new AC()
+      const sr = ctx.sampleRate
+      const buf = ctx.createBuffer(1, sr, sr)
+      const data = buf.getChannelData(0)
+      for (let k = 0; k < sr; k++) data[k] = Math.random() * 2 - 1
+      const noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 200; bp.Q.value = 0.7
+      const ng = ctx.createGain(); ng.gain.value = 0
+      noise.connect(bp); bp.connect(ng); ng.connect(ctx.destination)
+      const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 80
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900
+      const og = ctx.createGain(); og.gain.value = 0
+      osc.connect(lp); lp.connect(og); og.connect(ctx.destination)
+      noise.start(); osc.start()
+      const loop = () => {
+        if (stopped || !ctx) return
+        const thr = Math.max(0, (inputsRef.current.throttle + 1) / 2)
+        const t = ctx.currentTime
+        ng.gain.setTargetAtTime(0.035 + thr * 0.11, t, 0.05)
+        og.gain.setTargetAtTime(0.012 + thr * 0.045, t, 0.05)
+        osc.frequency.setTargetAtTime(68 + thr * 190, t, 0.05)
+        bp.frequency.setTargetAtTime(160 + thr * 240, t, 0.05)
+        raf = requestAnimationFrame(loop)
+      }
+      loop()
+    }
+    const resume = () => { build(); ctx?.resume?.() }
+    window.addEventListener('pointerdown', resume)
+    window.addEventListener('keydown', resume)
+    build() // thử khởi tạo ngay (có thể suspended tới khi có gesture)
+    return () => {
+      stopped = true
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointerdown', resume)
+      window.removeEventListener('keydown', resume)
+      ctx?.close?.()
+    }
+  }, [inputsRef, muted])
+  return null
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -1677,6 +1815,20 @@ function GameScreen({
   const startTimeRef = useRef(Date.now())
   const completedRef = useRef(false)
   const gamepadId = useGamepadInput(inputsRef)
+  const dronePosRef = useRef(new THREE.Vector3(0, 0.5, 0))
+  const [muted, setMuted] = useState(false)
+  const [showSticks, setShowSticks] = useState(isMobile())
+  const [showHint, setShowHint] = useState(true)
+  useEffect(() => { const id = setTimeout(() => setShowHint(false), 9000); return () => clearTimeout(id) }, [])
+
+  // Mục tiêu kế tiếp để vẽ mũi tên chỉ đường + đo khoảng cách
+  const guideTarget: [number, number, number] | null = useMemo(() => {
+    if (level.type === 'hover' && level.hover) return [0, level.hover.altitude, 0]
+    if (level.type === 'gates' && level.gates) return level.gates[gateProgress]?.pos ?? null
+    return null
+  }, [level, gateProgress])
+  const guideDist = telemetry && guideTarget
+    ? telemetry.pos.distanceTo(new THREE.Vector3(...guideTarget)) : null
 
   // Countdown timer
   useEffect(() => {
@@ -1741,8 +1893,9 @@ function GameScreen({
           <LevelEnvironment level={level} currentGate={gateProgress} />
           <Suspense fallback={null}>
             <DroneRig inputs={inputsRef} level={level} model={model} onTelemetry={onTelemetry}
-              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} />
+              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} posRef={dronePosRef} />
           </Suspense>
+          <WaypointGuide posRef={dronePosRef} target={guideTarget} />
           <KeyboardBridge inputsRef={inputsRef} />
           <Text position={[0, 14, -20]} fontSize={1.5} color="#22c55e" anchorX="center">
             {level.emoji} {level.name.toUpperCase()}
@@ -1752,8 +1905,48 @@ function GameScreen({
         <GameHUD telemetry={telemetry} gamepadId={gamepadId} level={level}
           gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining} />
         <VRButton glRef={glRef} />
-        {/* Mobile touch sticks — chỉ hiện trên touch device khi không có gamepad */}
-        {isMobile() && !gamepadId && <MobileTouchSticks inputsRef={inputsRef} />}
+        {/* Âm thanh động cơ (WebAudio) */}
+        <DroneSound inputsRef={inputsRef} muted={muted} />
+        {/* Joystick ảo — bật khi mobile-không-gamepad hoặc user tự bật */}
+        {showSticks && !gamepadId && <MobileTouchSticks inputsRef={inputsRef} />}
+
+        {/* Khoảng cách tới mục tiêu kế tiếp */}
+        {guideDist != null && (
+          <div style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(8,145,178,0.85)', color: '#ecfeff', padding: '5px 14px',
+            borderRadius: 999, fontSize: 13, fontWeight: 700, fontFamily: 'monospace', zIndex: 10,
+          }}>🎯 Mục tiêu: {guideDist.toFixed(1)}m</div>
+        )}
+
+        {/* Hint điều khiển lúc bắt đầu */}
+        {showHint && (
+          <div onClick={() => setShowHint(false)} style={{
+            position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+            maxWidth: '90%', background: 'rgba(15,23,42,0.9)', color: '#e2e8f0',
+            padding: '10px 16px', borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+            textAlign: 'center', zIndex: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)',
+          }}>
+            <b style={{ color: '#22d3ee' }}>{level.emoji} {level.name}</b><br />
+            {level.hint}<br />
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              {gamepadId ? '🎮 Tay cầm' : showSticks ? '🕹️ Joystick 2 cần (trái: ga/xoay · phải: nghiêng)' : '⌨️ W/S A/D · ↑↓ ←→'} · chạm để ẩn
+            </span>
+          </div>
+        )}
+
+        {/* Nút điều khiển góc phải-trên */}
+        <button onClick={() => setMuted((m) => !m)} title="Bật/tắt âm thanh" style={{
+          position: 'absolute', top: 12, right: 200, padding: '6px 10px',
+          background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(255,255,255,0.15)',
+          color: '#e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14, zIndex: 10,
+        }}>{muted ? '🔇' : '🔊'}</button>
+        <button onClick={() => setShowSticks((s) => !s)} title="Bật/tắt joystick ảo" style={{
+          position: 'absolute', top: 12, right: 156, padding: '6px 10px',
+          background: showSticks ? 'rgba(34,197,94,0.25)' : 'rgba(30,41,59,0.7)',
+          border: '1px solid rgba(255,255,255,0.15)', color: '#e2e8f0', borderRadius: 6,
+          cursor: 'pointer', fontSize: 14, zIndex: 10,
+        }}>🕹️</button>
         {/* Abort button top-left of canvas */}
         <button onClick={onAbort} style={{
           position: 'absolute', top: 12, right: 110, padding: '6px 12px',
