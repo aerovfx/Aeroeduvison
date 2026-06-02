@@ -40,6 +40,21 @@ function myCallsign(): string {
     return n
   } catch { return 'Phi công ' + Math.floor(1000 + Math.random() * 9000) }
 }
+// Leaderboard lưu cục bộ (localStorage) — lịch sử kết quả đua
+interface LbEntry { room: string; map: string; name: string; time: number; at: number }
+function saveLeaderboard(room: string, mapName: string, name: string, time: number) {
+  try {
+    const arr: LbEntry[] = JSON.parse(localStorage.getItem('drone_leaderboard') || '[]')
+    arr.push({ room, map: mapName, name, time: +time.toFixed(2), at: Date.now() })
+    localStorage.setItem('drone_leaderboard', JSON.stringify(arr.slice(-300)))
+  } catch { /* */ }
+}
+function loadLeaderboard(room?: string): LbEntry[] {
+  try {
+    const arr: LbEntry[] = JSON.parse(localStorage.getItem('drone_leaderboard') || '[]')
+    return (room ? arr.filter((e) => e.room === room) : arr).sort((a, b) => a.time - b.time)
+  } catch { return [] }
+}
 
 // ═════════════════════════════════════════════════════════════
 // DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
@@ -2363,23 +2378,64 @@ function GameScreen({
   const droneRotRef = useRef({ yaw: 0, pitch: 0, roll: 0 })
   // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
   const peersRef = useRef<Map<string, Peer>>(new Map())
+  const raceRef = useRef<Map<string, { name: string; time: number }>>(new Map())
+  const lastPeerHit = useRef(0)
+  const finishedRef = useRef(false)
+  const onHitRef = useRef<() => void>(() => {})
   const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
   const myName = playerName || myCallsign()
   const token = room ? tokenStore.getAccessToken() : null
   const topic = room ? `drone:room:${room}` : ''
+  const [peerCount, setPeerCount] = useState(0)
+  const [raceBoard, setRaceBoard] = useState<{ name: string; time: number; me?: boolean }[]>([])
+  const [myFinishTime, setMyFinishTime] = useState<number | null>(null)
+  const buildBoard = useCallback(() => {
+    const arr = Array.from(raceRef.current.entries()).map(([cid, v]) => ({ name: v.name, time: v.time, me: cid === myCid }))
+    return arr.sort((a, b) => a.time - b.time)
+  }, [myCid])
+
   const { publish } = useBroker(token, room ? [topic] : [], {
     onMsg: (m) => {
       const p = m.payload as any
-      if (!p || p.cid === myCid || p.kind !== 'state') return
-      peersRef.current.set(p.cid, { name: p.name, pos: p.p, yaw: p.y, pitch: p.pi, roll: p.r, t: performance.now() })
+      if (!p || p.cid === myCid) return
+      if (p.kind === 'state') {
+        peersRef.current.set(p.cid, { name: p.name, pos: p.p, yaw: p.y, pitch: p.pi, roll: p.r, t: performance.now() })
+      } else if (p.kind === 'finish') {
+        if (!raceRef.current.has(p.cid)) { raceRef.current.set(p.cid, { name: p.name, time: p.time }); setRaceBoard(buildBoard()) }
+      }
     },
   })
-  const [peerCount, setPeerCount] = useState(0)
+
+  const finishRace = useCallback((elapsed: number) => {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    raceRef.current.set(myCid, { name: myName, time: elapsed })
+    setMyFinishTime(elapsed)
+    setRaceBoard(buildBoard())
+    publish(topic, { kind: 'finish', cid: myCid, name: myName, time: +elapsed.toFixed(2) })
+    if (room) saveLeaderboard(room, `${level.emoji} ${level.name}`, myName, elapsed)
+  }, [myCid, myName, publish, topic, room, level, buildBoard])
+
+  // Trong phòng: thắng = về đích nhanh nhất; KHÔNG thoát ngay (xem bảng + bay tiếp)
+  const completeRef = useRef<(s: boolean, e: number) => void>(() => {})
+  completeRef.current = (success: boolean, elapsed: number) => {
+    if (room) { if (success) finishRace(elapsed); return }
+    onComplete(success, elapsed)
+  }
+
   useEffect(() => {
     if (!room) return
     const send = setInterval(() => {
       const dp = dronePosRef.current, dr = droneRotRef.current
       publish(topic, { kind: 'state', cid: myCid, name: myName, p: [+dp.x.toFixed(2), +dp.y.toFixed(2), +dp.z.toFixed(2)], y: +dr.yaw.toFixed(3), pi: +dr.pitch.toFixed(3), r: +dr.roll.toFixed(3) })
+      // Va chạm PvP giữa người chơi
+      for (const pr of peersRef.current.values()) {
+        if (Math.hypot(dp.x - pr.pos[0], dp.y - pr.pos[1], dp.z - pr.pos[2]) < 1.4) {
+          const now = performance.now()
+          if (now - lastPeerHit.current > 1000) { lastPeerHit.current = now; onHitRef.current() }
+          break
+        }
+      }
     }, 80)
     const count = setInterval(() => setPeerCount(peersRef.current.size), 600)
     return () => { clearInterval(send); clearInterval(count) }
@@ -2399,12 +2455,13 @@ function GameScreen({
   const onCargoComplete = useCallback(() => {
     if (completedRef.current) return
     completedRef.current = true
-    onComplete(true, (Date.now() - startTimeRef.current) / 1000)
-  }, [onComplete])
+    completeRef.current(true, (Date.now() - startTimeRef.current) / 1000)
+  }, [])
   const onHit = useCallback(() => {
     playHit(); setHits((h) => h + 1); setHitFlash(true)
     setTimeout(() => setHitFlash(false), 280)
   }, [])
+  onHitRef.current = onHit
 
   // Mục tiêu kế tiếp để vẽ mũi tên chỉ đường + đo khoảng cách
   const guideTarget: [number, number, number] | null = useMemo(() => {
@@ -2443,11 +2500,11 @@ function GameScreen({
       setTimeRemaining(remaining)
       if (remaining <= 0 && !completedRef.current) {
         completedRef.current = true
-        onComplete(false, level.timeLimit)
+        completeRef.current(false, level.timeLimit)
       }
     }, 100)
     return () => clearInterval(id)
-  }, [level, onComplete])
+  }, [level])
 
   // Throttled telemetry
   const lastUpdRef = useRef(0)
@@ -2463,18 +2520,18 @@ function GameScreen({
     if (idx + 1 >= (level.gates?.length || 0) && !completedRef.current) {
       completedRef.current = true
       const elapsed = (Date.now() - startTimeRef.current) / 1000
-      onComplete(true, elapsed)
+      completeRef.current(true, elapsed)
     }
-  }, [level, onComplete])
+  }, [level])
 
   const onHoverProg = useCallback((sec: number) => {
     setHoverProgress(sec)
     if (level.hover && sec >= level.hover.duration && !completedRef.current) {
       completedRef.current = true
       const elapsed = (Date.now() - startTimeRef.current) / 1000
-      onComplete(true, elapsed)
+      completeRef.current(true, elapsed)
     }
-  }, [level, onComplete])
+  }, [level])
 
   const onCrash = useCallback(() => {
     if (completedRef.current) return
@@ -2566,6 +2623,34 @@ function GameScreen({
             background: 'rgba(249,115,22,0.85)', color: '#1c1917', padding: '4px 12px',
             borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace',
           }}>⚔️ PHÒNG {room} · {peerCount} đối thủ</div>
+        )}
+
+        {/* Bảng xếp hạng về đích realtime */}
+        {room && raceBoard.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 110, left: 50, zIndex: 10, fontFamily: 'monospace', fontSize: 12,
+            background: 'rgba(8,30,38,0.82)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: 10, padding: '8px 12px', minWidth: 170,
+          }}>
+            <div style={{ color: '#7dd3fc', fontSize: 10, marginBottom: 4 }}>🏁 VỀ ĐÍCH</div>
+            {raceBoard.slice(0, 6).map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: r.me ? '#22d3ee' : '#e2e8f0', fontWeight: r.me ? 700 : 400 }}>
+                <span>{['🥇', '🥈', '🥉'][i] || `${i + 1}.`} {r.name}{r.me ? ' (bạn)' : ''}</span>
+                <span>{r.time.toFixed(1)}s</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Banner về đích + rời phòng */}
+        {room && myFinishTime != null && (
+          <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 12, pointerEvents: 'auto' }}>
+            <div style={{ background: 'rgba(8,30,38,0.94)', border: '1px solid #22d3ee', borderRadius: 16, padding: '18px 28px', color: '#e2e8f0', fontFamily: 'monospace', textAlign: 'center', boxShadow: '0 0 30px rgba(34,211,238,0.3)' }}>
+              <div style={{ fontSize: 28 }}>🏁 VỀ ĐÍCH!</div>
+              <div style={{ fontSize: 15, color: '#7dd3fc', margin: '6px 0' }}>Hạng {(raceBoard.findIndex((r) => r.me) + 1) || '-'} · {myFinishTime.toFixed(2)}s</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Bay tiếp để xem bảng hoặc rời phòng</div>
+              <button onClick={onAbort} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>Rời phòng →</button>
+            </div>
+          </div>
         )}
 
         {/* Trạng thái tải bản đồ thật (OSM) */}
