@@ -24,7 +24,7 @@ import {
   Plus, Eye, EyeOff, Trash2, ZoomIn, ZoomOut, Maximize2,
   Calculator, FunctionSquare, Hash, RotateCcw, Boxes, X,
   MousePointer2, Dot, Minus, Slash, Triangle, Circle as CircleIcon, Eraser,
-  CircleDot, Equal, Spline, CornerDownRight,
+  CircleDot, Equal, Spline, CornerDownRight, Compass,
 } from 'lucide-react'
 
 // Lazy: chỉ nạp three/drei/AR khi user mở chế độ 3D
@@ -396,7 +396,7 @@ type EquationRow = {
 // ── Dựng hình (điểm + nối) kiểu GeoGebra ──
 type GeoToolId =
   | 'move' | 'point' | 'segment' | 'line' | 'polygon' | 'circle'
-  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular' | 'delete'
+  | 'midpoint' | 'intersect' | 'parallel' | 'perpendicular' | 'delete' | 'angle'
 // Điểm phái sinh: toạ độ tính từ điểm cha/hình cha → tự cập nhật khi kéo
 type GeoDef =
   | { kind: 'mid'; a: string; b: string }
@@ -405,7 +405,18 @@ type GeoDef =
   | { kind: 'interSS'; s1: string; s2: string; which: number } // giao 2 HÌNH (đường/tròn)
 type GeoPoint = { id: string; x: number; y: number; def?: GeoDef }
 type GeoShape = { id: string; type: 'segment' | 'line' | 'polygon' | 'circle'; pts: string[]; color: string }
+type GeoAngle = { id: string; s1: string; s2: string } // góc giữa 2 đoạn/đường
 type Pt = { x: number; y: number }
+
+// Đỉnh chung của 2 shape (theo id điểm) + 2 điểm còn lại; null nếu không chung đỉnh
+function sharedVertex(s1: GeoShape, s2: GeoShape): { v: string; r1: string; r2: string } | null {
+  const [a, b] = s1.pts, [c, d] = s2.pts
+  if (a === c) return { v: a, r1: b, r2: d }
+  if (a === d) return { v: a, r1: b, r2: c }
+  if (b === c) return { v: b, r1: a, r2: d }
+  if (b === d) return { v: b, r1: a, r2: c }
+  return null
+}
 
 // Giao 2 đường thẳng (p1p2) × (p3p4) — null nếu song song
 function lineIntersect(p1: Pt, p2: Pt, p3: Pt, p4: Pt): Pt | null {
@@ -621,6 +632,7 @@ function Plot({
     tool: GeoToolId
     points: GeoPoint[]
     shapes: GeoShape[]
+    angles: GeoAngle[]
     pending: string[]
     selShapes: string[]
     measure: boolean
@@ -1247,6 +1259,50 @@ function Plot({
                 )
               })}
 
+              {/* Góc giữa 2 đoạn/đường */}
+              {geo.angles.map((an) => {
+                const s1 = geo.shapes.find((s) => s.id === an.s1)
+                const s2 = geo.shapes.find((s) => s.id === an.s2)
+                if (!s1 || !s2) return null
+                const e1a = rp(s1.pts[0]), e1b = rp(s1.pts[1]), e2a = rp(s2.pts[0]), e2b = rp(s2.pts[1])
+                if (!e1a || !e1b || !e2a || !e2b) return null
+                const sv = sharedVertex(s1, s2)
+                let V: Pt | null, d1: Pt, d2: Pt
+                if (sv) {
+                  V = rp(sv.v); const r1 = rp(sv.r1), r2 = rp(sv.r2)
+                  if (!V || !r1 || !r2) return null
+                  d1 = { x: r1.x - V.x, y: r1.y - V.y }; d2 = { x: r2.x - V.x, y: r2.y - V.y }
+                } else {
+                  V = lineIntersect(e1a, e1b, e2a, e2b)
+                  if (!V) return null
+                  d1 = { x: e1b.x - e1a.x, y: e1b.y - e1a.y }; d2 = { x: e2b.x - e2a.x, y: e2b.y - e2a.y }
+                }
+                const m1 = Math.hypot(d1.x, d1.y), m2 = Math.hypot(d2.x, d2.y)
+                if (m1 < 1e-9 || m2 < 1e-9) return null
+                const deg = (Math.acos(Math.max(-1, Math.min(1, (d1.x * d2.x + d1.y * d2.y) / (m1 * m2)))) * 180) / Math.PI
+                const vx = xS(V.x), vy = yS(V.y)
+                const a1 = Math.atan2(yS(V.y + d1.y) - vy, xS(V.x + d1.x) - vx)
+                const a2 = Math.atan2(yS(V.y + d2.y) - vy, xS(V.x + d2.x) - vx)
+                let diff = a2 - a1
+                while (diff <= -Math.PI) diff += 2 * Math.PI
+                while (diff > Math.PI) diff -= 2 * Math.PI
+                const rad = 28
+                const x1 = vx + rad * Math.cos(a1), y1 = vy + rad * Math.sin(a1)
+                const x2 = vx + rad * Math.cos(a2), y2 = vy + rad * Math.sin(a2)
+                const sweep = diff > 0 ? 1 : 0
+                const mid = a1 + diff / 2
+                return (
+                  <g key={an.id}>
+                    <path d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${rad},${rad} 0 0 ${sweep} ${x2.toFixed(1)},${y2.toFixed(1)}`}
+                          fill="none" stroke="#34d399" strokeWidth={2} />
+                    <text x={vx + (rad + 14) * Math.cos(mid)} y={vy + (rad + 14) * Math.sin(mid)}
+                          fill="#6ee7b7" fontSize={12} fontWeight={700} fontFamily="monospace"
+                          textAnchor="middle" dominantBaseline="middle"
+                          stroke="#0a0f1a" strokeWidth={3} paintOrder="stroke">{deg.toFixed(1)}°</text>
+                  </g>
+                )
+              })}
+
               {/* Điểm + nhãn (điểm phái sinh: rỗng viền vàng, không kéo) */}
               {geo.points.map((p, i) => {
                 const r = rp(p.id)
@@ -1483,6 +1539,7 @@ export default function GraphLab() {
   const [geoPoints, setGeoPoints] = useState<GeoPoint[]>([])
   const [geoShapes, setGeoShapes] = useState<GeoShape[]>([])
   const [geoPending, setGeoPending] = useState<string[]>([])
+  const [geoAngles, setGeoAngles] = useState<GeoAngle[]>([])
 
   const [geoSelShapes, setGeoSelShapes] = useState<string[]>([])
   const handleGeoClick = (gx: number, gy: number) => {
@@ -1511,6 +1568,17 @@ export default function GraphLab() {
       if (pid) { removeGeo(pid, undefined); return }
       const sid = nearestShapeId(['segment', 'line', 'circle', 'polygon'])
       if (sid) { removeGeo(undefined, sid); return }
+      return
+    }
+
+    // ── Đo góc: chọn 2 ĐOẠN/ĐƯỜNG ──
+    if (geoTool === 'angle') {
+      const sid = nearestShapeId(['segment', 'line'])
+      if (!sid) return
+      const sel = [...geoSelShapes, sid]
+      if (sel.length < 2) { setGeoSelShapes(sel); return }
+      setGeoSelShapes([])
+      if (sel[0] !== sel[1]) setGeoAngles((as) => [...as, { id: mkId(), s1: sel[0], s2: sel[1] }])
       return
     }
 
@@ -1654,11 +1722,13 @@ export default function GraphLab() {
     }
     setGeoPoints((ps) => ps.filter((p) => !remP.has(p.id)))
     setGeoShapes((ss) => ss.filter((s) => !remS.has(s.id)))
+    setGeoAngles((as) => as.filter((a) => !remS.has(a.s1) && !remS.has(a.s2)))
   }
-  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]) }
+  const clearGeo = () => { setGeoPoints([]); setGeoShapes([]); setGeoPending([]); setGeoSelShapes([]); setGeoAngles([]) }
   const undoGeo = () => {
     if (geoSelShapes.length) { setGeoSelShapes([]); return }
     if (geoPending.length) { setGeoPending([]); return }
+    if (geoAngles.length) { setGeoAngles((a) => a.slice(0, -1)); return }
     if (geoShapes.length) { setGeoShapes((s) => s.slice(0, -1)); return }
     setGeoPoints((p) => p.slice(0, -1))
   }
@@ -1973,6 +2043,7 @@ export default function GraphLab() {
                 { id: 'intersect', icon: Spline, label: 'Giao điểm' },
                 { id: 'parallel', icon: Equal, label: 'Song song' },
                 { id: 'perpendicular', icon: CornerDownRight, label: 'Vuông góc' },
+                { id: 'angle', icon: Compass, label: 'Đo góc' },
                 { id: 'delete', icon: Trash2, label: 'Xoá' },
               ] as { id: GeoToolId; icon: typeof Dot; label: string }[]).map((t) => {
                 const Icon = t.icon
@@ -2011,6 +2082,7 @@ export default function GraphLab() {
                 {geoTool === 'intersect' && 'Chạm lần lượt 2 HÌNH (đường thẳng/đoạn/đường tròn) → giao điểm (đường–tròn, tròn–tròn cho tối đa 2 điểm).'}
                 {geoTool === 'parallel' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường thẳng qua điểm đó song song.'}
                 {geoTool === 'perpendicular' && 'Chạm 1 ĐƯỜNG có sẵn, rồi chạm 1 điểm → đường vuông góc với nó qua điểm đó.'}
+                {geoTool === 'angle' && 'Chạm 2 đoạn/đường → đo góc giữa chúng (cung + số đo độ).'}
                 {geoTool === 'delete' && 'Chạm 1 điểm hoặc 1 hình để xoá (tự xoá kèm các phần phụ thuộc).'}
                 {geoPending.length > 0 && <b className="ml-1 text-cyan-300">· đã chọn {geoPending.length} điểm</b>}
                 {geoSelShapes.length > 0 && <b className="ml-1 text-amber-300">· đã chọn {geoSelShapes.length} hình</b>}
@@ -2021,7 +2093,7 @@ export default function GraphLab() {
               viewport={viewport}
               onViewportChange={setViewport}
               height={560}
-              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, pending: geoPending, selShapes: geoSelShapes, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
+              geo={{ tool: geoTool, points: geoPoints, shapes: geoShapes, angles: geoAngles, pending: geoPending, selShapes: geoSelShapes, measure: geoMeasure, onClick: handleGeoClick, onMovePoint: moveGeoPoint }}
               curves={compiledCurves
                 .filter((c) => c.row.visible && !c.err)
                 .map((c) => ({ kind: c.row.kind, fnX: c.fnX, fnY: c.fnY, fnR: c.fnR, tMin: c.row.tMin, tMax: c.row.tMax, color: c.row.color }))}
