@@ -164,8 +164,8 @@ export function XRCanvas({
             boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
           }}
         >
-          {arPhase === 'searching' && '🔍 Di chuyển điện thoại hướng vào mặt bàn/sàn để tìm mặt phẳng — hoặc chạm để đặt ngay trước mặt'}
-          {arPhase === 'ready' && '👆 Chạm màn hình để đặt lên điểm đã ngắm'}
+          {arPhase === 'searching' && '🔍 Di chuyển điện thoại quét mặt bàn/sàn để nhận diện mặt phẳng — hoặc chạm để đặt ngay trước mặt'}
+          {arPhase === 'ready' && '✅ Đã nhận diện mặt phẳng — chạm màn hình để đặt'}
           {arPhase === 'placed' && '✓ Đã đặt — chạm chỗ khác để di chuyển · chụm 2 ngón để phóng to/thu nhỏ'}
         </div>
       )}
