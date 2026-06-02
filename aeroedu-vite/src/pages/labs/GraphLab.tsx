@@ -19,11 +19,14 @@
  *
  * Supports implicit multiplication: 2x, 3sin(x), (x+1)(x-1).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Eye, EyeOff, Trash2, ZoomIn, ZoomOut, Maximize2,
-  Calculator, FunctionSquare, Hash, RotateCcw,
+  Calculator, FunctionSquare, Hash, RotateCcw, Boxes, X,
 } from 'lucide-react'
+
+// Lazy: chỉ nạp three/drei/AR khi user mở chế độ 3D
+const GraphAR3D = lazy(() => import('@/components/labs/GraphAR3D'))
 
 // ─────────────────────────────────────────────────────────────
 // Expression parser & evaluator
@@ -1126,6 +1129,7 @@ export default function GraphLab() {
   const [kbMode, setKbMode] = useState<KbMode>('fx')
   const [kbOpen, setKbOpen] = useState(true)
   const [viewport, setViewport] = useState({ xMin: -10, xMax: 10, yMin: -10, yMax: 10 })
+  const [ar3dOpen, setAr3dOpen] = useState(false)
 
   const compiled: Compiled[] = useMemo(
     () => rows.map((row) => {
@@ -1251,6 +1255,10 @@ export default function GraphLab() {
             <button onClick={resetView} title="Reset view"
                     className="p-2 rounded-lg bg-slate-800/70 ring-1 ring-slate-700 hover:bg-slate-700">
               <RotateCcw size={16} />
+            </button>
+            <button onClick={() => setAr3dOpen(true)} title="Xem đồ thị 3D / AR"
+                    className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 text-white text-xs font-bold hover:from-violet-500 hover:to-cyan-500">
+              <Boxes size={16} /> 3D / AR
             </button>
           </div>
         </div>
@@ -1411,6 +1419,43 @@ export default function GraphLab() {
           </section>
         </div>
       </div>
+
+      {/* ════════ Overlay: đồ thị 3D + AR ════════ */}
+      {ar3dOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col">
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/10">
+            <Boxes size={18} className="text-cyan-300" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-white">Đồ thị 3D — Thực tế tăng cường</div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Xoay để xem 3D · bấm nút <b className="text-cyan-300">AR</b> để đặt đồ thị lên bàn (Android/Quest realtime · iPhone Quick Look)
+              </div>
+            </div>
+            <button onClick={() => setAr3dOpen(false)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600/90 text-white text-xs font-bold hover:bg-rose-500">
+              <X size={14} /> Đóng
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 relative">
+            <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-slate-400 text-sm">Đang tải 3D…</div>}>
+              <GraphAR3D
+                functions={compiled
+                  .filter((c) => c.row.visible && !c.err && !c.ineq)
+                  .map((c) => ({ fn: c.fn, color: c.row.color }))}
+                viewport={viewport}
+              />
+            </Suspense>
+            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).length === 0 && (
+              <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                <div className="rounded-xl bg-slate-900/80 border border-white/10 px-4 py-3 text-center text-slate-300 text-sm max-w-xs">
+                  Chưa có hàm số y = f(x) nào hiển thị. Thêm một hàm (vd <span className="font-mono text-cyan-300">x^2</span>) rồi mở lại 3D.
+                  <div className="text-[11px] text-slate-500 mt-1">(Bất phương trình chưa hỗ trợ ở chế độ 3D)</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
