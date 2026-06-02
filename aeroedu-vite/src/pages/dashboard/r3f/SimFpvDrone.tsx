@@ -25,6 +25,20 @@ import { useRef, useState, useEffect, useCallback, useMemo, Suspense } from 'rea
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars, Text, KeyboardControls, useKeyboardControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { QRCodeSVG } from 'qrcode.react'
+import { tokenStore } from '@/services/api'
+import { useBroker } from '@/lib/broker-client'
+
+// ── Multiplayer (Thách đấu) helpers ──
+type Peer = { name: string; pos: [number, number, number]; yaw: number; pitch: number; roll: number; t: number }
+const genRoomCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+function myCallsign(): string {
+  try {
+    let n = localStorage.getItem('drone_callsign')
+    if (!n) { n = 'Phi công ' + Math.floor(1000 + Math.random() * 9000); localStorage.setItem('drone_callsign', n) }
+    return n
+  } catch { return 'Phi công ' + Math.floor(1000 + Math.random() * 9000) }
+}
 
 // ═════════════════════════════════════════════════════════════
 // DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
@@ -945,7 +959,7 @@ const PHYSICS = {
 }
 
 function DroneRig({
-  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash, posRef,
+  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash, posRef, rotRef,
 }: {
   inputs: React.MutableRefObject<ControlInputs>
   level: Level
@@ -955,6 +969,7 @@ function DroneRig({
   onHoverProgress: (secondsHeld: number) => void
   onCrash: () => void
   posRef?: React.MutableRefObject<THREE.Vector3>
+  rotRef?: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const stateRef = useRef<DroneState>({
@@ -1006,6 +1021,7 @@ function DroneRig({
     if (s.pos.y > PHYSICS.maxAltitude) { s.pos.y = PHYSICS.maxAltitude; s.vel.y = Math.min(0, s.vel.y) }
     if (s.battery > 0) s.battery = Math.max(0, s.battery - throttleMag * PHYSICS.batteryDrain * dt)
     if (posRef) posRef.current.copy(s.pos)
+    if (rotRef) { rotRef.current.yaw = s.yaw; rotRef.current.pitch = s.pitch; rotRef.current.roll = s.roll }
 
     if (groupRef.current) {
       groupRef.current.position.copy(s.pos)
@@ -1293,6 +1309,66 @@ function MobileTouchSticks({ inputsRef }: { inputsRef: React.MutableRefObject<Co
       />
     </>
   )
+}
+
+// ═════════════════════════════════════════════════════════════
+// PEER DRONES (Thách đấu realtime) — drone người chơi khác
+// ═════════════════════════════════════════════════════════════
+function PeerDroneMesh() {
+  const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null])
+  useFrame((_s, dt) => propRefs.current.forEach((p) => p && (p.rotation.y += dt * 40)))
+  const arms: Vec3[] = [[0.22, 0, 0.22], [-0.22, 0, 0.22], [0.22, 0, -0.22], [-0.22, 0, -0.22]]
+  return (
+    <group>
+      <mesh castShadow><boxGeometry args={[0.34, 0.1, 0.34]} /><meshStandardMaterial color="#f97316" metalness={0.5} roughness={0.4} /></mesh>
+      {arms.map((p, i) => (
+        <group key={i} position={p}>
+          <mesh><cylinderGeometry args={[0.03, 0.03, 0.06, 8]} /><meshStandardMaterial color="#1c1917" /></mesh>
+          <group ref={(el) => { propRefs.current[i] = el }} position={[0, 0.04, 0]}>
+            <mesh><boxGeometry args={[0.26, 0.005, 0.03]} /><meshStandardMaterial color="#fdba74" transparent opacity={0.55} /></mesh>
+          </group>
+        </group>
+      ))}
+      <mesh position={[0, 0.08, 0.1]}><sphereGeometry args={[0.04, 8, 8]} /><meshBasicMaterial color="#fed7aa" /></mesh>
+    </group>
+  )
+}
+function PeerGhost({ id, peersRef }: { id: string; peersRef: React.MutableRefObject<Map<string, Peer>> }) {
+  const g = useRef<THREE.Group>(null)
+  const q = useMemo(() => new THREE.Quaternion(), [])
+  const e = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
+  const tp = useMemo(() => new THREE.Vector3(), [])
+  const [name, setName] = useState('')
+  useFrame((_s, dt) => {
+    const p = peersRef.current.get(id)
+    const gg = g.current
+    if (!p || !gg) return
+    if (p.name !== name) setName(p.name)
+    const k = 1 - Math.exp(-dt / 0.08)
+    gg.position.lerp(tp.set(p.pos[0], p.pos[1], p.pos[2]), k)
+    e.set(p.pitch, p.yaw, p.roll)
+    gg.quaternion.slerp(q.setFromEuler(e), k)
+  })
+  return (
+    <group ref={g}>
+      <PeerDroneMesh />
+      <Text position={[0, 0.5, 0]} fontSize={0.32} color="#fdba74" anchorX="center" outlineWidth={0.02} outlineColor="#000">{name}</Text>
+    </group>
+  )
+}
+function PeerDrones({ peersRef }: { peersRef: React.MutableRefObject<Map<string, Peer>> }) {
+  const [ids, setIds] = useState<string[]>([])
+  useEffect(() => {
+    const it = setInterval(() => {
+      const now = performance.now()
+      const map = peersRef.current
+      for (const [k, v] of map) if (now - v.t > 2500) map.delete(k) // bỏ peer mất tín hiệu
+      const keys = Array.from(map.keys())
+      setIds((prev) => (prev.length === keys.length && prev.every((x) => keys.includes(x)) ? prev : keys))
+    }, 500)
+    return () => clearInterval(it)
+  }, [peersRef])
+  return <>{ids.map((id) => <PeerGhost key={id} id={id} peersRef={peersRef} />)}</>
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -2172,12 +2248,14 @@ function LevelSelectScreen({
 // SCREEN: GAME (level đang chạy)
 // ═════════════════════════════════════════════════════════════
 function GameScreen({
-  level, model, onComplete, onAbort,
+  level, model, onComplete, onAbort, room, playerName,
 }: {
   level: Level
   model: DroneModel
   onComplete: (success: boolean, elapsed: number) => void
   onAbort: () => void
+  room?: string
+  playerName?: string
 }) {
   const inputsRef = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
   const glRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -2189,6 +2267,31 @@ function GameScreen({
   const completedRef = useRef(false)
   const gamepadId = useGamepadInput(inputsRef)
   const dronePosRef = useRef(new THREE.Vector3(0, 0.5, 0))
+  const droneRotRef = useRef({ yaw: 0, pitch: 0, roll: 0 })
+  // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
+  const peersRef = useRef<Map<string, Peer>>(new Map())
+  const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
+  const myName = playerName || myCallsign()
+  const token = room ? tokenStore.getAccessToken() : null
+  const topic = room ? `drone:room:${room}` : ''
+  const { publish } = useBroker(token, room ? [topic] : [], {
+    onMsg: (m) => {
+      const p = m.payload as any
+      if (!p || p.cid === myCid || p.kind !== 'state') return
+      peersRef.current.set(p.cid, { name: p.name, pos: p.p, yaw: p.y, pitch: p.pi, roll: p.r, t: performance.now() })
+    },
+  })
+  const [peerCount, setPeerCount] = useState(0)
+  useEffect(() => {
+    if (!room) return
+    const send = setInterval(() => {
+      const dp = dronePosRef.current, dr = droneRotRef.current
+      publish(topic, { kind: 'state', cid: myCid, name: myName, p: [+dp.x.toFixed(2), +dp.y.toFixed(2), +dp.z.toFixed(2)], y: +dr.yaw.toFixed(3), pi: +dr.pitch.toFixed(3), r: +dr.roll.toFixed(3) })
+    }, 80)
+    const count = setInterval(() => setPeerCount(peersRef.current.size), 600)
+    return () => { clearInterval(send); clearInterval(count) }
+  }, [room, topic, myCid, myName, publish])
+
   const [muted, setMuted] = useState(false)
   const [showSticks, setShowSticks] = useState(isMobile())
   const [showHint, setShowHint] = useState(true)
@@ -2301,8 +2404,10 @@ function GameScreen({
           <LevelEnvironment level={level} currentGate={gateProgress} />
           <Suspense fallback={null}>
             <DroneRig inputs={inputsRef} level={level} model={model} onTelemetry={onTelemetry}
-              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} posRef={dronePosRef} />
+              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash}
+              posRef={dronePosRef} rotRef={droneRotRef} />
           </Suspense>
+          {room && <PeerDrones peersRef={peersRef} />}
           <WaypointGuide posRef={dronePosRef} target={guideTarget} />
           {level.type === 'cargo' && level.cargo && (
             <>
@@ -2353,6 +2458,15 @@ function GameScreen({
               💥 {hits}
             </span>
           </div>
+        )}
+
+        {/* Thách đấu: phòng + số đối thủ đang bay */}
+        {room && (
+          <div style={{
+            position: 'absolute', top: 80, right: 24, zIndex: 10, textAlign: 'right',
+            background: 'rgba(249,115,22,0.85)', color: '#1c1917', padding: '4px 12px',
+            borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace',
+          }}>⚔️ PHÒNG {room} · {peerCount} đối thủ</div>
         )}
 
         {/* Flash đỏ khi va chạm */}
@@ -2481,17 +2595,160 @@ function ResultScreen({
 }
 
 // ═════════════════════════════════════════════════════════════
+// SCREEN: MODE — chọn Nhiệm vụ / Thách đấu
+// ═════════════════════════════════════════════════════════════
+function ModeScreen({ onMission, onChallenge }: { onMission: () => void; onChallenge: () => void }) {
+  const card: React.CSSProperties = {
+    padding: '28px 20px', borderRadius: 16, cursor: 'pointer', textAlign: 'center',
+    background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.4)', color: '#e2e8f0',
+    fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 'bold', lineHeight: 1.5,
+  }
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: SCIFI_BG, color: '#e2e8f0', fontFamily: 'ui-monospace, monospace', padding: 24 }}>
+      <ScreenCorners />
+      <div style={{ textAlign: 'center', maxWidth: 720, width: '100%' }}>
+        <h1 style={{ fontSize: 32, margin: '0 0 4px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>🚁 FPV DRONE</h1>
+        <p style={{ color: '#7dd3fc', marginBottom: 28, fontSize: 13 }}>Chọn chế độ chơi</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <button onClick={onMission} style={card}>
+            <div style={{ fontSize: 40 }}>🎯</div>NHIỆM VỤ
+            <div style={{ fontSize: 12, fontWeight: 'normal', color: '#94a3b8', marginTop: 6 }}>Chiến dịch 6 cấp độ + Giao hàng</div>
+          </button>
+          <button onClick={onChallenge} style={card}>
+            <div style={{ fontSize: 40 }}>⚔️</div>THÁCH ĐẤU
+            <div style={{ fontSize: 12, fontWeight: 'normal', color: '#94a3b8', marginTop: 6 }}>Tạo phòng → mời bạn quét QR / link bay cùng realtime</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCREEN: CHALLENGE — lobby thách đấu (mã/QR/link/người chơi)
+// ═════════════════════════════════════════════════════════════
+function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
+  initialRoom?: string; initialLvl?: number
+  onStart: (level: Level, room: string, name: string) => void
+  onBack: () => void
+}) {
+  const isJoiner = !!initialRoom
+  const [room] = useState(() => initialRoom || genRoomCode())
+  const [name, setName] = useState(() => myCallsign())
+  const [levelId, setLevelId] = useState(() => initialLvl || 4)
+  const [players, setPlayers] = useState<Record<string, string>>({})
+  const [copied, setCopied] = useState(false)
+  const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
+  const token = tokenStore.getAccessToken()
+  const link = `${window.location.origin}${window.location.pathname}?droneRoom=${room}&lvl=${levelId}`
+
+  useEffect(() => { try { localStorage.setItem('drone_callsign', name) } catch { /* */ } }, [name])
+
+  const { publish } = useBroker(token, [`drone:lobby:${room}`], {
+    onMsg: (m) => {
+      const p = m.payload as any
+      if (!p || p.cid === myCid || p.kind !== 'hello') return
+      setPlayers((s) => ({ ...s, [p.cid]: p.name }))
+      if (isJoiner && p.host && p.lvl) setLevelId(p.lvl) // joiner đồng bộ level theo host
+    },
+  })
+  useEffect(() => {
+    const id = setInterval(() => publish(`drone:lobby:${room}`, { kind: 'hello', cid: myCid, name, host: !isJoiner, lvl: levelId }), 1500)
+    return () => clearInterval(id)
+  }, [room, name, levelId, isJoiner, myCid, publish])
+
+  const level = LEVELS.find((l) => l.id === levelId) || LEVELS[3]
+  const allNames = [`${name} (bạn)`, ...Object.values(players)]
+  const fld: React.CSSProperties = { background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: 10, padding: 14 }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflowY: 'auto', background: SCIFI_BG, color: '#e2e8f0', fontFamily: 'ui-monospace, monospace', padding: '28px 20px' }}>
+      <ScreenCorners />
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#7dd3fc', cursor: 'pointer', fontSize: 13, marginBottom: 8 }}>← Quay lại</button>
+        <h1 style={{ fontSize: 24, margin: '0 0 16px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>⚔️ THÁCH ĐẤU — {isJoiner ? 'Tham gia phòng' : 'Tạo phòng'}</h1>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 4 }}>MÃ PHÒNG</div>
+              <div style={{ fontSize: 30, fontWeight: 'bold', letterSpacing: 4, color: '#22d3ee' }}>{room}</div>
+            </div>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>TÊN PHI CÔNG</div>
+              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20}
+                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 14 }} />
+            </div>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>BẢN ĐỒ {isJoiner ? '(theo chủ phòng)' : ''}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {LEVELS.map((l) => (
+                  <button key={l.id} disabled={isJoiner} onClick={() => setLevelId(l.id)}
+                    style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, cursor: isJoiner ? 'default' : 'pointer',
+                      background: l.id === levelId ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${l.id === levelId ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0', fontFamily: 'inherit' }}>
+                    {l.emoji} {l.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>PHI CÔNG TRONG PHÒNG ({allNames.length})</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {allNames.map((n, i) => (
+                  <span key={i} style={{ fontSize: 12, padding: '3px 9px', borderRadius: 999, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.4)', color: '#fdba74' }}>🛩 {n}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...fld, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 8 }}>QUÉT ĐỂ THAM GIA</div>
+            <div style={{ background: '#fff', padding: 8, borderRadius: 8, display: 'inline-block' }}>
+              <QRCodeSVG value={link} size={150} />
+            </div>
+            <button onClick={() => { navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}
+              style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+              {copied ? '✓ Đã copy link' : '🔗 Copy link mời'}
+            </button>
+          </div>
+        </div>
+
+        <button onClick={() => onStart(level, room, name)}
+          style={{ marginTop: 18, width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', fontSize: 16, cursor: 'pointer', fontFamily: 'inherit' }}>
+          🚁 VÀO BAY ({level.emoji} {level.name})
+        </button>
+        <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 8 }}>
+          Mỗi người tự bấm “Vào bay” — sẽ thấy drone của nhau realtime trong cùng bản đồ.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
 // MAIN — flow controller
 // ═════════════════════════════════════════════════════════════
 type Screen =
+  | { kind: 'mode' }
+  | { kind: 'challenge'; room?: string; lvl?: number }
   | { kind: 'setup' }
   | { kind: 'levels' }
-  | { kind: 'game'; level: Level }
+  | { kind: 'game'; level: Level; room?: string; playerName?: string }
   | { kind: 'result'; level: Level; success: boolean; elapsed: number; isNewBest: boolean; isNewUnlock: boolean }
+
+function readInitialScreen(): Screen {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    const room = q.get('droneRoom')
+    if (room) return { kind: 'challenge', room: room.toUpperCase().slice(0, 8), lvl: Number(q.get('lvl')) || undefined }
+  } catch { /* */ }
+  return { kind: 'mode' }
+}
 
 function FpvAppRoot() {
   const [progress, setProgress] = useState<Progress>(() => loadProgress())
-  const [screen, setScreen] = useState<Screen>({ kind: 'setup' })
+  const [screen, setScreen] = useState<Screen>(() => readInitialScreen())
   const [selectedModelId, setSelectedModelId] = useState<string>(() => loadSelectedModel())
   const selectedModel = useMemo(
     () => DRONE_MODELS.find(m => m.id === selectedModelId) || DRONE_MODELS[0],
@@ -2531,6 +2788,16 @@ function FpvAppRoot() {
   }, [])
 
   switch (screen.kind) {
+    case 'mode':
+      return <ModeScreen onMission={() => setScreen({ kind: 'setup' })} onChallenge={() => setScreen({ kind: 'challenge' })} />
+    case 'challenge':
+      return (
+        <ChallengeScreen
+          initialRoom={screen.room} initialLvl={screen.lvl}
+          onStart={(level, room, name) => setScreen({ kind: 'game', level, room, playerName: name })}
+          onBack={() => setScreen({ kind: 'mode' })}
+        />
+      )
     case 'setup':
       return <SetupScreen onStart={() => setScreen({ kind: 'levels' })} />
     case 'levels':
@@ -2548,8 +2815,10 @@ function FpvAppRoot() {
         <GameScreen
           level={screen.level}
           model={selectedModel}
+          room={screen.room}
+          playerName={screen.playerName}
           onComplete={(success, elapsed) => handleComplete(screen.level, success, elapsed)}
-          onAbort={() => setScreen({ kind: 'levels' })}
+          onAbort={() => setScreen(screen.room ? { kind: 'challenge', room: screen.room } : { kind: 'levels' })}
         />
       )
     case 'result':
