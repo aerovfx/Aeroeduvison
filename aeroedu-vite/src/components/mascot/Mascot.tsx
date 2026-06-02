@@ -50,6 +50,11 @@ export default function Mascot() {
   const [anim, setAnim] = useState<Anim>('')
   const [blink, setBlink] = useState(false)
   const [hidden, setHidden] = useState(() => sessionStorage.getItem('aero_hidden') === '1')
+  const [pos, setPos] = useState<{ dx: number; dy: number }>(() => {
+    try { return JSON.parse(localStorage.getItem('aero_pos') || '') || { dx: 0, dy: 0 } } catch { return { dx: 0, dy: 0 } }
+  })
+  const [voice, setVoice] = useState(() => localStorage.getItem('aero_voice') === '1')
+  const drag = useRef<{ x0: number; y0: number; dx0: number; dy0: number; moved: boolean } | null>(null)
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastActivity = useRef(Date.now())
@@ -59,7 +64,17 @@ export default function Mascot() {
     lastActivity.current = Date.now()
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current)
     bubbleTimer.current = setTimeout(() => setBubble(null), ms)
-  }, [])
+    // Giọng nói (TTS) — tuỳ chọn, theo ngôn ngữ đang chọn
+    if (voice && typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel()
+        const u = new SpeechSynthesisUtterance(text.replace(/[^\p{L}\p{N} .,!?…]/gu, ''))
+        u.lang = localStorage.getItem('lang') === 'en' ? 'en-US' : 'vi-VN'
+        u.rate = 1.05; u.pitch = 1.25
+        window.speechSynthesis.speak(u)
+      } catch { /* ignore */ }
+    }
+  }, [voice])
 
   const react = useCallback((event: MascotEvent, payload: MascotPayload = {}) => {
     const r = REACTIONS[event]
@@ -117,9 +132,36 @@ export default function Mascot() {
     return () => clearInterval(id)
   }, [react])
 
-  const onClick = () => {
+  const openAssistant = () => {
     say('Mình mở trợ lý AI cho bạn nhé! 💬', 2500)
     window.dispatchEvent(new CustomEvent('aero:open-assistant'))
+  }
+  // Kéo-thả để di chuyển; nếu không kéo (chỉ chạm) thì mở trợ lý
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { x0: e.clientX, y0: e.clientY, dx0: pos.dx, dy0: pos.dy, moved: false }
+    ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current
+    if (!d) return
+    const ndx = d.dx0 + (e.clientX - d.x0)
+    const ndy = d.dy0 + (e.clientY - d.y0)
+    if (Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) > 4) d.moved = true
+    setPos({
+      dx: Math.max(0, Math.min(window.innerWidth - 120, ndx)),
+      dy: Math.max(-(window.innerHeight - 180), Math.min(20, ndy)),
+    })
+  }
+  const onPointerUp = () => {
+    const d = drag.current
+    drag.current = null
+    if (!d) return
+    if (d.moved) { try { localStorage.setItem('aero_pos', JSON.stringify(pos)) } catch { /* */ } }
+    else openAssistant()
+  }
+  const toggleVoice = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setVoice((v) => { const n = !v; localStorage.setItem('aero_voice', n ? '1' : '0'); return n })
   }
   const hide = (e: React.MouseEvent) => { e.stopPropagation(); setHidden(true); sessionStorage.setItem('aero_hidden', '1') }
   const show = () => { setHidden(false); sessionStorage.removeItem('aero_hidden'); say('Mình quay lại rồi! 🛸', 2500) }
@@ -135,7 +177,7 @@ export default function Mascot() {
 
   const e = EYES[mood]
   return (
-    <div style={{ position: 'fixed', bottom: 76, left: 14, zIndex: 45, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', bottom: 76, left: 14, zIndex: 45, pointerEvents: 'none', transform: `translate(${pos.dx}px, ${pos.dy}px)` }}>
       <style>{`
         @keyframes aero-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
         @keyframes aero-jump { 0%{transform:translateY(0)} 30%{transform:translateY(-18px) scale(1.05)} 60%{transform:translateY(2px)} 100%{transform:translateY(0)} }
@@ -157,11 +199,14 @@ export default function Mascot() {
         </div>
       )}
 
-      {/* Mascot SVG */}
+      {/* Mascot SVG — kéo để di chuyển, chạm để mở trợ lý */}
       <div
-        onClick={onClick}
-        style={{ width: 84, height: 84, cursor: 'pointer', pointerEvents: 'auto', animation: anim ? `${anim} .7s ease` : 'aero-float 3s ease-in-out infinite' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{ width: 84, height: 84, cursor: drag.current ? 'grabbing' : 'grab', touchAction: 'none', pointerEvents: 'auto', animation: anim ? `${anim} .7s ease` : 'aero-float 3s ease-in-out infinite' }}
       >
+        <button onClick={toggleVoice} title="Bật/tắt giọng nói" style={{ position: 'absolute', top: -2, left: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.7)', color: voice ? '#22d3ee' : '#64748b', fontSize: 10, cursor: 'pointer', lineHeight: '16px', pointerEvents: 'auto' }}>{voice ? '🔊' : '🔈'}</button>
         <button onClick={hide} title="Ẩn" style={{ position: 'absolute', top: -2, right: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.7)', color: '#94a3b8', fontSize: 11, cursor: 'pointer', lineHeight: '16px', pointerEvents: 'auto' }}>×</button>
         <svg width="84" height="84" viewBox="0 0 100 100">
           {/* Cánh quạt (4 góc, quay) */}
