@@ -25,6 +25,101 @@ import { useRef, useState, useEffect, useCallback, useMemo, Suspense } from 'rea
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars, Text, KeyboardControls, useKeyboardControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { QRCodeSVG } from 'qrcode.react'
+import { tokenStore } from '@/services/api'
+import { useBroker } from '@/lib/broker-client'
+import { fetchOsmBuildings, type OsmBox } from '@/lib/osm-buildings'
+
+// ── Multiplayer (Thách đấu) helpers ──
+type Peer = { name: string; pos: [number, number, number]; yaw: number; pitch: number; roll: number; t: number }
+const genRoomCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+function myCallsign(): string {
+  try {
+    let n = localStorage.getItem('drone_callsign')
+    if (!n) { n = 'Phi công ' + Math.floor(1000 + Math.random() * 9000); localStorage.setItem('drone_callsign', n) }
+    return n
+  } catch { return 'Phi công ' + Math.floor(1000 + Math.random() * 9000) }
+}
+// Leaderboard lưu cục bộ (localStorage) — lịch sử kết quả đua
+interface LbEntry { room: string; map: string; name: string; time: number; at: number }
+function saveLeaderboard(room: string, mapName: string, name: string, time: number) {
+  try {
+    const arr: LbEntry[] = JSON.parse(localStorage.getItem('drone_leaderboard') || '[]')
+    arr.push({ room, map: mapName, name, time: +time.toFixed(2), at: Date.now() })
+    localStorage.setItem('drone_leaderboard', JSON.stringify(arr.slice(-300)))
+  } catch { /* */ }
+}
+function loadLeaderboard(room?: string): LbEntry[] {
+  try {
+    const arr: LbEntry[] = JSON.parse(localStorage.getItem('drone_leaderboard') || '[]')
+    return (room ? arr.filter((e) => e.room === room) : arr).sort((a, b) => a.time - b.time)
+  } catch { return [] }
+}
+// Tên màn theo địa danh + số thứ tự tự tăng (vd "New York map#01")
+function nextMapName(place: string): string {
+  const short = place.split(',')[0].trim().slice(0, 24) || 'Map'
+  try {
+    const k = 'drone_mapseq_' + short.toLowerCase()
+    const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1
+    localStorage.setItem(k, String(n))
+    return `${short} map#${String(n).padStart(2, '0')}`
+  } catch { return `${short} map#01` }
+}
+// Dựng Level bay trên bản đồ thật từ 1 toạ độ (cổng đặt tự động quanh tâm)
+function makeMapLevel(name: string, lat: number, lon: number): Level {
+  return {
+    id: 100, name, emoji: '🗺️', difficulty: 'pro',
+    description: 'Đua trên bản đồ thật (OpenStreetMap)',
+    timeLimit: 180, reward: 0, type: 'gates',
+    map: { lat, lon, radius: 800 },
+    gates: ([[0, 40, -90], [110, 55, -190], [-100, 60, -300], [70, 48, -410], [0, 45, -520]] as Vec3[]).map((p) => ({ pos: p, r: 3.2 })),
+    hint: 'Đua qua các cổng giữa thành phố thật. Né toà nhà (box từ OSM). Theo mũi tên chỉ đường.',
+  }
+}
+// Geocode tên địa danh → toạ độ (Nominatim/OSM)
+async function geocodePlace(q: string): Promise<{ name: string; lat: number; lon: number }[]> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`, {
+      headers: { 'Accept-Language': 'vi' },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data as any[]).map((d) => ({ name: d.display_name as string, lat: +d.lat, lon: +d.lon }))
+  } catch { return [] }
+}
+
+// RNG có seed → mọi người chơi cùng phòng thấy phần thưởng/mother ship GIỐNG NHAU
+function seedFrom(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
+function mulberry32(a: number) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
+
+// Điểm tích luỹ + cấp độ người chơi (localStorage)
+function getPoints(): number { try { return parseInt(localStorage.getItem('drone_points') || '0', 10) || 0 } catch { return 0 } }
+function addPoints(d: number): number { try { const v = Math.max(0, getPoints() + d); localStorage.setItem('drone_points', String(v)); return v } catch { return Math.max(0, d) } }
+function playerLevel(points: number): number { return Math.floor(Math.sqrt(Math.max(0, points) / 120)) + 1 }
+
+type PickupType = 'battery' | 'points' | 'cargo' | 'upgrade' | 'drone'
+interface PickupItem { type: PickupType; pos: Vec3 }
+const PICKUP_INFO: Record<PickupType, { color: string; label: string; score: number }> = {
+  battery: { color: '#22c55e', label: 'BAT', score: 0 },
+  points: { color: '#fbbf24', label: '+50', score: 50 },
+  cargo: { color: '#b45309', label: 'BOX', score: 80 },
+  upgrade: { color: '#a855f7', label: 'UP', score: 20 },
+  drone: { color: '#22d3ee', label: 'NEW', score: 30 },
+}
+function generatePickups(seedStr: string, count = 14): PickupItem[] {
+  const rnd = mulberry32(seedFrom('pk' + seedStr))
+  const bag: PickupType[] = ['battery', 'battery', 'points', 'points', 'points', 'cargo', 'cargo', 'upgrade', 'upgrade', 'drone']
+  const out: PickupItem[] = []
+  for (let i = 0; i < count; i++) out.push({ type: bag[Math.floor(rnd() * bag.length)], pos: [(rnd() - 0.5) * 300, 6 + rnd() * 40, -(rnd() * 460) - 20] })
+  return out
+}
+interface MotherShipSpec { pos: Vec3 }
+function generateMotherships(seedStr: string, count = 3): MotherShipSpec[] {
+  const rnd = mulberry32(seedFrom('ms' + seedStr))
+  const out: MotherShipSpec[] = []
+  for (let i = 0; i < count; i++) out.push({ pos: [(rnd() - 0.5) * 260, 32 + rnd() * 26, -(rnd() * 420) - 40] })
+  return out
+}
 
 // ═════════════════════════════════════════════════════════════
 // DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
@@ -97,7 +192,8 @@ function preloadDroneModels() {
 // ═════════════════════════════════════════════════════════════
 // LEVEL DEFINITIONS
 // ═════════════════════════════════════════════════════════════
-type LevelType = 'hover' | 'gates'
+type LevelType = 'hover' | 'gates' | 'cargo'
+type Vec3 = [number, number, number]
 interface Level {
   id: number
   name: string
@@ -108,7 +204,13 @@ interface Level {
   reward: number             // điểm cộng dồn
   type: LevelType
   hover?: { altitude: number; tolerance: number; duration: number }   // hover N giây ở độ cao X±tol
-  gates?: Array<{ pos: [number, number, number]; r: number }>          // qua các gates theo thứ tự
+  gates?: Array<{ pos: Vec3; r: number }>                              // qua các gates theo thứ tự
+  cargo?: {                                                            // nhiệm vụ giao hàng
+    packages: Array<{ pickup: Vec3; drop: Vec3 }>
+    enemies?: Array<{ center: Vec3; radius: number; speed: number }>
+    poles?: Array<{ pos: Vec3; h: number }>
+  }
+  map?: { lat: number; lon: number; radius?: number }                  // bay trên bản đồ thật (OSM)
   hint: string
 }
 
@@ -163,6 +265,42 @@ const LEVELS: Level[] = [
       { pos: [  0,  4, -40], r: 2.0 },
     ],
     hint: 'Yaw + roll combo để xoay theo trục. Né tower xanh. Giữ AOA thấp khi turn nhanh.',
+  },
+  {
+    id: 6, name: 'Giao hàng', emoji: '📦', difficulty: 'expert',
+    description: 'Gắp 3 kiện hàng ở bãi LẤY, né drone địch & cọc, thả đúng bãi THẢ',
+    timeLimit: 150, reward: 1500, type: 'cargo',
+    cargo: {
+      packages: [
+        { pickup: [-6, 1, -6], drop: [10, 1, -22] },
+        { pickup: [8, 1, -4], drop: [-12, 1, -28] },
+        { pickup: [0, 1, -34], drop: [6, 1, -10] },
+      ],
+      enemies: [
+        { center: [2, 6, -16], radius: 8, speed: 0.6 },
+        { center: [-8, 8, -22], radius: 6, speed: 0.9 },
+        { center: [12, 5, -12], radius: 7, speed: 0.75 },
+      ],
+      poles: [
+        { pos: [3, 0, -12], h: 10 }, { pos: [-4, 0, -18], h: 12 },
+        { pos: [7, 0, -26], h: 9 }, { pos: [-10, 0, -14], h: 11 },
+        { pos: [0, 0, -24], h: 8 }, { pos: [14, 0, -20], h: 10 },
+      ],
+    },
+    hint: 'Bay tới bãi XANH (LẤY) chậm lại để gắp kiện → bay tới bãi XANH DƯƠNG (THẢ). Né drone đỏ và cọc. Theo mũi tên chỉ đường.',
+  },
+  {
+    id: 7, name: 'Bản đồ thật', emoji: '🗺️', difficulty: 'pro',
+    description: 'Bay qua cổng giữa thành phố thật (OpenStreetMap) — toà nhà dựng từ địa hình thực',
+    timeLimit: 150, reward: 2500, type: 'gates',
+    map: { lat: 21.0285, lon: 105.8542, radius: 700 }, // Hồ Gươm, Hà Nội
+    gates: [
+      { pos: [0, 30, -70], r: 3 },
+      { pos: [90, 45, -150], r: 3 },
+      { pos: [-80, 55, -240], r: 3 },
+      { pos: [40, 40, -330], r: 3 },
+    ],
+    hint: 'Toà nhà là box từ OpenStreetMap quanh Hồ Gươm. Bay cao trên nóc nhà, né công trình, qua các cổng. Bản đồ tải vài giây lần đầu.',
   },
 ]
 
@@ -855,8 +993,8 @@ function LevelEnvironment({ level, currentGate }: { level: Level; currentGate: n
       {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
       <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
 
-      {/* Per-level scenery (terrain + obstacles) */}
-      <LevelScenery levelId={level.id} />
+      {/* Per-level scenery (bỏ khi bay bản đồ thật để nhường chỗ cho OSM city) */}
+      {!level.map && <LevelScenery levelId={level.id} />}
 
       {/* Gates — current gate sáng vàng glow, qua rồi xanh, chưa tới hồng */}
       {(level.gates || []).map((g, i) => {
@@ -909,14 +1047,14 @@ interface DroneState {
   roll: number
   battery: number
 }
-interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number }
+interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number; fire?: boolean }
 const PHYSICS = {
   thrustGain: 25, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
   airDrag: 0.92, gravity: 9.81, maxAltitude: 80, batteryDrain: 0.5,
 }
 
 function DroneRig({
-  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash,
+  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash, posRef, rotRef,
 }: {
   inputs: React.MutableRefObject<ControlInputs>
   level: Level
@@ -925,6 +1063,13 @@ function DroneRig({
   onGatePass: (idx: number) => void
   onHoverProgress: (secondsHeld: number) => void
   onCrash: () => void
+  posRef?: React.MutableRefObject<THREE.Vector3>
+  rotRef?: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
+  rechargeRef?: React.MutableRefObject<number>          // >0 = nạp pin (phần thưởng trạm sạc)
+  boostRef?: React.MutableRefObject<{ mult: number; until: number }>  // tăng lực đẩy tạm thời
+  sizeMult?: number   // kích thước drone theo cấp độ người chơi
+  rangeMult?: number  // tầm bay / lực đẩy theo cấp độ
+  respawnRef?: React.MutableRefObject<number>  // >0 = hồi sinh (về điểm xuất phát, đầy pin)
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const stateRef = useRef<DroneState>({
@@ -934,20 +1079,40 @@ function DroneRig({
   const hoverHeldRef = useRef(0)
   const lastGateCheckedRef = useRef(-1)
   const { camera } = useThree()
+  // Làm mượt kiểu UE5: input low-pass + camera lerp + FOV theo tốc độ
+  const inSmooth = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
+  const camLook = useRef(new THREE.Vector3(0, 0.5, 1))
+  const smooth = (dt: number, tau: number) => 1 - Math.exp(-dt / tau)
 
-  useFrame((_state, dt) => {
+  useFrame((_state, dtRaw) => {
+    const dt = Math.min(dtRaw, 1 / 30) // clamp để không giật khi frame rớt
     const s = stateRef.current
     const i = inputs.current
-    s.yaw += i.yaw * PHYSICS.yawRate * dt
-    s.pitch = i.pitch * 0.5
-    s.roll = i.roll * 0.5
+    const sm = inSmooth.current
+    // Input low-pass → cảm giác mượt, không "bụp" như UE5 (frame-independent)
+    const ai = smooth(dt, 0.12)
+    sm.throttle += (i.throttle - sm.throttle) * ai
+    sm.yaw += (i.yaw - sm.yaw) * ai
+    sm.pitch += (i.pitch - sm.pitch) * ai
+    sm.roll += (i.roll - sm.roll) * ai
+
+    s.yaw += sm.yaw * PHYSICS.yawRate * dt
+    // pitch/roll tiến mượt về góc mục tiêu (ease) thay vì gán tức thì
+    const ab = smooth(dt, 0.10)
+    s.pitch += (sm.pitch * 0.5 - s.pitch) * (ab + (1 - ab) * 0) // ease tới target
+    s.roll += (sm.roll * 0.5 - s.roll) * ab
     const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw)
     const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s.pitch)
     const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), s.roll)
     const orient = yawQ.clone().multiply(pitchQ).multiply(rollQ)
     const thrustVec = new THREE.Vector3(0, 1, 0).applyQuaternion(orient)
-    const throttleMag = Math.max(0, (i.throttle + 1) / 2)
-    s.vel.addScaledVector(thrustVec, throttleMag * PHYSICS.thrustGain * dt)
+    const throttleMag = Math.max(0, (sm.throttle + 1) / 2)
+    // Nạp pin (trạm sạc / mother ship) + boost (nâng cấp) + tầm bay theo cấp độ
+    if (respawnRef && respawnRef.current > 0) { s.pos.set(0, 3, 0); s.vel.set(0, 0, 0); s.battery = 100; respawnRef.current = 0 }
+    if (rechargeRef && rechargeRef.current > 0) { s.battery = Math.min(100, s.battery + rechargeRef.current); rechargeRef.current = 0 }
+    const boostMult = boostRef && performance.now() < boostRef.current.until ? boostRef.current.mult : 1
+    const thrust = PHYSICS.thrustGain * boostMult * (rangeMult ?? 1)
+    s.vel.addScaledVector(thrustVec, throttleMag * thrust * dt)
     s.vel.y -= PHYSICS.gravity * dt
     s.vel.multiplyScalar(PHYSICS.airDrag ** (dt * 60))
     s.pos.addScaledVector(s.vel, dt)
@@ -960,14 +1125,26 @@ function DroneRig({
     }
     if (s.pos.y > PHYSICS.maxAltitude) { s.pos.y = PHYSICS.maxAltitude; s.vel.y = Math.min(0, s.vel.y) }
     if (s.battery > 0) s.battery = Math.max(0, s.battery - throttleMag * PHYSICS.batteryDrain * dt)
+    if (posRef) posRef.current.copy(s.pos)
+    if (rotRef) { rotRef.current.yaw = s.yaw; rotRef.current.pitch = s.pitch; rotRef.current.roll = s.roll }
 
     if (groupRef.current) {
       groupRef.current.position.copy(s.pos)
       groupRef.current.quaternion.copy(orient)
     }
+    // Camera mượt: lerp vị trí + điểm nhìn, FOV "punch" theo tốc độ (cảm giác UE5)
     const camOffset = new THREE.Vector3(0, 0.05, 0).applyQuaternion(orient)
-    camera.position.copy(s.pos).add(camOffset)
-    camera.lookAt(s.pos.clone().add(new THREE.Vector3(0, 0, 1).applyQuaternion(orient)))
+    const desiredPos = s.pos.clone().add(camOffset)
+    camera.position.lerp(desiredPos, smooth(dt, 0.05))
+    const lookTarget = s.pos.clone().add(new THREE.Vector3(0, 0, 1).applyQuaternion(orient))
+    camLook.current.lerp(lookTarget, smooth(dt, 0.05))
+    camera.lookAt(camLook.current)
+    const cam = camera as THREE.PerspectiveCamera
+    if (cam.isPerspectiveCamera) {
+      const targetFov = 88 + Math.min(22, s.vel.length() * 0.7)
+      cam.fov += (targetFov - cam.fov) * smooth(dt, 0.25)
+      cam.updateProjectionMatrix()
+    }
 
     // ── Level objective check ──
     if (level.type === 'hover' && level.hover) {
@@ -994,7 +1171,7 @@ function DroneRig({
 
   const propSpeed = Math.max(0.1, (inputs.current.throttle + 1) / 2)
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} scale={sizeMult ?? 1}>
       {model.gltfUrl ? (
         // GLTF model — Suspense fallback ở caller, primitive sẽ mount khi load xong
         <GltfDrone url={model.gltfUrl} scale={model.scale}
@@ -1036,6 +1213,7 @@ function useGamepadInput(inputsRef: React.MutableRefObject<ControlInputs>) {
         inputsRef.current.throttle = dz(-(pad.axes[1] || 0))
         inputsRef.current.roll = dz(pad.axes[2] || 0)
         inputsRef.current.pitch = dz(-(pad.axes[3] || 0))
+        inputsRef.current.fire = !!(pad.buttons[0]?.pressed || pad.buttons[5]?.pressed || pad.buttons[7]?.pressed)
       }
       raf = requestAnimationFrame(poll)
     }
@@ -1175,7 +1353,7 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
           position: 'relative', width: RADIUS * 2, height: RADIUS * 2, margin: '0 auto',
           borderRadius: '50%',
           background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
-          border: `2px solid ${active ? '#ec4899' : 'rgba(148, 163, 184, 0.4)'}`,
+          border: `2px solid ${active ? '#22d3ee' : 'rgba(148, 163, 184, 0.4)'}`,
           backdropFilter: 'blur(4px)',
           transition: active ? 'none' : 'background 0.2s',
         }}
@@ -1199,7 +1377,7 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
           transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
           borderRadius: '50%',
           background: active
-            ? 'linear-gradient(135deg, #ec4899, #8b5cf6)'
+            ? CYAN_GRAD
             : 'rgba(100, 116, 139, 0.7)',
           border: '2px solid rgba(255, 255, 255, 0.3)',
           boxShadow: active ? '0 0 16px rgba(236, 72, 153, 0.6)' : '0 2px 6px rgba(0,0,0,0.4)',
@@ -1235,6 +1413,587 @@ function MobileTouchSticks({ inputsRef }: { inputsRef: React.MutableRefObject<Co
         onMove={(dx, dy, ins) => { ins.pitch = dy; ins.roll = dx }}
         onRelease={(ins) => { ins.pitch = 0; ins.roll = 0 }}
       />
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// PEER DRONES (Thách đấu realtime) — drone người chơi khác
+// ═════════════════════════════════════════════════════════════
+function PeerDroneMesh() {
+  const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null])
+  useFrame((_s, dt) => propRefs.current.forEach((p) => p && (p.rotation.y += dt * 40)))
+  const arms: Vec3[] = [[0.22, 0, 0.22], [-0.22, 0, 0.22], [0.22, 0, -0.22], [-0.22, 0, -0.22]]
+  return (
+    <group>
+      <mesh castShadow><boxGeometry args={[0.34, 0.1, 0.34]} /><meshStandardMaterial color="#f97316" metalness={0.5} roughness={0.4} /></mesh>
+      {arms.map((p, i) => (
+        <group key={i} position={p}>
+          <mesh><cylinderGeometry args={[0.03, 0.03, 0.06, 8]} /><meshStandardMaterial color="#1c1917" /></mesh>
+          <group ref={(el) => { propRefs.current[i] = el }} position={[0, 0.04, 0]}>
+            <mesh><boxGeometry args={[0.26, 0.005, 0.03]} /><meshStandardMaterial color="#fdba74" transparent opacity={0.55} /></mesh>
+          </group>
+        </group>
+      ))}
+      <mesh position={[0, 0.08, 0.1]}><sphereGeometry args={[0.04, 8, 8]} /><meshBasicMaterial color="#fed7aa" /></mesh>
+    </group>
+  )
+}
+function PeerGhost({ id, peersRef }: { id: string; peersRef: React.MutableRefObject<Map<string, Peer>> }) {
+  const g = useRef<THREE.Group>(null)
+  const q = useMemo(() => new THREE.Quaternion(), [])
+  const e = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
+  const tp = useMemo(() => new THREE.Vector3(), [])
+  const [name, setName] = useState('')
+  useFrame((_s, dt) => {
+    const p = peersRef.current.get(id)
+    const gg = g.current
+    if (!p || !gg) return
+    if (p.name !== name) setName(p.name)
+    const k = 1 - Math.exp(-dt / 0.08)
+    gg.position.lerp(tp.set(p.pos[0], p.pos[1], p.pos[2]), k)
+    e.set(p.pitch, p.yaw, p.roll)
+    gg.quaternion.slerp(q.setFromEuler(e), k)
+  })
+  return (
+    <group ref={g}>
+      <PeerDroneMesh />
+      <Text position={[0, 0.5, 0]} fontSize={0.32} color="#fdba74" anchorX="center" outlineWidth={0.02} outlineColor="#000">{name}</Text>
+    </group>
+  )
+}
+function PeerDrones({ peersRef }: { peersRef: React.MutableRefObject<Map<string, Peer>> }) {
+  const [ids, setIds] = useState<string[]>([])
+  useEffect(() => {
+    const it = setInterval(() => {
+      const now = performance.now()
+      const map = peersRef.current
+      for (const [k, v] of map) if (now - v.t > 2500) map.delete(k) // bỏ peer mất tín hiệu
+      const keys = Array.from(map.keys())
+      setIds((prev) => (prev.length === keys.length && prev.every((x) => keys.includes(x)) ? prev : keys))
+    }, 500)
+    return () => clearInterval(it)
+  }, [peersRef])
+  return <>{ids.map((id) => <PeerGhost key={id} id={id} peersRef={peersRef} />)}</>
+}
+
+// ═════════════════════════════════════════════════════════════
+// PHẦN THƯỞNG (pickups) + MOTHER SHIP (trạm sạc bay)
+// ═════════════════════════════════════════════════════════════
+function PickupShape({ type }: { type: PickupType }) {
+  const info = PICKUP_INFO[type]
+  return (
+    <group>
+      {type === 'battery' && <mesh><cylinderGeometry args={[0.3, 0.3, 0.7, 12]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.5} /></mesh>}
+      {type === 'points' && <mesh><octahedronGeometry args={[0.45]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} metalness={0.6} /></mesh>}
+      {type === 'cargo' && <mesh><boxGeometry args={[0.6, 0.6, 0.6]} /><meshStandardMaterial color={info.color} /></mesh>}
+      {type === 'upgrade' && <mesh><coneGeometry args={[0.35, 0.7, 6]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} /></mesh>}
+      {type === 'drone' && <mesh><torusGeometry args={[0.35, 0.12, 10, 20]} /><meshStandardMaterial color={info.color} emissive={info.color} emissiveIntensity={0.6} /></mesh>}
+      <Text position={[0, 0.7, 0]} fontSize={0.3} color={info.color} anchorX="center" outlineWidth={0.02} outlineColor="#000">{info.label}</Text>
+    </group>
+  )
+}
+function Pickups({ items, posRef, onCollect }: {
+  items: PickupItem[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onCollect: (type: PickupType) => void
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const taken = useRef<Set<number>>(new Set())
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    items.forEach((it, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      if (taken.current.has(i)) { if (g.visible) g.visible = false; return }
+      g.rotation.y += dt * 1.6
+      g.position.y = it.pos[1] + Math.sin(performance.now() / 420 + i) * 0.25
+      if (Math.hypot(dp.x - it.pos[0], dp.y - g.position.y, dp.z - it.pos[2]) < 1.7) {
+        taken.current.add(i); g.visible = false; onCollect(it.type)
+      }
+    })
+  })
+  return <>{items.map((it, i) => <group key={i} ref={(el) => { refs.current[i] = el }} position={it.pos}><PickupShape type={it.type} /></group>)}</>
+}
+function MotherShips({ specs, posRef, onNear }: {
+  specs: MotherShipSpec[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onNear: () => void
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const lastTick = useRef(0)
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    let near = false
+    specs.forEach((sp, i) => {
+      const g = refs.current[i]
+      if (g) { g.position.y = sp.pos[1] + Math.sin(performance.now() / 1200 + i) * 0.6; g.rotation.y += dt * 0.15 }
+      if (Math.hypot(dp.x - sp.pos[0], dp.y - sp.pos[1], dp.z - sp.pos[2]) < 16) near = true
+    })
+    if (near) { const now = performance.now(); if (now - lastTick.current > 200) { lastTick.current = now; onNear() } }
+  })
+  return (
+    <>
+      {specs.map((sp, i) => (
+        <group key={i} ref={(el) => { refs.current[i] = el }} position={sp.pos}>
+          <mesh castShadow><cylinderGeometry args={[6, 7, 1.6, 6]} /><meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} /></mesh>
+          <mesh position={[0, 0.9, 0]}><cylinderGeometry args={[2.4, 4, 1.2, 6]} /><meshStandardMaterial color="#475569" metalness={0.6} /></mesh>
+          <mesh position={[0, -0.9, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[5, 7, 24]} /><meshBasicMaterial color="#22d3ee" transparent opacity={0.5} side={THREE.DoubleSide} /></mesh>
+          <pointLight position={[0, -1, 0]} color="#22d3ee" intensity={2} distance={20} />
+          <Text position={[0, 2.4, 0]} fontSize={0.9} color="#22d3ee" anchorX="center" outlineWidth={0.04} outlineColor="#000">⬡ TRẠM SẠC</Text>
+        </group>
+      ))}
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// VŨ KHÍ — đạn bắn (tiêu diệt drone địch / bắn trúng đối thủ PvP)
+// ═════════════════════════════════════════════════════════════
+interface EnemyShared { pos: THREE.Vector3[]; alive: boolean[]; respawnAt: number[] }
+const playShoot = () => sfxTone(900, 0.06, 'square', 0.1)
+function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, enemyShared, peersRef, onEnemyKill, onPeerShot, onExplode }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  rotRef: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
+  inputs: React.MutableRefObject<ControlInputs>
+  ammoRef: React.MutableRefObject<number>
+  onShoot: () => void
+  enemyShared?: React.MutableRefObject<EnemyShared | null>
+  peersRef?: React.MutableRefObject<Map<string, Peer>>
+  onEnemyKill?: () => void
+  onPeerShot?: (cid: string) => void
+  onExplode?: (x: number, y: number, z: number) => void
+}) {
+  const MAX = 24, SPEED = 70, LIFE = 2.2
+  const pool = useRef(Array.from({ length: MAX }, () => ({ active: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0 })))
+  const refs = useRef<(THREE.Mesh | null)[]>([])
+  const lastFire = useRef(0)
+  const e = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
+  useFrame((_s, dt) => {
+    const now = performance.now()
+    // Bắn (edge + cooldown 220ms)
+    if (inputs.current.fire && ammoRef.current > 0 && now - lastFire.current > 220) {
+      lastFire.current = now
+      ammoRef.current -= 1
+      onShoot()
+      playShoot()
+      const r = rotRef.current
+      const dir = new THREE.Vector3(0, 0, 1).applyEuler(e.set(r.pitch, r.yaw, r.roll))
+      const slot = pool.current.find((p) => !p.active)
+      if (slot) {
+        slot.active = true; slot.life = LIFE
+        slot.pos.copy(posRef.current).addScaledVector(dir, 1)
+        slot.vel.copy(dir).multiplyScalar(SPEED)
+      }
+    }
+    // Cập nhật đạn + va chạm
+    const es = enemyShared?.current
+    pool.current.forEach((p, i) => {
+      const m = refs.current[i]
+      if (!p.active) { if (m) m.visible = false; return }
+      p.life -= dt
+      p.pos.addScaledVector(p.vel, dt)
+      if (p.life <= 0 || p.pos.y < 0) { p.active = false; if (m) m.visible = false; return }
+      // trúng địch
+      if (es) {
+        for (let k = 0; k < es.pos.length; k++) {
+          if (!es.alive[k]) continue
+          if (p.pos.distanceTo(es.pos[k]) < 1.6) { es.alive[k] = false; es.respawnAt[k] = now + 4000; p.active = false; onExplode?.(es.pos[k].x, es.pos[k].y, es.pos[k].z); onEnemyKill?.(); break }
+        }
+      }
+      // trúng đối thủ PvP
+      if (p.active && peersRef) {
+        for (const [cid, pr] of peersRef.current) {
+          if (p.pos.distanceTo(new THREE.Vector3(pr.pos[0], pr.pos[1], pr.pos[2])) < 1.6) { p.active = false; onExplode?.(pr.pos[0], pr.pos[1], pr.pos[2]); onPeerShot?.(cid); break }
+        }
+      }
+      if (m) { m.visible = p.active; m.position.copy(p.pos) }
+    })
+  })
+  return (
+    <>
+      {pool.current.map((_, i) => (
+        <mesh key={i} ref={(el) => { refs.current[i] = el }} visible={false}>
+          <sphereGeometry args={[0.12, 8, 8]} />
+          <meshBasicMaterial color="#fde047" toneMapped={false} />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+// Hiệu ứng nổ (khi đạn trúng / drone bị hạ gục)
+function Explosions({ fxRef }: { fxRef: React.MutableRefObject<{ x: number; y: number; z: number; t: number }[]> }) {
+  const MAX = 12
+  const refs = useRef<(THREE.Mesh | null)[]>([])
+  useFrame(() => {
+    const now = performance.now()
+    const arr = fxRef.current
+    while (arr.length && now - arr[0].t > 700) arr.shift()
+    for (let i = 0; i < MAX; i++) {
+      const m = refs.current[i]
+      if (!m) continue
+      const fx = arr[i]
+      if (!fx) { m.visible = false; continue }
+      const age = (now - fx.t) / 700
+      m.visible = true
+      m.position.set(fx.x, fx.y, fx.z)
+      m.scale.setScalar(0.5 + age * 3.5)
+      ;(m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.85 * (1 - age))
+    }
+  })
+  return <>{Array.from({ length: MAX }).map((_, i) => (
+    <mesh key={i} ref={(el) => { refs.current[i] = el }} visible={false}>
+      <sphereGeometry args={[1, 12, 12]} />
+      <meshBasicMaterial color="#fb923c" transparent opacity={0.85} toneMapped={false} />
+    </mesh>
+  ))}</>
+}
+
+// ═════════════════════════════════════════════════════════════
+// OSM CITY — box công trình từ OpenStreetMap + tile culling
+// Chia bản đồ thành ô vuông (tile), chỉ dựng ô quanh drone (trong tầm nhìn).
+// 1 InstancedMesh → 1 draw call; chỉ rebuild khi drone sang ô mới.
+// ═════════════════════════════════════════════════════════════
+function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4 }: {
+  boxes: OsmBox[]
+  posRef: React.MutableRefObject<THREE.Vector3>
+  tile?: number
+  viewTiles?: number
+}) {
+  const MAX = 5000
+  const meshRef = useRef<THREE.InstancedMesh>(null)
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const lastKey = useRef('')
+  const tiles = useMemo(() => {
+    const m = new Map<string, OsmBox[]>()
+    for (const b of boxes) {
+      const k = `${Math.floor(b.cx / tile)}_${Math.floor(b.cz / tile)}`
+      let a = m.get(k); if (!a) { a = []; m.set(k, a) }
+      a.push(b)
+    }
+    return m
+  }, [boxes, tile])
+  useEffect(() => { if (meshRef.current) meshRef.current.count = 0; lastKey.current = '' }, [boxes])
+  useFrame(() => {
+    const dp = posRef.current
+    const tx = Math.floor(dp.x / tile), tz = Math.floor(dp.z / tile)
+    const key = `${tx}_${tz}`
+    if (key === lastKey.current) return // chưa sang ô mới → khỏi rebuild
+    lastKey.current = key
+    const mesh = meshRef.current
+    if (!mesh) return
+    let n = 0
+    for (let i = -viewTiles; i <= viewTiles && n < MAX; i++) {
+      for (let j = -viewTiles; j <= viewTiles && n < MAX; j++) {
+        const arr = tiles.get(`${tx + i}_${tz + j}`)
+        if (!arr) continue
+        for (const b of arr) {
+          if (n >= MAX) break
+          dummy.position.set(b.cx, b.h / 2, b.cz)
+          dummy.scale.set(Math.max(2, b.w), b.h, Math.max(2, b.d))
+          dummy.rotation.set(0, 0, 0)
+          dummy.updateMatrix()
+          mesh.setMatrixAt(n, dummy.matrix)
+          n++
+        }
+      }
+    }
+    mesh.count = n
+    mesh.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX]} castShadow receiveShadow>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#7b8794" roughness={0.85} metalness={0.05} />
+    </instancedMesh>
+  )
+}
+function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus }: {
+  lat: number; lon: number; radius?: number
+  posRef: React.MutableRefObject<THREE.Vector3>
+  onStatus?: (s: 'loading' | 'ready' | 'empty' | 'error') => void
+}) {
+  const [boxes, setBoxes] = useState<OsmBox[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    onStatus?.('loading')
+    fetchOsmBuildings(lat, lon, radius)
+      .then((b) => { if (!alive) return; setBoxes(b); onStatus?.(b.length ? 'ready' : 'empty') })
+      .catch(() => alive && onStatus?.('error'))
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lon, radius])
+  if (!boxes || !boxes.length) return null
+  return <OsmCity boxes={boxes} posRef={posRef} />
+}
+
+// ═════════════════════════════════════════════════════════════
+// MŨI TÊN CHỈ ĐƯỜNG (3D) — bay tới mục tiêu kế tiếp
+// ═════════════════════════════════════════════════════════════
+function WaypointGuide({ posRef, target, color = '#22d3ee' }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  target: [number, number, number] | null
+  color?: string
+}) {
+  const arrowRef = useRef<THREE.Group>(null)
+  const beaconRef = useRef<THREE.Group>(null)
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_s, dt) => {
+    const a = arrowRef.current, b = beaconRef.current
+    if (!target) { if (a) a.visible = false; if (b) b.visible = false; return }
+    const tp = tmp.set(target[0], target[1], target[2])
+    const dp = posRef.current
+    const dir = tp.clone().sub(dp)
+    const dist = dir.length()
+    if (a) {
+      a.visible = dist > 1.5
+      if (dist > 0.001) {
+        dir.normalize()
+        a.position.copy(dp).addScaledVector(dir, 2.6)
+        a.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
+        const pulse = 1 + Math.sin(performance.now() / 180) * 0.12
+        a.scale.setScalar(pulse)
+      }
+    }
+    if (b) { b.visible = true; b.position.set(tp.x, 0, tp.z) }
+  })
+  return (
+    <>
+      {/* Mũi tên trôi phía trước, chỉ về mục tiêu */}
+      <group ref={arrowRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.28]}>
+          <coneGeometry args={[0.2, 0.42, 18]} />
+          <meshBasicMaterial color={color} transparent opacity={0.92} toneMapped={false} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.34, 14]} />
+          <meshBasicMaterial color={color} transparent opacity={0.7} toneMapped={false} />
+        </mesh>
+      </group>
+      {/* Cột sáng tại mục tiêu */}
+      <group ref={beaconRef}>
+        <mesh position={[0, 40, 0]}>
+          <cylinderGeometry args={[0.12, 0.12, 80, 12]} />
+          <meshBasicMaterial color="#fbbf24" transparent opacity={0.16} toneMapped={false} />
+        </mesh>
+      </group>
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// ÂM THANH ĐỘNG CƠ DRONE — WebAudio, phản ứng theo throttle
+// ═════════════════════════════════════════════════════════════
+function DroneSound({ inputsRef, muted }: {
+  inputsRef: React.MutableRefObject<ControlInputs>
+  muted: boolean
+}) {
+  useEffect(() => {
+    if (muted) return
+    const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined
+    if (!AC) return
+    let ctx: AudioContext | null = null
+    let raf = 0
+    let stopped = false
+    const build = () => {
+      if (ctx) return
+      ctx = new AC()
+      const sr = ctx.sampleRate
+      const buf = ctx.createBuffer(1, sr, sr)
+      const data = buf.getChannelData(0)
+      for (let k = 0; k < sr; k++) data[k] = Math.random() * 2 - 1
+      const noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 200; bp.Q.value = 0.7
+      const ng = ctx.createGain(); ng.gain.value = 0
+      noise.connect(bp); bp.connect(ng); ng.connect(ctx.destination)
+      const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 80
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900
+      const og = ctx.createGain(); og.gain.value = 0
+      osc.connect(lp); lp.connect(og); og.connect(ctx.destination)
+      noise.start(); osc.start()
+      const loop = () => {
+        if (stopped || !ctx) return
+        const thr = Math.max(0, (inputsRef.current.throttle + 1) / 2)
+        const t = ctx.currentTime
+        ng.gain.setTargetAtTime(0.035 + thr * 0.11, t, 0.05)
+        og.gain.setTargetAtTime(0.012 + thr * 0.045, t, 0.05)
+        osc.frequency.setTargetAtTime(68 + thr * 190, t, 0.05)
+        bp.frequency.setTargetAtTime(160 + thr * 240, t, 0.05)
+        raf = requestAnimationFrame(loop)
+      }
+      loop()
+    }
+    const resume = () => { build(); ctx?.resume?.() }
+    window.addEventListener('pointerdown', resume)
+    window.addEventListener('keydown', resume)
+    build() // thử khởi tạo ngay (có thể suspended tới khi có gesture)
+    return () => {
+      stopped = true
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointerdown', resume)
+      window.removeEventListener('keydown', resume)
+      ctx?.close?.()
+    }
+  }, [inputsRef, muted])
+  return null
+}
+
+// ═════════════════════════════════════════════════════════════
+// SFX một-lần (va chạm / giao hàng) — WebAudio dùng chung
+// ═════════════════════════════════════════════════════════════
+let sfxCtx: AudioContext | null = null
+function sfxTone(freq: number, dur: number, type: OscillatorType = 'square', vol = 0.18) {
+  try {
+    const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined
+    if (!AC) return
+    sfxCtx = sfxCtx || new AC()
+    const o = sfxCtx.createOscillator(), g = sfxCtx.createGain()
+    o.type = type; o.frequency.value = freq
+    o.connect(g); g.connect(sfxCtx.destination)
+    const t = sfxCtx.currentTime
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.start(t); o.stop(t + dur + 0.02)
+  } catch { /* ignore */ }
+}
+const playHit = () => sfxTone(130, 0.25, 'square', 0.22)
+const playPickup = () => sfxTone(520, 0.12, 'triangle', 0.18)
+const playDeliver = () => { sfxTone(660, 0.12, 'triangle', 0.18); setTimeout(() => sfxTone(880, 0.18, 'triangle', 0.18), 90) }
+
+// ═════════════════════════════════════════════════════════════
+// CARGO / ENEMY / OBSTACLE (chế độ Giao hàng)
+// ═════════════════════════════════════════════════════════════
+function CargoCrate() {
+  return (
+    <group>
+      <mesh castShadow><boxGeometry args={[0.7, 0.55, 0.7]} /><meshStandardMaterial color="#b45309" /></mesh>
+      <mesh position={[0, 0.28, 0]}><boxGeometry args={[0.74, 0.05, 0.18]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+      <mesh position={[0, 0.28, 0]} rotation={[0, Math.PI / 2, 0]}><boxGeometry args={[0.74, 0.05, 0.18]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+    </group>
+  )
+}
+function Pad({ pos, color, label }: { pos: Vec3; color: string; label: string }) {
+  return (
+    <group position={[pos[0], 0.06, pos[2]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.5, 2.1, 36]} /><meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}><circleGeometry args={[1.5, 36]} /><meshBasicMaterial color={color} transparent opacity={0.14} side={THREE.DoubleSide} /></mesh>
+      <Text position={[0, 2.6, 0]} fontSize={0.7} color={color} anchorX="center" outlineWidth={0.05} outlineColor="#000">{label}</Text>
+    </group>
+  )
+}
+function CargoMission({ posRef, packages, onState, onComplete }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  packages: Array<{ pickup: Vec3; drop: Vec3 }>
+  onState: (idx: number, carrying: boolean) => void
+  onComplete: () => void
+}) {
+  const [idx, setIdx] = useState(0)
+  const [carrying, setCarrying] = useState(false)
+  const idxRef = useRef(0), carryingRef = useRef(false), doneRef = useRef(false)
+  const boxRef = useRef<THREE.Group>(null)
+  const v = useMemo(() => new THREE.Vector3(), [])
+  useFrame(() => {
+    if (doneRef.current) return
+    const pkg = packages[idxRef.current]
+    if (!pkg) return
+    const dp = posRef.current
+    if (!carryingRef.current) {
+      if (boxRef.current) boxRef.current.position.set(pkg.pickup[0], pkg.pickup[1], pkg.pickup[2])
+      if (dp.distanceTo(v.set(...pkg.pickup)) < 2.2) {
+        carryingRef.current = true; setCarrying(true); onState(idxRef.current, true); playPickup()
+      }
+    } else {
+      if (boxRef.current) boxRef.current.position.set(dp.x, dp.y - 0.45, dp.z)
+      if (dp.distanceTo(v.set(...pkg.drop)) < 2.2) {
+        carryingRef.current = false; setCarrying(false)
+        const next = idxRef.current + 1; idxRef.current = next; setIdx(next); onState(next, false); playDeliver()
+        if (next >= packages.length) { doneRef.current = true; onComplete() }
+      }
+    }
+  })
+  const pkg = packages[idx]
+  return (
+    <>
+      <group ref={boxRef} visible={!!pkg}><CargoCrate /></group>
+      {pkg && <Pad pos={pkg.pickup} color="#22c55e" label={carrying ? '...' : 'LẤY'} />}
+      {pkg && <Pad pos={pkg.drop} color="#3b82f6" label="THẢ" />}
+    </>
+  )
+}
+function EnemyMesh() {
+  return (
+    <group>
+      <mesh><boxGeometry args={[0.32, 0.1, 0.32]} /><meshStandardMaterial color="#7f1d1d" metalness={0.5} roughness={0.4} /></mesh>
+      {([[0.24, 0, 0.24], [-0.24, 0, 0.24], [0.24, 0, -0.24], [-0.24, 0, -0.24]] as Vec3[]).map((p, i) => (
+        <mesh key={i} position={p}><cylinderGeometry args={[0.14, 0.14, 0.02, 12]} /><meshStandardMaterial color="#ef4444" transparent opacity={0.5} /></mesh>
+      ))}
+      <mesh position={[0, 0.09, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshBasicMaterial color="#fecaca" /></mesh>
+    </group>
+  )
+}
+function EnemyDrones({ posRef, specs, onHit, shared }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  specs: Array<{ center: Vec3; radius: number; speed: number }>
+  onHit: () => void
+  shared?: React.MutableRefObject<EnemyShared | null>
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const phase = useRef(specs.map((_, i) => i * 1.9))
+  const lastHit = useRef(0)
+  // bộ chia sẻ cho hệ đạn (vị trí + sống/hồi sinh)
+  const local = useRef<EnemyShared>({ pos: specs.map(() => new THREE.Vector3()), alive: specs.map(() => true), respawnAt: specs.map(() => 0) })
+  useEffect(() => { if (shared) shared.current = local.current }, [shared])
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    const st = local.current
+    const now = performance.now()
+    specs.forEach((sp, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      if (!st.alive[i]) { // bị bắn rơi → ẩn, hồi sinh sau 4s
+        g.visible = false
+        if (now > st.respawnAt[i]) st.alive[i] = true
+        return
+      }
+      g.visible = true
+      phase.current[i] += dt * sp.speed
+      const a = phase.current[i]
+      const ep = st.pos[i].set(
+        sp.center[0] + Math.cos(a) * sp.radius,
+        sp.center[1] + Math.sin(a * 0.7) * 1.6,
+        sp.center[2] + Math.sin(a) * sp.radius,
+      )
+      if (ep.distanceTo(dp) < 16) ep.lerp(dp, 0.015) // bám nhẹ khi gần
+      g.position.copy(ep); g.rotation.y += dt * 5
+      if (ep.distanceTo(dp) < 1.3) { if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } }
+    })
+  })
+  return <>{specs.map((_, i) => (<group key={i} ref={(el) => { refs.current[i] = el }}><EnemyMesh /></group>))}</>
+}
+function PoleObstacles({ posRef, poles, onHit }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  poles: Array<{ pos: Vec3; h: number }>
+  onHit: () => void
+}) {
+  const lastHit = useRef(0)
+  useFrame(() => {
+    const dp = posRef.current
+    for (const p of poles) {
+      const hd = Math.hypot(dp.x - p.pos[0], dp.z - p.pos[2])
+      if (hd < 0.95 && dp.y < p.h) { const now = performance.now(); if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } break }
+    }
+  })
+  return (
+    <>
+      {poles.map((p, i) => (
+        <group key={i} position={[p.pos[0], 0, p.pos[2]]}>
+          <mesh position={[0, p.h / 2, 0]} castShadow><cylinderGeometry args={[0.36, 0.42, p.h, 12]} /><meshStandardMaterial color="#dc2626" metalness={0.2} roughness={0.7} /></mesh>
+          <mesh position={[0, p.h - 0.5, 0]}><cylinderGeometry args={[0.44, 0.44, 0.5, 12]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+          <mesh position={[0, p.h + 0.15, 0]}><sphereGeometry args={[0.26, 10, 10]} /><meshBasicMaterial color="#f87171" /></mesh>
+        </group>
+      ))}
     </>
   )
 }
@@ -1279,57 +2038,249 @@ function VRButton({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer
   )
 }
 
+// ── Sci-fi HUD palette ──
+const HUD_C = '#5eead4'        // teal-cyan chính
+const HUD_DIM = 'rgba(94,234,212,0.45)'
+const HUD_BG = 'rgba(6,30,38,0.6)'
+// Nền sci-fi dùng chung cho các màn (lưới + glow + gradient tối)
+const SCIFI_BG = [
+  'radial-gradient(circle at 50% 8%, rgba(34,211,238,0.12), transparent 55%)',
+  'linear-gradient(rgba(34,211,238,0.045) 1px, transparent 1px) 0 0/42px 42px',
+  'linear-gradient(90deg, rgba(34,211,238,0.045) 1px, transparent 1px) 0 0/42px 42px',
+  'linear-gradient(160deg, #07151c 0%, #040c12 100%)',
+].join(',')
+const CYAN_GRAD = 'linear-gradient(135deg, #22d3ee, #0ea5e9)'
+// 4 khung góc sci-fi cho màn hình
+function ScreenCorners() {
+  const b = (s: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', width: 42, height: 42, borderColor: 'rgba(34,211,238,0.45)',
+    borderStyle: 'solid', pointerEvents: 'none', zIndex: 2, ...s,
+  })
+  return (
+    <>
+      <div style={b({ top: 8, left: 8, borderWidth: '2px 0 0 2px' })} />
+      <div style={b({ top: 8, right: 8, borderWidth: '2px 2px 0 0' })} />
+      <div style={b({ bottom: 8, left: 8, borderWidth: '0 0 2px 2px' })} />
+      <div style={b({ bottom: 8, right: 8, borderWidth: '0 2px 2px 0' })} />
+    </>
+  )
+}
+
+/** Thước dọc (tốc độ / độ cao) kiểu HUD máy bay. */
+function HudTape({ value, label, unit, side }: { value: number; label: string; unit: string; side: 'left' | 'right' }) {
+  const H = 200, W = 64, step = 5, win = 20
+  const ticks: { v: number; y: number }[] = []
+  const startV = Math.ceil((value - win) / step) * step
+  for (let v = startV; v <= value + win; v += step) ticks.push({ v, y: H / 2 - ((v - value) / (win * 2)) * H })
+  const railX = side === 'left' ? W - 2 : 2
+  return (
+    <svg width={W} height={H} style={{ overflow: 'visible' }}>
+      <text x={railX} y={-8} fontSize={10} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'} style={{ letterSpacing: 1 }}>{label}</text>
+      <line x1={railX} y1={0} x2={railX} y2={H} stroke={HUD_DIM} strokeWidth={1.5} />
+      {ticks.map((t, i) => {
+        const major = Math.abs(Math.round(t.v) % 10) === 0
+        const len = major ? 14 : 7
+        const x2 = side === 'left' ? railX - len : railX + len
+        return (
+          <g key={i} opacity={0.7}>
+            <line x1={railX} y1={t.y} x2={x2} y2={t.y} stroke={HUD_C} strokeWidth={1} />
+            {major && <text x={side === 'left' ? railX - 18 : railX + 18} y={t.y + 3} fontSize={9} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'}>{Math.round(t.v)}</text>}
+          </g>
+        )
+      })}
+      <polygon
+        points={side === 'left'
+          ? `${railX},${H / 2} ${railX - 8},${H / 2 - 12} ${W - 56},${H / 2 - 12} ${W - 56},${H / 2 + 12} ${railX - 8},${H / 2 + 12}`
+          : `${railX},${H / 2} ${railX + 8},${H / 2 - 12} ${58},${H / 2 - 12} ${58},${H / 2 + 12} ${railX + 8},${H / 2 + 12}`}
+        fill={HUD_BG} stroke={HUD_C} strokeWidth={1.2}
+      />
+      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 4} fontSize={14} fontWeight="bold" fill="#fff" textAnchor="middle">{value.toFixed(0)}</text>
+      <text x={railX} y={H + 14} fontSize={8} fill={HUD_DIM} textAnchor={side === 'left' ? 'end' : 'start'}>{unit}</text>
+    </svg>
+  )
+}
+
+/** Dải la bàn ngang trên đỉnh. */
+function HudCompass({ heading }: { heading: number }) {
+  const W = 300, H = 34, win = 60
+  const marks: { d: number; x: number }[] = []
+  const start = Math.ceil((heading - win) / 15) * 15
+  for (let d = start; d <= heading + win; d += 15) {
+    let dd = ((d % 360) + 360) % 360
+    marks.push({ d: dd, x: W / 2 + ((d - heading) / win) * (W / 2) })
+  }
+  const card: Record<number, string> = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }
+  return (
+    <svg width={W} height={H} style={{ overflow: 'hidden' }}>
+      <line x1={0} y1={H - 2} x2={W} y2={H - 2} stroke={HUD_DIM} strokeWidth={1} />
+      {marks.map((m, i) => (
+        <g key={i} opacity={0.85}>
+          <line x1={m.x} y1={H - 2} x2={m.x} y2={card[m.d] ? H - 14 : H - 8} stroke={HUD_C} strokeWidth={card[m.d] ? 1.6 : 1} />
+          {card[m.d] && <text x={m.x} y={H - 18} fontSize={12} fontWeight="bold" fill={HUD_C} textAnchor="middle">{card[m.d]}</text>}
+        </g>
+      ))}
+      <polygon points={`${W / 2},2 ${W / 2 - 6},-6 ${W / 2 + 6},-6`} fill="#fbbf24" transform="translate(0,8)" />
+      <rect x={W / 2 - 22} y={0} width={44} height={15} fill={HUD_BG} stroke={HUD_C} strokeWidth={1} />
+      <text x={W / 2} y={11} fontSize={11} fontWeight="bold" fill="#fff" textAnchor="middle">{Math.round(heading)}°</text>
+    </svg>
+  )
+}
+
+/** Radar tròn góc dưới-phải: chấm mục tiêu quanh drone (forward = lên). */
+function HudRadar({ heading, rel }: { heading: number; rel: { x: number; z: number; color: string }[] }) {
+  const R = 56, range = 60
+  const yaw = (heading * Math.PI) / 180
+  const fx = Math.sin(yaw), fz = Math.cos(yaw)
+  return (
+    <svg width={R * 2} height={R * 2}>
+      <circle cx={R} cy={R} r={R - 2} fill="rgba(6,30,38,0.5)" stroke={HUD_DIM} strokeWidth={1} />
+      <circle cx={R} cy={R} r={(R - 2) * 0.6} fill="none" stroke={HUD_DIM} strokeWidth={0.6} />
+      <line x1={R} y1={4} x2={R} y2={R * 2 - 4} stroke={HUD_DIM} strokeWidth={0.5} />
+      <line x1={4} y1={R} x2={R * 2 - 4} y2={R} stroke={HUD_DIM} strokeWidth={0.5} />
+      {/* Tia quét quay (SMIL — mượt, không phụ thuộc React render) */}
+      <polygon points={`${R},${R} ${R},6 ${R + 22},10`} fill={HUD_C} opacity={0.22}>
+        <animateTransform attributeName="transform" type="rotate" from={`0 ${R} ${R}`} to={`360 ${R} ${R}`} dur="3.2s" repeatCount="indefinite" />
+      </polygon>
+      {rel.map((t, i) => {
+        const right = t.x * fz - t.z * fx
+        const fwd = t.x * fx + t.z * fz
+        let px = R + (right / range) * (R - 6)
+        let py = R - (fwd / range) * (R - 6)
+        const d = Math.hypot(px - R, py - R)
+        if (d > R - 6) { px = R + ((px - R) / d) * (R - 6); py = R + ((py - R) / d) * (R - 6) }
+        return <circle key={i} cx={px} cy={py} r={3.5} fill={t.color} />
+      })}
+      <polygon points={`${R},${R - 6} ${R - 5},${R + 5} ${R + 5},${R + 5}`} fill={HUD_C} />
+    </svg>
+  )
+}
+
+/** Đường chân trời nhân tạo — nghiêng theo roll, trượt theo pitch (FPV artificial horizon). */
+function HudHorizon({ pitch, roll }: { pitch: number; roll: number }) {
+  const W = 260, H = 160
+  const rollDeg = (roll * 180) / Math.PI
+  const pitchPx = (pitch * 180) / Math.PI * 2.2 // độ → px
+  const ladder = [-20, -10, 10, 20]
+  return (
+    <svg width={W} height={H} style={{ overflow: 'visible', opacity: 0.8 }}>
+      <g transform={`rotate(${-rollDeg} ${W / 2} ${H / 2})`}>
+        <g transform={`translate(0 ${pitchPx})`}>
+          {/* đường chân trời */}
+          <line x1={W / 2 - 110} y1={H / 2} x2={W / 2 - 24} y2={H / 2} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={W / 2 + 24} y1={H / 2} x2={W / 2 + 110} y2={H / 2} stroke={HUD_C} strokeWidth={1.4} />
+          {ladder.map((d) => {
+            const y = H / 2 - d * 2.2
+            const w = d % 20 === 0 ? 44 : 28
+            return (
+              <g key={d} opacity={0.7}>
+                <line x1={W / 2 - w} y1={y} x2={W / 2 - 14} y2={y} stroke={HUD_C} strokeWidth={1} />
+                <line x1={W / 2 + 14} y1={y} x2={W / 2 + w} y2={y} stroke={HUD_C} strokeWidth={1} />
+                <text x={W / 2 - w - 6} y={y + 3} fontSize={8} fill={HUD_C} textAnchor="end">{Math.abs(d)}</text>
+              </g>
+            )
+          })}
+        </g>
+      </g>
+      {/* chỉ báo roll cố định (cung trên) */}
+      <path d={`M${W / 2 - 40},${H / 2 - 56} A56,56 0 0 1 ${W / 2 + 40},${H / 2 - 56}`} fill="none" stroke={HUD_DIM} strokeWidth={1} />
+      <polygon points={`${W / 2},${H / 2 - 52} ${W / 2 - 5},${H / 2 - 44} ${W / 2 + 5},${H / 2 - 44}`} fill="#fbbf24"
+        transform={`rotate(${rollDeg} ${W / 2} ${H / 2})`} />
+    </svg>
+  )
+}
+
 function GameHUD({
-  telemetry, gamepadId, level, gateProgress, hoverProgress, timeRemaining,
+  telemetry, gamepadId, level, gateProgress, hoverProgress, timeRemaining, targets = [],
 }: {
   telemetry: DroneState | null; gamepadId: string | null; level: Level
   gateProgress: number; hoverProgress: number; timeRemaining: number
+  targets?: { x: number; z: number; color: string }[]
 }) {
+  const [scale, setScale] = useState(1)
+  useEffect(() => {
+    const upd = () => setScale(Math.min(1, window.innerWidth / 900))
+    upd(); window.addEventListener('resize', upd)
+    return () => window.removeEventListener('resize', upd)
+  }, [])
   if (!telemetry) return null
-  const speed = telemetry.vel.length()
-  const battColor = telemetry.battery > 30 ? '#10b981' : telemetry.battery > 15 ? '#f59e0b' : '#ef4444'
+  const speed = telemetry.vel.length() * 3.6 // km/h cho cảm giác HUD
+  const heading = ((telemetry.yaw * 180) / Math.PI % 360 + 360) % 360
+  const battColor = telemetry.battery > 30 ? HUD_C : telemetry.battery > 15 ? '#f59e0b' : '#ef4444'
+  const rel = targets.map((t) => ({ x: t.x - telemetry.pos.x, z: t.z - telemetry.pos.z, color: t.color }))
   const objStr = level.type === 'hover' && level.hover
-    ? `Hover ${hoverProgress.toFixed(1)}/${level.hover.duration}s`
-    : `Gate ${gateProgress}/${(level.gates || []).length}`
+    ? `HOVER ${hoverProgress.toFixed(1)}/${level.hover.duration}s`
+    : level.type === 'cargo' && level.cargo
+      ? `CARGO ${gateProgress}` // gateProgress unused cho cargo; HUD cargo riêng ở GameScreen
+      : `GATE ${gateProgress}/${(level.gates || []).length}`
+  const bracket = (corner: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', width: 26, height: 26, borderColor: HUD_DIM, borderStyle: 'solid', ...corner,
+  })
   return (
     <div style={{
       position: 'absolute', inset: 0, pointerEvents: 'none',
-      fontFamily: 'monospace', color: '#22c55e', textShadow: '0 0 4px rgba(0,0,0,0.8)',
+      fontFamily: 'ui-monospace, monospace', color: HUD_C,
+      textShadow: '0 0 6px rgba(34,211,238,0.6)',
+      transform: `scale(${scale})`, transformOrigin: 'center center',
     }}>
-      {/* Top-left: alt + speed */}
-      <div style={{ position: 'absolute', top: 12, left: 16 }}>
-        <div style={{ fontSize: 10, opacity: 0.7 }}>ALT</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold' }}>{telemetry.pos.y.toFixed(1)}m</div>
-        <div style={{ fontSize: 10, opacity: 0.7, marginTop: 8 }}>SPEED</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold' }}>{speed.toFixed(1)} m/s</div>
+      {/* Đường chân trời nhân tạo (sau tâm ngắm) */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+        <HudHorizon pitch={telemetry.pitch} roll={telemetry.roll} />
       </div>
-      {/* Top-center: objective + time */}
-      <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>{level.emoji} LEVEL {level.id} • {level.name.toUpperCase()}</div>
-        <div style={{ fontSize: 26, fontWeight: 'bold', marginTop: 2, color: '#fbbf24' }}>{objStr}</div>
-        <div style={{ fontSize: 14, marginTop: 4, color: timeRemaining < 10 ? '#ef4444' : '#22c55e' }}>
-          ⏱ {timeRemaining.toFixed(1)}s
+      {/* Khung góc HUD */}
+      <div style={bracket({ top: 14, left: 14, borderWidth: '2px 0 0 2px' })} />
+      <div style={bracket({ top: 14, right: 14, borderWidth: '2px 2px 0 0' })} />
+      <div style={bracket({ bottom: 14, left: 14, borderWidth: '0 0 2px 2px' })} />
+      <div style={bracket({ bottom: 14, right: 14, borderWidth: '0 2px 2px 0' })} />
+
+      {/* La bàn trên đỉnh */}
+      <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)' }}>
+        <HudCompass heading={heading} />
+      </div>
+
+      {/* Thước tốc độ (trái) + độ cao (phải) */}
+      <div style={{ position: 'absolute', top: '50%', left: 26, transform: 'translateY(-50%)' }}>
+        <HudTape value={speed} label="SPD" unit="km/h" side="left" />
+      </div>
+      <div style={{ position: 'absolute', top: '50%', right: 26, transform: 'translateY(-50%)' }}>
+        <HudTape value={telemetry.pos.y} label="ALT" unit="m" side="right" />
+      </div>
+
+      {/* Tâm ngắm + ladder */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+        <svg width={120} height={70} style={{ overflow: 'visible' }}>
+          <circle cx={60} cy={35} r={5} fill="none" stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={18} y1={35} x2={48} y2={35} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={72} y1={35} x2={102} y2={35} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={48} y1={35} x2={52} y2={31} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={72} y1={35} x2={68} y2={31} stroke={HUD_C} strokeWidth={1.4} />
+        </svg>
+      </div>
+
+      {/* Objective + time — thanh trên */}
+      <div style={{ position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+        <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold' }}>{objStr}</div>
+        <div style={{ fontSize: 13, color: timeRemaining < 10 ? '#ef4444' : HUD_C }}>⏱ {timeRemaining.toFixed(1)}s</div>
+      </div>
+
+      {/* Pin — cột dọc bên trái ngoài */}
+      <div style={{ position: 'absolute', top: '50%', left: 96, transform: 'translateY(-50%)', textAlign: 'center' }}>
+        <div style={{ fontSize: 8, color: HUD_DIM, marginBottom: 3 }}>BATT</div>
+        <div style={{ width: 8, height: 120, background: 'rgba(255,255,255,0.12)', borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', border: `1px solid ${HUD_DIM}` }}>
+          <div style={{ width: '100%', height: `${telemetry.battery}%`, background: battColor }} />
         </div>
+        <div style={{ fontSize: 10, color: battColor, marginTop: 3, fontWeight: 'bold' }}>{telemetry.battery.toFixed(0)}%</div>
       </div>
-      {/* Top-right: battery */}
-      <div style={{ position: 'absolute', top: 12, right: 16, textAlign: 'right' }}>
-        <div style={{ fontSize: 10, opacity: 0.7 }}>BATTERY</div>
-        <div style={{ fontSize: 22, fontWeight: 'bold', color: battColor }}>{telemetry.battery.toFixed(0)}%</div>
-        <div style={{ width: 80, height: 6, background: 'rgba(255,255,255,0.2)', marginTop: 4, borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ width: `${telemetry.battery}%`, height: '100%', background: battColor }} />
-        </div>
+
+      {/* Radar góc dưới-phải */}
+      <div style={{ position: 'absolute', bottom: 26, right: 26 }}>
+        <HudRadar heading={heading} rel={rel} />
+        <div style={{ textAlign: 'center', fontSize: 8, color: HUD_DIM, marginTop: 2 }}>RADAR {Math.round(speed)}km/h</div>
       </div>
-      {/* Bottom: input source */}
-      <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', textAlign: 'center', fontSize: 11 }}>
-        <div style={{ opacity: 0.7 }}>
-          {gamepadId ? `🎮 ${gamepadId.slice(0, 40)}` : '⌨️ Bàn phím (W/S A/D ↑↓ ←→)'}
-        </div>
+
+      {/* Input source góc dưới-trái */}
+      <div style={{ position: 'absolute', bottom: 28, left: 50, fontSize: 10, color: HUD_DIM }}>
+        {gamepadId ? `🎮 ${gamepadId.slice(0, 24)}` : '⌨️/🕹️ READY'}
       </div>
-      {/* Crosshair */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        width: 30, height: 30, border: '1.5px solid rgba(34, 197, 94, 0.6)', borderRadius: '50%',
-      }} />
     </div>
   )
 }
@@ -1371,13 +2322,15 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
 
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', overflowY: 'auto',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: '32px 24px',
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: '32px 24px', fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             🚁 FPV Drone Sandbox + VR
           </h1>
           <p style={{ color: '#94a3b8', fontSize: 14 }}>
@@ -1414,7 +2367,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 'bold' }}>🥽 VR Headset</span>
               <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6,
-                background: vrSupport === 'yes' ? '#8b5cf6' : '#475569', color: 'white' }}>
+                background: vrSupport === 'yes' ? '#22d3ee' : '#475569', color: 'white' }}>
                 {vrSupport === 'checking' ? 'KIỂM TRA' : vrSupport === 'yes' ? 'HỖ TRỢ' : 'KHÔNG HỖ TRỢ'}
               </span>
             </div>
@@ -1435,7 +2388,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             📖 Hướng dẫn cài đặt
           </h3>
           <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.7 }}>
-            <p style={{ marginTop: 0 }}><b style={{ color: '#ec4899' }}>1. Tay cầm FPV (FrSky / RadioMaster / TBS Tango):</b></p>
+            <p style={{ marginTop: 0 }}><b style={{ color: '#22d3ee' }}>1. Tay cầm FPV (FrSky / RadioMaster / TBS Tango):</b></p>
             <ul style={{ marginTop: 4, paddingLeft: 22 }}>
               <li>Cắm cáp USB-C từ TX → laptop/PC</li>
               <li>Vào menu System → <code style={{ color: '#fbbf24' }}>USB Joystick (HID)</code> mode</li>
@@ -1447,7 +2400,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
               <li>Cắm USB hoặc pair Bluetooth</li>
               <li>Test joystick: <a href="https://hardwaretester.com/gamepad" target="_blank" rel="noreferrer" style={{ color: '#06b6d4' }}>hardwaretester.com/gamepad</a></li>
             </ul>
-            <p style={{ marginTop: 12 }}><b style={{ color: '#8b5cf6' }}>3. VR Headset (tuỳ chọn — Meta Quest / Vision Pro):</b></p>
+            <p style={{ marginTop: 12 }}><b style={{ color: '#22d3ee' }}>3. VR Headset (tuỳ chọn — Meta Quest / Vision Pro):</b></p>
             <ul style={{ marginTop: 4, paddingLeft: 22 }}>
               <li>Mở trình duyệt trên Quest (Meta Browser hoặc Wolvic)</li>
               <li>Truy cập <code style={{ color: '#fbbf24' }}>inphysic.com/dashboard/aura</code></li>
@@ -1471,7 +2424,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             disabled={!gamepadId}
             style={{
               padding: '14px 28px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 'bold',
-              background: gamepadId ? 'linear-gradient(135deg, #ec4899, #8b5cf6)' : '#475569',
+              background: gamepadId ? CYAN_GRAD : '#475569',
               color: 'white', cursor: gamepadId ? 'pointer' : 'not-allowed', opacity: gamepadId ? 1 : 0.5,
               boxShadow: gamepadId ? '0 4px 16px rgba(236, 72, 153, 0.4)' : 'none',
             }}
@@ -1523,10 +2476,12 @@ function LevelSelectScreen({
   useEffect(() => { preloadDroneModels() }, [])
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', overflowY: 'auto',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: '24px',
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: '24px', fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
@@ -1551,26 +2506,31 @@ function LevelSelectScreen({
           <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, fontWeight: 'bold', letterSpacing: 1 }}>
             🛸 CHỌN MẪU DRONE
           </div>
+          <div style={{ fontSize: 10, color: '#7dd3fc', marginBottom: 8 }}>Cấp người chơi: <b style={{ color: '#fbbf24' }}>{playerLevel(getPoints())}</b> · drone xịn mở khoá theo cấp</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-            {DRONE_MODELS.map(m => {
+            {DRONE_MODELS.map((m, idx) => {
               const active = m.id === selectedModelId
+              const reqLevel = idx === 0 ? 1 : idx * 2 // model0 free, sau đó cấp 2,4,6…
+              const locked = playerLevel(getPoints()) < reqLevel
               return (
                 <button
                   key={m.id}
-                  onClick={() => { onSelectModel(m.id); saveSelectedModel(m.id) }}
+                  disabled={locked}
+                  onClick={() => { if (locked) return; onSelectModel(m.id); saveSelectedModel(m.id) }}
                   style={{
-                    padding: 12, borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                    background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
-                    border: `1px solid ${active ? '#ec4899' : 'rgba(71, 85, 105, 0.4)'}`,
-                    color: '#e2e8f0', transition: 'all 0.15s',
+                    padding: 12, borderRadius: 10, cursor: locked ? 'not-allowed' : 'pointer', textAlign: 'left',
+                    background: active ? 'rgba(34,211,238,0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    border: `1px solid ${active ? '#22d3ee' : 'rgba(71, 85, 105, 0.4)'}`,
+                    color: '#e2e8f0', transition: 'all 0.15s', opacity: locked ? 0.5 : 1,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 24 }}>{m.emoji}</span>
+                    <span style={{ fontSize: 24 }}>{locked ? '🔒' : m.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 'bold' }}>
                         {m.name}
-                        {active && <span style={{ marginLeft: 6, fontSize: 11, color: '#ec4899' }}>● ĐANG DÙNG</span>}
+                        {active && <span style={{ marginLeft: 6, fontSize: 11, color: '#22d3ee' }}>● ĐANG DÙNG</span>}
+                        {locked && <span style={{ marginLeft: 6, fontSize: 11, color: '#f87171' }}>🔒 Cấp {reqLevel}</span>}
                       </div>
                       <div style={{ fontSize: 11, color: '#94a3b8' }}>{m.description}</div>
                       {m.attribution && (
@@ -1661,12 +2621,14 @@ function LevelSelectScreen({
 // SCREEN: GAME (level đang chạy)
 // ═════════════════════════════════════════════════════════════
 function GameScreen({
-  level, model, onComplete, onAbort,
+  level, model, onComplete, onAbort, room, playerName,
 }: {
   level: Level
   model: DroneModel
   onComplete: (success: boolean, elapsed: number) => void
   onAbort: () => void
+  room?: string
+  playerName?: string
 }) {
   const inputsRef = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
   const glRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -1677,6 +2639,212 @@ function GameScreen({
   const startTimeRef = useRef(Date.now())
   const completedRef = useRef(false)
   const gamepadId = useGamepadInput(inputsRef)
+  const dronePosRef = useRef(new THREE.Vector3(0, 0.5, 0))
+  const droneRotRef = useRef({ yaw: 0, pitch: 0, roll: 0 })
+  // Phần thưởng / nâng cấp / cấp độ
+  const rechargeRef = useRef(0)
+  const boostRef = useRef({ mult: 1, until: 0 })
+  const [points] = useState(() => getPoints())
+  const lvlNum = playerLevel(points)
+  const sizeMult = 1 + (lvlNum - 1) * 0.08
+  const rangeMult = 1 + (lvlNum - 1) * 0.06
+  const [runScore, setRunScore] = useState(0)
+  const [collectMsg, setCollectMsg] = useState<string | null>(null)
+  const [modelOverride, setModelOverride] = useState<DroneModel | null>(null)
+  const [boostOn, setBoostOn] = useState(false)
+  const seedStr = room || `lvl${level.id}`
+  const pickups = useMemo(() => generatePickups(seedStr), [seedStr])
+  const motherships = useMemo(() => generateMotherships(seedStr), [seedStr])
+  const onCollect = useCallback((type: PickupType) => {
+    playPickup()
+    const info = PICKUP_INFO[type]
+    if (type === 'battery') rechargeRef.current = 100
+    else if (type === 'upgrade') { boostRef.current = { mult: 1.6, until: performance.now() + 9000 }; setBoostOn(true); setTimeout(() => setBoostOn(false), 9000); ammoRef.current = Math.min(30, ammoRef.current + 10); setAmmo(ammoRef.current) }
+    else if (type === 'drone') setModelOverride(DRONE_MODELS[Math.floor(Math.random() * DRONE_MODELS.length)])
+    if (info.score) setRunScore((s) => s + info.score)
+    setCollectMsg(type === 'battery' ? '🔋 Sạc đầy pin!' : type === 'upgrade' ? '⚡ Tăng tốc 9s!' : type === 'drone' ? '🚁 Drone mới!' : `+${info.score} điểm`)
+    setTimeout(() => setCollectMsg(null), 1400)
+  }, [])
+  // Vũ khí
+  const AMMO_MAX = 30
+  const ammoRef = useRef(AMMO_MAX)
+  const [ammo, setAmmo] = useState(AMMO_MAX)
+  const enemySharedRef = useRef<EnemyShared | null>(null)
+  const onShoot = useCallback(() => setAmmo(ammoRef.current), [])
+  const onEnemyKill = useCallback(() => { setRunScore((s) => s + 40); setCollectMsg('💥 Hạ địch +40'); setTimeout(() => setCollectMsg(null), 1200) }, [])
+  const onPeerShot = useCallback((cid: string) => {
+    setRunScore((s) => s + 30); setCollectMsg('🎯 Bắn trúng +30'); setTimeout(() => setCollectMsg(null), 1200)
+    if (room) publish(topic, { kind: 'shot', cid: myCid, target: cid, by: myName })
+  }, [room, publish, topic, myCid, myName])
+  const onMotherNear = useCallback(() => {
+    rechargeRef.current = Math.max(rechargeRef.current, 1.5)
+    if (ammoRef.current < AMMO_MAX) { ammoRef.current = AMMO_MAX; setAmmo(AMMO_MAX) }
+  }, [])
+  // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
+  const peersRef = useRef<Map<string, Peer>>(new Map())
+  const raceRef = useRef<Map<string, { name: string; time: number }>>(new Map())
+  const lastPeerHit = useRef(0)
+  const finishedRef = useRef(false)
+  const onHitRef = useRef<() => void>(() => {})
+  const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
+  const myName = playerName || myCallsign()
+  const token = room ? tokenStore.getAccessToken() : null
+  const topic = room ? `drone:room:${room}` : ''
+  const [peerCount, setPeerCount] = useState(0)
+  const [raceBoard, setRaceBoard] = useState<{ name: string; time: number; me?: boolean }[]>([])
+  const [myFinishTime, setMyFinishTime] = useState<number | null>(null)
+  const buildBoard = useCallback(() => {
+    const arr = Array.from(raceRef.current.entries()).map(([cid, v]) => ({ name: v.name, time: v.time, me: cid === myCid }))
+    return arr.sort((a, b) => a.time - b.time)
+  }, [myCid])
+
+  const { publish } = useBroker(token, room ? [topic] : [], {
+    onMsg: (m) => {
+      const p = m.payload as any
+      if (!p || p.cid === myCid) return
+      if (p.kind === 'state') {
+        peersRef.current.set(p.cid, { name: p.name, pos: p.p, yaw: p.y, pitch: p.pi, roll: p.r, t: performance.now() })
+      } else if (p.kind === 'finish') {
+        if (!raceRef.current.has(p.cid)) { raceRef.current.set(p.cid, { name: p.name, time: p.time }); setRaceBoard(buildBoard()) }
+      } else if (p.kind === 'shot' && p.target === myCid) {
+        lastShooterRef.current = p.cid; onHitRef.current(); damageRef.current(34) // bị bắn → flash + mất máu
+      } else if (p.kind === 'down' && p.by === myCid) {
+        onKillRef.current() // mình hạ gục được đối thủ
+      }
+    },
+  })
+
+  const finishRace = useCallback((elapsed: number) => {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    raceRef.current.set(myCid, { name: myName, time: elapsed })
+    setMyFinishTime(elapsed)
+    setRaceBoard(buildBoard())
+    publish(topic, { kind: 'finish', cid: myCid, name: myName, time: +elapsed.toFixed(2) })
+    if (room) saveLeaderboard(room, `${level.emoji} ${level.name}`, myName, elapsed)
+  }, [myCid, myName, publish, topic, room, level, buildBoard])
+
+  // Trong phòng: thắng = về đích nhanh nhất; KHÔNG thoát ngay (xem bảng + bay tiếp)
+  const completeRef = useRef<(s: boolean, e: number) => void>(() => {})
+  completeRef.current = (success: boolean, elapsed: number) => {
+    if (room) { if (success) { finishRace(elapsed); addPoints(60 + runScore) } return }
+    if (success) addPoints(40 + runScore) // nhiệm vụ: cộng điểm
+    onComplete(success, elapsed)
+  }
+  // Thoát giữa chừng trận thách đấu (chưa về đích) → TRỪ điểm
+  const handleAbort = useCallback(() => {
+    if (room && !finishedRef.current) addPoints(-30)
+    onAbort()
+  }, [room, onAbort])
+
+  // ── Máu / hạ gục / nổ ──
+  const HP_MAX = 100
+  const hpRef = useRef(HP_MAX)
+  const respawnRef = useRef(0)
+  const lastShooterRef = useRef<string | null>(null)
+  const fxRef = useRef<{ x: number; y: number; z: number; t: number }[]>([])
+  const [hp, setHp] = useState(HP_MAX)
+  const [kills, setKills] = useState(0)
+  const [deaths, setDeaths] = useState(0)
+  const [knockMsg, setKnockMsg] = useState(false)
+  const explode = useCallback((x: number, y: number, z: number) => {
+    fxRef.current.push({ x, y, z, t: performance.now() })
+    if (fxRef.current.length > 16) fxRef.current.shift()
+  }, [])
+  const knockdown = useCallback(() => {
+    const dp = dronePosRef.current
+    explode(dp.x, dp.y, dp.z)
+    respawnRef.current = 1; hpRef.current = HP_MAX; setHp(HP_MAX); setDeaths((d) => d + 1); addPoints(-20)
+    setKnockMsg(true); setTimeout(() => setKnockMsg(false), 1800)
+    if (room && lastShooterRef.current) publish(topic, { kind: 'down', cid: myCid, by: lastShooterRef.current })
+    lastShooterRef.current = null
+  }, [explode, room, publish, topic, myCid])
+  const damage = useCallback((amt: number) => {
+    hpRef.current -= amt
+    if (hpRef.current <= 0) knockdown()
+    setHp(Math.max(0, hpRef.current))
+  }, [knockdown])
+  const damageRef = useRef<(a: number) => void>(() => {})
+  damageRef.current = damage
+  const onKillRef = useRef<() => void>(() => {})
+  onKillRef.current = () => { setKills((k) => k + 1); addPoints(100); setCollectMsg('💀 Hạ gục đối thủ +100'); setTimeout(() => setCollectMsg(null), 1400) }
+
+  useEffect(() => {
+    if (!room) return
+    const send = setInterval(() => {
+      const dp = dronePosRef.current, dr = droneRotRef.current
+      publish(topic, { kind: 'state', cid: myCid, name: myName, p: [+dp.x.toFixed(2), +dp.y.toFixed(2), +dp.z.toFixed(2)], y: +dr.yaw.toFixed(3), pi: +dr.pitch.toFixed(3), r: +dr.roll.toFixed(3) })
+      // Va chạm PvP giữa người chơi
+      for (const pr of peersRef.current.values()) {
+        if (Math.hypot(dp.x - pr.pos[0], dp.y - pr.pos[1], dp.z - pr.pos[2]) < 1.4) {
+          const now = performance.now()
+          if (now - lastPeerHit.current > 1000) { lastPeerHit.current = now; onHitRef.current() }
+          break
+        }
+      }
+    }, 80)
+    const count = setInterval(() => setPeerCount(peersRef.current.size), 600)
+    return () => { clearInterval(send); clearInterval(count) }
+  }, [room, topic, myCid, myName, publish])
+
+  const [muted, setMuted] = useState(false)
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'empty' | 'error' | null>(null)
+  const [showSticks, setShowSticks] = useState(isMobile())
+  const [showHint, setShowHint] = useState(true)
+  const [cargoIdx, setCargoIdx] = useState(0)
+  const [cargoCarrying, setCargoCarrying] = useState(false)
+  const [hits, setHits] = useState(0)
+  const [hitFlash, setHitFlash] = useState(false)
+  useEffect(() => { const id = setTimeout(() => setShowHint(false), 9000); return () => clearTimeout(id) }, [])
+  // Phím Space = bắn (giữ để bắn liên tục)
+  useEffect(() => {
+    const dn = (e: KeyboardEvent) => { if (e.code === 'Space') { e.preventDefault(); inputsRef.current.fire = true } }
+    const up = (e: KeyboardEvent) => { if (e.code === 'Space') inputsRef.current.fire = false }
+    window.addEventListener('keydown', dn); window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', dn); window.removeEventListener('keyup', up) }
+  }, [])
+
+  const onCargoState = useCallback((idx: number, carrying: boolean) => { setCargoIdx(idx); setCargoCarrying(carrying) }, [])
+  const onCargoComplete = useCallback(() => {
+    if (completedRef.current) return
+    completedRef.current = true
+    completeRef.current(true, (Date.now() - startTimeRef.current) / 1000)
+  }, [])
+  const onHit = useCallback(() => {
+    playHit(); setHits((h) => h + 1); setHitFlash(true)
+    setTimeout(() => setHitFlash(false), 280)
+    damageRef.current(12) // va chạm cũng mất máu
+  }, [])
+  onHitRef.current = onHit
+
+  // Mục tiêu kế tiếp để vẽ mũi tên chỉ đường + đo khoảng cách
+  const guideTarget: [number, number, number] | null = useMemo(() => {
+    if (level.type === 'hover' && level.hover) return [0, level.hover.altitude, 0]
+    if (level.type === 'gates' && level.gates) return level.gates[gateProgress]?.pos ?? null
+    if (level.type === 'cargo' && level.cargo) {
+      const pkg = level.cargo.packages[cargoIdx]
+      if (!pkg) return null
+      return cargoCarrying ? pkg.drop : pkg.pickup
+    }
+    return null
+  }, [level, gateProgress, cargoIdx, cargoCarrying])
+  const guideDist = telemetry && guideTarget
+    ? telemetry.pos.distanceTo(new THREE.Vector3(...guideTarget)) : null
+
+  // Chấm mục tiêu cho radar HUD
+  const radarTargets = useMemo(() => {
+    const t: { x: number; z: number; color: string }[] = []
+    if (level.type === 'gates' && level.gates) {
+      level.gates.forEach((g, i) => t.push({ x: g.pos[0], z: g.pos[2], color: i === gateProgress ? '#fbbf24' : i < gateProgress ? '#10b981' : '#ec4899' }))
+    } else if (level.type === 'hover') {
+      t.push({ x: 0, z: 0, color: '#fbbf24' })
+    } else if (level.type === 'cargo' && level.cargo) {
+      const pkg = level.cargo.packages[cargoIdx]
+      if (pkg) { const tgt = cargoCarrying ? pkg.drop : pkg.pickup; t.push({ x: tgt[0], z: tgt[2], color: cargoCarrying ? '#3b82f6' : '#22c55e' }) }
+      level.cargo.enemies?.forEach((e) => t.push({ x: e.center[0], z: e.center[2], color: '#ef4444' }))
+    }
+    return t
+  }, [level, gateProgress, cargoIdx, cargoCarrying])
 
   // Countdown timer
   useEffect(() => {
@@ -1686,11 +2854,11 @@ function GameScreen({
       setTimeRemaining(remaining)
       if (remaining <= 0 && !completedRef.current) {
         completedRef.current = true
-        onComplete(false, level.timeLimit)
+        completeRef.current(false, level.timeLimit)
       }
     }, 100)
     return () => clearInterval(id)
-  }, [level, onComplete])
+  }, [level])
 
   // Throttled telemetry
   const lastUpdRef = useRef(0)
@@ -1706,18 +2874,18 @@ function GameScreen({
     if (idx + 1 >= (level.gates?.length || 0) && !completedRef.current) {
       completedRef.current = true
       const elapsed = (Date.now() - startTimeRef.current) / 1000
-      onComplete(true, elapsed)
+      completeRef.current(true, elapsed)
     }
-  }, [level, onComplete])
+  }, [level])
 
   const onHoverProg = useCallback((sec: number) => {
     setHoverProgress(sec)
     if (level.hover && sec >= level.hover.duration && !completedRef.current) {
       completedRef.current = true
       const elapsed = (Date.now() - startTimeRef.current) / 1000
-      onComplete(true, elapsed)
+      completeRef.current(true, elapsed)
     }
-  }, [level, onComplete])
+  }, [level])
 
   const onCrash = useCallback(() => {
     if (completedRef.current) return
@@ -1731,6 +2899,7 @@ function GameScreen({
       { name: 'yawLeft', keys: ['KeyA'] }, { name: 'yawRight', keys: ['KeyD'] },
       { name: 'pitchUp', keys: ['ArrowUp'] }, { name: 'pitchDown', keys: ['ArrowDown'] },
       { name: 'rollLeft', keys: ['ArrowLeft'] }, { name: 'rollRight', keys: ['ArrowRight'] },
+      { name: 'fire', keys: ['Space'] },
     ]}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         <Canvas
@@ -1740,9 +2909,37 @@ function GameScreen({
         >
           <LevelEnvironment level={level} currentGate={gateProgress} />
           <Suspense fallback={null}>
-            <DroneRig inputs={inputsRef} level={level} model={model} onTelemetry={onTelemetry}
-              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} />
+            <DroneRig inputs={inputsRef} level={level} model={modelOverride || model} onTelemetry={onTelemetry}
+              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash}
+              posRef={dronePosRef} rotRef={droneRotRef}
+              rechargeRef={rechargeRef} boostRef={boostRef} sizeMult={sizeMult} rangeMult={rangeMult}
+              respawnRef={respawnRef} />
           </Suspense>
+          <Pickups items={pickups} posRef={dronePosRef} onCollect={onCollect} />
+          <MotherShips specs={motherships} posRef={dronePosRef} onNear={onMotherNear} />
+          <Projectiles posRef={dronePosRef} rotRef={droneRotRef} inputs={inputsRef} ammoRef={ammoRef}
+            onShoot={onShoot} enemyShared={enemySharedRef} peersRef={peersRef}
+            onEnemyKill={onEnemyKill} onPeerShot={onPeerShot} onExplode={explode} />
+          <Explosions fxRef={fxRef} />
+          {room && <PeerDrones peersRef={peersRef} />}
+          {level.map && (
+            <Suspense fallback={null}>
+              <OsmCityLoader lat={level.map.lat} lon={level.map.lon} radius={level.map.radius} posRef={dronePosRef} onStatus={setMapStatus} />
+            </Suspense>
+          )}
+          <WaypointGuide posRef={dronePosRef} target={guideTarget} />
+          {level.type === 'cargo' && level.cargo && (
+            <>
+              <CargoMission posRef={dronePosRef} packages={level.cargo.packages}
+                onState={onCargoState} onComplete={onCargoComplete} />
+              {level.cargo.enemies && level.cargo.enemies.length > 0 && (
+                <EnemyDrones posRef={dronePosRef} specs={level.cargo.enemies} onHit={onHit} shared={enemySharedRef} />
+              )}
+              {level.cargo.poles && level.cargo.poles.length > 0 && (
+                <PoleObstacles posRef={dronePosRef} poles={level.cargo.poles} onHit={onHit} />
+              )}
+            </>
+          )}
           <KeyboardBridge inputsRef={inputsRef} />
           <Text position={[0, 14, -20]} fontSize={1.5} color="#22c55e" anchorX="center">
             {level.emoji} {level.name.toUpperCase()}
@@ -1750,12 +2947,201 @@ function GameScreen({
           <GlCapture glRef={glRef} />
         </Canvas>
         <GameHUD telemetry={telemetry} gamepadId={gamepadId} level={level}
-          gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining} />
+          gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining}
+          targets={radarTargets} />
         <VRButton glRef={glRef} />
-        {/* Mobile touch sticks — chỉ hiện trên touch device khi không có gamepad */}
-        {isMobile() && !gamepadId && <MobileTouchSticks inputsRef={inputsRef} />}
+        {/* Âm thanh động cơ (WebAudio) */}
+        <DroneSound inputsRef={inputsRef} muted={muted} />
+        {/* Joystick ảo — bật khi mobile-không-gamepad hoặc user tự bật */}
+        {showSticks && !gamepadId && <MobileTouchSticks inputsRef={inputsRef} />}
+
+        {/* Khoảng cách tới mục tiêu kế tiếp */}
+        {guideDist != null && (
+          <div style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(8,145,178,0.85)', color: '#ecfeff', padding: '5px 14px',
+            borderRadius: 999, fontSize: 13, fontWeight: 700, fontFamily: 'monospace', zIndex: 10,
+          }}>{level.type === 'cargo' ? (cargoCarrying ? '📦→ Thả' : '📦 Lấy') : '🎯 Mục tiêu'}: {guideDist.toFixed(1)}m</div>
+        )}
+
+        {/* HUD cargo: tiến độ giao hàng + va chạm */}
+        {level.type === 'cargo' && level.cargo && (
+          <div style={{
+            position: 'absolute', top: 46, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 8, zIndex: 10,
+          }}>
+            <span style={{ background: 'rgba(34,197,94,0.85)', color: '#052e16', padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>
+              📦 {cargoIdx}/{level.cargo.packages.length}
+            </span>
+            <span style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>
+              💥 {hits}
+            </span>
+          </div>
+        )}
+
+        {/* Thách đấu: phòng + số đối thủ đang bay */}
+        {room && (
+          <div style={{
+            position: 'absolute', top: 80, right: 24, zIndex: 10, textAlign: 'right',
+            background: 'rgba(249,115,22,0.85)', color: '#1c1917', padding: '4px 12px',
+            borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace',
+          }}>⚔️ PHÒNG {room} · {peerCount} đối thủ · ☠️{kills}/💀{deaths}</div>
+        )}
+
+        {/* Overlay HẠ GỤC */}
+        {knockMsg && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <div style={{ background: 'rgba(127,29,29,0.85)', color: '#fff', padding: '16px 34px', borderRadius: 14, fontFamily: 'monospace', fontSize: 30, fontWeight: 'bold', border: '2px solid #ef4444' }}>💥 HẠ GỤC!</div>
+          </div>
+        )}
+
+        {/* Bảng xếp hạng về đích realtime */}
+        {room && raceBoard.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 110, left: 50, zIndex: 10, fontFamily: 'monospace', fontSize: 12,
+            background: 'rgba(8,30,38,0.82)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: 10, padding: '8px 12px', minWidth: 170,
+          }}>
+            <div style={{ color: '#7dd3fc', fontSize: 10, marginBottom: 4 }}>🏁 VỀ ĐÍCH</div>
+            {raceBoard.slice(0, 6).map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: r.me ? '#22d3ee' : '#e2e8f0', fontWeight: r.me ? 700 : 400 }}>
+                <span>{['🥇', '🥈', '🥉'][i] || `${i + 1}.`} {r.name}{r.me ? ' (bạn)' : ''}</span>
+                <span>{r.time.toFixed(1)}s</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Banner về đích + rời phòng */}
+        {room && myFinishTime != null && (
+          <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 12, pointerEvents: 'auto' }}>
+            <div style={{ background: 'rgba(8,30,38,0.94)', border: '1px solid #22d3ee', borderRadius: 16, padding: '18px 28px', color: '#e2e8f0', fontFamily: 'monospace', textAlign: 'center', boxShadow: '0 0 30px rgba(34,211,238,0.3)' }}>
+              <div style={{ fontSize: 28 }}>🏁 VỀ ĐÍCH!</div>
+              <div style={{ fontSize: 15, color: '#7dd3fc', margin: '6px 0' }}>Hạng {(raceBoard.findIndex((r) => r.me) + 1) || '-'} · {myFinishTime.toFixed(2)}s</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>Bay tiếp để xem bảng hoặc rời phòng</div>
+              <button onClick={handleAbort} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>Rời phòng →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Trạng thái tải bản đồ thật (OSM) */}
+        {level.map && mapStatus && mapStatus !== 'ready' && (
+          <div style={{
+            position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+            background: 'rgba(15,23,42,0.9)', color: '#7dd3fc', padding: '6px 14px', borderRadius: 999,
+            fontSize: 12, fontFamily: 'monospace',
+          }}>
+            {mapStatus === 'loading' && '🗺️ Đang tải bản đồ OpenStreetMap…'}
+            {mapStatus === 'empty' && '🗺️ Không có dữ liệu công trình ở khu vực này'}
+            {mapStatus === 'error' && '⚠️ Lỗi tải bản đồ (mạng/Overpass) — bay không có toà nhà'}
+          </div>
+        )}
+
+        {/* Bảng chỉ số Drone (kiểu game đua xe) */}
+        <div style={{
+          position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
+          display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(8,30,38,0.78)',
+          border: '1px solid rgba(34,211,238,0.3)', borderRadius: 12, padding: '8px 14px', fontFamily: 'monospace',
+        }}>
+          {(() => {
+            const spd = telemetry ? telemetry.vel.length() * 3.6 : 0
+            const maxSpd = 90 * rangeMult
+            const bar = (label: string, frac: number, col: string) => (
+              <div style={{ textAlign: 'center', minWidth: 46 }}>
+                <div style={{ fontSize: 8, color: '#7dd3fc', marginBottom: 3 }}>{label}</div>
+                <div style={{ width: 44, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, height: '100%', background: col }} />
+                </div>
+              </div>
+            )
+            return (
+              <>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>CẤP</div>
+                  <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{lvlNum}</div>
+                </div>
+                {bar('MÁU', hp / HP_MAX, hp < 30 ? '#ef4444' : '#f87171')}
+                {bar('TỐC ĐỘ', spd / maxSpd, '#22d3ee')}
+                {bar('PIN', (telemetry?.battery ?? 0) / 100, telemetry && telemetry.battery < 20 ? '#ef4444' : '#22c55e')}
+                {bar('TẦM BAY', (rangeMult - 1) / 0.6 + 0.2, '#a855f7')}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>BOOST</div>
+                  <div style={{ fontSize: 14, color: boostOn ? '#a855f7' : '#475569' }}>{boostOn ? '⚡ON' : '—'}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐẠN</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: ammo > 0 ? '#fde047' : '#ef4444' }}>{ammo}</div>
+                </div>
+                <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: 10 }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐIỂM MÀN</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: '#fde68a' }}>{runScore}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>TỔNG</div>
+                  <div style={{ fontSize: 14, color: '#cbd5e1' }}>{points + runScore}</div>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+
+        {/* Nút BẮN (chạm/giữ) */}
+        <button
+          onPointerDown={(e) => { e.preventDefault(); inputsRef.current.fire = true }}
+          onPointerUp={() => { inputsRef.current.fire = false }}
+          onPointerLeave={() => { inputsRef.current.fire = false }}
+          style={{
+            position: 'absolute', bottom: 110, right: 30, zIndex: 11, width: 68, height: 68, borderRadius: '50%',
+            background: 'rgba(239,68,68,0.35)', border: '2px solid rgba(239,68,68,0.8)', color: '#fff',
+            fontSize: 26, cursor: 'pointer', userSelect: 'none', touchAction: 'none', pointerEvents: 'auto',
+          }}>🔫</button>
+
+        {/* Toast nhận thưởng */}
+        {collectMsg && (
+          <div style={{
+            position: 'absolute', top: '32%', left: '50%', transform: 'translateX(-50%)', zIndex: 11,
+            background: 'rgba(168,85,247,0.9)', color: '#fff', padding: '8px 18px', borderRadius: 999,
+            fontSize: 15, fontWeight: 'bold', fontFamily: 'monospace', pointerEvents: 'none',
+          }}>{collectMsg}</div>
+        )}
+
+        {/* Flash đỏ khi va chạm */}
+        {hitFlash && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 9, pointerEvents: 'none',
+            boxShadow: 'inset 0 0 120px 40px rgba(239,68,68,0.55)',
+          }} />
+        )}
+
+        {/* Hint điều khiển lúc bắt đầu */}
+        {showHint && (
+          <div onClick={() => setShowHint(false)} style={{
+            position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+            maxWidth: '90%', background: 'rgba(15,23,42,0.9)', color: '#e2e8f0',
+            padding: '10px 16px', borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+            textAlign: 'center', zIndex: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)',
+          }}>
+            <b style={{ color: '#22d3ee' }}>{level.emoji} {level.name}</b><br />
+            {level.hint}<br />
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              {gamepadId ? '🎮 Tay cầm' : showSticks ? '🕹️ Joystick 2 cần (trái: ga/xoay · phải: nghiêng)' : '⌨️ W/S A/D · ↑↓ ←→'} · 🔫/Space bắn · chạm để ẩn
+            </span>
+          </div>
+        )}
+
+        {/* Nút điều khiển góc phải-trên */}
+        <button onClick={() => setMuted((m) => !m)} title="Bật/tắt âm thanh" style={{
+          position: 'absolute', top: 12, right: 200, padding: '6px 10px',
+          background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(255,255,255,0.15)',
+          color: '#e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14, zIndex: 10,
+        }}>{muted ? '🔇' : '🔊'}</button>
+        <button onClick={() => setShowSticks((s) => !s)} title="Bật/tắt joystick ảo" style={{
+          position: 'absolute', top: 12, right: 156, padding: '6px 10px',
+          background: showSticks ? 'rgba(34,197,94,0.25)' : 'rgba(30,41,59,0.7)',
+          border: '1px solid rgba(255,255,255,0.15)', color: '#e2e8f0', borderRadius: 6,
+          cursor: 'pointer', fontSize: 14, zIndex: 10,
+        }}>🕹️</button>
         {/* Abort button top-left of canvas */}
-        <button onClick={onAbort} style={{
+        <button onClick={handleAbort} style={{
           position: 'absolute', top: 12, right: 110, padding: '6px 12px',
           background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)',
           color: '#fca5a5', borderRadius: 6, cursor: 'pointer', fontSize: 12, zIndex: 10,
@@ -1777,10 +3163,12 @@ function ResultScreen({
   const stars = success ? calculateStars(elapsed, level.timeLimit) : 0
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: 32,
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: 32, fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ textAlign: 'center', maxWidth: 480 }}>
         <div style={{ fontSize: 64, marginBottom: 12 }}>{success ? '🏆' : '⏱'}</div>
         <h2 style={{ fontSize: 28, fontWeight: 'bold', margin: '0 0 8px',
@@ -1831,7 +3219,7 @@ function ResultScreen({
             borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
           }}>🔄 Thử lại</button>
           <button onClick={onContinue} style={{
-            padding: '10px 24px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+            padding: '10px 24px', background: CYAN_GRAD,
             border: 'none', color: 'white', borderRadius: 10, cursor: 'pointer',
             fontSize: 14, fontWeight: 'bold',
           }}>{success ? '→ Cấp tiếp / chọn cấp' : '← Chọn cấp khác'}</button>
@@ -1842,17 +3230,234 @@ function ResultScreen({
 }
 
 // ═════════════════════════════════════════════════════════════
+// SCREEN: MODE — chọn Nhiệm vụ / Thách đấu
+// ═════════════════════════════════════════════════════════════
+function ModeScreen({ onMission, onChallenge }: { onMission: () => void; onChallenge: () => void }) {
+  const card: React.CSSProperties = {
+    padding: '28px 20px', borderRadius: 16, cursor: 'pointer', textAlign: 'center',
+    background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.4)', color: '#e2e8f0',
+    fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 'bold', lineHeight: 1.5,
+  }
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: SCIFI_BG, color: '#e2e8f0', fontFamily: 'ui-monospace, monospace', padding: 24 }}>
+      <ScreenCorners />
+      <div style={{ textAlign: 'center', maxWidth: 720, width: '100%' }}>
+        <h1 style={{ fontSize: 32, margin: '0 0 4px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>🚁 FPV DRONE</h1>
+        <p style={{ color: '#7dd3fc', marginBottom: 28, fontSize: 13 }}>Chọn chế độ chơi</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <button onClick={onMission} style={card}>
+            <div style={{ fontSize: 40 }}>🎯</div>NHIỆM VỤ
+            <div style={{ fontSize: 12, fontWeight: 'normal', color: '#94a3b8', marginTop: 6 }}>Chiến dịch 6 cấp độ + Giao hàng</div>
+          </button>
+          <button onClick={onChallenge} style={card}>
+            <div style={{ fontSize: 40 }}>⚔️</div>THÁCH ĐẤU
+            <div style={{ fontSize: 12, fontWeight: 'normal', color: '#94a3b8', marginTop: 6 }}>Tạo phòng → mời bạn quét QR / link bay cùng realtime</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCREEN: CHALLENGE — lobby thách đấu (mã/QR/link/người chơi)
+// ═════════════════════════════════════════════════════════════
+const ROOM_MAX = 10
+function ChallengeScreen({ initialRoom, initialLvl, initialMap, onStart, onBack }: {
+  initialRoom?: string; initialLvl?: number; initialMap?: { lat: number; lon: number; name: string }
+  onStart: (level: Level, room: string, name: string) => void
+  onBack: () => void
+}) {
+  const isJoiner = !!initialRoom
+  const [room] = useState(() => initialRoom || genRoomCode())
+  const [name, setName] = useState(() => myCallsign())
+  const [mode, setMode] = useState<'level' | 'map'>(initialMap ? 'map' : 'level')
+  const [levelId, setLevelId] = useState(() => initialLvl || 4)
+  const [picked, setPicked] = useState<{ lat: number; lon: number; name: string } | null>(initialMap || null)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ name: string; lat: number; lon: number }[]>([])
+  const [searching, setSearching] = useState(false)
+  const [players, setPlayers] = useState<Record<string, string>>({})
+  const [copied, setCopied] = useState(false)
+  const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
+  const token = tokenStore.getAccessToken()
+  const base = `${window.location.origin}${window.location.pathname}?droneRoom=${room}`
+  const link = mode === 'map' && picked
+    ? `${base}&mlat=${picked.lat.toFixed(5)}&mlon=${picked.lon.toFixed(5)}&mname=${encodeURIComponent(picked.name)}`
+    : `${base}&lvl=${levelId}`
+
+  useEffect(() => { try { localStorage.setItem('drone_callsign', name) } catch { /* */ } }, [name])
+
+  const { publish } = useBroker(token, [`drone:lobby:${room}`], {
+    onMsg: (m) => {
+      const p = m.payload as any
+      if (!p || p.cid === myCid || p.kind !== 'hello') return
+      setPlayers((s) => ({ ...s, [p.cid]: p.name }))
+      if (isJoiner && p.host) { // joiner đồng bộ lựa chọn theo chủ phòng
+        if (p.map) { setMode('map'); setPicked(p.map) }
+        else if (p.lvl) { setMode('level'); setLevelId(p.lvl) }
+      }
+    },
+  })
+  useEffect(() => {
+    const id = setInterval(() => publish(`drone:lobby:${room}`, {
+      kind: 'hello', cid: myCid, name, host: !isJoiner,
+      lvl: mode === 'level' ? levelId : undefined,
+      map: mode === 'map' && picked ? picked : undefined,
+    }), 1500)
+    return () => clearInterval(id)
+  }, [room, name, mode, levelId, picked, isJoiner, myCid, publish])
+
+  const doSearch = async () => {
+    if (!query.trim()) return
+    setSearching(true)
+    setResults(await geocodePlace(query.trim()))
+    setSearching(false)
+  }
+  const choosePlace = (pl: { name: string; lat: number; lon: number }) => {
+    setPicked({ lat: pl.lat, lon: pl.lon, name: nextMapName(pl.name) })
+    setResults([])
+  }
+
+  const level = mode === 'map' && picked ? makeMapLevel(picked.name, picked.lat, picked.lon) : (LEVELS.find((l) => l.id === levelId) || LEVELS[3])
+  const allNames = [`${name} (bạn)`, ...Object.values(players)]
+  const full = allNames.length > ROOM_MAX
+  const fld: React.CSSProperties = { background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: 10, padding: 14 }
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    flex: 1, padding: '8px', borderRadius: 8, cursor: isJoiner ? 'default' : 'pointer', fontSize: 13, fontFamily: 'inherit',
+    background: active ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
+    border: `1px solid ${active ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0',
+  })
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflowY: 'auto', background: SCIFI_BG, color: '#e2e8f0', fontFamily: 'ui-monospace, monospace', padding: '28px 20px' }}>
+      <ScreenCorners />
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#7dd3fc', cursor: 'pointer', fontSize: 13, marginBottom: 8 }}>← Quay lại</button>
+        <h1 style={{ fontSize: 24, margin: '0 0 16px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>⚔️ THÁCH ĐẤU — {isJoiner ? 'Tham gia phòng' : 'Tạo phòng'}</h1>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 4 }}>MÃ PHÒNG</div>
+              <div style={{ fontSize: 30, fontWeight: 'bold', letterSpacing: 4, color: '#22d3ee' }}>{room}</div>
+            </div>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>TÊN PHI CÔNG</div>
+              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20}
+                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 14 }} />
+            </div>
+            <div style={fld}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <button disabled={isJoiner} onClick={() => setMode('level')} style={tabBtn(mode === 'level')}>🎮 Bản đồ dựng sẵn</button>
+                <button disabled={isJoiner} onClick={() => setMode('map')} style={tabBtn(mode === 'map')}>🗺️ Bản đồ thật</button>
+              </div>
+              {mode === 'level' ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {LEVELS.map((l) => (
+                    <button key={l.id} disabled={isJoiner} onClick={() => setLevelId(l.id)}
+                      style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, cursor: isJoiner ? 'default' : 'pointer',
+                        background: l.id === levelId ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${l.id === levelId ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0', fontFamily: 'inherit' }}>
+                      {l.emoji} {l.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {!isJoiner && (
+                    <>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+                          placeholder="Tìm địa danh: New York, Paris, Hồ Gươm…"
+                          style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 13 }} />
+                        <button onClick={doSearch} style={{ padding: '0 14px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontFamily: 'inherit' }}>{searching ? '…' : '🔍'}</button>
+                      </div>
+                      {results.length > 0 && (
+                        <div style={{ maxHeight: 130, overflowY: 'auto', marginBottom: 8, display: 'grid', gap: 4 }}>
+                          {results.map((r, i) => (
+                            <button key={i} onClick={() => choosePlace(r)} style={{ textAlign: 'left', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#cbd5e1', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>📍 {r.name}</button>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        {OSM_PLACES.map((pl) => (
+                          <button key={pl.id} onClick={() => choosePlace(pl)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', cursor: 'pointer', fontFamily: 'inherit' }}>{pl.name}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <div style={{ fontSize: 13, color: picked ? '#22d3ee' : '#94a3b8', fontWeight: picked ? 700 : 400 }}>
+                    {picked ? `🗺️ ${picked.name}` : 'Chọn 1 địa danh trên bản đồ →'}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={fld}>
+              <div style={{ fontSize: 11, color: full ? '#f87171' : '#7dd3fc', marginBottom: 6 }}>
+                PHI CÔNG TRONG PHÒNG ({allNames.length}/{ROOM_MAX}){full ? ' — ĐẦY' : ''}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {allNames.map((n, i) => (
+                  <span key={i} style={{ fontSize: 12, padding: '3px 9px', borderRadius: 999, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.4)', color: '#fdba74' }}>🛩 {n}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...fld, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 8 }}>QUÉT ĐỂ THAM GIA</div>
+            <div style={{ background: '#fff', padding: 8, borderRadius: 8, display: 'inline-block' }}>
+              <QRCodeSVG value={link} size={150} />
+            </div>
+            <button onClick={() => { navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}
+              style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+              {copied ? '✓ Đã copy link' : '🔗 Copy link mời'}
+            </button>
+          </div>
+        </div>
+
+        <button onClick={() => !full && (mode === 'level' || picked) && onStart(level, room, name)} disabled={full || (mode === 'map' && !picked)}
+          style={{ marginTop: 18, width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: full || (mode === 'map' && !picked) ? '#475569' : CYAN_GRAD, color: '#04212b', fontWeight: 'bold', fontSize: 16, cursor: full || (mode === 'map' && !picked) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: full || (mode === 'map' && !picked) ? 0.6 : 1 }}>
+          {full ? '🚫 PHÒNG ĐẦY (tối đa 10)' : `🚁 VÀO BAY (${level.emoji} ${level.name})`}
+        </button>
+        <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 8 }}>
+          Mỗi người tự bấm “Vào bay” — thấy drone của nhau realtime, đua về đích. ⚠️ Thoát giữa chừng bị TRỪ ĐIỂM.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
 // MAIN — flow controller
 // ═════════════════════════════════════════════════════════════
+type MapPick = { lat: number; lon: number; name: string }
 type Screen =
+  | { kind: 'mode' }
+  | { kind: 'challenge'; room?: string; lvl?: number; map?: MapPick }
   | { kind: 'setup' }
   | { kind: 'levels' }
-  | { kind: 'game'; level: Level }
+  | { kind: 'game'; level: Level; room?: string; playerName?: string }
   | { kind: 'result'; level: Level; success: boolean; elapsed: number; isNewBest: boolean; isNewUnlock: boolean }
+
+function readInitialScreen(): Screen {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    const room = q.get('droneRoom')
+    if (room) {
+      const mlat = parseFloat(q.get('mlat') || ''), mlon = parseFloat(q.get('mlon') || '')
+      const map = Number.isFinite(mlat) && Number.isFinite(mlon)
+        ? { lat: mlat, lon: mlon, name: q.get('mname') || 'Bản đồ thật' } : undefined
+      return { kind: 'challenge', room: room.toUpperCase().slice(0, 8), lvl: Number(q.get('lvl')) || undefined, map }
+    }
+  } catch { /* */ }
+  return { kind: 'mode' }
+}
 
 function FpvAppRoot() {
   const [progress, setProgress] = useState<Progress>(() => loadProgress())
-  const [screen, setScreen] = useState<Screen>({ kind: 'setup' })
+  const [screen, setScreen] = useState<Screen>(() => readInitialScreen())
   const [selectedModelId, setSelectedModelId] = useState<string>(() => loadSelectedModel())
   const selectedModel = useMemo(
     () => DRONE_MODELS.find(m => m.id === selectedModelId) || DRONE_MODELS[0],
@@ -1892,6 +3497,16 @@ function FpvAppRoot() {
   }, [])
 
   switch (screen.kind) {
+    case 'mode':
+      return <ModeScreen onMission={() => setScreen({ kind: 'setup' })} onChallenge={() => setScreen({ kind: 'challenge' })} />
+    case 'challenge':
+      return (
+        <ChallengeScreen
+          initialRoom={screen.room} initialLvl={screen.lvl} initialMap={screen.map}
+          onStart={(level, room, name) => setScreen({ kind: 'game', level, room, playerName: name })}
+          onBack={() => setScreen({ kind: 'mode' })}
+        />
+      )
     case 'setup':
       return <SetupScreen onStart={() => setScreen({ kind: 'levels' })} />
     case 'levels':
@@ -1909,8 +3524,10 @@ function FpvAppRoot() {
         <GameScreen
           level={screen.level}
           model={selectedModel}
+          room={screen.room}
+          playerName={screen.playerName}
           onComplete={(success, elapsed) => handleComplete(screen.level, success, elapsed)}
-          onAbort={() => setScreen({ kind: 'levels' })}
+          onAbort={() => setScreen(screen.room ? { kind: 'challenge', room: screen.room } : { kind: 'levels' })}
         />
       )
     case 'result':
