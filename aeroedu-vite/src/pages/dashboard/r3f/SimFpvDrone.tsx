@@ -97,7 +97,8 @@ function preloadDroneModels() {
 // ═════════════════════════════════════════════════════════════
 // LEVEL DEFINITIONS
 // ═════════════════════════════════════════════════════════════
-type LevelType = 'hover' | 'gates'
+type LevelType = 'hover' | 'gates' | 'cargo'
+type Vec3 = [number, number, number]
 interface Level {
   id: number
   name: string
@@ -108,7 +109,12 @@ interface Level {
   reward: number             // điểm cộng dồn
   type: LevelType
   hover?: { altitude: number; tolerance: number; duration: number }   // hover N giây ở độ cao X±tol
-  gates?: Array<{ pos: [number, number, number]; r: number }>          // qua các gates theo thứ tự
+  gates?: Array<{ pos: Vec3; r: number }>                              // qua các gates theo thứ tự
+  cargo?: {                                                            // nhiệm vụ giao hàng
+    packages: Array<{ pickup: Vec3; drop: Vec3 }>
+    enemies?: Array<{ center: Vec3; radius: number; speed: number }>
+    poles?: Array<{ pos: Vec3; h: number }>
+  }
   hint: string
 }
 
@@ -163,6 +169,29 @@ const LEVELS: Level[] = [
       { pos: [  0,  4, -40], r: 2.0 },
     ],
     hint: 'Yaw + roll combo để xoay theo trục. Né tower xanh. Giữ AOA thấp khi turn nhanh.',
+  },
+  {
+    id: 6, name: 'Giao hàng', emoji: '📦', difficulty: 'expert',
+    description: 'Gắp 3 kiện hàng ở bãi LẤY, né drone địch & cọc, thả đúng bãi THẢ',
+    timeLimit: 150, reward: 1500, type: 'cargo',
+    cargo: {
+      packages: [
+        { pickup: [-6, 1, -6], drop: [10, 1, -22] },
+        { pickup: [8, 1, -4], drop: [-12, 1, -28] },
+        { pickup: [0, 1, -34], drop: [6, 1, -10] },
+      ],
+      enemies: [
+        { center: [2, 6, -16], radius: 8, speed: 0.6 },
+        { center: [-8, 8, -22], radius: 6, speed: 0.9 },
+        { center: [12, 5, -12], radius: 7, speed: 0.75 },
+      ],
+      poles: [
+        { pos: [3, 0, -12], h: 10 }, { pos: [-4, 0, -18], h: 12 },
+        { pos: [7, 0, -26], h: 9 }, { pos: [-10, 0, -14], h: 11 },
+        { pos: [0, 0, -24], h: 8 }, { pos: [14, 0, -20], h: 10 },
+      ],
+    },
+    hint: 'Bay tới bãi XANH (LẤY) chậm lại để gắp kiện → bay tới bãi XANH DƯƠNG (THẢ). Né drone đỏ và cọc. Theo mũi tên chỉ đường.',
   },
 ]
 
@@ -1378,6 +1407,154 @@ function DroneSound({ inputsRef, muted }: {
 }
 
 // ═════════════════════════════════════════════════════════════
+// SFX một-lần (va chạm / giao hàng) — WebAudio dùng chung
+// ═════════════════════════════════════════════════════════════
+let sfxCtx: AudioContext | null = null
+function sfxTone(freq: number, dur: number, type: OscillatorType = 'square', vol = 0.18) {
+  try {
+    const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined
+    if (!AC) return
+    sfxCtx = sfxCtx || new AC()
+    const o = sfxCtx.createOscillator(), g = sfxCtx.createGain()
+    o.type = type; o.frequency.value = freq
+    o.connect(g); g.connect(sfxCtx.destination)
+    const t = sfxCtx.currentTime
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.start(t); o.stop(t + dur + 0.02)
+  } catch { /* ignore */ }
+}
+const playHit = () => sfxTone(130, 0.25, 'square', 0.22)
+const playPickup = () => sfxTone(520, 0.12, 'triangle', 0.18)
+const playDeliver = () => { sfxTone(660, 0.12, 'triangle', 0.18); setTimeout(() => sfxTone(880, 0.18, 'triangle', 0.18), 90) }
+
+// ═════════════════════════════════════════════════════════════
+// CARGO / ENEMY / OBSTACLE (chế độ Giao hàng)
+// ═════════════════════════════════════════════════════════════
+function CargoCrate() {
+  return (
+    <group>
+      <mesh castShadow><boxGeometry args={[0.7, 0.55, 0.7]} /><meshStandardMaterial color="#b45309" /></mesh>
+      <mesh position={[0, 0.28, 0]}><boxGeometry args={[0.74, 0.05, 0.18]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+      <mesh position={[0, 0.28, 0]} rotation={[0, Math.PI / 2, 0]}><boxGeometry args={[0.74, 0.05, 0.18]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+    </group>
+  )
+}
+function Pad({ pos, color, label }: { pos: Vec3; color: string; label: string }) {
+  return (
+    <group position={[pos[0], 0.06, pos[2]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.5, 2.1, 36]} /><meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}><circleGeometry args={[1.5, 36]} /><meshBasicMaterial color={color} transparent opacity={0.14} side={THREE.DoubleSide} /></mesh>
+      <Text position={[0, 2.6, 0]} fontSize={0.7} color={color} anchorX="center" outlineWidth={0.05} outlineColor="#000">{label}</Text>
+    </group>
+  )
+}
+function CargoMission({ posRef, packages, onState, onComplete }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  packages: Array<{ pickup: Vec3; drop: Vec3 }>
+  onState: (idx: number, carrying: boolean) => void
+  onComplete: () => void
+}) {
+  const [idx, setIdx] = useState(0)
+  const [carrying, setCarrying] = useState(false)
+  const idxRef = useRef(0), carryingRef = useRef(false), doneRef = useRef(false)
+  const boxRef = useRef<THREE.Group>(null)
+  const v = useMemo(() => new THREE.Vector3(), [])
+  useFrame(() => {
+    if (doneRef.current) return
+    const pkg = packages[idxRef.current]
+    if (!pkg) return
+    const dp = posRef.current
+    if (!carryingRef.current) {
+      if (boxRef.current) boxRef.current.position.set(pkg.pickup[0], pkg.pickup[1], pkg.pickup[2])
+      if (dp.distanceTo(v.set(...pkg.pickup)) < 2.2) {
+        carryingRef.current = true; setCarrying(true); onState(idxRef.current, true); playPickup()
+      }
+    } else {
+      if (boxRef.current) boxRef.current.position.set(dp.x, dp.y - 0.45, dp.z)
+      if (dp.distanceTo(v.set(...pkg.drop)) < 2.2) {
+        carryingRef.current = false; setCarrying(false)
+        const next = idxRef.current + 1; idxRef.current = next; setIdx(next); onState(next, false); playDeliver()
+        if (next >= packages.length) { doneRef.current = true; onComplete() }
+      }
+    }
+  })
+  const pkg = packages[idx]
+  return (
+    <>
+      <group ref={boxRef} visible={!!pkg}><CargoCrate /></group>
+      {pkg && <Pad pos={pkg.pickup} color="#22c55e" label={carrying ? '...' : 'LẤY'} />}
+      {pkg && <Pad pos={pkg.drop} color="#3b82f6" label="THẢ" />}
+    </>
+  )
+}
+function EnemyMesh() {
+  return (
+    <group>
+      <mesh><boxGeometry args={[0.32, 0.1, 0.32]} /><meshStandardMaterial color="#7f1d1d" metalness={0.5} roughness={0.4} /></mesh>
+      {([[0.24, 0, 0.24], [-0.24, 0, 0.24], [0.24, 0, -0.24], [-0.24, 0, -0.24]] as Vec3[]).map((p, i) => (
+        <mesh key={i} position={p}><cylinderGeometry args={[0.14, 0.14, 0.02, 12]} /><meshStandardMaterial color="#ef4444" transparent opacity={0.5} /></mesh>
+      ))}
+      <mesh position={[0, 0.09, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshBasicMaterial color="#fecaca" /></mesh>
+    </group>
+  )
+}
+function EnemyDrones({ posRef, specs, onHit }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  specs: Array<{ center: Vec3; radius: number; speed: number }>
+  onHit: () => void
+}) {
+  const refs = useRef<(THREE.Group | null)[]>([])
+  const phase = useRef(specs.map((_, i) => i * 1.9))
+  const lastHit = useRef(0)
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_s, dt) => {
+    const dp = posRef.current
+    specs.forEach((sp, i) => {
+      phase.current[i] += dt * sp.speed
+      const g = refs.current[i]
+      if (!g) return
+      const a = phase.current[i]
+      const ep = tmp.set(
+        sp.center[0] + Math.cos(a) * sp.radius,
+        sp.center[1] + Math.sin(a * 0.7) * 1.6,
+        sp.center[2] + Math.sin(a) * sp.radius,
+      )
+      if (ep.distanceTo(dp) < 16) ep.lerp(dp, 0.015) // bám nhẹ khi gần
+      g.position.copy(ep); g.rotation.y += dt * 5
+      if (ep.distanceTo(dp) < 1.3) { const now = performance.now(); if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } }
+    })
+  })
+  return <>{specs.map((_, i) => (<group key={i} ref={(el) => { refs.current[i] = el }}><EnemyMesh /></group>))}</>
+}
+function PoleObstacles({ posRef, poles, onHit }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  poles: Array<{ pos: Vec3; h: number }>
+  onHit: () => void
+}) {
+  const lastHit = useRef(0)
+  useFrame(() => {
+    const dp = posRef.current
+    for (const p of poles) {
+      const hd = Math.hypot(dp.x - p.pos[0], dp.z - p.pos[2])
+      if (hd < 0.95 && dp.y < p.h) { const now = performance.now(); if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } break }
+    }
+  })
+  return (
+    <>
+      {poles.map((p, i) => (
+        <group key={i} position={[p.pos[0], 0, p.pos[2]]}>
+          <mesh position={[0, p.h / 2, 0]} castShadow><cylinderGeometry args={[0.36, 0.42, p.h, 12]} /><meshStandardMaterial color="#dc2626" metalness={0.2} roughness={0.7} /></mesh>
+          <mesh position={[0, p.h - 0.5, 0]}><cylinderGeometry args={[0.44, 0.44, 0.5, 12]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+          <mesh position={[0, p.h + 0.15, 0]}><sphereGeometry args={[0.26, 10, 10]} /><meshBasicMaterial color="#f87171" /></mesh>
+        </group>
+      ))}
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
 // HUD + VR (giống cũ, thêm objective progress)
 // ═════════════════════════════════════════════════════════════
 function GlCapture({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer | null> }) {
@@ -1819,14 +1996,34 @@ function GameScreen({
   const [muted, setMuted] = useState(false)
   const [showSticks, setShowSticks] = useState(isMobile())
   const [showHint, setShowHint] = useState(true)
+  const [cargoIdx, setCargoIdx] = useState(0)
+  const [cargoCarrying, setCargoCarrying] = useState(false)
+  const [hits, setHits] = useState(0)
+  const [hitFlash, setHitFlash] = useState(false)
   useEffect(() => { const id = setTimeout(() => setShowHint(false), 9000); return () => clearTimeout(id) }, [])
+
+  const onCargoState = useCallback((idx: number, carrying: boolean) => { setCargoIdx(idx); setCargoCarrying(carrying) }, [])
+  const onCargoComplete = useCallback(() => {
+    if (completedRef.current) return
+    completedRef.current = true
+    onComplete(true, (Date.now() - startTimeRef.current) / 1000)
+  }, [onComplete])
+  const onHit = useCallback(() => {
+    playHit(); setHits((h) => h + 1); setHitFlash(true)
+    setTimeout(() => setHitFlash(false), 280)
+  }, [])
 
   // Mục tiêu kế tiếp để vẽ mũi tên chỉ đường + đo khoảng cách
   const guideTarget: [number, number, number] | null = useMemo(() => {
     if (level.type === 'hover' && level.hover) return [0, level.hover.altitude, 0]
     if (level.type === 'gates' && level.gates) return level.gates[gateProgress]?.pos ?? null
+    if (level.type === 'cargo' && level.cargo) {
+      const pkg = level.cargo.packages[cargoIdx]
+      if (!pkg) return null
+      return cargoCarrying ? pkg.drop : pkg.pickup
+    }
     return null
-  }, [level, gateProgress])
+  }, [level, gateProgress, cargoIdx, cargoCarrying])
   const guideDist = telemetry && guideTarget
     ? telemetry.pos.distanceTo(new THREE.Vector3(...guideTarget)) : null
 
@@ -1896,6 +2093,18 @@ function GameScreen({
               onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} posRef={dronePosRef} />
           </Suspense>
           <WaypointGuide posRef={dronePosRef} target={guideTarget} />
+          {level.type === 'cargo' && level.cargo && (
+            <>
+              <CargoMission posRef={dronePosRef} packages={level.cargo.packages}
+                onState={onCargoState} onComplete={onCargoComplete} />
+              {level.cargo.enemies && level.cargo.enemies.length > 0 && (
+                <EnemyDrones posRef={dronePosRef} specs={level.cargo.enemies} onHit={onHit} />
+              )}
+              {level.cargo.poles && level.cargo.poles.length > 0 && (
+                <PoleObstacles posRef={dronePosRef} poles={level.cargo.poles} onHit={onHit} />
+              )}
+            </>
+          )}
           <KeyboardBridge inputsRef={inputsRef} />
           <Text position={[0, 14, -20]} fontSize={1.5} color="#22c55e" anchorX="center">
             {level.emoji} {level.name.toUpperCase()}
@@ -1916,7 +2125,30 @@ function GameScreen({
             position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(8,145,178,0.85)', color: '#ecfeff', padding: '5px 14px',
             borderRadius: 999, fontSize: 13, fontWeight: 700, fontFamily: 'monospace', zIndex: 10,
-          }}>🎯 Mục tiêu: {guideDist.toFixed(1)}m</div>
+          }}>{level.type === 'cargo' ? (cargoCarrying ? '📦→ Thả' : '📦 Lấy') : '🎯 Mục tiêu'}: {guideDist.toFixed(1)}m</div>
+        )}
+
+        {/* HUD cargo: tiến độ giao hàng + va chạm */}
+        {level.type === 'cargo' && level.cargo && (
+          <div style={{
+            position: 'absolute', top: 46, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 8, zIndex: 10,
+          }}>
+            <span style={{ background: 'rgba(34,197,94,0.85)', color: '#052e16', padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>
+              📦 {cargoIdx}/{level.cargo.packages.length}
+            </span>
+            <span style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>
+              💥 {hits}
+            </span>
+          </div>
+        )}
+
+        {/* Flash đỏ khi va chạm */}
+        {hitFlash && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 9, pointerEvents: 'none',
+            boxShadow: 'inset 0 0 120px 40px rgba(239,68,68,0.55)',
+          }} />
         )}
 
         {/* Hint điều khiển lúc bắt đầu */}
