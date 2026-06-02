@@ -1231,7 +1231,7 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
           position: 'relative', width: RADIUS * 2, height: RADIUS * 2, margin: '0 auto',
           borderRadius: '50%',
           background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
-          border: `2px solid ${active ? '#ec4899' : 'rgba(148, 163, 184, 0.4)'}`,
+          border: `2px solid ${active ? '#22d3ee' : 'rgba(148, 163, 184, 0.4)'}`,
           backdropFilter: 'blur(4px)',
           transition: active ? 'none' : 'background 0.2s',
         }}
@@ -1255,7 +1255,7 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
           transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
           borderRadius: '50%',
           background: active
-            ? 'linear-gradient(135deg, #ec4899, #8b5cf6)'
+            ? CYAN_GRAD
             : 'rgba(100, 116, 139, 0.7)',
           border: '2px solid rgba(255, 255, 255, 0.3)',
           boxShadow: active ? '0 0 16px rgba(236, 72, 153, 0.6)' : '0 2px 6px rgba(0,0,0,0.4)',
@@ -1598,6 +1598,29 @@ function VRButton({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer
 const HUD_C = '#5eead4'        // teal-cyan chính
 const HUD_DIM = 'rgba(94,234,212,0.45)'
 const HUD_BG = 'rgba(6,30,38,0.6)'
+// Nền sci-fi dùng chung cho các màn (lưới + glow + gradient tối)
+const SCIFI_BG = [
+  'radial-gradient(circle at 50% 8%, rgba(34,211,238,0.12), transparent 55%)',
+  'linear-gradient(rgba(34,211,238,0.045) 1px, transparent 1px) 0 0/42px 42px',
+  'linear-gradient(90deg, rgba(34,211,238,0.045) 1px, transparent 1px) 0 0/42px 42px',
+  'linear-gradient(160deg, #07151c 0%, #040c12 100%)',
+].join(',')
+const CYAN_GRAD = 'linear-gradient(135deg, #22d3ee, #0ea5e9)'
+// 4 khung góc sci-fi cho màn hình
+function ScreenCorners() {
+  const b = (s: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', width: 42, height: 42, borderColor: 'rgba(34,211,238,0.45)',
+    borderStyle: 'solid', pointerEvents: 'none', zIndex: 2, ...s,
+  })
+  return (
+    <>
+      <div style={b({ top: 8, left: 8, borderWidth: '2px 0 0 2px' })} />
+      <div style={b({ top: 8, right: 8, borderWidth: '2px 2px 0 0' })} />
+      <div style={b({ bottom: 8, left: 8, borderWidth: '0 0 2px 2px' })} />
+      <div style={b({ bottom: 8, right: 8, borderWidth: '0 2px 2px 0' })} />
+    </>
+  )
+}
 
 /** Thước dọc (tốc độ / độ cao) kiểu HUD máy bay. */
 function HudTape({ value, label, unit, side }: { value: number; label: string; unit: string; side: 'left' | 'right' }) {
@@ -1855,13 +1878,15 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
 
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', overflowY: 'auto',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: '32px 24px',
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: '32px 24px', fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px', background: CYAN_GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             🚁 FPV Drone Sandbox + VR
           </h1>
           <p style={{ color: '#94a3b8', fontSize: 14 }}>
@@ -1898,7 +1923,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 'bold' }}>🥽 VR Headset</span>
               <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6,
-                background: vrSupport === 'yes' ? '#8b5cf6' : '#475569', color: 'white' }}>
+                background: vrSupport === 'yes' ? '#22d3ee' : '#475569', color: 'white' }}>
                 {vrSupport === 'checking' ? 'KIỂM TRA' : vrSupport === 'yes' ? 'HỖ TRỢ' : 'KHÔNG HỖ TRỢ'}
               </span>
             </div>
@@ -1919,7 +1944,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             📖 Hướng dẫn cài đặt
           </h3>
           <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.7 }}>
-            <p style={{ marginTop: 0 }}><b style={{ color: '#ec4899' }}>1. Tay cầm FPV (FrSky / RadioMaster / TBS Tango):</b></p>
+            <p style={{ marginTop: 0 }}><b style={{ color: '#22d3ee' }}>1. Tay cầm FPV (FrSky / RadioMaster / TBS Tango):</b></p>
             <ul style={{ marginTop: 4, paddingLeft: 22 }}>
               <li>Cắm cáp USB-C từ TX → laptop/PC</li>
               <li>Vào menu System → <code style={{ color: '#fbbf24' }}>USB Joystick (HID)</code> mode</li>
@@ -1931,7 +1956,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
               <li>Cắm USB hoặc pair Bluetooth</li>
               <li>Test joystick: <a href="https://hardwaretester.com/gamepad" target="_blank" rel="noreferrer" style={{ color: '#06b6d4' }}>hardwaretester.com/gamepad</a></li>
             </ul>
-            <p style={{ marginTop: 12 }}><b style={{ color: '#8b5cf6' }}>3. VR Headset (tuỳ chọn — Meta Quest / Vision Pro):</b></p>
+            <p style={{ marginTop: 12 }}><b style={{ color: '#22d3ee' }}>3. VR Headset (tuỳ chọn — Meta Quest / Vision Pro):</b></p>
             <ul style={{ marginTop: 4, paddingLeft: 22 }}>
               <li>Mở trình duyệt trên Quest (Meta Browser hoặc Wolvic)</li>
               <li>Truy cập <code style={{ color: '#fbbf24' }}>inphysic.com/dashboard/aura</code></li>
@@ -1955,7 +1980,7 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mob
             disabled={!gamepadId}
             style={{
               padding: '14px 28px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 'bold',
-              background: gamepadId ? 'linear-gradient(135deg, #ec4899, #8b5cf6)' : '#475569',
+              background: gamepadId ? CYAN_GRAD : '#475569',
               color: 'white', cursor: gamepadId ? 'pointer' : 'not-allowed', opacity: gamepadId ? 1 : 0.5,
               boxShadow: gamepadId ? '0 4px 16px rgba(236, 72, 153, 0.4)' : 'none',
             }}
@@ -2007,10 +2032,12 @@ function LevelSelectScreen({
   useEffect(() => { preloadDroneModels() }, [])
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', overflowY: 'auto',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: '24px',
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: '24px', fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
@@ -2045,7 +2072,7 @@ function LevelSelectScreen({
                   style={{
                     padding: 12, borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                     background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
-                    border: `1px solid ${active ? '#ec4899' : 'rgba(71, 85, 105, 0.4)'}`,
+                    border: `1px solid ${active ? '#22d3ee' : 'rgba(71, 85, 105, 0.4)'}`,
                     color: '#e2e8f0', transition: 'all 0.15s',
                   }}
                 >
@@ -2054,7 +2081,7 @@ function LevelSelectScreen({
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 'bold' }}>
                         {m.name}
-                        {active && <span style={{ marginLeft: 6, fontSize: 11, color: '#ec4899' }}>● ĐANG DÙNG</span>}
+                        {active && <span style={{ marginLeft: 6, fontSize: 11, color: '#22d3ee' }}>● ĐANG DÙNG</span>}
                       </div>
                       <div style={{ fontSize: 11, color: '#94a3b8' }}>{m.description}</div>
                       {m.attribution && (
@@ -2387,10 +2414,12 @@ function ResultScreen({
   const stars = success ? calculateStars(elapsed, level.timeLimit) : 0
   return (
     <div style={{
+      position: 'relative',
       width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0a0a0f 100%)',
-      color: '#e2e8f0', padding: 32,
+      background: SCIFI_BG,
+      color: '#e2e8f0', padding: 32, fontFamily: 'ui-monospace, monospace',
     }}>
+      <ScreenCorners />
       <div style={{ textAlign: 'center', maxWidth: 480 }}>
         <div style={{ fontSize: 64, marginBottom: 12 }}>{success ? '🏆' : '⏱'}</div>
         <h2 style={{ fontSize: 28, fontWeight: 'bold', margin: '0 0 8px',
@@ -2441,7 +2470,7 @@ function ResultScreen({
             borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
           }}>🔄 Thử lại</button>
           <button onClick={onContinue} style={{
-            padding: '10px 24px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+            padding: '10px 24px', background: CYAN_GRAD,
             border: 'none', color: 'white', borderRadius: 10, cursor: 'pointer',
             fontSize: 14, fontWeight: 'bold',
           }}>{success ? '→ Cấp tiếp / chọn cấp' : '← Chọn cấp khác'}</button>
