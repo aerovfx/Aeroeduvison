@@ -1670,6 +1670,10 @@ function HudRadar({ heading, rel }: { heading: number; rel: { x: number; z: numb
       <circle cx={R} cy={R} r={(R - 2) * 0.6} fill="none" stroke={HUD_DIM} strokeWidth={0.6} />
       <line x1={R} y1={4} x2={R} y2={R * 2 - 4} stroke={HUD_DIM} strokeWidth={0.5} />
       <line x1={4} y1={R} x2={R * 2 - 4} y2={R} stroke={HUD_DIM} strokeWidth={0.5} />
+      {/* Tia quét quay (SMIL — mượt, không phụ thuộc React render) */}
+      <polygon points={`${R},${R} ${R},6 ${R + 22},10`} fill={HUD_C} opacity={0.22}>
+        <animateTransform attributeName="transform" type="rotate" from={`0 ${R} ${R}`} to={`360 ${R} ${R}`} dur="3.2s" repeatCount="indefinite" />
+      </polygon>
       {rel.map((t, i) => {
         const right = t.x * fz - t.z * fx
         const fwd = t.x * fx + t.z * fz
@@ -1684,6 +1688,40 @@ function HudRadar({ heading, rel }: { heading: number; rel: { x: number; z: numb
   )
 }
 
+/** Đường chân trời nhân tạo — nghiêng theo roll, trượt theo pitch (FPV artificial horizon). */
+function HudHorizon({ pitch, roll }: { pitch: number; roll: number }) {
+  const W = 260, H = 160
+  const rollDeg = (roll * 180) / Math.PI
+  const pitchPx = (pitch * 180) / Math.PI * 2.2 // độ → px
+  const ladder = [-20, -10, 10, 20]
+  return (
+    <svg width={W} height={H} style={{ overflow: 'visible', opacity: 0.8 }}>
+      <g transform={`rotate(${-rollDeg} ${W / 2} ${H / 2})`}>
+        <g transform={`translate(0 ${pitchPx})`}>
+          {/* đường chân trời */}
+          <line x1={W / 2 - 110} y1={H / 2} x2={W / 2 - 24} y2={H / 2} stroke={HUD_C} strokeWidth={1.4} />
+          <line x1={W / 2 + 24} y1={H / 2} x2={W / 2 + 110} y2={H / 2} stroke={HUD_C} strokeWidth={1.4} />
+          {ladder.map((d) => {
+            const y = H / 2 - d * 2.2
+            const w = d % 20 === 0 ? 44 : 28
+            return (
+              <g key={d} opacity={0.7}>
+                <line x1={W / 2 - w} y1={y} x2={W / 2 - 14} y2={y} stroke={HUD_C} strokeWidth={1} />
+                <line x1={W / 2 + 14} y1={y} x2={W / 2 + w} y2={y} stroke={HUD_C} strokeWidth={1} />
+                <text x={W / 2 - w - 6} y={y + 3} fontSize={8} fill={HUD_C} textAnchor="end">{Math.abs(d)}</text>
+              </g>
+            )
+          })}
+        </g>
+      </g>
+      {/* chỉ báo roll cố định (cung trên) */}
+      <path d={`M${W / 2 - 40},${H / 2 - 56} A56,56 0 0 1 ${W / 2 + 40},${H / 2 - 56}`} fill="none" stroke={HUD_DIM} strokeWidth={1} />
+      <polygon points={`${W / 2},${H / 2 - 52} ${W / 2 - 5},${H / 2 - 44} ${W / 2 + 5},${H / 2 - 44}`} fill="#fbbf24"
+        transform={`rotate(${rollDeg} ${W / 2} ${H / 2})`} />
+    </svg>
+  )
+}
+
 function GameHUD({
   telemetry, gamepadId, level, gateProgress, hoverProgress, timeRemaining, targets = [],
 }: {
@@ -1691,6 +1729,12 @@ function GameHUD({
   gateProgress: number; hoverProgress: number; timeRemaining: number
   targets?: { x: number; z: number; color: string }[]
 }) {
+  const [scale, setScale] = useState(1)
+  useEffect(() => {
+    const upd = () => setScale(Math.min(1, window.innerWidth / 900))
+    upd(); window.addEventListener('resize', upd)
+    return () => window.removeEventListener('resize', upd)
+  }, [])
   if (!telemetry) return null
   const speed = telemetry.vel.length() * 3.6 // km/h cho cảm giác HUD
   const heading = ((telemetry.yaw * 180) / Math.PI % 360 + 360) % 360
@@ -1709,7 +1753,12 @@ function GameHUD({
       position: 'absolute', inset: 0, pointerEvents: 'none',
       fontFamily: 'ui-monospace, monospace', color: HUD_C,
       textShadow: '0 0 6px rgba(34,211,238,0.6)',
+      transform: `scale(${scale})`, transformOrigin: 'center center',
     }}>
+      {/* Đường chân trời nhân tạo (sau tâm ngắm) */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+        <HudHorizon pitch={telemetry.pitch} roll={telemetry.roll} />
+      </div>
       {/* Khung góc HUD */}
       <div style={bracket({ top: 14, left: 14, borderWidth: '2px 0 0 2px' })} />
       <div style={bracket({ top: 14, right: 14, borderWidth: '2px 2px 0 0' })} />
