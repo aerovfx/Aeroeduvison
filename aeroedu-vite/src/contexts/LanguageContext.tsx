@@ -2,7 +2,9 @@
  * LanguageContext — Tiếng Việt / English bilingual system
  * Persists to localStorage key 'lang'
  */
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { setAutoTranslate } from './autoTranslate'
+import { EXTRA_VI_EN } from './translations-extra'
 
 export type Language = 'vi' | 'en'
 
@@ -747,6 +749,19 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguageSt(lang)
     localStorage.setItem('lang', lang)
   }
+
+  // Từ điển VI→EN cho bộ dịch tự động toàn app: lấy từ 305 cặp t() có sẵn + bổ sung
+  const viToEn = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const key of Object.keys(translations.vi)) {
+      const vi = translations.vi[key], en = translations.en[key]
+      if (vi && en && vi !== en) m[vi] = en
+    }
+    return { ...m, ...EXTRA_VI_EN }
+  }, [])
+
+  // Bật/tắt dịch DOM toàn app theo ngôn ngữ (EN → dịch, VI → khôi phục)
+  useEffect(() => { setAutoTranslate(viToEn, language === 'en') }, [language, viToEn])
 
   const t = (key: string): string =>
     translations[language][key] ?? key
