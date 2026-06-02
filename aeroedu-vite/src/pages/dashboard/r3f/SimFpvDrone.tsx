@@ -55,6 +55,38 @@ function loadLeaderboard(room?: string): LbEntry[] {
     return (room ? arr.filter((e) => e.room === room) : arr).sort((a, b) => a.time - b.time)
   } catch { return [] }
 }
+// Tên màn theo địa danh + số thứ tự tự tăng (vd "New York map#01")
+function nextMapName(place: string): string {
+  const short = place.split(',')[0].trim().slice(0, 24) || 'Map'
+  try {
+    const k = 'drone_mapseq_' + short.toLowerCase()
+    const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1
+    localStorage.setItem(k, String(n))
+    return `${short} map#${String(n).padStart(2, '0')}`
+  } catch { return `${short} map#01` }
+}
+// Dựng Level bay trên bản đồ thật từ 1 toạ độ (cổng đặt tự động quanh tâm)
+function makeMapLevel(name: string, lat: number, lon: number): Level {
+  return {
+    id: 100, name, emoji: '🗺️', difficulty: 'pro',
+    description: 'Đua trên bản đồ thật (OpenStreetMap)',
+    timeLimit: 180, reward: 0, type: 'gates',
+    map: { lat, lon, radius: 800 },
+    gates: ([[0, 40, -90], [110, 55, -190], [-100, 60, -300], [70, 48, -410], [0, 45, -520]] as Vec3[]).map((p) => ({ pos: p, r: 3.2 })),
+    hint: 'Đua qua các cổng giữa thành phố thật. Né toà nhà (box từ OSM). Theo mũi tên chỉ đường.',
+  }
+}
+// Geocode tên địa danh → toạ độ (Nominatim/OSM)
+async function geocodePlace(q: string): Promise<{ name: string; lat: number; lon: number }[]> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`, {
+      headers: { 'Accept-Language': 'vi' },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data as any[]).map((d) => ({ name: d.display_name as string, lat: +d.lat, lon: +d.lon }))
+  } catch { return [] }
+}
 
 // ═════════════════════════════════════════════════════════════
 // DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
@@ -2824,20 +2856,29 @@ function ModeScreen({ onMission, onChallenge }: { onMission: () => void; onChall
 // ═════════════════════════════════════════════════════════════
 // SCREEN: CHALLENGE — lobby thách đấu (mã/QR/link/người chơi)
 // ═════════════════════════════════════════════════════════════
-function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
-  initialRoom?: string; initialLvl?: number
+const ROOM_MAX = 10
+function ChallengeScreen({ initialRoom, initialLvl, initialMap, onStart, onBack }: {
+  initialRoom?: string; initialLvl?: number; initialMap?: { lat: number; lon: number; name: string }
   onStart: (level: Level, room: string, name: string) => void
   onBack: () => void
 }) {
   const isJoiner = !!initialRoom
   const [room] = useState(() => initialRoom || genRoomCode())
   const [name, setName] = useState(() => myCallsign())
+  const [mode, setMode] = useState<'level' | 'map'>(initialMap ? 'map' : 'level')
   const [levelId, setLevelId] = useState(() => initialLvl || 4)
+  const [picked, setPicked] = useState<{ lat: number; lon: number; name: string } | null>(initialMap || null)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ name: string; lat: number; lon: number }[]>([])
+  const [searching, setSearching] = useState(false)
   const [players, setPlayers] = useState<Record<string, string>>({})
   const [copied, setCopied] = useState(false)
   const myCid = useRef(Math.random().toString(36).slice(2, 9)).current
   const token = tokenStore.getAccessToken()
-  const link = `${window.location.origin}${window.location.pathname}?droneRoom=${room}&lvl=${levelId}`
+  const base = `${window.location.origin}${window.location.pathname}?droneRoom=${room}`
+  const link = mode === 'map' && picked
+    ? `${base}&mlat=${picked.lat.toFixed(5)}&mlon=${picked.lon.toFixed(5)}&mname=${encodeURIComponent(picked.name)}`
+    : `${base}&lvl=${levelId}`
 
   useEffect(() => { try { localStorage.setItem('drone_callsign', name) } catch { /* */ } }, [name])
 
@@ -2846,17 +2887,41 @@ function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
       const p = m.payload as any
       if (!p || p.cid === myCid || p.kind !== 'hello') return
       setPlayers((s) => ({ ...s, [p.cid]: p.name }))
-      if (isJoiner && p.host && p.lvl) setLevelId(p.lvl) // joiner đồng bộ level theo host
+      if (isJoiner && p.host) { // joiner đồng bộ lựa chọn theo chủ phòng
+        if (p.map) { setMode('map'); setPicked(p.map) }
+        else if (p.lvl) { setMode('level'); setLevelId(p.lvl) }
+      }
     },
   })
   useEffect(() => {
-    const id = setInterval(() => publish(`drone:lobby:${room}`, { kind: 'hello', cid: myCid, name, host: !isJoiner, lvl: levelId }), 1500)
+    const id = setInterval(() => publish(`drone:lobby:${room}`, {
+      kind: 'hello', cid: myCid, name, host: !isJoiner,
+      lvl: mode === 'level' ? levelId : undefined,
+      map: mode === 'map' && picked ? picked : undefined,
+    }), 1500)
     return () => clearInterval(id)
-  }, [room, name, levelId, isJoiner, myCid, publish])
+  }, [room, name, mode, levelId, picked, isJoiner, myCid, publish])
 
-  const level = LEVELS.find((l) => l.id === levelId) || LEVELS[3]
+  const doSearch = async () => {
+    if (!query.trim()) return
+    setSearching(true)
+    setResults(await geocodePlace(query.trim()))
+    setSearching(false)
+  }
+  const choosePlace = (pl: { name: string; lat: number; lon: number }) => {
+    setPicked({ lat: pl.lat, lon: pl.lon, name: nextMapName(pl.name) })
+    setResults([])
+  }
+
+  const level = mode === 'map' && picked ? makeMapLevel(picked.name, picked.lat, picked.lon) : (LEVELS.find((l) => l.id === levelId) || LEVELS[3])
   const allNames = [`${name} (bạn)`, ...Object.values(players)]
+  const full = allNames.length > ROOM_MAX
   const fld: React.CSSProperties = { background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: 10, padding: 14 }
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    flex: 1, padding: '8px', borderRadius: 8, cursor: isJoiner ? 'default' : 'pointer', fontSize: 13, fontFamily: 'inherit',
+    background: active ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
+    border: `1px solid ${active ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0',
+  })
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflowY: 'auto', background: SCIFI_BG, color: '#e2e8f0', fontFamily: 'ui-monospace, monospace', padding: '28px 20px' }}>
@@ -2877,20 +2942,55 @@ function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
                 style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 14 }} />
             </div>
             <div style={fld}>
-              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>BẢN ĐỒ {isJoiner ? '(theo chủ phòng)' : ''}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {LEVELS.map((l) => (
-                  <button key={l.id} disabled={isJoiner} onClick={() => setLevelId(l.id)}
-                    style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, cursor: isJoiner ? 'default' : 'pointer',
-                      background: l.id === levelId ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${l.id === levelId ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0', fontFamily: 'inherit' }}>
-                    {l.emoji} {l.name}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <button disabled={isJoiner} onClick={() => setMode('level')} style={tabBtn(mode === 'level')}>🎮 Bản đồ dựng sẵn</button>
+                <button disabled={isJoiner} onClick={() => setMode('map')} style={tabBtn(mode === 'map')}>🗺️ Bản đồ thật</button>
               </div>
+              {mode === 'level' ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {LEVELS.map((l) => (
+                    <button key={l.id} disabled={isJoiner} onClick={() => setLevelId(l.id)}
+                      style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, cursor: isJoiner ? 'default' : 'pointer',
+                        background: l.id === levelId ? 'rgba(34,211,238,0.25)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${l.id === levelId ? '#22d3ee' : 'rgba(255,255,255,0.12)'}`, color: '#e2e8f0', fontFamily: 'inherit' }}>
+                      {l.emoji} {l.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {!isJoiner && (
+                    <>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+                          placeholder="Tìm địa danh: New York, Paris, Hồ Gươm…"
+                          style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 13 }} />
+                        <button onClick={doSearch} style={{ padding: '0 14px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontFamily: 'inherit' }}>{searching ? '…' : '🔍'}</button>
+                      </div>
+                      {results.length > 0 && (
+                        <div style={{ maxHeight: 130, overflowY: 'auto', marginBottom: 8, display: 'grid', gap: 4 }}>
+                          {results.map((r, i) => (
+                            <button key={i} onClick={() => choosePlace(r)} style={{ textAlign: 'left', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#cbd5e1', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>📍 {r.name}</button>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        {OSM_PLACES.map((pl) => (
+                          <button key={pl.id} onClick={() => choosePlace(pl)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', cursor: 'pointer', fontFamily: 'inherit' }}>{pl.name}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <div style={{ fontSize: 13, color: picked ? '#22d3ee' : '#94a3b8', fontWeight: picked ? 700 : 400 }}>
+                    {picked ? `🗺️ ${picked.name}` : 'Chọn 1 địa danh trên bản đồ →'}
+                  </div>
+                </div>
+              )}
             </div>
             <div style={fld}>
-              <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>PHI CÔNG TRONG PHÒNG ({allNames.length})</div>
+              <div style={{ fontSize: 11, color: full ? '#f87171' : '#7dd3fc', marginBottom: 6 }}>
+                PHI CÔNG TRONG PHÒNG ({allNames.length}/{ROOM_MAX}){full ? ' — ĐẦY' : ''}
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {allNames.map((n, i) => (
                   <span key={i} style={{ fontSize: 12, padding: '3px 9px', borderRadius: 999, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.4)', color: '#fdba74' }}>🛩 {n}</span>
@@ -2911,12 +3011,12 @@ function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
           </div>
         </div>
 
-        <button onClick={() => onStart(level, room, name)}
-          style={{ marginTop: 18, width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: CYAN_GRAD, color: '#04212b', fontWeight: 'bold', fontSize: 16, cursor: 'pointer', fontFamily: 'inherit' }}>
-          🚁 VÀO BAY ({level.emoji} {level.name})
+        <button onClick={() => !full && (mode === 'level' || picked) && onStart(level, room, name)} disabled={full || (mode === 'map' && !picked)}
+          style={{ marginTop: 18, width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: full || (mode === 'map' && !picked) ? '#475569' : CYAN_GRAD, color: '#04212b', fontWeight: 'bold', fontSize: 16, cursor: full || (mode === 'map' && !picked) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: full || (mode === 'map' && !picked) ? 0.6 : 1 }}>
+          {full ? '🚫 PHÒNG ĐẦY (tối đa 10)' : `🚁 VÀO BAY (${level.emoji} ${level.name})`}
         </button>
         <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 8 }}>
-          Mỗi người tự bấm “Vào bay” — sẽ thấy drone của nhau realtime trong cùng bản đồ.
+          Mỗi người tự bấm “Vào bay” — thấy drone của nhau realtime, đua về đích. ⚠️ Thoát giữa chừng bị TRỪ ĐIỂM.
         </p>
       </div>
     </div>
@@ -2926,9 +3026,10 @@ function ChallengeScreen({ initialRoom, initialLvl, onStart, onBack }: {
 // ═════════════════════════════════════════════════════════════
 // MAIN — flow controller
 // ═════════════════════════════════════════════════════════════
+type MapPick = { lat: number; lon: number; name: string }
 type Screen =
   | { kind: 'mode' }
-  | { kind: 'challenge'; room?: string; lvl?: number }
+  | { kind: 'challenge'; room?: string; lvl?: number; map?: MapPick }
   | { kind: 'setup' }
   | { kind: 'levels' }
   | { kind: 'game'; level: Level; room?: string; playerName?: string }
@@ -2938,7 +3039,12 @@ function readInitialScreen(): Screen {
   try {
     const q = new URLSearchParams(window.location.search)
     const room = q.get('droneRoom')
-    if (room) return { kind: 'challenge', room: room.toUpperCase().slice(0, 8), lvl: Number(q.get('lvl')) || undefined }
+    if (room) {
+      const mlat = parseFloat(q.get('mlat') || ''), mlon = parseFloat(q.get('mlon') || '')
+      const map = Number.isFinite(mlat) && Number.isFinite(mlon)
+        ? { lat: mlat, lon: mlon, name: q.get('mname') || 'Bản đồ thật' } : undefined
+      return { kind: 'challenge', room: room.toUpperCase().slice(0, 8), lvl: Number(q.get('lvl')) || undefined, map }
+    }
   } catch { /* */ }
   return { kind: 'mode' }
 }
@@ -2990,7 +3096,7 @@ function FpvAppRoot() {
     case 'challenge':
       return (
         <ChallengeScreen
-          initialRoom={screen.room} initialLvl={screen.lvl}
+          initialRoom={screen.room} initialLvl={screen.lvl} initialMap={screen.map}
           onStart={(level, room, name) => setScreen({ kind: 'game', level, room, playerName: name })}
           onBack={() => setScreen({ kind: 'mode' })}
         />
