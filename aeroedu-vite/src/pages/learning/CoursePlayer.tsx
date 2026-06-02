@@ -40,6 +40,7 @@ import {
 import { learningService } from '@/services/learning.service'
 import { api } from '@/services/api'
 import { cn } from '@/lib/utils'
+import { mascot } from '@/components/mascot/MascotBus'
 import { useAuth } from '@/hooks/useAuth'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
 import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
@@ -559,8 +560,10 @@ export default function CoursePlayer() {
   }, [courseId])
   const markLessonComplete = (id: string) => {
     setCompletedLessonIds(prev => {
+      if (prev.has(id)) return prev
       const next = new Set(prev).add(id)
       try { localStorage.setItem(`completed-lessons:${courseId}`, JSON.stringify(Array.from(next))) } catch { /* ignore */ }
+      mascot.emit('lessonDone')  // 🛸 Aero ăn mừng hoàn thành bài
       return next
     })
   }

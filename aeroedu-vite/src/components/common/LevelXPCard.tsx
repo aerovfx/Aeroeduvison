@@ -10,11 +10,13 @@
  *
  * Style: dark navy/purple bg, glow effects, pink accent.
  */
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Star, Coins, Trophy, ChevronRight } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
+import { mascot } from '@/components/mascot/MascotBus'
 
 interface XpMe {
   totalXp: number
@@ -54,6 +56,14 @@ export function LevelXPCard({ showAchievements = true, compact = false }: LevelX
 
   const totalXp = data?.totalXp ?? 0
   const level = data?.level ?? 1
+  // Mascot Aero ăn mừng khi lên cấp
+  const prevLevel = useRef<number | null>(null)
+  useEffect(() => {
+    if (prevLevel.current != null && level > prevLevel.current) {
+      mascot.emit('levelUp', { text: `Lên cấp ${level}! 🚀` })
+    }
+    prevLevel.current = level
+  }, [level])
   const xpInLevel = totalXp % 100
   const progress = (xpInLevel / 100) * 100
   const displayName = user?.name?.split(' ').pop() || 'Bạn'

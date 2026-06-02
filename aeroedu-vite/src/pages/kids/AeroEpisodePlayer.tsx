@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { getEpisodeById, getSeason, ALL_EPISODES, type AeroQuiz } from '@/data/aeroEpisodes'
+import { mascot } from '@/components/mascot/MascotBus'
 
 const KIDS = {
   bg:      '#fff8e1',
@@ -83,6 +84,7 @@ export default function AeroEpisodePlayer() {
 
   const handleAnswer = (correct: boolean) => {
     setShowFeedback(correct ? 'correct' : 'wrong')
+    mascot.emit(correct ? 'correct' : 'wrong')  // 🛸 Aero phản ứng đúng/sai
     if (correct) confetti({ particleCount: 30, spread: 50, origin: { y: 0.5 } })
     setTimeout(() => {
       setShowFeedback(null)

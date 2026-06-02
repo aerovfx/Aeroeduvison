@@ -10,6 +10,7 @@ import { ColdStartIndicator } from '@/components/common/ColdStartIndicator'
 import { NativeBridge } from '@/components/common/NativeBridge'
 import { OfflineIndicator } from '@/components/common/OfflineIndicator'
 import ArkAssistant from '@/components/ai/ArkAssistant'
+import Mascot from '@/components/mascot/Mascot'
 
 export default function App() {
   return (
@@ -25,6 +26,8 @@ export default function App() {
           {/* 🤖 ByteDance Ark Bot — floating chat all pages
               Bot-aware role: HS/GV/Admin → tailored system prompt */}
           <ArkAssistant />
+          {/* 🛸 Mascot Aero — gương mặt trợ lý + animation tương tác học tập */}
+          <Mascot />
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

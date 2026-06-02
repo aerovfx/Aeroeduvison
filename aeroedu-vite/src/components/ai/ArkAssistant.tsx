@@ -42,6 +42,13 @@ export default function ArkAssistant() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Mascot Aero bấm vào → mở trợ lý
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    window.addEventListener('aero:open-assistant', onOpen)
+    return () => window.removeEventListener('aero:open-assistant', onOpen)
+  }, [])
+
   // Load history từ LS
   useEffect(() => {
     try {
