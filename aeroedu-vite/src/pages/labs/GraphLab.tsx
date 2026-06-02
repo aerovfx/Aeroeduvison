@@ -281,6 +281,24 @@ function compileFunction(src: string): { ok: true; eval: (x: number) => number }
   }
 }
 
+// Compile hàm 2 biến z = f(x, y) cho chế độ mặt 3D.
+function compileSurface(src: string): { ok: true; eval: (x: number, y: number) => number } | { ok: false; err: string } {
+  try {
+    let s = normalizeMathSrc(src.trim())
+    s = s.replace(/^\s*z\s*=\s*/i, '').replace(/^\s*f\s*\(\s*x\s*,\s*y\s*\)\s*=\s*/i, '')
+    if (!s) return { ok: false, err: 'Biểu thức rỗng' }
+    const node = parse(s)
+    return {
+      ok: true,
+      eval: (x: number, y: number) => {
+        try { return evalNode(node, x, y) } catch { return NaN }
+      },
+    }
+  } catch (e) {
+    return { ok: false, err: (e as Error).message }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // Inequality parser & compiler
 // Hỗ trợ: 3x < 2, y > x^2, x^2 + y^2 <= 4, y < sin(x), etc.
@@ -1130,6 +1148,25 @@ export default function GraphLab() {
   const [kbOpen, setKbOpen] = useState(true)
   const [viewport, setViewport] = useState({ xMin: -10, xMax: 10, yMin: -10, yMax: 10 })
   const [ar3dOpen, setAr3dOpen] = useState(false)
+  // Mặt 3D z = f(x, y) — chỉ dùng trong overlay 3D
+  const [surfaceRows, setSurfaceRows] = useState<EquationRow[]>([
+    { id: mkId(), src: 'x^2 - y^2', color: COLORS[4], visible: true },
+  ])
+  const compiledSurfaces = useMemo(
+    () => surfaceRows.map((row) => {
+      const r = compileSurface(row.src)
+      return { row, fn: r.ok ? r.eval : (() => NaN), err: r.ok ? null : r.err }
+    }),
+    [surfaceRows],
+  )
+  const addSurface = () =>
+    setSurfaceRows((rs) => [...rs, { id: mkId(), src: '', color: COLORS[(rs.length + 4) % COLORS.length], visible: true }])
+  const updateSurface = (id: string, src: string) =>
+    setSurfaceRows((rs) => rs.map((r) => (r.id === id ? { ...r, src } : r)))
+  const deleteSurface = (id: string) =>
+    setSurfaceRows((rs) => rs.filter((r) => r.id !== id))
+  const toggleSurface = (id: string) =>
+    setSurfaceRows((rs) => rs.map((r) => (r.id === id ? { ...r, visible: !r.visible } : r)))
 
   const compiled: Compiled[] = useMemo(
     () => rows.map((row) => {
@@ -1428,7 +1465,7 @@ export default function GraphLab() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-white">Đồ thị 3D — Thực tế tăng cường</div>
               <div className="text-[11px] text-slate-400 truncate">
-                Xoay để xem 3D · bấm nút <b className="text-cyan-300">AR</b> để đặt đồ thị lên bàn (Android/Quest realtime · iPhone Quick Look)
+                Đường cong y=f(x) + mặt cong <b className="text-fuchsia-300">z=f(x,y)</b> · xoay để xem · nút <b className="text-cyan-300">AR</b> đặt lên bàn
               </div>
             </div>
             <button onClick={() => setAr3dOpen(false)}
@@ -1442,14 +1479,57 @@ export default function GraphLab() {
                 functions={compiled
                   .filter((c) => c.row.visible && !c.err && !c.ineq)
                   .map((c) => ({ fn: c.fn, color: c.row.color }))}
+                surfaces={compiledSurfaces
+                  .filter((c) => c.row.visible && !c.err)
+                  .map((c) => ({ fn: c.fn, color: c.row.color }))}
                 viewport={viewport}
               />
             </Suspense>
-            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).length === 0 && (
+
+            {/* Panel nhập mặt z=f(x,y) */}
+            <div className="absolute top-3 left-3 w-[250px] max-w-[80vw] rounded-xl bg-slate-900/85 border border-white/10 backdrop-blur p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-fuchsia-300">Mặt 3D · z = f(x, y)</span>
+                <button onClick={addSurface}
+                        className="flex items-center gap-1 rounded-lg bg-fuchsia-500/20 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-200 ring-1 ring-fuchsia-400/40 hover:bg-fuchsia-500/30">
+                  <Plus size={11} /> Thêm
+                </button>
+              </div>
+              {surfaceRows.map((row) => {
+                const c = compiledSurfaces.find((s) => s.row.id === row.id)
+                return (
+                  <div key={row.id} className="rounded-lg bg-white/5 px-2 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: row.color }} />
+                      <span className="text-[10px] font-mono text-slate-400">z=</span>
+                      <input
+                        value={row.src}
+                        onChange={(e) => updateSurface(row.id, e.target.value)}
+                        placeholder="x^2 - y^2"
+                        spellCheck={false}
+                        className="flex-1 min-w-0 bg-transparent text-xs font-mono text-white outline-none"
+                      />
+                      <button onClick={() => toggleSurface(row.id)} className="text-slate-400 hover:text-white" title={row.visible ? 'Ẩn' : 'Hiện'}>
+                        {row.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                      <button onClick={() => deleteSurface(row.id)} className="text-slate-500 hover:text-rose-400" title="Xóa">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {c?.err && <div className="mt-0.5 text-[10px] text-rose-400 font-mono">⚠ {c.err}</div>}
+                  </div>
+                )
+              })}
+              <div className="text-[10px] text-slate-500 leading-snug">
+                Ví dụ: <span className="font-mono text-fuchsia-200">x^2 - y^2</span> · <span className="font-mono text-fuchsia-200">sin(x)*cos(y)</span> · <span className="font-mono text-fuchsia-200">sin(sqrt(x^2+y^2))</span>
+              </div>
+            </div>
+
+            {compiled.filter((c) => c.row.visible && !c.err && !c.ineq).length === 0 &&
+             compiledSurfaces.filter((c) => c.row.visible && !c.err).length === 0 && (
               <div className="absolute inset-0 grid place-items-center pointer-events-none">
                 <div className="rounded-xl bg-slate-900/80 border border-white/10 px-4 py-3 text-center text-slate-300 text-sm max-w-xs">
-                  Chưa có hàm số y = f(x) nào hiển thị. Thêm một hàm (vd <span className="font-mono text-cyan-300">x^2</span>) rồi mở lại 3D.
-                  <div className="text-[11px] text-slate-500 mt-1">(Bất phương trình chưa hỗ trợ ở chế độ 3D)</div>
+                  Chưa có gì để vẽ. Thêm hàm <span className="font-mono text-cyan-300">y=f(x)</span> ở ngoài, hoặc mặt <span className="font-mono text-fuchsia-300">z=f(x,y)</span> ở panel trái.
                 </div>
               </div>
             )}
