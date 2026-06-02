@@ -1047,7 +1047,7 @@ interface DroneState {
   roll: number
   battery: number
 }
-interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number }
+interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number; fire?: boolean }
 const PHYSICS = {
   thrustGain: 25, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
   airDrag: 0.92, gravity: 9.81, maxAltitude: 80, batteryDrain: 0.5,
@@ -1211,6 +1211,7 @@ function useGamepadInput(inputsRef: React.MutableRefObject<ControlInputs>) {
         inputsRef.current.throttle = dz(-(pad.axes[1] || 0))
         inputsRef.current.roll = dz(pad.axes[2] || 0)
         inputsRef.current.pitch = dz(-(pad.axes[3] || 0))
+        inputsRef.current.fire = !!(pad.buttons[0]?.pressed || pad.buttons[5]?.pressed || pad.buttons[7]?.pressed)
       }
       raf = requestAnimationFrame(poll)
     }
@@ -1545,6 +1546,80 @@ function MotherShips({ specs, posRef, onNear }: {
 }
 
 // ═════════════════════════════════════════════════════════════
+// VŨ KHÍ — đạn bắn (tiêu diệt drone địch / bắn trúng đối thủ PvP)
+// ═════════════════════════════════════════════════════════════
+interface EnemyShared { pos: THREE.Vector3[]; alive: boolean[]; respawnAt: number[] }
+const playShoot = () => sfxTone(900, 0.06, 'square', 0.1)
+function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, enemyShared, peersRef, onEnemyKill, onPeerShot }: {
+  posRef: React.MutableRefObject<THREE.Vector3>
+  rotRef: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
+  inputs: React.MutableRefObject<ControlInputs>
+  ammoRef: React.MutableRefObject<number>
+  onShoot: () => void
+  enemyShared?: React.MutableRefObject<EnemyShared | null>
+  peersRef?: React.MutableRefObject<Map<string, Peer>>
+  onEnemyKill?: () => void
+  onPeerShot?: (cid: string) => void
+}) {
+  const MAX = 24, SPEED = 70, LIFE = 2.2
+  const pool = useRef(Array.from({ length: MAX }, () => ({ active: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0 })))
+  const refs = useRef<(THREE.Mesh | null)[]>([])
+  const lastFire = useRef(0)
+  const e = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
+  useFrame((_s, dt) => {
+    const now = performance.now()
+    // Bắn (edge + cooldown 220ms)
+    if (inputs.current.fire && ammoRef.current > 0 && now - lastFire.current > 220) {
+      lastFire.current = now
+      ammoRef.current -= 1
+      onShoot()
+      playShoot()
+      const r = rotRef.current
+      const dir = new THREE.Vector3(0, 0, 1).applyEuler(e.set(r.pitch, r.yaw, r.roll))
+      const slot = pool.current.find((p) => !p.active)
+      if (slot) {
+        slot.active = true; slot.life = LIFE
+        slot.pos.copy(posRef.current).addScaledVector(dir, 1)
+        slot.vel.copy(dir).multiplyScalar(SPEED)
+      }
+    }
+    // Cập nhật đạn + va chạm
+    const es = enemyShared?.current
+    pool.current.forEach((p, i) => {
+      const m = refs.current[i]
+      if (!p.active) { if (m) m.visible = false; return }
+      p.life -= dt
+      p.pos.addScaledVector(p.vel, dt)
+      if (p.life <= 0 || p.pos.y < 0) { p.active = false; if (m) m.visible = false; return }
+      // trúng địch
+      if (es) {
+        for (let k = 0; k < es.pos.length; k++) {
+          if (!es.alive[k]) continue
+          if (p.pos.distanceTo(es.pos[k]) < 1.6) { es.alive[k] = false; es.respawnAt[k] = now + 4000; p.active = false; onEnemyKill?.(); break }
+        }
+      }
+      // trúng đối thủ PvP
+      if (p.active && peersRef) {
+        for (const [cid, pr] of peersRef.current) {
+          if (p.pos.distanceTo(new THREE.Vector3(pr.pos[0], pr.pos[1], pr.pos[2])) < 1.6) { p.active = false; onPeerShot?.(cid); break }
+        }
+      }
+      if (m) { m.visible = p.active; m.position.copy(p.pos) }
+    })
+  })
+  return (
+    <>
+      {pool.current.map((_, i) => (
+        <mesh key={i} ref={(el) => { refs.current[i] = el }} visible={false}>
+          <sphereGeometry args={[0.12, 8, 8]} />
+          <meshBasicMaterial color="#fde047" toneMapped={false} />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
 // OSM CITY — box công trình từ OpenStreetMap + tile culling
 // Chia bản đồ thành ô vuông (tile), chỉ dựng ô quanh drone (trong tầm nhìn).
 // 1 InstancedMesh → 1 draw call; chỉ rebuild khi drone sang ô mới.
@@ -1827,30 +1902,41 @@ function EnemyMesh() {
     </group>
   )
 }
-function EnemyDrones({ posRef, specs, onHit }: {
+function EnemyDrones({ posRef, specs, onHit, shared }: {
   posRef: React.MutableRefObject<THREE.Vector3>
   specs: Array<{ center: Vec3; radius: number; speed: number }>
   onHit: () => void
+  shared?: React.MutableRefObject<EnemyShared | null>
 }) {
   const refs = useRef<(THREE.Group | null)[]>([])
   const phase = useRef(specs.map((_, i) => i * 1.9))
   const lastHit = useRef(0)
-  const tmp = useMemo(() => new THREE.Vector3(), [])
+  // bộ chia sẻ cho hệ đạn (vị trí + sống/hồi sinh)
+  const local = useRef<EnemyShared>({ pos: specs.map(() => new THREE.Vector3()), alive: specs.map(() => true), respawnAt: specs.map(() => 0) })
+  useEffect(() => { if (shared) shared.current = local.current }, [shared])
   useFrame((_s, dt) => {
     const dp = posRef.current
+    const st = local.current
+    const now = performance.now()
     specs.forEach((sp, i) => {
-      phase.current[i] += dt * sp.speed
       const g = refs.current[i]
       if (!g) return
+      if (!st.alive[i]) { // bị bắn rơi → ẩn, hồi sinh sau 4s
+        g.visible = false
+        if (now > st.respawnAt[i]) st.alive[i] = true
+        return
+      }
+      g.visible = true
+      phase.current[i] += dt * sp.speed
       const a = phase.current[i]
-      const ep = tmp.set(
+      const ep = st.pos[i].set(
         sp.center[0] + Math.cos(a) * sp.radius,
         sp.center[1] + Math.sin(a * 0.7) * 1.6,
         sp.center[2] + Math.sin(a) * sp.radius,
       )
       if (ep.distanceTo(dp) < 16) ep.lerp(dp, 0.015) // bám nhẹ khi gần
       g.position.copy(ep); g.rotation.y += dt * 5
-      if (ep.distanceTo(dp) < 1.3) { const now = performance.now(); if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } }
+      if (ep.distanceTo(dp) < 1.3) { if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } }
     })
   })
   return <>{specs.map((_, i) => (<group key={i} ref={(el) => { refs.current[i] = el }}><EnemyMesh /></group>))}</>
@@ -2537,13 +2623,27 @@ function GameScreen({
     playPickup()
     const info = PICKUP_INFO[type]
     if (type === 'battery') rechargeRef.current = 100
-    else if (type === 'upgrade') { boostRef.current = { mult: 1.6, until: performance.now() + 9000 }; setBoostOn(true); setTimeout(() => setBoostOn(false), 9000) }
+    else if (type === 'upgrade') { boostRef.current = { mult: 1.6, until: performance.now() + 9000 }; setBoostOn(true); setTimeout(() => setBoostOn(false), 9000); ammoRef.current = Math.min(30, ammoRef.current + 10); setAmmo(ammoRef.current) }
     else if (type === 'drone') setModelOverride(DRONE_MODELS[Math.floor(Math.random() * DRONE_MODELS.length)])
     if (info.score) setRunScore((s) => s + info.score)
     setCollectMsg(type === 'battery' ? '🔋 Sạc đầy pin!' : type === 'upgrade' ? '⚡ Tăng tốc 9s!' : type === 'drone' ? '🚁 Drone mới!' : `+${info.score} điểm`)
     setTimeout(() => setCollectMsg(null), 1400)
   }, [])
-  const onMotherNear = useCallback(() => { rechargeRef.current = Math.max(rechargeRef.current, 1.5) }, [])
+  // Vũ khí
+  const AMMO_MAX = 30
+  const ammoRef = useRef(AMMO_MAX)
+  const [ammo, setAmmo] = useState(AMMO_MAX)
+  const enemySharedRef = useRef<EnemyShared | null>(null)
+  const onShoot = useCallback(() => setAmmo(ammoRef.current), [])
+  const onEnemyKill = useCallback(() => { setRunScore((s) => s + 40); setCollectMsg('💥 Hạ địch +40'); setTimeout(() => setCollectMsg(null), 1200) }, [])
+  const onPeerShot = useCallback((cid: string) => {
+    setRunScore((s) => s + 30); setCollectMsg('🎯 Bắn trúng +30'); setTimeout(() => setCollectMsg(null), 1200)
+    if (room) publish(topic, { kind: 'shot', cid: myCid, target: cid, by: myName })
+  }, [room, publish, topic, myCid, myName])
+  const onMotherNear = useCallback(() => {
+    rechargeRef.current = Math.max(rechargeRef.current, 1.5)
+    if (ammoRef.current < AMMO_MAX) { ammoRef.current = AMMO_MAX; setAmmo(AMMO_MAX) }
+  }, [])
   // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
   const peersRef = useRef<Map<string, Peer>>(new Map())
   const raceRef = useRef<Map<string, { name: string; time: number }>>(new Map())
@@ -2570,6 +2670,8 @@ function GameScreen({
         peersRef.current.set(p.cid, { name: p.name, pos: p.p, yaw: p.y, pitch: p.pi, roll: p.r, t: performance.now() })
       } else if (p.kind === 'finish') {
         if (!raceRef.current.has(p.cid)) { raceRef.current.set(p.cid, { name: p.name, time: p.time }); setRaceBoard(buildBoard()) }
+      } else if (p.kind === 'shot' && p.target === myCid) {
+        onHitRef.current() // bị đối thủ bắn trúng → flash + đếm
       }
     },
   })
@@ -2624,6 +2726,13 @@ function GameScreen({
   const [hits, setHits] = useState(0)
   const [hitFlash, setHitFlash] = useState(false)
   useEffect(() => { const id = setTimeout(() => setShowHint(false), 9000); return () => clearTimeout(id) }, [])
+  // Phím Space = bắn (giữ để bắn liên tục)
+  useEffect(() => {
+    const dn = (e: KeyboardEvent) => { if (e.code === 'Space') { e.preventDefault(); inputsRef.current.fire = true } }
+    const up = (e: KeyboardEvent) => { if (e.code === 'Space') inputsRef.current.fire = false }
+    window.addEventListener('keydown', dn); window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', dn); window.removeEventListener('keyup', up) }
+  }, [])
 
   const onCargoState = useCallback((idx: number, carrying: boolean) => { setCargoIdx(idx); setCargoCarrying(carrying) }, [])
   const onCargoComplete = useCallback(() => {
@@ -2719,6 +2828,7 @@ function GameScreen({
       { name: 'yawLeft', keys: ['KeyA'] }, { name: 'yawRight', keys: ['KeyD'] },
       { name: 'pitchUp', keys: ['ArrowUp'] }, { name: 'pitchDown', keys: ['ArrowDown'] },
       { name: 'rollLeft', keys: ['ArrowLeft'] }, { name: 'rollRight', keys: ['ArrowRight'] },
+      { name: 'fire', keys: ['Space'] },
     ]}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         <Canvas
@@ -2735,6 +2845,9 @@ function GameScreen({
           </Suspense>
           <Pickups items={pickups} posRef={dronePosRef} onCollect={onCollect} />
           <MotherShips specs={motherships} posRef={dronePosRef} onNear={onMotherNear} />
+          <Projectiles posRef={dronePosRef} rotRef={droneRotRef} inputs={inputsRef} ammoRef={ammoRef}
+            onShoot={onShoot} enemyShared={enemySharedRef} peersRef={peersRef}
+            onEnemyKill={onEnemyKill} onPeerShot={onPeerShot} />
           {room && <PeerDrones peersRef={peersRef} />}
           {level.map && (
             <Suspense fallback={null}>
@@ -2747,7 +2860,7 @@ function GameScreen({
               <CargoMission posRef={dronePosRef} packages={level.cargo.packages}
                 onState={onCargoState} onComplete={onCargoComplete} />
               {level.cargo.enemies && level.cargo.enemies.length > 0 && (
-                <EnemyDrones posRef={dronePosRef} specs={level.cargo.enemies} onHit={onHit} />
+                <EnemyDrones posRef={dronePosRef} specs={level.cargo.enemies} onHit={onHit} shared={enemySharedRef} />
               )}
               {level.cargo.poles && level.cargo.poles.length > 0 && (
                 <PoleObstacles posRef={dronePosRef} poles={level.cargo.poles} onHit={onHit} />
@@ -2873,6 +2986,10 @@ function GameScreen({
                   <div style={{ fontSize: 8, color: '#7dd3fc' }}>BOOST</div>
                   <div style={{ fontSize: 14, color: boostOn ? '#a855f7' : '#475569' }}>{boostOn ? '⚡ON' : '—'}</div>
                 </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐẠN</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: ammo > 0 ? '#fde047' : '#ef4444' }}>{ammo}</div>
+                </div>
                 <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: 10 }}>
                   <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐIỂM MÀN</div>
                   <div style={{ fontSize: 16, fontWeight: 'bold', color: '#fde68a' }}>{runScore}</div>
@@ -2885,6 +3002,17 @@ function GameScreen({
             )
           })()}
         </div>
+
+        {/* Nút BẮN (chạm/giữ) */}
+        <button
+          onPointerDown={(e) => { e.preventDefault(); inputsRef.current.fire = true }}
+          onPointerUp={() => { inputsRef.current.fire = false }}
+          onPointerLeave={() => { inputsRef.current.fire = false }}
+          style={{
+            position: 'absolute', bottom: 110, right: 30, zIndex: 11, width: 68, height: 68, borderRadius: '50%',
+            background: 'rgba(239,68,68,0.35)', border: '2px solid rgba(239,68,68,0.8)', color: '#fff',
+            fontSize: 26, cursor: 'pointer', userSelect: 'none', touchAction: 'none', pointerEvents: 'auto',
+          }}>🔫</button>
 
         {/* Toast nhận thưởng */}
         {collectMsg && (
@@ -2914,7 +3042,7 @@ function GameScreen({
             <b style={{ color: '#22d3ee' }}>{level.emoji} {level.name}</b><br />
             {level.hint}<br />
             <span style={{ fontSize: 11, color: '#94a3b8' }}>
-              {gamepadId ? '🎮 Tay cầm' : showSticks ? '🕹️ Joystick 2 cần (trái: ga/xoay · phải: nghiêng)' : '⌨️ W/S A/D · ↑↓ ←→'} · chạm để ẩn
+              {gamepadId ? '🎮 Tay cầm' : showSticks ? '🕹️ Joystick 2 cần (trái: ga/xoay · phải: nghiêng)' : '⌨️ W/S A/D · ↑↓ ←→'} · 🔫/Space bắn · chạm để ẩn
             </span>
           </div>
         )}
