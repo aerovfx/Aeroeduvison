@@ -776,7 +776,9 @@ export default function AuraPage() {
             </span>
           </div>
 
-          {/* Floating exit button — ALWAYS visible on bottom-left, ngay cả khi sim fullscreen */}
+          {/* Floating exit button — bottom-left. ẨN với FPV drone vì đè lên joystick
+              trái (drone đã có nút "← Thoát" riêng ở góc trên-phải). */}
+          {activeSim !== 'fpv-drone-vr' && (
           <button
             onClick={() => goSim(null)}
             className="fixed bottom-4 left-4 z-50 group flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold text-white bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/20 hover:border-cyan-400/60 transition-all shadow-lg hover:shadow-cyan-500/20"
@@ -787,6 +789,7 @@ export default function AuraPage() {
             <span className="hidden group-hover:inline">Thoát mô phỏng</span>
             <span className="group-hover:hidden text-xs text-white/70">ESC</span>
           </button>
+          )}
           <div className="flex-1" style={{ minHeight: 0 }}>
             {SimComponent ? (
               <Suspense fallback={

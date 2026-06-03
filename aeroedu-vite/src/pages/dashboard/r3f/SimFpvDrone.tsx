@@ -1049,7 +1049,7 @@ const PHYSICS = {
   // FPV thật đạt 300-400 km/h: lực đẩy cao + cản RẤT thấp (airDrag gần 1 = giữ đà)
   thrustGain: 42, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
   airDrag: 0.992, gravity: 9.81, maxAltitude: 150, batteryDrain: 0.5,
-  pitchAngle: 0.95, rollAngle: 0.7,   // dive dốc tới ~54° để lao nhanh kiểu kamikaze
+  pitchAngle: 0.78, rollAngle: 0.6,   // góc nghiêng tối đa — vừa đủ dive, dễ kiểm soát
   maxSpeed: 116,                       // ~418 km/h (m/s) — trần tốc độ an toàn
 }
 
@@ -1289,8 +1289,11 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
     const dist = Math.sqrt(dx * dx + dy * dy)
     if (dist > RADIUS) { dx = (dx / dist) * RADIUS; dy = (dy / dist) * RADIUS }
     setKnobPos({ x: dx, y: dy })
-    // Map sang [-1, 1], invert Y (touch Y down = positive nhưng game up = positive)
-    onMove(dx / RADIUS, -dy / RADIUS, inputsRef.current)
+    // Map sang [-1, 1], invert Y (touch Y down = positive nhưng game up = positive).
+    // EXPO: mềm ở gần tâm → điều khiển tinh, vẫn đủ lực ở rìa (dễ lái hơn nhiều).
+    const EXPO = 0.65
+    const expo = (v: number) => v * (EXPO * v * v + (1 - EXPO))
+    onMove(expo(dx / RADIUS), expo(-dy / RADIUS), inputsRef.current)
   }, [inputsRef, onMove])
 
   const handleStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
@@ -3129,7 +3132,7 @@ function GameScreen({
           onPointerUp={() => { inputsRef.current.fire = false }}
           onPointerLeave={() => { inputsRef.current.fire = false }}
           style={{
-            position: 'absolute', bottom: 220, right: 30, zIndex: 11, width: 68, height: 68, borderRadius: '50%',
+            position: 'absolute', bottom: 300, right: 24, zIndex: 11, width: 64, height: 64, borderRadius: '50%',
             background: 'rgba(239,68,68,0.35)', border: '2px solid rgba(239,68,68,0.8)', color: '#fff',
             fontSize: 26, cursor: 'pointer', userSelect: 'none', touchAction: 'none', pointerEvents: 'auto',
           }}>🔫</button>
