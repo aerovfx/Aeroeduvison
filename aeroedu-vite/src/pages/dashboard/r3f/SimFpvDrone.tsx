@@ -2092,9 +2092,13 @@ function VRButton({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer
 }
 
 // ── Sci-fi HUD palette ──
-const HUD_C = '#5eead4'        // teal-cyan chính
-const HUD_DIM = 'rgba(94,234,212,0.45)'
-const HUD_BG = 'rgba(6,30,38,0.6)'
+const HUD_C = '#7cf7e6'        // teal-cyan sáng (tương phản tốt hơn)
+const HUD_DIM = '#c7f5ec'      // sáng + ĐẶC (trước là 45% opacity → quá mờ)
+const HUD_BG = 'rgba(3,20,26,0.82)'  // nền panel đậm hơn để chữ nổi
+// Viền tối quanh chữ SVG → đọc rõ trên MỌI nền (trời sáng, đất, biển…)
+const HUD_OUTLINE = { stroke: 'rgba(1,14,18,0.92)', strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' } as React.CSSProperties
+// Bóng tối cho chữ HTML (thay glow cyan vốn không tăng tương phản)
+const HUD_TXT_SHADOW = '0 1px 2px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.85)'
 // Nền sci-fi dùng chung cho các màn (lưới + glow + gradient tối)
 const SCIFI_BG = [
   'radial-gradient(circle at 50% 8%, rgba(34,211,238,0.12), transparent 55%)',
@@ -2128,16 +2132,16 @@ function HudTape({ value, label, unit, side }: { value: number; label: string; u
   const railX = side === 'left' ? W - 2 : 2
   return (
     <svg width={W} height={H} style={{ overflow: 'visible' }}>
-      <text x={railX} y={-8} fontSize={10} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'} style={{ letterSpacing: 1 }}>{label}</text>
+      <text x={railX} y={-8} fontSize={11} fontWeight="bold" fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'} style={{ letterSpacing: 1, ...HUD_OUTLINE }}>{label}</text>
       <line x1={railX} y1={0} x2={railX} y2={H} stroke={HUD_DIM} strokeWidth={1.5} />
       {ticks.map((t, i) => {
         const major = Math.abs(Math.round(t.v) % 10) === 0
         const len = major ? 14 : 7
         const x2 = side === 'left' ? railX - len : railX + len
         return (
-          <g key={i} opacity={0.7}>
-            <line x1={railX} y1={t.y} x2={x2} y2={t.y} stroke={HUD_C} strokeWidth={1} />
-            {major && <text x={side === 'left' ? railX - 18 : railX + 18} y={t.y + 3} fontSize={9} fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'}>{Math.round(t.v)}</text>}
+          <g key={i} opacity={0.92}>
+            <line x1={railX} y1={t.y} x2={x2} y2={t.y} stroke={HUD_C} strokeWidth={1.3} />
+            {major && <text x={side === 'left' ? railX - 18 : railX + 18} y={t.y + 3} fontSize={10} fontWeight="bold" fill={HUD_C} textAnchor={side === 'left' ? 'end' : 'start'} style={HUD_OUTLINE}>{Math.round(t.v)}</text>}
           </g>
         )
       })}
@@ -2145,10 +2149,10 @@ function HudTape({ value, label, unit, side }: { value: number; label: string; u
         points={side === 'left'
           ? `${railX},${H / 2} ${railX - 8},${H / 2 - 12} ${W - 56},${H / 2 - 12} ${W - 56},${H / 2 + 12} ${railX - 8},${H / 2 + 12}`
           : `${railX},${H / 2} ${railX + 8},${H / 2 - 12} ${58},${H / 2 - 12} ${58},${H / 2 + 12} ${railX + 8},${H / 2 + 12}`}
-        fill={HUD_BG} stroke={HUD_C} strokeWidth={1.2}
+        fill={HUD_BG} stroke={HUD_C} strokeWidth={1.5}
       />
-      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 4} fontSize={14} fontWeight="bold" fill="#fff" textAnchor="middle">{value.toFixed(0)}</text>
-      <text x={railX} y={H + 14} fontSize={8} fill={HUD_DIM} textAnchor={side === 'left' ? 'end' : 'start'}>{unit}</text>
+      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 5} fontSize={16} fontWeight="bold" fill="#fff" textAnchor="middle" style={HUD_OUTLINE}>{value.toFixed(0)}</text>
+      <text x={railX} y={H + 14} fontSize={9} fontWeight="bold" fill={HUD_DIM} textAnchor={side === 'left' ? 'end' : 'start'} style={HUD_OUTLINE}>{unit}</text>
     </svg>
   )
 }
@@ -2169,12 +2173,12 @@ function HudCompass({ heading }: { heading: number }) {
       {marks.map((m, i) => (
         <g key={i} opacity={0.85}>
           <line x1={m.x} y1={H - 2} x2={m.x} y2={card[m.d] ? H - 14 : H - 8} stroke={HUD_C} strokeWidth={card[m.d] ? 1.6 : 1} />
-          {card[m.d] && <text x={m.x} y={H - 18} fontSize={12} fontWeight="bold" fill={HUD_C} textAnchor="middle">{card[m.d]}</text>}
+          {card[m.d] && <text x={m.x} y={H - 18} fontSize={13} fontWeight="bold" fill={HUD_C} textAnchor="middle" style={HUD_OUTLINE}>{card[m.d]}</text>}
         </g>
       ))}
       <polygon points={`${W / 2},2 ${W / 2 - 6},-6 ${W / 2 + 6},-6`} fill="#fbbf24" transform="translate(0,8)" />
-      <rect x={W / 2 - 22} y={0} width={44} height={15} fill={HUD_BG} stroke={HUD_C} strokeWidth={1} />
-      <text x={W / 2} y={11} fontSize={11} fontWeight="bold" fill="#fff" textAnchor="middle">{Math.round(heading)}°</text>
+      <rect x={W / 2 - 24} y={0} width={48} height={16} rx={2} fill={HUD_BG} stroke={HUD_C} strokeWidth={1.3} />
+      <text x={W / 2} y={12} fontSize={12} fontWeight="bold" fill="#fff" textAnchor="middle" style={HUD_OUTLINE}>{Math.round(heading)}°</text>
     </svg>
   )
 }
@@ -2215,7 +2219,7 @@ function HudHorizon({ pitch, roll }: { pitch: number; roll: number }) {
   const pitchPx = (pitch * 180) / Math.PI * 2.2 // độ → px
   const ladder = [-20, -10, 10, 20]
   return (
-    <svg width={W} height={H} style={{ overflow: 'visible', opacity: 0.8 }}>
+    <svg width={W} height={H} style={{ overflow: 'visible', opacity: 0.95 }}>
       <g transform={`rotate(${-rollDeg} ${W / 2} ${H / 2})`}>
         <g transform={`translate(0 ${pitchPx})`}>
           {/* đường chân trời */}
@@ -2225,10 +2229,10 @@ function HudHorizon({ pitch, roll }: { pitch: number; roll: number }) {
             const y = H / 2 - d * 2.2
             const w = d % 20 === 0 ? 44 : 28
             return (
-              <g key={d} opacity={0.7}>
-                <line x1={W / 2 - w} y1={y} x2={W / 2 - 14} y2={y} stroke={HUD_C} strokeWidth={1} />
-                <line x1={W / 2 + 14} y1={y} x2={W / 2 + w} y2={y} stroke={HUD_C} strokeWidth={1} />
-                <text x={W / 2 - w - 6} y={y + 3} fontSize={8} fill={HUD_C} textAnchor="end">{Math.abs(d)}</text>
+              <g key={d} opacity={0.92}>
+                <line x1={W / 2 - w} y1={y} x2={W / 2 - 14} y2={y} stroke={HUD_C} strokeWidth={1.3} />
+                <line x1={W / 2 + 14} y1={y} x2={W / 2 + w} y2={y} stroke={HUD_C} strokeWidth={1.3} />
+                <text x={W / 2 - w - 6} y={y + 3} fontSize={9} fontWeight="bold" fill={HUD_C} textAnchor="end" style={HUD_OUTLINE}>{Math.abs(d)}</text>
               </g>
             )
           })}
@@ -2271,8 +2275,8 @@ function GameHUD({
   return (
     <div style={{
       position: 'absolute', inset: 0, pointerEvents: 'none',
-      fontFamily: 'ui-monospace, monospace', color: HUD_C,
-      textShadow: '0 0 6px rgba(34,211,238,0.6)',
+      fontFamily: 'ui-monospace, monospace', color: HUD_C, fontWeight: 600,
+      textShadow: HUD_TXT_SHADOW,
       transform: `scale(${scale})`, transformOrigin: 'center center',
     }}>
       {/* Đường chân trời nhân tạo (sau tâm ngắm) */}
@@ -2311,33 +2315,33 @@ function GameHUD({
 
       {/* TỐC ĐỘ — số lớn rõ kiểu OSD FPV (ngay dưới tâm ngắm) */}
       <div style={{ position: 'absolute', top: 'calc(50% + 44px)', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', fontFamily: 'monospace' }}>
-        <div style={{ fontSize: 32, fontWeight: 900, color: HUD_C, lineHeight: 1, textShadow: '0 0 10px rgba(34,211,238,0.7)' }}>{Math.round(speed)}</div>
-        <div style={{ fontSize: 11, color: HUD_DIM, letterSpacing: 2 }}>KM/H</div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: '#ffffff', lineHeight: 1, textShadow: HUD_TXT_SHADOW }}>{Math.round(speed)}</div>
+        <div style={{ fontSize: 13, fontWeight: 'bold', color: HUD_DIM, letterSpacing: 2 }}>KM/H</div>
       </div>
 
       {/* Objective + time — thanh trên */}
       <div style={{ position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-        <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 'bold' }}>{objStr}</div>
-        <div style={{ fontSize: 13, color: timeRemaining < 10 ? '#ef4444' : HUD_C }}>⏱ {timeRemaining.toFixed(1)}s</div>
+        <div style={{ fontSize: 13, color: '#fcd34d', fontWeight: 'bold' }}>{objStr}</div>
+        <div style={{ fontSize: 15, fontWeight: 'bold', color: timeRemaining < 10 ? '#ff6b6b' : HUD_C }}>⏱ {timeRemaining.toFixed(1)}s</div>
       </div>
 
       {/* Pin — cột dọc bên trái ngoài */}
       <div style={{ position: 'absolute', top: '50%', left: 96, transform: 'translateY(-50%)', textAlign: 'center' }}>
-        <div style={{ fontSize: 8, color: HUD_DIM, marginBottom: 3 }}>BATT</div>
+        <div style={{ fontSize: 10, fontWeight: 'bold', color: HUD_DIM, marginBottom: 3 }}>BATT</div>
         <div style={{ width: 8, height: 120, background: 'rgba(255,255,255,0.12)', borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', border: `1px solid ${HUD_DIM}` }}>
           <div style={{ width: '100%', height: `${telemetry.battery}%`, background: battColor }} />
         </div>
-        <div style={{ fontSize: 10, color: battColor, marginTop: 3, fontWeight: 'bold' }}>{telemetry.battery.toFixed(0)}%</div>
+        <div style={{ fontSize: 12, color: battColor, marginTop: 3, fontWeight: 'bold' }}>{telemetry.battery.toFixed(0)}%</div>
       </div>
 
       {/* Radar góc dưới-phải */}
       <div style={{ position: 'absolute', bottom: 26, right: 26 }}>
         <HudRadar heading={heading} rel={rel} />
-        <div style={{ textAlign: 'center', fontSize: 8, color: HUD_DIM, marginTop: 2 }}>RADAR {Math.round(speed)}km/h</div>
+        <div style={{ textAlign: 'center', fontSize: 10, fontWeight: 'bold', color: HUD_DIM, marginTop: 2 }}>RADAR {Math.round(speed)}km/h</div>
       </div>
 
       {/* Input source góc dưới-trái */}
-      <div style={{ position: 'absolute', bottom: 28, left: 50, fontSize: 10, color: HUD_DIM }}>
+      <div style={{ position: 'absolute', bottom: 28, left: 50, fontSize: 11, fontWeight: 'bold', color: HUD_DIM }}>
         {gamepadId ? `🎮 ${gamepadId.slice(0, 24)}` : '⌨️/🕹️ READY'}
       </div>
     </div>
