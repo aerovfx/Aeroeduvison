@@ -72,8 +72,9 @@ gcloud services enable \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com \
   secretmanager.googleapis.com \
+  texttospeech.googleapis.com \
   --quiet 2>/dev/null || true
-echo "✅ APIs enabled"
+echo "✅ APIs enabled (gồm Cloud Text-to-Speech cho giọng mascot Aero)"
 
 # ── Step 3: Ensure Artifact Registry repo exists ────────────────
 echo ""
@@ -125,6 +126,12 @@ for s in "pixiai-jwt-secret" "pixiai-database-url" "pixiai-google-client-id"; do
     --role="roles/secretmanager.secretAccessor" \
     --quiet >/dev/null 2>&1 || true
 done
+
+# Cho runtime SA dùng các API đã bật (Cloud Text-to-Speech cho giọng mascot Aero)
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/serviceusage.serviceUsageConsumer" \
+  --condition=None --quiet >/dev/null 2>&1 || true
 
 # Grant Cloud Build SA permission to push to Artifact Registry + act on Cloud Run
 for ROLE in "roles/artifactregistry.writer" "roles/run.admin" "roles/iam.serviceAccountUser"; do
