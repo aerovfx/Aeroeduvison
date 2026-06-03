@@ -151,6 +151,7 @@ const RollCallWheel      = lazy(() => import('@/pages/labs/RollCallWheel'))
 const GestureSwarm       = lazy(() => import('@/pages/labs/GestureSwarm'))
 const AssemblySim        = lazy(() => import('@/pages/labs/AssemblySim'))
 const IoTLab             = lazy(() => import('@/pages/labs/IoTLab'))
+const IoTIndex           = lazy(() => import('@/pages/labs/IoTIndex'))
 const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
 const PeriodicTablePage  = lazy(() => import('@/pages/labs/PeriodicTable'))
 
@@ -408,8 +409,8 @@ export function AppRouter() {
             <Route path="/dashboard/competition"           element={<PageFallback />} />
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
-            <Route path="/dashboard/iot-lab"                       element={<IoTLab />} />
-            {/* User: "thêm các routes cho các thí nghiệm trong /dashboard/iot-lab" */}
+            {/* Hub card phân nhóm (mỗi thí nghiệm có route riêng để nhúng/chia sẻ) */}
+            <Route path="/dashboard/iot-lab"                       element={<IoTIndex />} />
             <Route path="/dashboard/iot-lab/sketch/:sketchId"      element={<IoTLab />} />
             <Route path="/dashboard/iot-lab/arduino/:sketchId"     element={<IoTLab />} />
             <Route path="/dashboard/iot-lab/emulator"              element={<ArduinoEmulator />} />

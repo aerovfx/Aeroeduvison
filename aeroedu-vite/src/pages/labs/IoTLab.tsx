@@ -1290,6 +1290,8 @@ export default function IoTLab() {
   usePageTitle('IoT Lab — Mạch điện & Arduino')
   const navigate = useNavigate()
   const { sketchId } = useParams<{ sketchId: string }>()
+  // Chế độ nhúng (iframe trong bài học): ?embed=1 → ẩn thanh điều hướng
+  const embed = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('embed') === '1'
   // Validate sketchId — fallback CIRCUITS[0] nếu không tồn tại
   const initialId = (sketchId && CIRCUITS.some((c) => c.id === sketchId))
     ? sketchId
@@ -1419,12 +1421,13 @@ export default function IoTLab() {
     <div className="min-h-screen bg-background dark:bg-gradient-to-b dark:from-zinc-950 dark:via-slate-950 dark:to-zinc-950 text-foreground">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {!embed && (
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <Link
-            to="/dashboard"
+            to="/dashboard/iot-lab"
             className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-foreground"
           >
-            <ChevronLeft className="w-4 h-4" /> Dashboard
+            <ChevronLeft className="w-4 h-4" /> Tất cả thí nghiệm IoT
           </Link>
           <Link
             to="/dashboard/iot-lab/emulator"
@@ -1435,6 +1438,7 @@ export default function IoTLab() {
             <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/15 ml-1">⚡ NEW</span>
           </Link>
         </div>
+        )}
 
         {/* ── Quick Access Cards — deep-link cho assignment "lắp ráp / nghiên cứu mạch" ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
