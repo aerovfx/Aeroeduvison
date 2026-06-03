@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState, lazy, Suspense, type MutableRefObject } from 'react'
 import type * as THREE from 'three'
 import { Box } from 'lucide-react'
-import { exportSceneToGLB, exportSceneToUSDZ } from '../../lib/ar/exportModel'
+import { exportSceneToGLB, exportSceneToUSDZ, bakeSceneAnimation } from '../../lib/ar/exportModel'
 import { detectAR } from '../../lib/ar/arCapabilities'
 
 const ARModelOverlay = lazy(() => import('./ARModelOverlay'))
@@ -42,7 +42,10 @@ export function ARLaunchButton({ sceneRef, title, onRealtimeAR }: Props) {
       return
     }
     try {
-      const glbBlob = await exportSceneToGLB(scene)
+      // Ghi hoạt hình useFrame ~3s thành AnimationClip → GLB phát được trong AR
+      // (best-effort: cảnh tĩnh/quá lớn → null → xuất tĩnh như cũ).
+      const clip = await bakeSceneAnimation(scene, { duration: 3, fps: 20 }).catch(() => null)
+      const glbBlob = await exportSceneToGLB(scene, clip)
       const glb = URL.createObjectURL(glbBlob)
       let usdz: string | undefined
       try {

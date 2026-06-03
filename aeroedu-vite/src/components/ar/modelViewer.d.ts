@@ -16,6 +16,8 @@ declare global {
         'ar-placement'?: string
         'camera-controls'?: boolean
         'auto-rotate'?: boolean
+        autoplay?: boolean
+        'animation-name'?: string
         'shadow-intensity'?: string
         'environment-image'?: string
         exposure?: string

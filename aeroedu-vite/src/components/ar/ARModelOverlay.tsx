@@ -100,6 +100,7 @@ export function ARModelOverlay({ glbUrl, usdzUrl, title, onClose }: Props) {
             ar-modes="webxr scene-viewer quick-look"
             ar-scale="auto"
             ar-placement="floor"
+            autoplay
             camera-controls
             auto-rotate
             shadow-intensity="1"
@@ -131,6 +132,12 @@ export function ARModelOverlay({ glbUrl, usdzUrl, title, onClose }: Props) {
               <span style={{ color: '#fbbf24' }}>
                 {' '}
                 (Mô hình này chưa xuất được USDZ — bạn vẫn xoay xem 3D được.)
+              </span>
+            )}
+            {caps.isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(navigator.userAgent) && (
+              <span style={{ color: '#fbbf24', display: 'block', marginTop: 6 }}>
+                ⚠️ Trên iPhone/iPad, chế độ AR chỉ chạy trong <b>Safari</b> (Apple giới hạn).
+                Hãy mở trang bằng Safari để xem AR; trình duyệt khác chỉ xem 3D được.
               </span>
             )}
           </span>
