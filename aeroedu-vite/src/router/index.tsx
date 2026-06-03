@@ -47,6 +47,9 @@ const LLMVisualizerPage = lazy(() => import('@/pages/marketing/LLMVisualizer'))
 const PedagogyCoursePage = lazy(() => import('@/pages/marketing/PedagogyCourse'))
 const AeroKidsPage = lazy(() => import('@/pages/kids/AeroKids'))
 const AeroEpisodePlayerPage = lazy(() => import('@/pages/kids/AeroEpisodePlayer'))
+const StorybookLibraryPage = lazy(() => import('@/pages/kids/StorybookLibrary'))
+const StorybookPlayerPage = lazy(() => import('@/pages/kids/StorybookPlayer'))
+const StorybookEditorPage = lazy(() => import('@/pages/kids/StorybookEditor'))
 const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
 const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
@@ -334,6 +337,11 @@ export function AppRouter() {
         {/* AeroKids — series game mầm non + tiểu học (Đậu Lém-inspired) */}
         <Route path="/kids/aero"             element={<AeroKidsPage />} />
         <Route path="/kids/aero/:episodeId"  element={<AeroEpisodePlayerPage />} />
+        {/* Flipbook có audio cho thiếu nhi — GV biên tập, bé xem + nghe */}
+        <Route path="/kids/storybooks"          element={<StorybookLibraryPage />} />
+        <Route path="/kids/storybooks/new"      element={<StorybookEditorPage />} />
+        <Route path="/kids/storybooks/:id"      element={<StorybookPlayerPage />} />
+        <Route path="/kids/storybooks/:id/edit" element={<StorybookEditorPage />} />
         <Route path="/pricing"          element={<PricingPage2 />} />
         <Route path="/payment/:orderId" element={<PaymentDetailPage />} />
         <Route path="/activate"         element={<ActivatePage />} />

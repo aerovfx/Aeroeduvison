@@ -129,6 +129,30 @@ export default function AeroKids() {
           </div>
         </section>
 
+        {/* ── CTA: Truyện tranh có audio (Flipbook) ── */}
+        <Link to="/kids/storybooks" style={{ textDecoration: 'none' }}>
+          <section style={{
+            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            background: 'linear-gradient(100deg, #6366f1, #ec4899)',
+            borderRadius: 20, padding: '18px 22px', marginBottom: 28,
+            boxShadow: '0 10px 30px rgba(99,102,241,0.35)', color: 'white',
+          }}>
+            <span style={{ fontSize: 44 }}>📖</span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 2 }}>Truyện tranh có giọng kể</div>
+              <div style={{ fontSize: 14, opacity: 0.92 }}>
+                Lật từng trang, vừa xem tranh vừa nghe cô/thầy kể chuyện. Do giáo viên biên tập 💛
+              </div>
+            </div>
+            <span style={{
+              background: 'white', color: '#6366f1', fontWeight: 900,
+              padding: '10px 18px', borderRadius: 999, fontSize: 14, whiteSpace: 'nowrap',
+            }}>
+              Vào đọc →
+            </span>
+          </section>
+        </Link>
+
         {/* ── Season tabs (5 cards lớn) ── */}
         <section style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 18, fontWeight: 900, margin: '0 0 12px', color: KIDS.text }}>

@@ -2942,6 +2942,170 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ── Kids Storybook — Flipbook có audio cho thiếu nhi (GV biên tập) — TRƯỚC proxy ──
+// GV upload PDF/ảnh → trang sách; gán audio per-trang HOẶC 1 file kể chuyện + mốc
+// lật theo timestamp. Bé vừa xem vừa nghe. Pages lưu JSONB.
+;(() => {
+  async function _ensureStorybookTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "KidsStorybook" (
+        id            VARCHAR(48)  PRIMARY KEY,
+        title         VARCHAR(300) NOT NULL,
+        description   TEXT,
+        cover_url     TEXT,
+        mode          VARCHAR(20)  NOT NULL DEFAULT 'perPage',
+        narration_url TEXT,
+        auto_advance  BOOLEAN      NOT NULL DEFAULT true,
+        pages         JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        published     BOOLEAN      NOT NULL DEFAULT false,
+        owner_id      VARCHAR(255),
+        owner_name    VARCHAR(200),
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_pub ON "KidsStorybook"(published)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_owner ON "KidsStorybook"(owner_id)`);
+  }
+  _ensureStorybookTable().catch((e) => console.error('[storybook] migration:', e.message));
+
+  const _sbAuth = (req) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return null;
+    try { return _akVerify(auth.slice(7)); } catch { return null; }
+  };
+  const _sbUid = (d) => (d && (d.userId || d.id || d.sub)) || null;
+  const _sbTokenRole = (d) => (d && d.role) ? String(d.role).toUpperCase() : '';
+  async function _sbRole(d) {
+    let role = _sbTokenRole(d);
+    if (role === 'TEACHER' || role === 'ADMIN') return role;
+    const uid = _sbUid(d);
+    if (!uid) return role;
+    try {
+      const r = await _getPool().query(`SELECT role FROM "User" WHERE id=$1`, [uid]);
+      if (r.rows[0]) return String(r.rows[0].role || '').toUpperCase();
+    } catch { /* ignore */ }
+    return role;
+  }
+  function _sbPages(pages) {
+    if (!Array.isArray(pages)) return [];
+    return pages.slice(0, 300).map((p, i) => ({
+      id: String(p?.id || `p${i}-${Math.random().toString(36).slice(2, 7)}`),
+      imageUrl: String(p?.imageUrl || '').slice(0, 1200),
+      caption: p?.caption ? String(p.caption).slice(0, 600) : '',
+      audioUrl: p?.audioUrl ? String(p.audioUrl).slice(0, 1200) : '',
+      flipAtSec: (typeof p?.flipAtSec === 'number' && isFinite(p.flipAtSec)) ? Math.max(0, p.flipAtSec) : null,
+    })).filter((p) => p.imageUrl);
+  }
+  const _sbRow = (r) => ({
+    id: r.id, title: r.title, description: r.description || '', coverUrl: r.cover_url || '',
+    mode: r.mode === 'narration' ? 'narration' : 'perPage', narrationUrl: r.narration_url || '',
+    autoAdvance: r.auto_advance !== false,
+    pages: Array.isArray(r.pages) ? r.pages : (r.pages || []),
+    published: !!r.published, ownerId: r.owner_id, ownerName: r.owner_name || '',
+    createdAt: r.created_at, updatedAt: r.updated_at,
+  });
+
+  // GET danh sách — published (cho bé) + sách của chính mình nếu đăng nhập
+  app.get('/api/kids/storybooks', async (req, res) => {
+    try {
+      const pool = _getPool();
+      const d = _sbAuth(req); const uid = _sbUid(d);
+      const mine = String(req.query.mine || '') === '1';
+      let rows;
+      if (mine && uid) {
+        rows = (await pool.query(`SELECT * FROM "KidsStorybook" WHERE owner_id=$1 ORDER BY updated_at DESC`, [uid])).rows;
+      } else if (uid) {
+        rows = (await pool.query(`SELECT * FROM "KidsStorybook" WHERE published=true OR owner_id=$1 ORDER BY updated_at DESC`, [uid])).rows;
+      } else {
+        rows = (await pool.query(`SELECT * FROM "KidsStorybook" WHERE published=true ORDER BY updated_at DESC`)).rows;
+      }
+      return res.json({ storybooks: rows.map(_sbRow) });
+    } catch (e) { console.error('[storybook:list]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // GET 1 sách
+  app.get('/api/kids/storybooks/:id', async (req, res) => {
+    try {
+      const r = await _getPool().query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
+      if (!r.rows[0]) return res.status(404).json({ error: 'Không tìm thấy sách' });
+      const book = _sbRow(r.rows[0]);
+      if (!book.published) {
+        const d = _sbAuth(req); const uid = _sbUid(d);
+        const role = await _sbRole(d);
+        if (!(uid && (uid === book.ownerId || role === 'ADMIN'))) return res.status(403).json({ error: 'Sách chưa xuất bản' });
+      }
+      return res.json({ storybook: book });
+    } catch (e) { console.error('[storybook:get]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // POST tạo (GV/Admin)
+  app.post('/api/kids/storybooks', async (req, res) => {
+    try {
+      const d = _sbAuth(req); const uid = _sbUid(d);
+      if (!uid) return res.status(401).json({ error: 'Cần đăng nhập' });
+      const role = await _sbRole(d);
+      if (role !== 'TEACHER' && role !== 'ADMIN') return res.status(403).json({ error: 'Chỉ giáo viên được tạo sách' });
+      const b = req.body || {};
+      const crypto = require('crypto');
+      const id = (crypto.randomUUID ? crypto.randomUUID() : `sb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+      const pages = _sbPages(b.pages);
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
+         String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
+         (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
+         b.autoAdvance !== false, JSON.stringify(pages), !!b.published, uid,
+         String(d.name || d.fullName || d.email || '').slice(0, 200)]
+      );
+      const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [id]);
+      return res.json({ storybook: _sbRow(r.rows[0]) });
+    } catch (e) { console.error('[storybook:create]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // PUT cập nhật (chủ sở hữu/Admin)
+  app.put('/api/kids/storybooks/:id', async (req, res) => {
+    try {
+      const d = _sbAuth(req); const uid = _sbUid(d);
+      if (!uid) return res.status(401).json({ error: 'Cần đăng nhập' });
+      const pool = _getPool();
+      const cur = await pool.query(`SELECT owner_id FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
+      if (!cur.rows[0]) return res.status(404).json({ error: 'Không tìm thấy sách' });
+      const role = await _sbRole(d);
+      if (cur.rows[0].owner_id !== uid && role !== 'ADMIN') return res.status(403).json({ error: 'Không có quyền sửa' });
+      const b = req.body || {};
+      const pages = _sbPages(b.pages);
+      await pool.query(
+        `UPDATE "KidsStorybook" SET title=$2,description=$3,cover_url=$4,mode=$5,narration_url=$6,auto_advance=$7,pages=$8,published=$9,updated_at=NOW() WHERE id=$1`,
+        [req.params.id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
+         String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
+         (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
+         b.autoAdvance !== false, JSON.stringify(pages), !!b.published]
+      );
+      const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
+      return res.json({ storybook: _sbRow(r.rows[0]) });
+    } catch (e) { console.error('[storybook:update]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+
+  // DELETE (chủ sở hữu/Admin)
+  app.delete('/api/kids/storybooks/:id', async (req, res) => {
+    try {
+      const d = _sbAuth(req); const uid = _sbUid(d);
+      if (!uid) return res.status(401).json({ error: 'Cần đăng nhập' });
+      const pool = _getPool();
+      const cur = await pool.query(`SELECT owner_id FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
+      if (!cur.rows[0]) return res.status(404).json({ error: 'Không tìm thấy sách' });
+      const role = await _sbRole(d);
+      if (cur.rows[0].owner_id !== uid && role !== 'ADMIN') return res.status(403).json({ error: 'Không có quyền xoá' });
+      await pool.query(`DELETE FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[storybook:delete]', e.message); return res.status(500).json({ error: e.message }); }
+  });
+})();
+
 // ── Stub student-cams (camera webcam HS làm bài) — TRƯỚC proxy ──
 // Endpoint thực sẽ join với ExamSubmission + WebcamSession table.
 // Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.
