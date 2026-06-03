@@ -15,6 +15,12 @@ import {
 import { getStorybook } from '@/services/storybook.service'
 import type { Storybook } from '@/types/storybook'
 import ShareMenu from '@/components/common/ShareMenu'
+import { api } from '@/services/api'
+
+// URL giọng đọc Google TTS (vi-VN Wavenet) cho 1 đoạn lời kể.
+const ttsBase = (api.defaults.baseURL || '/api').replace(/\/$/, '')
+const ttsUrl = (text: string, lang: 'vi' | 'en' = 'vi') =>
+  `${ttsBase}/tts?lang=${lang}&text=${encodeURIComponent(text.slice(0, 380))}`
 
 export default function StorybookPlayer() {
   const { id } = useParams<{ id: string }>()
@@ -87,6 +93,7 @@ export default function StorybookPlayer() {
   }, [])
 
   // ── Mode perPage: phát audio (hoặc đọc caption) của trang hiện tại ──
+  // Ưu tiên: file audio đã thu → giọng Google TTS (/api/tts) → giọng trình duyệt.
   useEffect(() => {
     if (!started || isNarration) return
     const a = audioRef.current
@@ -94,12 +101,17 @@ export default function StorybookPlayer() {
     const cap = pages[page]?.caption
     window.speechSynthesis?.cancel()
     usingSpeechRef.current = false
+    if (a) a.onerror = null
     if (url && a) {
       a.src = url; a.currentTime = 0
       a.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-    } else if (cap) {
-      a?.removeAttribute('src')
-      speakCaption(cap)
+    } else if (cap && a) {
+      // Thử giọng Google TTS qua audio element; lỗi (501/mạng) → giọng trình duyệt.
+      let fellBack = false
+      const fb = () => { if (fellBack) return; fellBack = true; a.onerror = null; speakCaption(cap) }
+      a.onerror = fb
+      a.src = ttsUrl(cap); a.currentTime = 0
+      a.play().then(() => setPlaying(true)).catch(() => fb())
     } else {
       a?.removeAttribute('src'); setPlaying(false)
     }

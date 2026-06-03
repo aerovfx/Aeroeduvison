@@ -2992,8 +2992,57 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     );
   }
 
+  // Pre-render giọng Google TTS (vi-VN Wavenet) cho truyện demo → lưu MP3 lên GCS,
+  // gắn vào page.audioUrl. Chạy nền, chỉ 1 lần; lỗi/chưa cấu hình thì bỏ qua
+  // (player sẽ tự gọi /api/tts trực tiếp hoặc dùng giọng trình duyệt).
+  function _sbStorage() {
+    try {
+      const { Storage } = require('@google-cloud/storage');
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || 'extreme-lattice-491123-p2';
+      if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+        try { return new Storage({ projectId, credentials: JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS) }); }
+        catch { return new Storage({ projectId }); }
+      }
+      return new Storage({ projectId });
+    } catch { return null; }
+  }
+  const _SB_BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+
+  async function _prerenderDemoAudio() {
+    if (!tts || !tts.synthesize) return;
+    const pool = _getPool();
+    const r = await pool.query(`SELECT pages FROM "KidsStorybook" WHERE id='demo-khan-do'`);
+    if (!r.rows[0]) return;
+    const pages = Array.isArray(r.rows[0].pages) ? r.rows[0].pages : [];
+    if (!pages.length || pages.every((p) => p.audioUrl)) return;  // đã có audio rồi
+    const storage = _sbStorage();
+    if (!storage) return;
+    let changed = false;
+    for (const p of pages) {
+      if (p.audioUrl || !p.caption) continue;
+      try {
+        const buf = await tts.synthesize(p.caption, 'vi');   // throw nếu TTS chưa cấu hình
+        const gcsPath = `storybooks/demo/khan-do-${p.id}.mp3`;
+        await storage.bucket(_SB_BUCKET).file(gcsPath).save(buf, {
+          resumable: false, contentType: 'audio/mpeg',
+          metadata: { cacheControl: 'public, max-age=604800' },
+        });
+        p.audioUrl = `https://storage.googleapis.com/${_SB_BUCKET}/${gcsPath}`;
+        changed = true;
+      } catch (e) {
+        console.warn('[storybook] TTS prerender dừng (chưa cấu hình?):', e.message);
+        break;  // không cấu hình được → dừng, để player tự fallback
+      }
+    }
+    if (changed) {
+      await pool.query(`UPDATE "KidsStorybook" SET pages=$2, updated_at=NOW() WHERE id='demo-khan-do'`, [JSON.stringify(pages)]);
+      console.log('[storybook] ✓ Đã pre-render giọng Google TTS cho truyện demo');
+    }
+  }
+
   _ensureStorybookTable()
     .then(() => _seedDemoStorybook())
+    .then(() => _prerenderDemoAudio().catch((e) => console.warn('[storybook] prerender:', e.message)))
     .catch((e) => console.error('[storybook] migration/seed:', e.message));
 
   const _sbAuth = (req) => {
