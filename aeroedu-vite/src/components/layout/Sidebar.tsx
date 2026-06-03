@@ -59,6 +59,7 @@ const studentSections: RouteSection[] = [
       { icon: FunctionSquare, labelKey: 'routeMath',       href: '/student/math',         badge: 'Mới' },
       { icon: Cpu,          labelKey: 'routeAiSkill',      href: '/student/ai',           badge: 'Mới' },
       { icon: BookOpen,     labelKey: 'routeMyCourses',    href: '/student/my-courses',   badge: 'LMS' },
+      { icon: BookOpenCheck, labelKey: 'routeStorybooks',  href: '/kids/storybooks',      badge: 'Kids' },
       { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },
       { icon: Map,          labelKey: 'routeLearningPath',  href: '/learning-paths' },
       { icon: FileText,     labelKey: 'routeExamPrep',      href: '/student/exam-prep' },
@@ -160,6 +161,7 @@ const teacherSections: RouteSection[] = [
       { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },
+      { icon: BookOpenCheck, labelKey: 'routeStorybooks', href: '/kids/storybooks',        badge: 'Kids' },
     ],
   },
   {
