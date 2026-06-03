@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e7f0d8"/>
+  <path d="M0 470 Q400 440 800 470 L800 600 L0 600 Z" fill="#6fc05f"/>
+  <!-- house -->
+  <g transform="translate(70,150)">
+    <rect x="0" y="120" width="240" height="200" rx="8" fill="#ffd9a0"/>
+    <polygon points="-16,120 120,30 256,120" fill="#e2604f"/>
+    <rect x="90" y="190" width="64" height="130" rx="8" fill="#a9602f"/>
+    <circle cx="142" cy="255" r="6" fill="#ffe066"/>
+  </g>
+  <!-- hunter -->
+  <g transform="translate(520,290)">
+    <path d="M-58 200 Q-64 50 0 30 Q64 50 58 200 Z" fill="#3f7d3a"/>
+    <circle cx="0" cy="6" r="46" fill="#ffe0bd"/>
+    <rect x="-50" y="-30" width="100" height="22" rx="10" fill="#5a3a22"/>
+    <rect x="-34" y="-66" width="68" height="42" rx="10" fill="#5a3a22"/>
+    <circle cx="-15" cy="8" r="5" fill="#5b3b2a"/><circle cx="15" cy="8" r="5" fill="#5b3b2a"/>
+    <path d="M-30 30 Q0 44 30 30" stroke="#7a4a24" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <rect x="-14" y="34" width="28" height="16" rx="4" fill="#5b3b2a"/>
+    <!-- axe -->
+    <g transform="translate(-86,40) rotate(-18)"><rect x="-6" y="-10" width="10" height="150" rx="4" fill="#8a5a2b"/><path d="M-6 -16 Q-46 -10 -40 26 Q-12 24 -6 14 Z" fill="#c9ced6"/><path d="M-6 -16 L-6 14 Q-12 22 -36 26 Q-30 -2 -6 -16 Z" fill="#9aa1ab"/></g>
+  </g>
+  <!-- speech -->
+  <g transform="translate(300,120)"><rect x="0" y="0" width="220" height="58" rx="18" fill="#fff"/><polygon points="40,56 60,56 30,86" fill="#fff"/><text x="110" y="38" font-family="'Comic Sans MS',sans-serif" font-size="22" font-weight="800" fill="#3f7d3a" text-anchor="middle">Để ta cứu mọi người!</text></g>
+  <rect x="120" y="500" width="560" height="58" rx="16" fill="#fff" opacity=".85"/>
+  <text x="400" y="538" font-family="'Comic Sans MS',sans-serif" font-size="24" font-weight="800" fill="#3f7d3a" text-anchor="middle">Bác thợ săn đi ngang qua nghe thấy tiếng lạ</text>
+</svg>

@@ -30,6 +30,9 @@ export default function StorybookPlayer() {
   const [playing, setPlaying] = useState(false)
   const [flipDir, setFlipDir] = useState<'next' | 'prev'>('next')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const utterRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const usingSpeechRef = useRef(false)   // trang hiện tại đang đọc bằng giọng máy (Web Speech)
+  const endRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     let alive = true
@@ -60,29 +63,57 @@ export default function StorybookPlayer() {
   const next = useCallback(() => goTo(page + 1, 'next'), [page, goTo])
   const prev = useCallback(() => goTo(page - 1, 'prev'), [page, goTo])
 
-  // ── Mode perPage: phát audio của trang hiện tại ──
+  // Đọc caption bằng giọng máy (vi-VN) khi trang chưa có file audio.
+  const speakCaption = useCallback((text: string) => {
+    const synth = window.speechSynthesis
+    if (!synth || !text) { setPlaying(false); return }
+    synth.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = 'vi-VN'
+    const vi = synth.getVoices().find((v) => (v.lang || '').toLowerCase().startsWith('vi'))
+    if (vi) u.voice = vi
+    u.rate = 0.96; u.pitch = 1.08
+    u.onstart = () => setPlaying(true)
+    u.onend = () => { setPlaying(false); endRef.current() }
+    utterRef.current = u
+    usingSpeechRef.current = true
+    synth.speak(u)
+  }, [])
+
+  // Nạp sẵn danh sách giọng + dọn dẹp khi rời trang
+  useEffect(() => {
+    window.speechSynthesis?.getVoices()
+    return () => { window.speechSynthesis?.cancel() }
+  }, [])
+
+  // ── Mode perPage: phát audio (hoặc đọc caption) của trang hiện tại ──
   useEffect(() => {
     if (!started || isNarration) return
     const a = audioRef.current
     const url = pages[page]?.audioUrl
-    if (!a) return
-    if (url) {
-      a.src = url
-      a.currentTime = 0
+    const cap = pages[page]?.caption
+    window.speechSynthesis?.cancel()
+    usingSpeechRef.current = false
+    if (url && a) {
+      a.src = url; a.currentTime = 0
       a.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+    } else if (cap) {
+      a?.removeAttribute('src')
+      speakCaption(cap)
     } else {
-      a.removeAttribute('src'); setPlaying(false)
+      a?.removeAttribute('src'); setPlaying(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, started, isNarration])
 
-  // perPage: nghe xong → tự sang trang
+  // perPage: nghe/đọc xong → tự sang trang
   const onEnded = useCallback(() => {
     setPlaying(false)
     if (!isNarration && book?.autoAdvance && !last) {
-      setTimeout(() => next(), 700)
+      setTimeout(() => next(), 800)
     }
   }, [isNarration, book?.autoAdvance, last, next])
+  useEffect(() => { endRef.current = onEnded }, [onEnded])
 
   // ── Mode narration: 1 file, tự lật theo timestamp ──
   const onTimeUpdate = useCallback(() => {
@@ -112,19 +143,28 @@ export default function StorybookPlayer() {
   }, [isNarration, book?.narrationUrl])
 
   const togglePlay = useCallback(() => {
+    if (usingSpeechRef.current) {
+      const synth = window.speechSynthesis
+      if (!synth) return
+      if (synth.paused) { synth.resume(); setPlaying(true) }
+      else if (synth.speaking) { synth.pause(); setPlaying(false) }
+      else { speakCaption(pages[page]?.caption || '') }
+      return
+    }
     const a = audioRef.current
     if (!a) return
     if (a.paused) { a.play().then(() => setPlaying(true)).catch(() => {}) }
     else { a.pause(); setPlaying(false) }
-  }, [])
+  }, [page, pages, speakCaption])
 
   const replay = useCallback(() => {
+    if (usingSpeechRef.current) { speakCaption(pages[page]?.caption || ''); return }
     const a = audioRef.current
     if (!a) return
     if (isNarration) { a.currentTime = (pages[page]?.flipAtSec ?? 0) }
     else { a.currentTime = 0 }
     a.play().then(() => setPlaying(true)).catch(() => {})
-  }, [isNarration, page, pages])
+  }, [isNarration, page, pages, speakCaption])
 
   // narration: prev/next seek audio tới mốc trang
   const seekToPage = useCallback((idx: number) => {

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3e0"/><stop offset="1" stop-color="#ffe6c7"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#w)"/>
+  <rect x="0" y="430" width="800" height="170" fill="#c98a5a"/>
+  <rect x="0" y="430" width="800" height="14" fill="#a9712f"/>
+  <rect x="70" y="120" width="200" height="150" rx="10" fill="#bfe7ff" stroke="#fff" stroke-width="8"/>
+  <line x1="170" y1="120" x2="170" y2="270" stroke="#fff" stroke-width="8"/>
+  <!-- mom -->
+  <g transform="translate(560,250)">
+    <path d="M-70 200 Q-78 40 0 18 Q78 40 70 200 Z" fill="#7e57c2"/>
+    <path d="M-50 200 Q-40 110 0 110 Q40 110 50 200 Z" fill="#fff" opacity=".85"/>
+    <circle cx="0" cy="-18" r="48" fill="#ffe0bd"/>
+    <path d="M-50 -24 Q0 -86 50 -24 Q44 -64 0 -66 Q-44 -64 -50 -24 Z" fill="#6d4c41"/>
+    <circle cx="-16" cy="-18" r="5" fill="#5b3b2a"/><circle cx="16" cy="-18" r="5" fill="#5b3b2a"/>
+    <path d="M-12 -2 Q0 8 12 -2" stroke="#c0392b" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- girl -->
+  <g transform="translate(300,300)">
+    <path d="M-50 165 Q-55 55 0 38 Q55 55 50 165 Z" fill="#e8362d"/>
+    <circle cx="0" cy="18" r="42" fill="#ffe0bd"/>
+    <path d="M-46 16 Q0 -38 46 16 Q36 -6 0 -10 Q-36 -6 -46 16 Z" fill="#e8362d"/>
+    <circle cx="-14" cy="20" r="5" fill="#5b3b2a"/><circle cx="14" cy="20" r="5" fill="#5b3b2a"/>
+    <path d="M-12 34 Q0 46 12 34" stroke="#c0392b" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="-24" cy="30" r="6" fill="#ff9a9a" opacity=".6"/><circle cx="24" cy="30" r="6" fill="#ff9a9a" opacity=".6"/>
+  </g>
+  <!-- basket handed in middle -->
+  <g transform="translate(430,360)"><ellipse cx="0" cy="0" rx="40" ry="26" fill="#c98a3e"/><path d="M-36 -2 A36 30 0 0 1 36 -2" fill="none" stroke="#a9712f" stroke-width="7"/><circle cx="-12" cy="-8" r="11" fill="#ffcf4d"/><circle cx="12" cy="-6" r="11" fill="#ff8fae"/><circle cx="0" cy="-12" r="9" fill="#a5d76e"/></g>
+  <g><rect x="190" y="36" width="420" height="70" rx="18" fill="#ffffff" opacity=".8"/>
+     <text x="400" y="82" font-family="'Comic Sans MS',sans-serif" font-size="30" font-weight="800" fill="#7e57c2" text-anchor="middle">Mẹ trao giỏ bánh cho Khăn Đỏ</text></g>
+</svg>

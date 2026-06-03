@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs><linearGradient id="s5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe6ff"/><stop offset="1" stop-color="#e9f7e2"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#s5)"/>
+  <path d="M0 470 Q400 440 800 470 L800 600 L0 600 Z" fill="#7fd06f"/>
+  <!-- grandma house far -->
+  <g transform="translate(560,250)">
+    <rect x="0" y="60" width="180" height="130" rx="8" fill="#ffd9a0"/>
+    <polygon points="-12,60 90,-10 192,60" fill="#e2604f"/>
+    <rect x="36" y="110" width="44" height="80" rx="6" fill="#a9602f"/>
+    <rect x="110" y="100" width="46" height="42" rx="6" fill="#bfe7ff" stroke="#fff" stroke-width="5"/>
+  </g>
+  <!-- trees -->
+  <rect x="90" y="300" width="34" height="150" fill="#7a4a24"/><circle cx="107" cy="290" r="64" fill="#3fa14a"/>
+  <!-- dust trail -->
+  <g fill="#cfa46a" opacity=".6"><circle cx="320" cy="430" r="14"/><circle cx="290" cy="445" r="11"/><circle cx="262" cy="432" r="9"/></g>
+  <!-- wolf running -->
+  <g transform="translate(380,330)">
+    <ellipse cx="0" cy="90" rx="100" ry="56" fill="#8d99ae"/>
+    <ellipse cx="78" cy="34" rx="50" ry="48" fill="#9aa6ba"/>
+    <polygon points="60,-6 72,-46 92,-8" fill="#9aa6ba"/><polygon points="98,-6 114,-44 122,-6" fill="#9aa6ba"/>
+    <circle cx="74" cy="30" r="6" fill="#2b2d42"/><circle cx="98" cy="30" r="6" fill="#2b2d42"/>
+    <ellipse cx="106" cy="48" rx="20" ry="14" fill="#cfd6e4"/><circle cx="120" cy="46" r="6" fill="#2b2d42"/>
+    <path d="M96 60 Q112 70 126 58" stroke="#2b2d42" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M-100 96 Q-150 70 -150 120 Q-128 110 -100 118 Z" fill="#8d99ae"/>
+    <!-- legs motion -->
+    <g stroke="#6b7689" stroke-width="14" stroke-linecap="round"><line x1="-30" y1="140" x2="-58" y2="170"/><line x1="40" y1="140" x2="66" y2="172"/></g>
+  </g>
+  <rect x="180" y="40" width="440" height="60" rx="16" fill="#fff" opacity=".82"/>
+  <text x="400" y="80" font-family="'Comic Sans MS',sans-serif" font-size="26" font-weight="800" fill="#6b7280" text-anchor="middle">Sói chạy thật nhanh đến nhà bà trước</text>
+</svg>

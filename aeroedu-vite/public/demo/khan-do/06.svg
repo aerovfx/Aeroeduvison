@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#f3e6d8"/>
+  <rect x="0" y="430" width="800" height="170" fill="#c98a5a"/>
+  <rect x="0" y="430" width="800" height="12" fill="#a9712f"/>
+  <rect x="80" y="120" width="150" height="120" rx="10" fill="#bfe7ff" stroke="#fff" stroke-width="8"/>
+  <!-- bed -->
+  <g>
+    <rect x="150" y="330" width="520" height="150" rx="14" fill="#9b6dd6"/>
+    <rect x="150" y="300" width="60" height="180" rx="10" fill="#7e4ec0"/>
+    <rect x="620" y="340" width="50" height="140" rx="10" fill="#7e4ec0"/>
+    <rect x="180" y="350" width="430" height="100" rx="14" fill="#fff4e6"/>
+    <path d="M180 450 L610 450 L610 360 Q400 340 180 360 Z" fill="#ffe0a3"/>
+    <!-- pillow + wolf-as-grandma -->
+    <ellipse cx="280" cy="360" rx="80" ry="40" fill="#fff"/>
+    <g transform="translate(280,350)">
+      <ellipse cx="0" cy="0" rx="56" ry="50" fill="#9aa6ba"/>
+      <path d="M-58 -10 Q0 -86 58 -10 Q58 -50 0 -54 Q-58 -50 -58 -10 Z" fill="#fff" opacity=".95"/>
+      <ellipse cx="0" cy="-56" rx="62" ry="22" fill="#f7d9e3"/>
+      <polygon points="-46,-30 -38,-66 -18,-34" fill="#9aa6ba"/><polygon points="18,-34 38,-66 46,-30" fill="#9aa6ba"/>
+      <circle cx="-18" cy="-2" r="14" fill="#fff"/><circle cx="18" cy="-2" r="14" fill="#fff"/>
+      <circle cx="-18" cy="-2" r="6" fill="#2b2d42"/><circle cx="18" cy="-2" r="6" fill="#2b2d42"/>
+      <rect x="-34" y="-8" width="68" height="3" fill="#6b7280"/>
+      <circle cx="-18" cy="-2" r="15" fill="none" stroke="#6b7280" stroke-width="3"/><circle cx="18" cy="-2" r="15" fill="none" stroke="#6b7280" stroke-width="3"/>
+      <ellipse cx="0" cy="20" rx="16" ry="12" fill="#cfd6e4"/><circle cx="0" cy="14" r="6" fill="#2b2d42"/>
+      <path d="M-14 30 Q0 40 14 30" stroke="#2b2d42" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+  </g>
+  <rect x="190" y="36" width="420" height="58" rx="16" fill="#fff" opacity=".85"/>
+  <text x="400" y="74" font-family="'Comic Sans MS',sans-serif" font-size="24" font-weight="800" fill="#7e4ec0" text-anchor="middle">Sói giả làm bà, nằm chờ trên giường</text>
+</svg>

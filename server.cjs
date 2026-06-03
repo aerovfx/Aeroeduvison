@@ -2968,7 +2968,33 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_pub ON "KidsStorybook"(published)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_owner ON "KidsStorybook"(owner_id)`);
   }
-  _ensureStorybookTable().catch((e) => console.error('[storybook] migration:', e.message));
+
+  // Seed truyện DEMO "Cô Bé Quàng Khăn Đỏ" (tranh SVG tĩnh + caption đọc bằng giọng máy)
+  async function _seedDemoStorybook() {
+    const pool = _getPool();
+    const demoPages = [
+      ['/demo/khan-do/01.svg', 'Ngày xửa ngày xưa, có một cô bé luôn quàng chiếc khăn đỏ xinh xắn nên mọi người gọi em là Cô Bé Quàng Khăn Đỏ.'],
+      ['/demo/khan-do/02.svg', 'Một hôm, mẹ đưa cho em một giỏ bánh và dặn: con mang đến biếu bà ngoại đang bị ốm nhé, nhớ đi thẳng đừng la cà.'],
+      ['/demo/khan-do/03.svg', 'Khăn Đỏ tung tăng đi vào rừng. Nắng vàng, hoa thơm, những chú bướm bay rập rờn thật là đẹp.'],
+      ['/demo/khan-do/04.svg', 'Bỗng nhiên, một con sói to lớn xuất hiện và hỏi bằng giọng ngọt ngào: cô bé ơi, cô đi đâu thế?'],
+      ['/demo/khan-do/05.svg', 'Khăn Đỏ ngây thơ trả lời rằng em đến thăm bà ngoại. Thế là sói liền chạy thật nhanh đến nhà bà trước.'],
+      ['/demo/khan-do/06.svg', 'Sói nhốt bà vào tủ rồi giả làm bà, đội mũ ngủ và nằm chờ trên giường.'],
+      ['/demo/khan-do/07.svg', 'Khi Khăn Đỏ hỏi sao tai bà to thế, sói định vồ lấy em. Vừa lúc đó, bác thợ săn đi ngang qua nghe thấy.'],
+      ['/demo/khan-do/08.svg', 'Bác thợ săn dũng cảm cứu được bà và Khăn Đỏ. Từ đó, Khăn Đỏ luôn nghe lời mẹ. Hết!'],
+    ].map(([imageUrl, caption], i) => ({ id: `khando-${i + 1}`, imageUrl, caption, audioUrl: '', flipAtSec: null }));
+    await pool.query(
+      `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
+       VALUES('demo-khan-do',$1,$2,$3,'perPage','',true,$4,true,'system-demo','AeroEduVision')
+       ON CONFLICT (id) DO NOTHING`,
+      ['Cô Bé Quàng Khăn Đỏ',
+       'Truyện cổ tích kinh điển — bé lật từng trang, vừa xem tranh vừa nghe kể chuyện. (Bản demo)',
+       '/demo/khan-do/01.svg', JSON.stringify(demoPages)]
+    );
+  }
+
+  _ensureStorybookTable()
+    .then(() => _seedDemoStorybook())
+    .catch((e) => console.error('[storybook] migration/seed:', e.message));
 
   const _sbAuth = (req) => {
     const auth = req.headers.authorization || '';
