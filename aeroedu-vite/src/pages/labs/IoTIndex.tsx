@@ -6,12 +6,12 @@
  * Circuit Arduino dùng route sẵn có /dashboard/iot-lab/sketch/:id (IoTLab tự mở
  * đúng mạch). Công cụ mô phỏng dùng các route con đã có.
  */
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Cpu, Wifi, Gauge, Wrench, BookOpen, Activity, Sigma, CircuitBoard, FileCode2,
-  Share2, Check, Lightbulb, Radio, Clock, Move3d, Ruler, Zap,
+  Lightbulb, Radio, Clock, Move3d, Ruler, Zap,
 } from 'lucide-react'
+import ShareMenu from '@/components/common/ShareMenu'
 
 type Group = 'arduino' | 'sensor' | 'network' | 'tools'
 interface IoTItem {
@@ -61,12 +61,6 @@ const GROUPS: { id: Group; label: string; emoji: string }[] = [
 const LEVEL_COLOR: Record<string, string> = { 'Dễ': '#22c55e', 'Trung bình': '#f59e0b', 'Nâng cao': '#ef4444' }
 
 export default function IoTIndex() {
-  const [copied, setCopied] = useState<string | null>(null)
-  const share = (e: React.MouseEvent, path: string) => {
-    e.preventDefault(); e.stopPropagation()
-    const url = `${window.location.origin}${path}`
-    navigator.clipboard?.writeText(url).then(() => { setCopied(path); setTimeout(() => setCopied(null), 1500) })
-  }
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-5 text-foreground">
       <div className="max-w-6xl mx-auto">
@@ -93,10 +87,9 @@ export default function IoTIndex() {
                   return (
                     <Link key={it.path} to={it.path}
                       className="group relative p-4 rounded-xl bg-slate-900/60 border border-border hover:border-cyan-500/50 hover:scale-[1.01] transition-all">
-                      <button onClick={(e) => share(e, it.path)} title="Chia sẻ / nhúng"
-                        className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-slate-800/80 text-slate-400 hover:text-cyan-300 hover:bg-slate-700 z-10">
-                        {copied === it.path ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
-                      </button>
+                      <div className="absolute top-2.5 right-2.5 z-10">
+                        <ShareMenu path={it.path} title={it.name} embeddable />
+                      </div>
                       <div className="flex items-start gap-3">
                         <div className="w-10 h-10 rounded-lg bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
                           <Icon className="w-5 h-5 text-cyan-300" />
