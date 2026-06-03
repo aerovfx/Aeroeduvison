@@ -28,7 +28,7 @@ import * as THREE from 'three'
 import { QRCodeSVG } from 'qrcode.react'
 import { tokenStore } from '@/services/api'
 import { useBroker } from '@/lib/broker-client'
-import { fetchOsmBuildings, type OsmBox } from '@/lib/osm-buildings'
+import { fetchOsmBuildings, OSM_PLACES, type OsmBox } from '@/lib/osm-buildings'
 
 // ── Multiplayer (Thách đấu) helpers ──
 type Peer = { name: string; pos: [number, number, number]; yaw: number; pitch: number; roll: number; t: number }
@@ -1055,6 +1055,7 @@ const PHYSICS = {
 
 function DroneRig({
   inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash, posRef, rotRef,
+  rechargeRef, boostRef, sizeMult, rangeMult, respawnRef,
 }: {
   inputs: React.MutableRefObject<ControlInputs>
   level: Level
@@ -2672,10 +2673,6 @@ function GameScreen({
   const enemySharedRef = useRef<EnemyShared | null>(null)
   const onShoot = useCallback(() => setAmmo(ammoRef.current), [])
   const onEnemyKill = useCallback(() => { setRunScore((s) => s + 40); setCollectMsg('💥 Hạ địch +40'); setTimeout(() => setCollectMsg(null), 1200) }, [])
-  const onPeerShot = useCallback((cid: string) => {
-    setRunScore((s) => s + 30); setCollectMsg('🎯 Bắn trúng +30'); setTimeout(() => setCollectMsg(null), 1200)
-    if (room) publish(topic, { kind: 'shot', cid: myCid, target: cid, by: myName })
-  }, [room, publish, topic, myCid, myName])
   const onMotherNear = useCallback(() => {
     rechargeRef.current = Math.max(rechargeRef.current, 1.5)
     if (ammoRef.current < AMMO_MAX) { ammoRef.current = AMMO_MAX; setAmmo(AMMO_MAX) }
@@ -2713,6 +2710,12 @@ function GameScreen({
       }
     },
   })
+
+  // Bị bắn trúng peer → cộng điểm + báo cho phòng (đặt SAU useBroker để publish/topic/myCid đã khai báo)
+  const onPeerShot = useCallback((cid: string) => {
+    setRunScore((s) => s + 30); setCollectMsg('🎯 Bắn trúng +30'); setTimeout(() => setCollectMsg(null), 1200)
+    if (room) publish(topic, { kind: 'shot', cid: myCid, target: cid, by: myName })
+  }, [room, publish, topic, myCid, myName])
 
   const finishRace = useCallback((elapsed: number) => {
     if (finishedRef.current) return

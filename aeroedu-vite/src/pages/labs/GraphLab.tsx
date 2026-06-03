@@ -659,7 +659,7 @@ function formatTick(v: number): string {
 }
 
 function Plot({
-  compiled, viewport, onViewportChange, height = 560, geo,
+  compiled, viewport, onViewportChange, height = 560, geo, curves,
 }: {
   compiled: Compiled[]
   viewport: { xMin: number; xMax: number; yMin: number; yMax: number }
