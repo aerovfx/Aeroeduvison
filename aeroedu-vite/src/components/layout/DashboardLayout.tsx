@@ -9,6 +9,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
 import { AntiScreenshotWarning } from '@/components/common/AntiScreenshotWarning'
+import LabShareFloating from '@/components/common/LabShareFloating'
 
 export function DashboardLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -27,6 +28,9 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Nút chia sẻ nổi cho các trang lab (IoT / Aura / Vẽ đồ thị / LabTwin) */}
+      <LabShareFloating />
 
       {/* Anti-screenshot warning overlay */}
       <AntiScreenshotWarning />

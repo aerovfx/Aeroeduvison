@@ -85,6 +85,7 @@ export function XRCanvas({
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Canvas
         {...rest}
+        gl={{ preserveDrawingBuffer: true, ...((rest as any).gl || {}) }}
         onCreated={(state) => {
           sceneRef.current = state.scene
           glRef.current = state.gl

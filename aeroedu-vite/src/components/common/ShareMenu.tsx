@@ -50,6 +50,28 @@ export default function ShareMenu({ path, title = 'AeroEduVision', embeddable = 
   }
   const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation() }
 
+  /** Ảnh gần như đồng nhất 1 màu (vd canvas WebGL không preserveDrawingBuffer → đen)
+   *  → coi là "trắng/đen trơn", bỏ qua để không lưu thumbnail xấu (giữ OG mặc định). */
+  const isMostlyBlank = (dataUrl: string): Promise<boolean> => new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const w = 40, h = 40
+        const c = document.createElement('canvas'); c.width = w; c.height = h
+        const ctx = c.getContext('2d'); if (!ctx) return resolve(false)
+        ctx.drawImage(img, 0, 0, w, h)
+        const d = ctx.getImageData(0, 0, w, h).data
+        const lum: number[] = []
+        for (let i = 0; i < d.length; i += 4) lum.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2])
+        const mean = lum.reduce((a, b) => a + b, 0) / lum.length
+        const variance = lum.reduce((a, b) => a + (b - mean) * (b - mean), 0) / lum.length
+        resolve(variance < 30)   // độ tương phản quá thấp → gần như trơn
+      } catch { resolve(false) }
+    }
+    img.onerror = () => resolve(false)
+    img.src = dataUrl
+  })
+
   /** Chụp màn hình phần tử captureNode → tải lên server làm thumbnail OG. */
   const captureAndUpload = async (): Promise<boolean> => {
     if (!captureNode) return false
@@ -60,10 +82,17 @@ export default function ShareMenu({ path, title = 'AeroEduVision', embeddable = 
       const dataUrl = await toPng(node, {
         cacheBust: true,
         pixelRatio: 1.5,
+        width: node.clientWidth || undefined,
+        height: node.clientHeight || undefined,
         backgroundColor: '#0a0f1e',
         // bỏ qua chính nút chia sẻ / phần đánh dấu không-chụp
         filter: (el) => !(el instanceof HTMLElement && el.dataset?.noCapture === '1'),
       })
+      if (await isMostlyBlank(dataUrl)) {
+        // WebGL không chụp được → giữ ảnh OG mặc định, không upload ảnh đen.
+        console.warn('[ShareMenu] capture gần như trơn (WebGL?) — bỏ qua thumbnail.')
+        return false
+      }
       await api.post('/api/share/snapshot', { path: url, image: dataUrl, title })
       setSnapped(true)
       return true
