@@ -26,7 +26,7 @@ function projKey(lat: number, lon: number, radius: number) {
   return `${lat.toFixed(4)},${lon.toFixed(4)},${radius}`
 }
 
-function parseHeight(tags: Record<string, string> | undefined): number {
+function parseHeight(tags: Record<string, string> | undefined, id = 0): number {
   if (!tags) return 9
   if (tags.height) {
     const m = parseFloat(tags.height)
@@ -41,7 +41,9 @@ function parseHeight(tags: Record<string, string> | undefined): number {
   const b = tags.building
   if (b === 'house' || b === 'detached' || b === 'garage') return 6
   if (b === 'apartments' || b === 'commercial' || b === 'office') return 18
-  return 9 + Math.random() * 6
+  // Pseudo-random DETERMINISTIC theo id (đồng bộ giữa người chơi cùng phòng)
+  const r = ((Math.imul(id || 1, 2654435761) >>> 0) % 1000) / 1000
+  return 9 + r * 6
 }
 
 /** Lat/lon → mét cục bộ quanh tâm (equirectangular). x: đông(+), z: nam(+). */
@@ -67,12 +69,16 @@ export async function fetchOsmBuildings(lat: number, lon: number, radius = 700):
   const query = buildQuery(lat, lon, radius)
   let data: any = null
   for (const url of MIRRORS) {
+    // Timeout client ~14s/mirror → không kẹt 'loading' nếu Overpass treo
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 14000)
     try {
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(query) })
+      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(query), signal: ctrl.signal })
+      clearTimeout(timer)
       if (!res.ok) continue
       data = await res.json()
       break
-    } catch { /* thử mirror kế */ }
+    } catch { clearTimeout(timer) /* thử mirror kế */ }
   }
   if (!data || !Array.isArray(data.elements)) return []
 
@@ -95,7 +101,7 @@ export async function fetchOsmBuildings(lat: number, lon: number, radius = 700):
     if (!ok) continue
     const w = maxX - minX, d = maxZ - minZ
     if (w < 1.5 || d < 1.5 || w > 400 || d > 400) continue // bỏ footprint lỗi/quá to
-    boxes.push({ cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, w, d, h: parseHeight(el.tags) })
+    boxes.push({ cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, w, d, h: parseHeight(el.tags, el.id) })
     if (boxes.length >= MAX_BOXES) break
   }
 
