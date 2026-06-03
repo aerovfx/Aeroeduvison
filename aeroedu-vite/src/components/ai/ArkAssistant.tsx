@@ -17,7 +17,7 @@
  *   - Phù hợp tư vấn / customer support / hỏi nhanh
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Loader2, Bot, User, Sparkles, Trash2 } from 'lucide-react'
+import { X, Send, Loader2, Bot, User, Sparkles, Trash2 } from 'lucide-react'
 import { api, tokenStore } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'react-hot-toast'
@@ -207,30 +207,8 @@ export default function ArkAssistant() {
 
   return (
     <>
-      {/* Floating bubble button (bottom-right) — bottom-20 mobile (above tab bar) */}
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          style={{ touchAction: 'manipulation' }}
-          className="fixed bottom-20 md:bottom-5 right-5 z-40
-                     w-14 h-14 rounded-full
-                     bg-gradient-to-br from-purple-500 via-pink-500 to-amber-500
-                     shadow-2xl border-2 border-white/20
-                     flex items-center justify-center
-                     hover:scale-110 transition active:scale-95
-                     animate-pulse hover:animate-none"
-          title="Trợ lý AI AeroEdu"
-        >
-          <MessageCircle className="w-6 h-6 text-white" />
-          {messages.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500
-                             border-2 border-zinc-950 text-white text-[10px] font-bold
-                             flex items-center justify-center">
-              {messages.length}
-            </span>
-          )}
-        </button>
-      )}
+      {/* Nút chat tròn đã GỠ — mở trợ lý bằng cách bấm vào mascot Aero (sự kiện
+          'aero:open-assistant'). Panel vẫn render bên dưới khi open=true. */}
 
       {/* Chat panel */}
       {open && (

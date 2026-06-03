@@ -18,7 +18,8 @@ import ShareMenu from './ShareMenu'
 //  - /dashboard/aura/<simId>        (chỉ khi mở 1 sim)
 //  - /dashboard/graph-lab
 //  - /dashboard/labtwin/<sim>       (từng sim; index /dashboard/labtwin loại trừ)
-const LAB_DETAIL_RE = /^\/dashboard\/(iot-lab\/(?!sketch\/|arduino\/).+|aura\/.+|graph-lab|labtwin\/.+)$/
+// (aura: loại trừ fpv-drone-vr — màn game toàn màn hình, nút share che điều khiển)
+const LAB_DETAIL_RE = /^\/dashboard\/(iot-lab\/(?!sketch\/|arduino\/).+|aura\/(?!fpv-drone-vr).+|graph-lab|labtwin\/.+)$/
 
 export default function LabShareFloating() {
   const { pathname } = useLocation()

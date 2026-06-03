@@ -193,6 +193,11 @@ export default function Mascot() {
   const hide = (e: React.MouseEvent) => { e.stopPropagation(); setHidden(true); sessionStorage.setItem('aero_hidden', '1') }
   const show = () => { setHidden(false); sessionStorage.removeItem('aero_hidden'); say('Mình quay lại rồi! 🛸', 2500) }
 
+  // Ẩn mascot ở các màn TƯƠNG TÁC toàn màn hình (drone/sim/game/lab/đồ thị/KG 3D/
+  // phòng thi) vì nó che điều khiển. Chỉ hiện ở bài học + màn hướng dẫn + trang thường.
+  const ROUTE_HIDE = /^\/dashboard\/(aura|games|graph-lab|knowledge-graph)(\/|$)|^\/dashboard\/(labtwin|iot-lab)\/[^/]+|^\/exam(-sheet)?\//
+  if (ROUTE_HIDE.test(pathname)) return null
+
   if (hidden) {
     return (
       <button onClick={show} title="Hiện mascot Aero" style={{

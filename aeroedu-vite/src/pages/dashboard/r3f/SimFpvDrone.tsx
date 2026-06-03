@@ -1097,7 +1097,8 @@ function DroneRig({
     sm.pitch += (i.pitch - sm.pitch) * ai
     sm.roll += (i.roll - sm.roll) * ai
 
-    s.yaw += sm.yaw * PHYSICS.yawRate * dt
+    // Yaw: đẩy TRÁI → xoay TRÁI (trừ vì +X thế giới = bên trái màn hình ở góc nhìn FPV)
+    s.yaw -= sm.yaw * PHYSICS.yawRate * dt
     // pitch/roll tiến mượt về góc mục tiêu (ease) thay vì gán tức thì
     const ab = smooth(dt, 0.10)
     s.pitch += (sm.pitch * 0.5 - s.pitch) * (ab + (1 - ab) * 0) // ease tới target
@@ -2233,8 +2234,8 @@ function GameHUD({
       <div style={bracket({ bottom: 14, left: 14, borderWidth: '0 0 2px 2px' })} />
       <div style={bracket({ bottom: 14, right: 14, borderWidth: '0 2px 2px 0' })} />
 
-      {/* La bàn trên đỉnh */}
-      <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)' }}>
+      {/* La bàn — đẩy xuống dưới bảng chỉ số ở đỉnh */}
+      <div style={{ position: 'absolute', top: 52, left: '50%', transform: 'translateX(-50%)' }}>
         <HudCompass heading={heading} />
       </div>
 
@@ -3039,11 +3040,12 @@ function GameScreen({
           </div>
         )}
 
-        {/* Bảng chỉ số Drone (kiểu game đua xe) */}
+        {/* Bảng chỉ số Drone — đặt TRÊN ĐỈNH (đáy nhường cho joystick), cuộn ngang nếu hẹp */}
         <div style={{
-          position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10,
-          display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(8,30,38,0.78)',
-          border: '1px solid rgba(34,211,238,0.3)', borderRadius: 12, padding: '8px 14px', fontFamily: 'monospace',
+          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', zIndex: 12,
+          display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(8,30,38,0.82)',
+          border: '1px solid rgba(34,211,238,0.3)', borderRadius: 10, padding: '5px 10px', fontFamily: 'monospace',
+          maxWidth: '94vw', overflowX: 'auto',
         }}>
           {(() => {
             const spd = telemetry ? telemetry.vel.length() * 3.6 : 0
@@ -3149,6 +3151,28 @@ function GameScreen({
           background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)',
           color: '#fca5a5', borderRadius: 6, cursor: 'pointer', fontSize: 12, zIndex: 10,
         }}>← Thoát</button>
+        {/* Nút xoay ngang / toàn màn hình — tăng diện tích chơi (Android/desktop;
+            iOS Safari không khoá được hướng nên là no-op an toàn, user xoay tay). */}
+        <button
+          onClick={async () => {
+            try {
+              if (document.fullscreenElement) {
+                try { (screen.orientation as any)?.unlock?.() } catch { /* */ }
+                await document.exitFullscreen()
+              } else {
+                const el = document.documentElement as any
+                if (el.requestFullscreen) await el.requestFullscreen()
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
+                try { await (screen.orientation as any)?.lock?.('landscape') } catch { /* */ }
+              }
+            } catch { /* */ }
+          }}
+          title="Xoay ngang / Toàn màn hình (tăng diện tích chơi)"
+          style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 12, width: 40, height: 30,
+            background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.4)',
+            color: '#7dd3fc', borderRadius: 8, cursor: 'pointer', fontSize: 15,
+          }}>⤢</button>
       </div>
     </KeyboardControls>
   )
