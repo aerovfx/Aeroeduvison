@@ -26,7 +26,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars, Text, KeyboardControls, useKeyboardControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { QRCodeSVG } from 'qrcode.react'
-import { tokenStore } from '@/services/api'
+import { tokenStore, api } from '@/services/api'
 import { useBroker } from '@/lib/broker-client'
 import { fetchOsmBuildings, OSM_PLACES, type OsmBox } from '@/lib/osm-buildings'
 
@@ -76,15 +76,12 @@ function makeMapLevel(name: string, lat: number, lon: number): Level {
     hint: 'Đua qua các cổng giữa thành phố thật. Né toà nhà (box từ OSM). Theo mũi tên chỉ đường.',
   }
 }
-// Geocode tên địa danh → toạ độ (Nominatim/OSM)
+// Geocode tên địa danh → toạ độ. Gọi BACKEND proxy (/api/geocode) thay vì Nominatim
+// trực tiếp: server gắn User-Agent đúng policy + cache + rate-limit ≤1 req/s → tránh ban.
 async function geocodePlace(q: string): Promise<{ name: string; lat: number; lon: number }[]> {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`, {
-      headers: { 'Accept-Language': 'vi' },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data as any[]).map((d) => ({ name: d.display_name as string, lat: +d.lat, lon: +d.lon }))
+    const { data } = await api.get('/geocode', { params: { q } })
+    return Array.isArray(data?.results) ? data.results : []
   } catch { return [] }
 }
 

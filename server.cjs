@@ -3186,6 +3186,70 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
 // Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.
 app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], count: 0 }));
 
+// ── Geocode proxy (Nominatim/OSM) — TRƯỚC proxy ──
+// Tìm địa danh cho map drone. Proxy qua server để: (1) gắn User-Agent đúng
+// Nominatim usage policy (browser cấm set UA → dễ bị ban nếu gọi thẳng);
+// (2) cache + rate-limit ≤1 req/s toàn cục (theo policy).
+;(() => {
+  const cache = new Map();                 // q(lower) → { at, data }
+  const TTL = 24 * 60 * 60 * 1000;         // toạ độ địa danh ổn định → cache 24h
+  const MIN_GAP = 1100;                    // ≥1.1s giữa 2 lần gọi Nominatim
+  let lastCall = 0;
+  let queue = Promise.resolve();           // serialize upstream calls
+
+  function throttled(fn) {
+    const run = queue.then(async () => {
+      const wait = lastCall + MIN_GAP - Date.now();
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      lastCall = Date.now();
+      return fn();
+    });
+    queue = run.then(() => {}, () => {});   // không vỡ chuỗi khi 1 request lỗi
+    return run;
+  }
+
+  async function nominatim(q) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'AeroEduVision/1.0 (https://inphysic.com; thegioithu2@gmail.com)',
+          'Accept-Language': 'vi',
+          'Referer': 'https://inphysic.com',
+        },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!r.ok) return [];
+      const data = await r.json();
+      if (!Array.isArray(data)) return [];
+      return data
+        .map((d) => ({ name: d.display_name, lat: +d.lat, lon: +d.lon }))
+        .filter((d) => Number.isFinite(d.lat) && Number.isFinite(d.lon));
+    } catch { clearTimeout(timer); return []; }
+  }
+
+  app.get('/api/geocode', async (req, res) => {
+    try {
+      const q = String(req.query.q || '').trim().slice(0, 120);
+      if (!q) return res.json({ results: [] });
+      const key = q.toLowerCase();
+      const hit = cache.get(key);
+      if (hit && Date.now() - hit.at < TTL) return res.json({ results: hit.data });
+      const results = await throttled(() => nominatim(q));
+      cache.set(key, { at: Date.now(), data: results });
+      if (cache.size > 800) cache.delete(cache.keys().next().value);
+      return res.json({ results });
+    } catch (e) {
+      console.error('[geocode]', e.message);
+      return res.json({ results: [] });
+    }
+  });
+})();
+
+
 // ── Learning Paths (LearningPathBuilder.tsx) — TRƯỚC proxy ──
 ;(() => {
   async function _ensureLPTable() {
