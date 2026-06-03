@@ -2877,6 +2877,69 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       return res.status(500).json({ error: 'Lỗi tạo signed URL: ' + e.message });
     }
   });
+
+  // ── Share snapshot: nhận ảnh chụp màn hình (dataURL) → tải lên GCS, lưu mapping
+  //    path → image_url để server gắn vào og:image/twitter:image cho social crawler.
+  async function _ensureShareSnapTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ShareSnapshot" (
+        path        TEXT PRIMARY KEY,
+        image_url   TEXT NOT NULL,
+        title       TEXT,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+  }
+  _ensureShareSnapTable().catch((e) => console.error('[share:snapshot] migration:', e.message));
+
+  app.post('/api/share/snapshot', async (req, res) => {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+      try { _akVerify(auth.slice(7)); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+      let { path: p, image, title } = req.body || {};
+      if (!p || !image) return res.status(400).json({ error: 'Thiếu path/image' });
+
+      // Chuẩn hoá path → chỉ giữ pathname (khớp với req.path lúc crawler ghé).
+      p = String(p);
+      if (!p.startsWith('/')) { try { p = new URL(p).pathname; } catch { /* giữ nguyên */ } }
+      p = p.split('#')[0].split('?')[0].slice(0, 300);
+
+      const m = /^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/.exec(String(image));
+      if (!m) return res.status(400).json({ error: 'image phải là dataURL png/jpeg/webp' });
+      const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+      const buf = Buffer.from(m[2], 'base64');
+      if (buf.length > 4 * 1024 * 1024) return res.status(413).json({ error: 'Ảnh quá lớn (>4MB)' });
+
+      const storage = _getStorage();
+      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha1').update(p).digest('hex').slice(0, 16);
+      const gcsPath = `share-thumbs/${hash}.${ext}`;
+      const file = storage.bucket(BUCKET).file(gcsPath);
+      await file.save(buf, {
+        resumable: false,
+        contentType: `image/${m[1] === 'jpg' ? 'jpeg' : m[1]}`,
+        metadata: { cacheControl: 'public, max-age=86400' },
+      });
+      const cleanUrl = `https://storage.googleapis.com/${BUCKET}/${gcsPath}`;
+
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "ShareSnapshot"(path, image_url, title, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (path) DO UPDATE SET image_url = EXCLUDED.image_url, title = EXCLUDED.title, updated_at = NOW()`,
+        [p, cleanUrl, title ? String(title).slice(0, 200) : null]
+      );
+      // Cache-bust ở client (FB/X tự refresh OG theo URL sạch).
+      return res.json({ ok: true, url: `${cleanUrl}?v=${Date.now()}` });
+    } catch (e) {
+      console.error('[share:snapshot]', e.message);
+      return res.status(500).json({ error: e.message });
+    }
+  });
 })();
 
 // ── Stub student-cams (camera webcam HS làm bài) — TRƯỚC proxy ──
@@ -16519,7 +16582,53 @@ app.use(express.static(distDir, {
 }));
 
 // ── SPA Fallback → index.html ───────────────────────────────
-app.use((_req, res) => {
+// Với SOCIAL CRAWLER (Facebook/X/Telegram/Zalo…) ta tra ShareSnapshot theo path
+// và CHÈN og:image/twitter:image/og:title = ảnh chụp màn hình đã tải lên → bài
+// chia sẻ có thumbnail đúng thí nghiệm. Người dùng thường vẫn nhận index.html tĩnh.
+const _SOCIAL_CRAWLER_RE = /(facebookexternalhit|facebookcatalog|Facebot|Twitterbot|Slackbot|TelegramBot|WhatsApp|LinkedInBot|Discordbot|Pinterest|redditbot|Zalo|SkypeUriPreview|vkShare|Applebot|Googlebot|bingbot|Embedly|Iframely)/i;
+let _indexHtmlCache = null;
+function _getIndexHtml() {
+  if (_indexHtmlCache == null) {
+    try { _indexHtmlCache = require('fs').readFileSync(path.join(distDir, 'index.html'), 'utf8'); }
+    catch { _indexHtmlCache = ''; }
+  }
+  return _indexHtmlCache;
+}
+function _escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+async function _getShareSnapshot(p) {
+  try {
+    const r = await _getPool().query(`SELECT image_url, title FROM "ShareSnapshot" WHERE path = $1`, [p]);
+    return r.rows[0] || null;
+  } catch { return null; }
+}
+app.use(async (req, res) => {
+  const ua = req.headers['user-agent'] || '';
+  if (_SOCIAL_CRAWLER_RE.test(ua)) {
+    const html = _getIndexHtml();
+    if (html) {
+      try {
+        const snap = await _getShareSnapshot(req.path);
+        if (snap && snap.image_url) {
+          const img = _escAttr(snap.image_url);
+          const pageUrl = _escAttr('https://inphysic.com' + req.path);
+          let out = html
+            .replace(/(<meta property="og:image" content=")[^"]*(")/i, `$1${img}$2`)
+            .replace(/(<meta name="twitter:image" content=")[^"]*(")/i, `$1${img}$2`)
+            .replace(/(<meta property="og:url" content=")[^"]*(")/i, `$1${pageUrl}$2`);
+          if (snap.title) {
+            const t = _escAttr(snap.title + ' — AeroEduVision');
+            out = out
+              .replace(/(<meta property="og:title" content=")[^"]*(")/i, `$1${t}$2`)
+              .replace(/(<meta name="twitter:title" content=")[^"]*(")/i, `$1${t}$2`);
+          }
+          res.setHeader('Cache-Control', 'no-store');
+          return res.type('html').send(out);
+        }
+      } catch (e) { /* fall through tới sendFile */ }
+    }
+  }
   res.sendFile(path.join(distDir, 'index.html'));
 });
 

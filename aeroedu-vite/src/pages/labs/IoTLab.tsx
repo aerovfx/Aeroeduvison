@@ -21,6 +21,7 @@ import SemiconductorLab from './SemiconductorLab'
 import CustomWokwiBoard from './CustomWokwiBoard'
 import AnalogCircuitBuilder from '@/components/iot/AnalogCircuitBuilder'
 import usePageTitle from '@/hooks/usePageTitle'
+import ShareMenu from '@/components/common/ShareMenu'
 
 // ───────────────────────────────────────────────────────────────────
 // Types
@@ -1328,6 +1329,7 @@ export default function IoTLab() {
 
   const lastTickRef = useRef<number>(performance.now())
   const rafRef = useRef<number | null>(null)
+  const labRef = useRef<HTMLDivElement | null>(null)   // vùng chụp ảnh thumbnail khi chia sẻ
 
   const active = useMemo(
     () => CIRCUITS.find(c => c.id === activeId) ?? CIRCUITS[0],
@@ -1418,7 +1420,7 @@ export default function IoTLab() {
   }
 
   return (
-    <div className="min-h-screen bg-background dark:bg-gradient-to-b dark:from-zinc-950 dark:via-slate-950 dark:to-zinc-950 text-foreground">
+    <div ref={labRef} className="min-h-screen bg-background dark:bg-gradient-to-b dark:from-zinc-950 dark:via-slate-950 dark:to-zinc-950 text-foreground">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {!embed && (
@@ -1429,14 +1431,22 @@ export default function IoTLab() {
           >
             <ChevronLeft className="w-4 h-4" /> Tất cả thí nghiệm IoT
           </Link>
-          <Link
-            to="/dashboard/iot-lab/emulator"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white inline-flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] transition-transform"
-            title="Viết code Arduino C++ → chạy real-time trong browser"
-          >
-            <Zap className="w-3.5 h-3.5" /> Arduino Emulator
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/15 ml-1">⚡ NEW</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ShareMenu
+              path={`/dashboard/iot-lab/sketch/${activeId}`}
+              title={active.name}
+              embeddable
+              captureNode={() => labRef.current}
+            />
+            <Link
+              to="/dashboard/iot-lab/emulator"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white inline-flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] transition-transform"
+              title="Viết code Arduino C++ → chạy real-time trong browser"
+            >
+              <Zap className="w-3.5 h-3.5" /> Arduino Emulator
+              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/15 ml-1">⚡ NEW</span>
+            </Link>
+          </div>
         </div>
         )}
 
