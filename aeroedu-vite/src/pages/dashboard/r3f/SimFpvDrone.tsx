@@ -1337,7 +1337,7 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
 
   return (
     <div style={{
-      position: 'absolute', bottom: 24, [side]: 24,
+      position: 'absolute', bottom: 70, [side]: 24,
       width: RADIUS * 2 + 20, padding: 10,
       pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
     } as React.CSSProperties}>
@@ -3129,7 +3129,7 @@ function GameScreen({
           onPointerUp={() => { inputsRef.current.fire = false }}
           onPointerLeave={() => { inputsRef.current.fire = false }}
           style={{
-            position: 'absolute', bottom: 110, right: 30, zIndex: 11, width: 68, height: 68, borderRadius: '50%',
+            position: 'absolute', bottom: 220, right: 30, zIndex: 11, width: 68, height: 68, borderRadius: '50%',
             background: 'rgba(239,68,68,0.35)', border: '2px solid rgba(239,68,68,0.8)', color: '#fff',
             fontSize: 26, cursor: 'pointer', userSelect: 'none', touchAction: 'none', pointerEvents: 'auto',
           }}>🔫</button>
@@ -3201,12 +3201,12 @@ function GameScreen({
               }
             } catch { /* */ }
           }}
-          title="Xoay ngang / Toàn màn hình (tăng diện tích chơi)"
+          title="Mở rộng toàn màn hình / xoay ngang (tăng diện tích chơi)"
           style={{
-            position: 'absolute', top: 12, right: 12, zIndex: 12, width: 40, height: 30,
-            background: 'rgba(8,30,38,0.6)', border: '1px solid rgba(34,211,238,0.4)',
-            color: '#7dd3fc', borderRadius: 8, cursor: 'pointer', fontSize: 15,
-          }}>⤢</button>
+            position: 'absolute', top: 10, right: 12, zIndex: 12, width: 48, height: 34,
+            background: 'rgba(8,30,38,0.7)', border: '1px solid rgba(34,211,238,0.55)',
+            color: '#7dd3fc', borderRadius: 8, cursor: 'pointer', fontSize: 19, lineHeight: 1,
+          }}>⛶</button>
       </div>
     </KeyboardControls>
   )
