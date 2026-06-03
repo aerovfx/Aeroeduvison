@@ -57,13 +57,13 @@ export default function AeroKids() {
           }}>
             <ArrowLeft size={14} /> Trang chủ
           </Link>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: KIDS.accent }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: KIDS.accent }}>
             🐭 AeroKids — Phiêu lưu cùng Aero
           </h1>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             background: `${KIDS.primary}25`, padding: '6px 12px', borderRadius: 999,
-            fontSize: 13, fontWeight: 800, color: '#92400e',
+            fontSize: 15, fontWeight: 800, color: '#92400e',
           }}>
             <Trophy size={14} /> {completedCount}/50 tập
           </div>
@@ -99,7 +99,7 @@ export default function AeroKids() {
             <h2 style={{ fontSize: 32, fontWeight: 900, margin: '0 0 6px', color: KIDS.text }}>
               Chào! Mình là <span style={{ color: KIDS.accent }}>Aero</span>!
             </h2>
-            <p style={{ fontSize: 15, lineHeight: 1.6, color: KIDS.muted, margin: '0 0 16px', maxWidth: 600 }}>
+            <p style={{ fontSize: 18, lineHeight: 1.6, color: KIDS.muted, margin: '0 0 16px', maxWidth: 600 }}>
               Mình là bé chinchilla 6 tuổi, thích thí nghiệm và khám phá thế giới.
               Cùng mình đi qua <strong style={{ color: KIDS.accent }}>50 cuộc phiêu lưu</strong> để học
               kỹ năng sống, an toàn, đạo đức, khoa học và năng lực số nhé! 🚀
@@ -120,8 +120,8 @@ export default function AeroKids() {
                 }}>
                   <span style={{ fontSize: 22 }}>{s.icon}</span>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: KIDS.text }}>{s.value}</div>
-                    <div style={{ fontSize: 11, color: KIDS.muted }}>{s.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: KIDS.text }}>{s.value}</div>
+                    <div style={{ fontSize: 14, color: KIDS.muted }}>{s.label}</div>
                   </div>
                 </div>
               ))}
@@ -140,7 +140,7 @@ export default function AeroKids() {
             <span style={{ fontSize: 44 }}>📖</span>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 2 }}>Truyện tranh có giọng kể</div>
-              <div style={{ fontSize: 14, opacity: 0.92 }}>
+              <div style={{ fontSize: 17, opacity: 0.92 }}>
                 Lật từng trang, vừa xem tranh vừa nghe cô/thầy kể chuyện. Do giáo viên biên tập 💛
               </div>
             </div>
@@ -155,7 +155,7 @@ export default function AeroKids() {
 
         {/* ── Season tabs (5 cards lớn) ── */}
         <section style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 900, margin: '0 0 12px', color: KIDS.text }}>
+          <h3 style={{ fontSize: 22, fontWeight: 900, margin: '0 0 12px', color: KIDS.text }}>
             🎬 Chọn mùa phiêu lưu
           </h3>
           <div style={{
@@ -181,13 +181,13 @@ export default function AeroKids() {
                   }}
                 >
                   <div style={{ fontSize: 36, marginBottom: 4 }}>{s.emoji}</div>
-                  <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 2 }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 2 }}>
                     MÙA {s.number}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
                     {s.title}
                   </div>
-                  <div style={{ fontSize: 11, opacity: 0.85 }}>
+                  <div style={{ fontSize: 14, opacity: 0.85 }}>
                     👶 {s.ageGroup} tuổi · 🎬 {seasonProgress}/{s.episodes.length} tập
                   </div>
                 </button>
@@ -211,7 +211,7 @@ export default function AeroKids() {
             <h3 style={{ fontSize: 22, fontWeight: 900, margin: 0, color: KIDS.text }}>
               {activeSeason.title}
             </h3>
-            <span style={{ fontSize: 13, color: KIDS.muted }}>
+            <span style={{ fontSize: 16, color: KIDS.muted }}>
               · {activeSeason.theme}
             </span>
           </div>
@@ -238,10 +238,10 @@ export default function AeroKids() {
           background: 'rgba(255,255,255,0.85)',
           border: `2px dashed ${KIDS.primary}80`,
         }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 900, color: KIDS.text, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Heart size={18} style={{ color: KIDS.accent }} /> Dành cho phụ huynh
+          <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 900, color: KIDS.text, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Heart size={20} style={{ color: KIDS.accent }} /> Dành cho phụ huynh
           </h3>
-          <p style={{ margin: 0, fontSize: 13, color: KIDS.muted, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: 16, color: KIDS.muted, lineHeight: 1.6 }}>
             AeroKids là series giáo dục VIỆT NAM dành cho trẻ 4-10 tuổi, dạy 5 chủ đề cốt lõi
             (vệ sinh / an toàn / đạo đức / khoa học / năng lực số) qua câu chuyện vui nhộn.
             Mỗi tập 6-8 phút + 3 câu đố củng cố kiến thức. Khuyến khích PH xem cùng con để
@@ -343,10 +343,10 @@ function EpisodeCard({ episode, episodeIndex, seasonColor, isCompleted }: {
         }}>
           TẬP {episode.episode} · {episode.ageGroup} TUỔI
         </div>
-        <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: KIDS.text, lineHeight: 1.3 }}>
+        <h4 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 800, color: KIDS.text, lineHeight: 1.3 }}>
           {episode.title}
         </h4>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: KIDS.muted, lineHeight: 1.5, flex: 1 }}>
+        <p style={{ margin: '0 0 10px', fontSize: 15, color: KIDS.muted, lineHeight: 1.5, flex: 1 }}>
           🎯 <strong>Kỹ năng:</strong> {episode.skill}
         </p>
 
@@ -355,11 +355,11 @@ function EpisodeCard({ episode, episodeIndex, seasonColor, isCompleted }: {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           paddingTop: 8, borderTop: '1px solid #f3f4f6',
         }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: KIDS.muted }}>
-            <Clock size={12} /> {Math.round(episode.durationSec / 60)} phút
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, color: KIDS.muted }}>
+            <Clock size={14} /> {Math.round(episode.durationSec / 60)} phút
           </span>
           <span style={{
-            display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, fontWeight: 700,
             color: isCompleted ? '#10b981' : seasonColor,
           }}>
             {isCompleted
