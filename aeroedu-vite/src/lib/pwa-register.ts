@@ -40,15 +40,21 @@ export async function registerPwa(): Promise<PwaRegistrationResult> {
     const { Workbox } = await import('workbox-window')
     const wb = new Workbox('/sw.js', { scope: '/' })
 
-    // Update available → emit event
+    // TỰ ĐỘNG cập nhật: khi có bản mới (SW vào "waiting") → skipWaiting NGAY thay
+    // vì chờ banner (banner chưa implement) → tránh kẹt bản cũ trong cache PWA.
     wb.addEventListener('waiting', () => {
       updateAvailable = true
       window.dispatchEvent(new CustomEvent('pwa:update-available'))
-      console.info('[pwa] New version waiting — emit pwa:update-available')
+      console.info('[pwa] New version → tự skipWaiting (auto-update)')
+      wb.messageSkipWaiting()
     })
 
-    // After user accepts update + reload
+    // SW mới kiểm soát trang → reload nạp bản mới. Chỉ xảy ra khi UPDATE (không
+    // ở lần cài đầu) nên không gây reload thừa; guard tránh reload lặp.
+    let reloaded = false
     wb.addEventListener('controlling', () => {
+      if (reloaded) return
+      reloaded = true
       window.location.reload()
     })
 
