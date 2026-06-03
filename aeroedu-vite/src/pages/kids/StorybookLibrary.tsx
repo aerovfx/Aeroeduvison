@@ -10,6 +10,7 @@ import { BookOpen, Plus, Pencil, Loader2, Volume2, Home, Sparkles, Eye } from 'l
 import { listStorybooks } from '@/services/storybook.service'
 import type { Storybook } from '@/types/storybook'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import ShareMenu from '@/components/common/ShareMenu'
 
 export default function StorybookLibrary() {
   const navigate = useNavigate()
@@ -46,6 +47,9 @@ export default function StorybookLibrary() {
           {b.ownerName && <div className="text-[11px] text-slate-400 mt-1 truncate">GV: {b.ownerName}</div>}
         </div>
       </Link>
+      <div className="absolute top-2 left-2 z-10">
+        <ShareMenu path={`/kids/storybooks/${b.id}`} title={b.title} embeddable />
+      </div>
       {manage && (
         <div className="absolute top-2 right-2 flex gap-1.5">
           {!b.published && <span className="px-2 py-0.5 rounded-full bg-amber-400 text-white text-[10px] font-black shadow">NHÁP</span>}

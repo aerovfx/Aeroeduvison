@@ -14,10 +14,13 @@ import {
 } from 'lucide-react'
 import { getStorybook } from '@/services/storybook.service'
 import type { Storybook } from '@/types/storybook'
+import ShareMenu from '@/components/common/ShareMenu'
 
 export default function StorybookPlayer() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const embed = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('embed') === '1'
+  const bookRef = useRef<HTMLDivElement | null>(null)   // vùng chụp thumbnail khi chia sẻ
   const [book, setBook] = useState<Storybook | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -164,13 +167,19 @@ export default function StorybookPlayer() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-sky-200 via-indigo-100 to-amber-100 select-none">
       {/* Thanh trên */}
       <div className="flex items-center gap-2 px-4 py-3">
-        <button onClick={() => navigate('/kids/storybooks')}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/80 text-slate-700 font-bold shadow hover:bg-white">
-          <Home className="w-4 h-4" /> <span className="hidden sm:inline">Thư viện</span>
-        </button>
+        {!embed && (
+          <button onClick={() => navigate('/kids/storybooks')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/80 text-slate-700 font-bold shadow hover:bg-white">
+            <Home className="w-4 h-4" /> <span className="hidden sm:inline">Thư viện</span>
+          </button>
+        )}
         <h1 className="flex-1 text-center text-lg sm:text-2xl font-black text-indigo-700 truncate drop-shadow-sm">
           {book.title}
         </h1>
+        {!embed && (
+          <ShareMenu path={`/kids/storybooks/${book.id}`} title={book.title} embeddable
+            captureNode={() => bookRef.current} />
+        )}
         <div className="px-3.5 py-2 rounded-full bg-white/80 text-indigo-600 font-black shadow text-sm">
           {page + 1}/{total}
         </div>
@@ -183,7 +192,7 @@ export default function StorybookPlayer() {
           <ChevronLeft className="w-8 h-8" />
         </button>
 
-        <div className="relative w-full max-w-3xl" style={{ perspective: '1800px' }}>
+        <div ref={bookRef} className="relative w-full max-w-3xl" style={{ perspective: '1800px' }}>
           <div
             key={page}
             className="relative rounded-3xl overflow-hidden shadow-2xl bg-white border-4 border-white"
