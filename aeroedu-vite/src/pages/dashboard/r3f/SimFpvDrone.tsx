@@ -1049,8 +1049,11 @@ interface DroneState {
 }
 interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number; fire?: boolean }
 const PHYSICS = {
-  thrustGain: 25, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
-  airDrag: 0.92, gravity: 9.81, maxAltitude: 80, batteryDrain: 0.5,
+  // FPV thật đạt 300-400 km/h: lực đẩy cao + cản RẤT thấp (airDrag gần 1 = giữ đà)
+  thrustGain: 42, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
+  airDrag: 0.992, gravity: 9.81, maxAltitude: 150, batteryDrain: 0.5,
+  pitchAngle: 0.95, rollAngle: 0.7,   // dive dốc tới ~54° để lao nhanh kiểu kamikaze
+  maxSpeed: 116,                       // ~418 km/h (m/s) — trần tốc độ an toàn
 }
 
 function DroneRig({
@@ -1091,7 +1094,7 @@ function DroneRig({
     const i = inputs.current
     const sm = inSmooth.current
     // Input low-pass → cảm giác mượt, không "bụp" như UE5 (frame-independent)
-    const ai = smooth(dt, 0.12)
+    const ai = smooth(dt, 0.10)
     sm.throttle += (i.throttle - sm.throttle) * ai
     sm.yaw += (i.yaw - sm.yaw) * ai
     sm.pitch += (i.pitch - sm.pitch) * ai
@@ -1099,10 +1102,10 @@ function DroneRig({
 
     // Yaw: đẩy TRÁI → xoay TRÁI (trừ vì +X thế giới = bên trái màn hình ở góc nhìn FPV)
     s.yaw -= sm.yaw * PHYSICS.yawRate * dt
-    // pitch/roll tiến mượt về góc mục tiêu (ease) thay vì gán tức thì
-    const ab = smooth(dt, 0.10)
-    s.pitch += (sm.pitch * 0.5 - s.pitch) * (ab + (1 - ab) * 0) // ease tới target
-    s.roll += (sm.roll * 0.5 - s.roll) * ab
+    // pitch/roll tiến nhanh-mượt về góc mục tiêu (FPV: nghiêng dốc hơn, phản hồi nhạy hơn)
+    const ab = smooth(dt, 0.08)
+    s.pitch += (sm.pitch * PHYSICS.pitchAngle - s.pitch) * ab
+    s.roll += (sm.roll * PHYSICS.rollAngle - s.roll) * ab
     const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw)
     const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s.pitch)
     const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), s.roll)
@@ -1117,6 +1120,8 @@ function DroneRig({
     s.vel.addScaledVector(thrustVec, throttleMag * thrust * dt)
     s.vel.y -= PHYSICS.gravity * dt
     s.vel.multiplyScalar(PHYSICS.airDrag ** (dt * 60))
+    const vmax = PHYSICS.maxSpeed * (rangeMult ?? 1)
+    if (s.vel.length() > vmax) s.vel.setLength(vmax)   // trần tốc độ (~400 km/h)
     s.pos.addScaledVector(s.vel, dt)
     if (s.pos.y < 0.3) {
       s.pos.y = 0.3
@@ -1657,16 +1662,18 @@ function Explosions({ fxRef }: { fxRef: React.MutableRefObject<{ x: number; y: n
 // Chia bản đồ thành ô vuông (tile), chỉ dựng ô quanh drone (trong tầm nhìn).
 // 1 InstancedMesh → 1 draw call; chỉ rebuild khi drone sang ô mới.
 // ═════════════════════════════════════════════════════════════
-function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4 }: {
+function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4, onHitBuilding }: {
   boxes: OsmBox[]
   posRef: React.MutableRefObject<THREE.Vector3>
   tile?: number
   viewTiles?: number
+  onHitBuilding?: () => void   // drone đâm vào toà nhà → cháy & die
 }) {
   const MAX = 5000
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const lastKey = useRef('')
+  const hitCd = useRef(0)   // cooldown tránh trigger nổ liên tục cùng 1 va chạm
   const tiles = useMemo(() => {
     const m = new Map<string, OsmBox[]>()
     for (const b of boxes) {
@@ -1680,6 +1687,28 @@ function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4 }: {
   useFrame(() => {
     const dp = posRef.current
     const tx = Math.floor(dp.x / tile), tz = Math.floor(dp.z / tile)
+
+    // ── VA CHẠM CÔNG TRÌNH → cháy & die ──
+    // Kiểm tra mỗi frame: drone nằm trong khối nhà nào (footprint + dưới mái) không.
+    // Chỉ quét các ô quanh drone (đã bucket) cho nhẹ; cooldown 2s sau mỗi lần đâm.
+    if (onHitBuilding && performance.now() > hitCd.current && dp.y > 0.4 && dp.y < 400) {
+      const R = 0.7 // bán kính drone
+      outer:
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const arr = tiles.get(`${tx + i}_${tz + j}`)
+        if (!arr) continue
+        for (const b of arr) {
+          if (dp.y < b.h + R &&
+              Math.abs(dp.x - b.cx) < b.w / 2 + R &&
+              Math.abs(dp.z - b.cz) < b.d / 2 + R) {
+            hitCd.current = performance.now() + 2000
+            onHitBuilding()
+            break outer
+          }
+        }
+      }
+    }
+
     const key = `${tx}_${tz}`
     if (key === lastKey.current) return // chưa sang ô mới → khỏi rebuild
     lastKey.current = key
@@ -1711,10 +1740,11 @@ function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4 }: {
     </instancedMesh>
   )
 }
-function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus }: {
+function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus, onHitBuilding }: {
   lat: number; lon: number; radius?: number
   posRef: React.MutableRefObject<THREE.Vector3>
   onStatus?: (s: 'loading' | 'ready' | 'empty' | 'error') => void
+  onHitBuilding?: () => void
 }) {
   const [boxes, setBoxes] = useState<OsmBox[] | null>(null)
   useEffect(() => {
@@ -1727,7 +1757,7 @@ function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon, radius])
   if (!boxes || !boxes.length) return null
-  return <OsmCity boxes={boxes} posRef={posRef} />
+  return <OsmCity boxes={boxes} posRef={posRef} onHitBuilding={onHitBuilding} />
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -2256,6 +2286,12 @@ function GameHUD({
           <line x1={48} y1={35} x2={52} y2={31} stroke={HUD_C} strokeWidth={1.4} />
           <line x1={72} y1={35} x2={68} y2={31} stroke={HUD_C} strokeWidth={1.4} />
         </svg>
+      </div>
+
+      {/* TỐC ĐỘ — số lớn rõ kiểu OSD FPV (ngay dưới tâm ngắm) */}
+      <div style={{ position: 'absolute', top: 'calc(50% + 44px)', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: 32, fontWeight: 900, color: HUD_C, lineHeight: 1, textShadow: '0 0 10px rgba(34,211,238,0.7)' }}>{Math.round(speed)}</div>
+        <div style={{ fontSize: 11, color: HUD_DIM, letterSpacing: 2 }}>KM/H</div>
       </div>
 
       {/* Objective + time — thanh trên */}
@@ -2928,7 +2964,8 @@ function GameScreen({
           {room && <PeerDrones peersRef={peersRef} />}
           {level.map && (
             <Suspense fallback={null}>
-              <OsmCityLoader lat={level.map.lat} lon={level.map.lon} radius={level.map.radius} posRef={dronePosRef} onStatus={setMapStatus} />
+              <OsmCityLoader lat={level.map.lat} lon={level.map.lon} radius={level.map.radius} posRef={dronePosRef} onStatus={setMapStatus}
+                onHitBuilding={() => { const dp = dronePosRef.current; explode(dp.x, dp.y, dp.z); damageRef.current(HP_MAX) }} />
             </Suspense>
           )}
           <WaypointGuide posRef={dronePosRef} target={guideTarget} />
@@ -3049,7 +3086,7 @@ function GameScreen({
         }}>
           {(() => {
             const spd = telemetry ? telemetry.vel.length() * 3.6 : 0
-            const maxSpd = 90 * rangeMult
+            const maxSpd = PHYSICS.maxSpeed * 3.6 * rangeMult  // ~418 km/h
             const bar = (label: string, frac: number, col: string) => (
               <div style={{ textAlign: 'center', minWidth: 46 }}>
                 <div style={{ fontSize: 8, color: '#7dd3fc', marginBottom: 3 }}>{label}</div>
