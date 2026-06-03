@@ -160,22 +160,43 @@ const DRONE_MODELS: DroneModel[] = [
   },
 ]
 
-const DEFAULT_MODEL_KEY = 'fpv-selected-model'
+const DEFAULT_MODEL_KEY = 'fpv-selected-model-v2'  // bump → reset về procedural (cánh quạt quay)
 
 function loadSelectedModel(): string {
-  try { return localStorage.getItem(DEFAULT_MODEL_KEY) || 'fpv_drone' } catch { return 'fpv_drone' }
+  // Mặc định: drone procedural (cánh quạt quay đảm bảo, load tức thì). Người chơi
+  // vẫn chọn được model GLTF chi tiết ở màn setup (cũng thử quay cánh theo tên node).
+  try { return localStorage.getItem(DEFAULT_MODEL_KEY) || 'procedural' } catch { return 'procedural' }
 }
 function saveSelectedModel(id: string) {
   try { localStorage.setItem(DEFAULT_MODEL_KEY, id) } catch {}
 }
 
 /** Component load GLTF từ URL — wrapped Suspense ở caller */
-function GltfDrone({ url, scale, rotation, position }: {
-  url: string; scale: number; rotation: [number, number, number]; position: [number, number, number]
+function GltfDrone({ url, scale, rotation, position, propSpeed = 1 }: {
+  url: string; scale: number; rotation: [number, number, number]; position: [number, number, number]; propSpeed?: number
 }) {
   const { scene } = useGLTF(url)
   // Clone scene để mỗi instance có transform riêng (useGLTF cache scene shared)
   const cloned = useMemo(() => scene.clone(), [scene])
+  // Tìm các node CÁNH QUẠT theo tên để quay (prop/rotor/blade/helice/fan…).
+  // Mỗi node lưu trục quay phù hợp (trục local "thẳng đứng" nhất theo world).
+  const props = useMemo(() => {
+    const list: { obj: THREE.Object3D; axis: 'x' | 'y' | 'z' }[] = []
+    cloned.traverse((o) => {
+      if (!/prop|rotor|blade|helix|helice|propeller|fan|spin|cánh|quạt/i.test(o.name)) return
+      // Chọn trục local mà sau khi xoay ra world gần trục Y (thẳng đứng) nhất
+      o.updateWorldMatrix(true, false)
+      const m = o.matrixWorld.elements
+      const cols: Record<'x' | 'y' | 'z', number> = { x: Math.abs(m[1]), y: Math.abs(m[5]), z: Math.abs(m[9]) }
+      const axis = (Object.keys(cols) as ('x' | 'y' | 'z')[]).sort((a, b) => cols[b] - cols[a])[0]
+      list.push({ obj: o, axis })
+    })
+    return list
+  }, [cloned])
+  useFrame((_s, dt) => {
+    const a = dt * 45 * propSpeed
+    for (const p of props) p.obj.rotation[p.axis] += a
+  })
   return <primitive object={cloned} scale={scale} rotation={rotation} position={position} />
 }
 
@@ -1179,7 +1200,7 @@ function DroneRig({
       {model.gltfUrl ? (
         // GLTF model — Suspense fallback ở caller, primitive sẽ mount khi load xong
         <GltfDrone url={model.gltfUrl} scale={model.scale}
-          rotation={model.rotation} position={model.position} />
+          rotation={model.rotation} position={model.position} propSpeed={propSpeed} />
       ) : (
         <Quadcopter propSpeed={propSpeed} />
       )}
