@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#d8f0e0"/>
+  <circle cx="700" cy="86" r="44" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#8fd89e" stroke="#46342a" stroke-width="3"/>
+  <!-- bụi tre -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="150" y="180" width="20" height="290" fill="#7cc47c"/><line x1="150" y1="250" x2="170" y2="250"/><line x1="150" y1="320" x2="170" y2="320"/><line x1="150" y1="390" x2="170" y2="390"/>
+    <rect x="190" y="200" width="20" height="270" fill="#6fb86f"/><line x1="190" y1="270" x2="210" y2="270"/><line x1="190" y1="340" x2="210" y2="340"/>
+    <path d="M150 185 Q120 150 100 175" fill="none"/><path d="M210 200 Q240 165 260 190" fill="none"/>
+  </g>
+  <!-- anh nông dân -->
+  <g transform="translate(440,310)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="150"/><line x1="12" y1="120" x2="12" y2="150"/>
+    <ellipse cx="-14" cy="154" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="154" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-32 122 Q-36 66 0 62 Q36 66 32 122 Z" fill="#9c7a4a"/>
+    <line x1="-30" y1="88" x2="-50" y2="106"/><circle cx="-52" cy="109" r="7" fill="#ffe0bd"/>
+    <line x1="30" y1="88" x2="50" y2="106"/><circle cx="52" cy="109" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="36" r="34" fill="#ffe0bd"/>
+    <path d="M-50 18 Q0 -2 50 18 Q40 -2 0 -6 Q-40 -2 -50 18 Z" fill="#caa15a"/>
+    <path d="M-36 30 Q-40 -4 0 -6 Q40 -4 36 30 Q36 8 0 6 Q-36 8 -36 30 Z" fill="#2a2a2a"/>
+    <circle cx="-11" cy="38" r="7.5" fill="#fff"/><circle cx="11" cy="38" r="7.5" fill="#fff"/><circle cx="-10" cy="39" r="3.8" fill="#2a2a2a" stroke="none"/><circle cx="12" cy="39" r="3.8" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-20" cy="48" r="6" fill="#ff9ab0" stroke="none"/><circle cx="20" cy="48" r="6" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 50 Q0 57 8 50" fill="none"/>
+  </g>
+  <g><rect x="180" y="34" width="440" height="64" rx="20" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="30" font-weight="900" fill="#3fa14a" text-anchor="middle">Cây Tre Trăm Đốt</text></g>
+</svg>

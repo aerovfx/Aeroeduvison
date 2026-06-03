@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <!-- nhà rơm -->
+    <rect x="60" y="360" width="150" height="110" fill="#ffe082"/><polygon points="48,360 135,300 222,360" fill="#f5c542"/><rect x="110" y="410" width="40" height="60" fill="#caa15a"/>
+    <!-- nhà gỗ -->
+    <rect x="320" y="350" width="160" height="120" fill="#c9914f"/><polygon points="308,350 400,288 492,350" fill="#9c5a2b"/><rect x="375" y="404" width="44" height="66" fill="#6f3f1f"/><line x1="320" y1="390" x2="480" y2="390"/><line x1="320" y1="430" x2="480" y2="430"/>
+    <!-- nhà gạch -->
+    <rect x="590" y="340" width="170" height="130" fill="#d4654a"/><polygon points="578,342 675,278 772,342" fill="#9c3a2a"/><rect x="650" y="402" width="46" height="68" fill="#6f2a1f"/>
+    <g stroke="#a04a38" stroke-width="2"><line x1="590" y1="372" x2="760" y2="372"/><line x1="590" y1="404" x2="760" y2="404"/><line x1="590" y1="436" x2="760" y2="436"/></g>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="19" font-weight="800" fill="#e85a9a" text-anchor="middle">Heo út xây nhà rơm, heo nhỡ nhà gỗ, heo cả nhà gạch</text></g>
+</svg>

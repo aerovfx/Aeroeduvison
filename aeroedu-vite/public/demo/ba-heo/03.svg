@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#bcd0e8"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#8ec87e" stroke="#46342a" stroke-width="3"/>
+  <!-- nhà rơm bay tung -->
+  <g stroke="#46342a" stroke-width="3" fill="#ffe082"><rect x="160" y="380" width="120" height="90"/><g transform="translate(120,300)"><path d="M0 0 l20 6 -18 8Z"/></g><g transform="translate(240,280)"><path d="M0 0 l22 4 -16 12Z"/></g><g transform="translate(180,300)"><path d="M0 0 l18 8 -20 6Z"/></g></g>
+  <!-- gió thổi -->
+  <g stroke="#fff" stroke-width="5" fill="none" opacity="0.85" stroke-linecap="round"><path d="M520 300 Q420 290 320 300"/><path d="M540 340 Q430 330 300 345"/><path d="M520 380 Q420 374 340 384"/></g>
+  <!-- Sói thổi -->
+  <g transform="translate(600,310)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-24" y1="150" x2="-24" y2="178"/><line x1="20" y1="150" x2="20" y2="178"/>
+    <ellipse cx="-26" cy="182" rx="13" ry="6" fill="#5a6472"/><ellipse cx="22" cy="182" rx="13" ry="6" fill="#5a6472"/>
+    <path d="M-46 150 Q-58 50 0 44 Q58 50 52 150 Z" fill="#8d99ae"/>
+    <circle cx="-22" cy="20" r="44" fill="#9aa6ba"/>
+    <polygon points="-56,-8 -46,-50 -26,-14" fill="#9aa6ba"/><polygon points="-4,-12 -12,-50 -32,-16" fill="#9aa6ba"/>
+    <path d="M-64 28 Q-90 30 -86 44 Q-66 48 -52 38 Z" fill="#cfd6e4"/>
+    <ellipse cx="-86" cy="40" rx="5" ry="7" fill="#2a0f0f" stroke="none"/>
+    <circle cx="-30" cy="14" r="8" fill="#fff"/><circle cx="-8" cy="14" r="8" fill="#fff"/>
+    <circle cx="-31" cy="15" r="4" fill="#2a2a2a" stroke="none"/><circle cx="-9" cy="15" r="4" fill="#2a2a2a" stroke="none"/>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="800" fill="#6b7280" text-anchor="middle">Sói thổi phù… bay mất ngôi nhà rơm!</text></g>
+</svg>

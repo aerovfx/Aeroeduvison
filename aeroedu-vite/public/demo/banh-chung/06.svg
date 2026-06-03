@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#fff2db"/>
+  <g fill="#ffd24d" stroke="#46342a" stroke-width="2"><path d="M150 140 l5 12 12 1 -9 9 3 12 -11 -7 -11 7 3 -12 -9 -9 12 -1Z"/><path d="M650 130 l5 12 12 1 -9 9 3 12 -11 -7 -11 7 3 -12 -9 -9 12 -1Z"/></g>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#8fd89e" stroke="#46342a" stroke-width="3"/>
+  <!-- vua Hùng trao ngôi -->
+  <g transform="translate(300,310)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="150"/><line x1="12" y1="120" x2="12" y2="150"/>
+    <ellipse cx="-14" cy="154" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="154" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-40 122 Q-48 54 0 50 Q48 54 40 122 Z" fill="#c0392b"/>
+    <line x1="36" y1="86" x2="60" y2="100"/><circle cx="62" cy="103" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="32" r="34" fill="#ffe0bd"/>
+    <path d="M-37 28 Q-41 -10 0 -12 Q41 -10 37 28 Q37 4 0 2 Q-37 4 -37 28 Z" fill="#2a2a2a"/>
+    <polygon points="-30,-12 -18,8 0,-14 18,8 30,-12 24,-26 -24,-26" fill="#ffd24d"/>
+    <path d="M-9 54 Q0 72 9 54 Q0 62 -9 54 Z" fill="#2a2a2a"/>
+    <circle cx="-11" cy="34" r="7.5" fill="#fff"/><circle cx="11" cy="34" r="7.5" fill="#fff"/><circle cx="-10" cy="35" r="3.8" fill="#2a2a2a" stroke="none"/><circle cx="12" cy="35" r="3.8" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-20" cy="44" r="6" fill="#ff9ab0" stroke="none"/><circle cx="20" cy="44" r="6" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 46 Q0 53 8 46" fill="none"/>
+  </g>
+  <!-- Lang Liêu nhận, bánh chưng cầm tay -->
+  <g transform="translate(520,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="150"/><line x1="12" y1="120" x2="12" y2="150"/>
+    <ellipse cx="-14" cy="154" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="154" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-32 122 Q-36 66 0 62 Q36 66 32 122 Z" fill="#3fa14a"/>
+    <line x1="-28" y1="90" x2="-50" y2="104"/>
+    <rect x="-72" y="98" width="40" height="36" rx="4" fill="#3a8a3a"/><line x1="-72" y1="116" x2="-32" y2="116" stroke="#caa15a" stroke-width="3"/>
+    <circle cx="0" cy="36" r="33" fill="#ffe0bd"/>
+    <path d="M-36 32 Q-40 -8 0 -10 Q40 -8 36 32 Q36 6 0 4 Q-36 6 -36 32 Z" fill="#2a2a2a"/>
+    <polygon points="-22,-10 -11,5 0,-12 11,5 22,-10 17,-21 -17,-21" fill="#ffd24d"/>
+    <circle cx="-10" cy="38" r="7" fill="#fff"/><circle cx="10" cy="38" r="7" fill="#fff"/><circle cx="-9" cy="39" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="39" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="48" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="48" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 50 Q0 57 7 50" fill="none"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="900" fill="#a0501a" text-anchor="middle">Vua khen bánh ý nghĩa, truyền ngôi cho Lang Liêu. Hết!</text></g>
+</svg>

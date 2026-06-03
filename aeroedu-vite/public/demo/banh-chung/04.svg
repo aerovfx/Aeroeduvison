@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#2a3358"/>
+  <g fill="#ffd24d" opacity="0.8"><circle cx="120" cy="90" r="4"/><circle cx="650" cy="80" r="4"/><circle cx="200" cy="150" r="3"/></g>
+  <rect x="0" y="430" width="800" height="170" fill="#3a3f5c" stroke="#46342a" stroke-width="3"/>
+  <circle cx="500" cy="240" r="140" fill="#fff3c0" opacity="0.4"/>
+  <!-- thần hiện trong mơ -->
+  <g transform="translate(500,230)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-44 150 Q-52 46 0 40 Q52 46 44 150 Z" fill="#eef2f6"/>
+    <circle cx="0" cy="10" r="38" fill="#ffe0bd"/>
+    <path d="M-40 8 Q-44 -42 0 -44 Q44 -42 40 8 Q34 -16 0 -14 Q-34 -16 -40 8 Z" fill="#eef2f6"/>
+    <path d="M-26 26 Q0 96 26 26 Q0 48 -26 26 Z" fill="#eef2f6"/>
+    <circle cx="-13" cy="12" r="7" fill="#fff"/><circle cx="13" cy="12" r="7" fill="#fff"/><circle cx="-12" cy="13" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="14" cy="13" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="22" r="6" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="22" r="6" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 22 Q0 28 8 22" fill="none"/>
+  </g>
+  <!-- hạt gạo gợi ý -->
+  <g fill="#fff" stroke="#46342a" stroke-width="1.5"><ellipse cx="360" cy="300" rx="8" ry="4"/><ellipse cx="378" cy="312" rx="8" ry="4"/><ellipse cx="350" cy="316" rx="8" ry="4"/></g>
+  <!-- Lang Liêu ngủ -->
+  <g transform="translate(220,420)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-70 22 Q-74 -12 -40 -14 L40 -14 Q74 -12 70 22 Z" fill="#3fa14a"/>
+    <circle cx="-66" cy="-2" r="30" fill="#ffe0bd"/>
+    <path d="M-96 -8 Q-100 -40 -66 -42 Q-32 -40 -36 -8 Q-36 -28 -66 -30 Q-96 -28 -96 -8 Z" fill="#2a2a2a"/>
+    <path d="M-76 -4 Q-70 0 -64 -4" fill="none" stroke-width="2.5"/><path d="M-58 -4 Q-52 0 -46 -4" fill="none" stroke-width="2.5"/>
+    <circle cx="-54" cy="6" r="6" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <text x="320" y="380" font-family="'Comic Sans MS',sans-serif" font-size="34" font-weight="900" fill="#9fb0d8">z Z</text>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="800" fill="#c08a2a" text-anchor="middle">Trong mơ, thần mách: hãy lấy gạo quý làm bánh dâng vua</text></g>
+</svg>

@@ -3061,6 +3061,42 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         'Tiếng đàn thần giúp Thạch Sanh được minh oan. Chàng cưới công chúa, lấy niêu cơm thần đãi quân sĩ. Hết!',
       ],
     },
+    {
+      id: 'demo-ba-heo', slug: 'ba-heo', title: 'Ba Chú Heo Con',
+      desc: 'Truyện dạy bé chăm chỉ và làm việc cẩn thận. (Bản demo)',
+      pages: [
+        'Ngày xưa có ba chú heo con. Khi lớn lên, các chú rời nhà mẹ để tự xây tổ ấm riêng.',
+        'Heo út làm nhà bằng rơm cho nhanh, heo nhỡ làm nhà gỗ, còn heo cả chăm chỉ xây nhà gạch chắc chắn.',
+        'Một con sói đói đến. Nó thổi phù một cái, ngôi nhà rơm bay tung. Heo út hoảng sợ bỏ chạy.',
+        'Sói lại thổi mạnh, ngôi nhà gỗ cũng đổ sập. Hai chú heo chạy sang nhà gạch của anh cả.',
+        'Sói thổi mãi mà ngôi nhà gạch vẫn vững chãi, không hề lay chuyển.',
+        'Sói mệt lử đành bỏ cuộc. Ba chú heo an toàn. Chăm chỉ và cẩn thận sẽ được đền đáp! Hết!',
+      ],
+    },
+    {
+      id: 'demo-cay-tre', slug: 'cay-tre', title: 'Cây Tre Trăm Đốt',
+      desc: 'Truyện cổ tích Việt Nam về sự hiền lành được đền đáp. (Bản demo)',
+      pages: [
+        'Ngày xưa có anh nông dân nghèo, hiền lành, chăm chỉ làm thuê cho nhà phú ông.',
+        'Phú ông hứa sẽ gả con gái cho anh nếu anh chịu khó làm lụng giúp ông suốt ba năm.',
+        'Hết ba năm, phú ông lật lọng, bảo anh phải tìm được cây tre trăm đốt mới chịu gả con.',
+        'Anh vào rừng buồn bã vì chẳng có cây tre nào trăm đốt. Bỗng Bụt hiện ra dạy câu thần: khắc nhập, khắc xuất.',
+        'Anh chặt một trăm đốt tre rồi hô khắc nhập, lập tức chúng dính liền thành cây tre trăm đốt.',
+        'Phú ông sờ vào liền bị dính chặt. Anh hô khắc nhập mãi cho đến khi ông chịu gả con gái. Hết!',
+      ],
+    },
+    {
+      id: 'demo-banh-chung', slug: 'banh-chung', title: 'Sự Tích Bánh Chưng Bánh Dày',
+      desc: 'Sự tích bánh chưng bánh dày — Trời tròn Đất vuông. (Bản demo)',
+      pages: [
+        'Vua Hùng đã già, muốn truyền ngôi. Vua hứa sẽ chọn người con dâng được món ăn ý nghĩa nhất.',
+        'Các hoàng tử đua nhau tìm sơn hào hải vị quý hiếm khắp nơi để dâng vua cha.',
+        'Lang Liêu là hoàng tử nghèo, chỉ có lúa gạo, không biết dâng gì nên rất lo lắng.',
+        'Một đêm, Lang Liêu nằm mơ thấy thần mách bảo: hãy dùng gạo nếp làm bánh dâng vua.',
+        'Lang Liêu gói bánh chưng vuông tượng trưng cho Đất, nặn bánh dày tròn tượng trưng cho Trời.',
+        'Vua khen bánh vừa ngon vừa ý nghĩa, liền truyền ngôi cho Lang Liêu. Hết!',
+      ],
+    },
   ];
 
   async function _seedDemoStorybook() {
