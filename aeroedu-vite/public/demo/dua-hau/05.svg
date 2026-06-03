@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#bfe0f0"/>
+  <circle cx="120" cy="90" r="40" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 360 Q400 340 800 360 L800 600 L0 600 Z" fill="#4a90b8" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#7ec8e0" stroke-width="3" fill="none" opacity="0.55"><path d="M60 470 Q120 460 180 470"/><path d="M520 510 Q580 500 640 510"/></g>
+  <!-- thuyền buôn -->
+  <g transform="translate(560,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><path d="M-90 60 Q0 92 90 60 L66 96 Q0 110 -66 96 Z" fill="#9c5a2b"/><rect x="-6" y="-40" width="10" height="100" fill="#7a4f2c"/><path d="M4 -38 L70 -10 L4 16 Z" fill="#e8e0c8"/></g>
+  <!-- dưa trôi có khắc chữ -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><ellipse cx="250" cy="430" rx="44" ry="32" fill="#3a8a3a"/><path d="M250 398 Q236 430 250 462" stroke="#2f6b2f" stroke-width="3" fill="none"/><text x="250" y="436" font-family="'Comic Sans MS',sans-serif" font-size="16" font-weight="900" fill="#fff" text-anchor="middle" stroke="none">An Tiêm</text></g>
+  <ellipse cx="370" cy="470" rx="34" ry="24" fill="#3a8a3a" stroke="#46342a" stroke-width="3"/>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="800" fill="#1c6a90" text-anchor="middle">Khắc tên thả dưa xuống biển, thuyền buôn tới đổi hàng</text></g>
+</svg>

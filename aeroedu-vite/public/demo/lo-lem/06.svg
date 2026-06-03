@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#f0e6ff"/>
+  <circle cx="700" cy="90" r="42" fill="#ffe066" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#a98fd0" stroke="#46342a" stroke-width="3"/>
+  <g fill="#ff6b9d" stroke="#46342a" stroke-width="2"><path d="M150 160 q-12 -15 -24 -2 q-8 10 24 32 q32 -22 24 -32 q-12 -13 -24 2Z"/><path d="M650 150 q-12 -14 -23 -2 q-8 10 23 31 q33 -20 23 -31 q-12 -12 -23 2Z"/></g>
+  <!-- hoàng tử quỳ thử hài -->
+  <g transform="translate(300,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-32 110 Q-36 56 0 52 Q36 56 32 110 Z" fill="#2f6bbf"/>
+    <line x1="-30" y1="80" x2="-44" y2="100"/><circle cx="-46" cy="103" r="7" fill="#ffe0bd"/>
+    <path d="M30 96 Q46 100 46 116" fill="none"/><path d="M40 112 Q46 102 52 112Z" fill="#bfe0ff"/>
+    <circle cx="0" cy="24" r="30" fill="#ffe0bd"/>
+    <path d="M-32 20 Q-36 -16 0 -18 Q36 -16 32 20 Q32 -2 0 -4 Q-32 -2 -32 20 Z" fill="#7a4a2a"/>
+    <polygon points="-20,-8 -10,5 0,-10 10,5 20,-8 16,-18 -16,-18" fill="#ffd24d"/>
+    <circle cx="-9" cy="26" r="6.5" fill="#fff"/><circle cx="9" cy="26" r="6.5" fill="#fff"/><circle cx="-8" cy="27" r="3.2" fill="#2a2a2a" stroke="none"/><circle cx="10" cy="27" r="3.2" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-18" cy="36" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="18" cy="36" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 38 Q0 44 7 38" fill="none"/>
+  </g>
+  <!-- Lọ Lem -->
+  <g transform="translate(520,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="150" x2="-12" y2="176"/><line x1="12" y1="150" x2="12" y2="176"/><ellipse cx="-14" cy="180" rx="11" ry="6" fill="#bfe0ff"/><ellipse cx="14" cy="180" rx="11" ry="6" fill="#bfe0ff"/>
+    <path d="M-54 150 Q-28 94 0 90 Q28 94 54 150 Z" fill="#5ab0e8"/>
+    <path d="M-24 108 Q-28 72 0 68 Q28 72 24 108 Z" fill="#7cc4f0"/>
+    <circle cx="0" cy="38" r="34" fill="#ffe0bd"/>
+    <path d="M-40 38 Q-44 -10 0 -12 Q44 -10 40 38 Q40 8 24 4 L-24 4 Q-40 8 -40 38 Z" fill="#caa15a"/>
+    <path d="M-20 -10 Q0 -24 20 -10 Q0 -16 -20 -10Z" fill="#5ab0e8"/>
+    <circle cx="-12" cy="40" r="8" fill="#fff"/><circle cx="12" cy="40" r="8" fill="#fff"/><circle cx="-11" cy="41" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="41" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="52" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="52" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 56 Q0 63 8 56" fill="#e0506a"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="900" fill="#7e4ec0" text-anchor="middle">Hài vừa chân Lọ Lem — hoàng tử cưới nàng. Hết!</text></g>
+</svg>

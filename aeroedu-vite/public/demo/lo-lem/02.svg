@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e8e0d2"/>
+  <rect x="0" y="450" width="800" height="150" fill="#c0a878" stroke="#46342a" stroke-width="3"/>
+  <!-- mẹ kế + 2 chị -->
+  <g transform="translate(560,300)" stroke="#46342a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <g transform="translate(0,0)"><path d="M-34 124 Q-40 60 0 56 Q40 60 34 124 Z" fill="#8a4a6a"/><circle cx="0" cy="32" r="30" fill="#ffe0bd"/><path d="M-32 28 Q-36 -8 0 -10 Q36 -8 32 28 Q32 6 0 4 Q-32 6 -32 28 Z" fill="#6b6b6b"/><circle cx="0" cy="-12" r="12" fill="#6b6b6b"/><circle cx="-9" cy="34" r="6" fill="#fff"/><circle cx="9" cy="34" r="6" fill="#fff"/><circle cx="-8" cy="35" r="3" fill="#2a2a2a" stroke="none"/><circle cx="10" cy="35" r="3" fill="#2a2a2a" stroke="none"/><path d="M-14 28 L-4 31 M14 28 L4 31" fill="none" stroke-width="2"/><path d="M-7 46 Q0 42 7 46" fill="none"/></g>
+    <g transform="translate(80,30) scale(0.8)"><path d="M-30 124 Q-36 64 0 60 Q36 64 30 124 Z" fill="#d06a8a"/><circle cx="0" cy="34" r="28" fill="#ffe0bd"/><path d="M-30 30 Q-34 -2 0 -4 Q34 -2 30 30 Q30 10 0 8 Q-30 10 -30 30 Z" fill="#7a4a2a"/><circle cx="-9" cy="36" r="6" fill="#fff"/><circle cx="9" cy="36" r="6" fill="#fff"/><circle cx="-8" cy="37" r="3" fill="#2a2a2a" stroke="none"/><circle cx="10" cy="37" r="3" fill="#2a2a2a" stroke="none"/><path d="M-6 46 Q0 42 6 46" fill="none"/></g>
+  </g>
+  <!-- Lọ Lem lau nhà -->
+  <g transform="translate(240,360)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-30 90 Q-34 40 0 36 Q34 40 30 90 Z" fill="#9a8a6a"/>
+    <line x1="-26" y1="60" x2="-44" y2="74"/><circle cx="-46" cy="77" r="6" fill="#ffe0bd"/>
+    <line x1="28" y1="56" x2="60" y2="70"/><circle cx="62" cy="72" r="6" fill="#ffe0bd"/>
+    <circle cx="0" cy="6" r="28" fill="#ffe0bd"/>
+    <path d="M-30 4 Q-34 -32 0 -34 Q34 -32 30 4 Q30 -16 16 -18 L-16 -18 Q-30 -16 -30 4 Z" fill="#caa15a"/>
+    <circle cx="-9" cy="8" r="6" fill="#fff"/><circle cx="9" cy="8" r="6" fill="#fff"/><circle cx="-8" cy="9" r="3" fill="#2a2a2a" stroke="none"/><circle cx="10" cy="9" r="3" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-17" cy="18" r="5" fill="#ff9ab0" stroke="none"/><circle cx="17" cy="18" r="5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-6 20 Q0 24 6 20" fill="none"/>
+    <ellipse cx="-60" cy="96" rx="20" ry="8" fill="#7ec8e0"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="800" fill="#8a4a6a" text-anchor="middle">Lọ Lem bị mẹ kế và hai chị bắt làm lụng suốt ngày</text></g>
+</svg>

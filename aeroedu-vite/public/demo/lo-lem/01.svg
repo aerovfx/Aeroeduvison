@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e6dcf5"/>
+  <circle cx="700" cy="86" r="44" fill="#ffe066" stroke="#46342a" stroke-width="3"/>
+  <g fill="#fff" stroke="#46342a" stroke-width="1.5"><path d="M150 120 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4Z"/><path d="M250 90 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3Z"/></g>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#a98fd0" stroke="#46342a" stroke-width="3"/>
+  <!-- Lọ Lem váy xanh -->
+  <g transform="translate(400,290)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="158" x2="-12" y2="184"/><line x1="12" y1="158" x2="12" y2="184"/>
+    <ellipse cx="-14" cy="188" rx="11" ry="6" fill="#bfe0ff"/><ellipse cx="14" cy="188" rx="11" ry="6" fill="#bfe0ff"/>
+    <path d="M-58 158 Q-30 96 0 92 Q30 96 58 158 Z" fill="#5ab0e8"/>
+    <path d="M-26 112 Q-30 72 0 68 Q30 72 26 112 Z" fill="#7cc4f0"/>
+    <line x1="-30" y1="100" x2="-50" y2="118"/><circle cx="-52" cy="121" r="7" fill="#ffe0bd"/>
+    <line x1="30" y1="100" x2="50" y2="118"/><circle cx="52" cy="121" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="38" r="38" fill="#ffe0bd"/>
+    <path d="M-42 38 Q-46 -10 0 -12 Q46 -10 42 38 Q42 8 26 4 L-26 4 Q-42 8 -42 38 Z" fill="#caa15a"/>
+    <path d="M-20 -10 Q0 -24 20 -10 Q0 -16 -20 -10Z" fill="#5ab0e8"/>
+    <circle cx="-13" cy="40" r="9" fill="#fff"/><circle cx="13" cy="40" r="9" fill="#fff"/><circle cx="-11" cy="42" r="4.5" fill="#2a2a2a" stroke="none"/><circle cx="15" cy="42" r="4.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-23" cy="52" r="7" fill="#ff9ab0" stroke="none"/><circle cx="23" cy="52" r="7" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 58 Q0 65 8 58" fill="#e0506a"/>
+  </g>
+  <g><rect x="220" y="34" width="360" height="64" rx="20" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="30" font-weight="900" fill="#7e4ec0" text-anchor="middle">Cô Bé Lọ Lem</text></g>
+</svg>

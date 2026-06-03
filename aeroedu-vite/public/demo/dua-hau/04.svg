@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#bfe7ff"/>
+  <circle cx="700" cy="86" r="42" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 440 Q400 410 800 440 L800 600 L0 600 Z" fill="#7fb86a" stroke="#46342a" stroke-width="3"/>
+  <!-- dây dưa + quả -->
+  <g stroke="#3a8a3a" stroke-width="4" fill="none"><path d="M120 470 Q200 420 320 460 Q440 500 560 450"/></g>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <ellipse cx="240" cy="480" rx="50" ry="38" fill="#3a8a3a"/><path d="M240 442 Q224 480 240 518" stroke="#2f6b2f" stroke-width="3" fill="none"/>
+    <ellipse cx="430" cy="500" rx="48" ry="36" fill="#3a8a3a"/><path d="M430 464 Q414 500 430 536" stroke="#2f6b2f" stroke-width="3" fill="none"/>
+    <g stroke="#2f8a3c" stroke-width="3" fill="#56b356"><path d="M330 446 q-18 -8 -10 14 q14 -4 18 4 q4 -12 -8 -18Z"/></g>
+  </g>
+  <!-- An Tiêm vui -->
+  <g transform="translate(540,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-30 120 Q-34 66 0 62 Q34 66 30 120 Z" fill="#5a8a4a"/>
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/><ellipse cx="-14" cy="150" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="150" rx="10" ry="6" fill="#5a3a22"/>
+    <line x1="-28" y1="86" x2="-50" y2="66"/><circle cx="-52" cy="63" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 28 Q-38 -8 0 -10 Q38 -8 34 28 Q34 6 0 4 Q-34 6 -34 28 Z" fill="#2a2a2a"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 46 Q0 54 8 46" fill="none"/>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="18" font-weight="800" fill="#3a8a3a" text-anchor="middle">Hạt mọc thành dây, ra những quả dưa hấu ngọt lành</text></g>
+</svg>

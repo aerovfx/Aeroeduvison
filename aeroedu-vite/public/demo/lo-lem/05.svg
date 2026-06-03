@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#3a2f55"/>
+  <rect x="0" y="450" width="800" height="150" fill="#6a5a8a" stroke="#46342a" stroke-width="3"/>
+  <!-- đồng hồ 12h -->
+  <g transform="translate(120,140)" stroke="#46342a" stroke-width="3.5"><circle cx="0" cy="0" r="56" fill="#fff7e6"/><line x1="0" y1="0" x2="0" y2="-40" stroke-width="4"/><line x1="0" y1="0" x2="0" y2="-30" stroke-width="4"/><text x="0" y="-34" font-size="12" fill="#2a2a2a" text-anchor="middle" stroke="none">12</text></g>
+  <!-- hoàng tử -->
+  <g transform="translate(310,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/><ellipse cx="-14" cy="152" rx="11" ry="6" fill="#2a2a2a"/><ellipse cx="14" cy="152" rx="11" ry="6" fill="#2a2a2a"/>
+    <path d="M-32 122 Q-36 64 0 60 Q36 64 32 122 Z" fill="#2f6bbf"/>
+    <line x1="30" y1="86" x2="52" y2="100"/><circle cx="54" cy="103" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 30 Q-38 -6 0 -8 Q38 -6 34 30 Q34 8 0 6 Q-34 8 -34 30 Z" fill="#7a4a2a"/>
+    <polygon points="-22,-8 -11,6 0,-10 11,6 22,-8 17,-18 -17,-18" fill="#ffd24d"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 53 7 48" fill="none"/>
+  </g>
+  <!-- Lọ Lem chạy + rơi hài -->
+  <g transform="translate(500,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-14" y1="148" x2="-24" y2="174"/><line x1="12" y1="148" x2="22" y2="176"/>
+    <ellipse cx="24" cy="180" rx="11" ry="6" fill="#bfe0ff"/>
+    <path d="M-54 148 Q-28 92 0 88 Q28 92 54 148 Z" fill="#5ab0e8"/>
+    <path d="M-24 106 Q-28 70 0 66 Q28 70 24 106 Z" fill="#7cc4f0"/>
+    <line x1="-28" y1="96" x2="-50" y2="112"/><circle cx="-52" cy="115" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="36" r="34" fill="#ffe0bd"/>
+    <path d="M-40 36 Q-44 -10 0 -12 Q44 -10 40 36 Q40 8 24 4 L-24 4 Q-40 8 -40 36 Z" fill="#caa15a"/>
+    <circle cx="-12" cy="38" r="8" fill="#fff"/><circle cx="12" cy="38" r="8" fill="#fff"/><circle cx="-11" cy="39" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="39" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="50" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="50" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 54 Q0 60 7 54" fill="#e0506a"/>
+  </g>
+  <!-- hài rơi -->
+  <g transform="translate(420,470)" stroke="#46342a" stroke-width="3"><path d="M-18 6 Q-20 -8 0 -8 Q20 -8 18 6 Z" fill="#bfe0ff"/></g>
+  <g><rect x="120" y="36" width="560" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="16" font-weight="800" fill="#bfe0ff" text-anchor="middle" stroke="#2a2a4a" stroke-width="0.3">Chuông điểm 12 giờ, Lọ Lem vội chạy về, đánh rơi chiếc hài</text></g>
+</svg>

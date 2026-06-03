@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#bfe7ff"/>
+  <circle cx="120" cy="90" r="40" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <rect x="0" y="430" width="800" height="170" fill="#4a90b8"/>
+  <path d="M0 430 Q400 405 800 430 L800 470 Q400 448 0 470 Z" fill="#e8d49a" stroke="#46342a" stroke-width="3"/>
+  <!-- chim mang hạt -->
+  <g transform="translate(560,180)" stroke="#46342a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-16 0 Q-44 -16 -50 12 Q-30 4 -10 10 Z" fill="#ffb84d"/>
+    <ellipse cx="6" cy="6" rx="24" ry="18" fill="#ff9a3d"/>
+    <circle cx="22" cy="-8" r="14" fill="#ffb84d"/>
+    <polygon points="34,-8 50,-4 34,0" fill="#ffd24d"/>
+    <circle cx="20" cy="-10" r="4" fill="#fff"/><circle cx="20" cy="-9" r="2" fill="#2a2a2a" stroke="none"/>
+    <ellipse cx="20" cy="14" rx="4" ry="3" fill="#3a8a3a"/>
+  </g>
+  <!-- An Tiêm + vợ nhìn -->
+  <g transform="translate(260,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-30 110 Q-34 60 0 56 Q34 60 30 110 Z" fill="#5a8a4a"/>
+    <line x1="-12" y1="110" x2="-12" y2="138"/><line x1="12" y1="110" x2="12" y2="138"/><ellipse cx="-14" cy="142" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="142" rx="10" ry="6" fill="#5a3a22"/>
+    <line x1="28" y1="78" x2="50" y2="60"/><circle cx="52" cy="57" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="30" r="30" fill="#ffe0bd"/>
+    <path d="M-32 26 Q-36 -8 0 -10 Q36 -8 32 26 Q32 4 0 2 Q-32 4 -32 26 Z" fill="#2a2a2a"/>
+    <circle cx="-9" cy="32" r="6.5" fill="#fff"/><circle cx="10" cy="32" r="6.5" fill="#fff"/><circle cx="-8" cy="31" r="3.2" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="31" r="3.2" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-18" cy="40" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="18" cy="40" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 42 Q0 48 7 42" fill="none"/>
+  </g>
+  <g transform="translate(370,340)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-28 60 Q-32 18 0 14 Q32 18 28 60 Z" fill="#c98ab0"/>
+    <circle cx="0" cy="-8" r="28" fill="#ffe0bd"/>
+    <path d="M-30 -10 Q-30 30 -26 50 M30 -10 Q30 30 26 50" fill="#2a2a2a"/>
+    <path d="M-30 -10 Q-32 -42 0 -44 Q32 -42 30 -10 Q30 -30 0 -32 Q-30 -30 -30 -10 Z" fill="#2a2a2a"/>
+    <circle cx="-9" cy="-4" r="6" fill="#fff"/><circle cx="9" cy="-4" r="6" fill="#fff"/><circle cx="-8" cy="-3" r="3" fill="#2a2a2a" stroke="none"/><circle cx="10" cy="-3" r="3" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-17" cy="6" r="5" fill="#ff9ab0" stroke="none"/><circle cx="17" cy="6" r="5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-6 8 Q0 14 6 8" fill="none"/>
+  </g>
+  <g><rect x="140" y="36" width="520" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="800" fill="#1c6a90" text-anchor="middle">Trên đảo hoang, một chú chim mang đến những hạt lạ</text></g>
+</svg>

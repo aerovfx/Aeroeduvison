@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <circle cx="700" cy="90" r="40" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <rect x="0" y="340" width="800" height="260" fill="#4a90b8"/>
+  <g stroke="#7ec8e0" stroke-width="3" fill="none" opacity="0.55"><path d="M60 470 Q120 460 180 470"/><path d="M520 500 Q580 490 640 500"/></g>
+  <!-- thuyền + vua trả gươm -->
+  <g transform="translate(250,360)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <path d="M-110 30 Q0 64 110 30 L86 64 Q0 78 -86 64 Z" fill="#9c5a2b"/>
+    <g transform="translate(0,-54)" stroke-linecap="round">
+      <path d="M-28 78 Q-32 24 0 20 Q32 24 28 78 Z" fill="#c0392b"/>
+      <line x1="26" y1="46" x2="60" y2="58"/>
+      <circle cx="0" cy="-2" r="28" fill="#ffe0bd"/>
+      <path d="M-30 -6 Q-34 -38 0 -40 Q34 -38 30 -6 Q30 -26 0 -28 Q-30 -26 -30 -6 Z" fill="#2a2a2a"/>
+      <rect x="-20" y="-30" width="40" height="8" rx="3" fill="#c9a23a"/>
+      <circle cx="-10" cy="0" r="6.5" fill="#fff"/><circle cx="10" cy="0" r="6.5" fill="#fff"/><circle cx="-9" cy="1" r="3.2" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="1" r="3.2" fill="#2a2a2a" stroke="none"/>
+      <circle cx="-18" cy="10" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="18" cy="10" r="5.5" fill="#ff9ab0" stroke="none"/>
+      <path d="M-7 12 Q0 18 7 12" fill="none"/>
+    </g>
+  </g>
+  <!-- rùa vàng ngậm gươm nổi lên -->
+  <g transform="translate(540,400)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-60 16 Q-60 -30 0 -32 Q60 -30 60 16 Z" fill="#d4a82a"/><path d="M-60 16 Q0 30 60 16" fill="#e8c84a"/>
+    <g stroke="#46342a" stroke-width="2" fill="#c89a1a"><path d="M-26 -8 l-9 12 5 12 14 0 5 -12 -9 -12Z"/><path d="M16 -10 l-9 12 5 12 14 0 5 -12 -9 -12Z"/></g>
+    <circle cx="-74" cy="2" r="20" fill="#e8c84a"/>
+    <circle cx="-80" cy="-2" r="4.5" fill="#fff"/><circle cx="-80" cy="-1" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <line x1="-92" y1="6" x2="-118" y2="-30" stroke="#c9ced6" stroke-width="5"/><rect x="-96" y="2" width="12" height="8" rx="2" fill="#caa23a"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="900" fill="#1c6a90" text-anchor="middle">Rùa Vàng đòi lại gươm. Hồ mang tên Hoàn Kiếm từ đó. Hết!</text></g>
+</svg>

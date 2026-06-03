@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e8e0d2"/>
+  <rect x="0" y="450" width="800" height="150" fill="#c0a878" stroke="#46342a" stroke-width="3"/>
+  <!-- thiệp vũ hội trên tường -->
+  <g stroke="#46342a" stroke-width="3" stroke-linejoin="round"><rect x="560" y="120" width="180" height="120" rx="8" fill="#fff"/><text x="650" y="170" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="900" fill="#7e4ec0" text-anchor="middle" stroke="none">VŨ HỘI</text><text x="650" y="205" font-family="'Comic Sans MS',sans-serif" font-size="16" fill="#a06a2a" text-anchor="middle" stroke="none">Hoàng cung</text></g>
+  <!-- Lọ Lem khóc -->
+  <g transform="translate(300,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="10" ry="6" fill="#5a3a22"/>
+    <path d="M-32 122 Q-36 60 0 56 Q36 60 32 122 Z" fill="#9a8a6a"/>
+    <line x1="-28" y1="84" x2="-46" y2="66"/><circle cx="-48" cy="63" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 32 Q-38 -6 0 -8 Q38 -6 34 32 Q34 8 18 6 L-18 6 Q-34 8 -34 32 Z" fill="#caa15a"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <line x1="-9" y1="42" x2="-9" y2="54" stroke="#7ec8ff" stroke-width="3"/><line x1="9" y1="42" x2="9" y2="54" stroke="#7ec8ff" stroke-width="3"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 54 Q0 50 7 54" fill="none"/>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="18" font-weight="800" fill="#7e4ec0" text-anchor="middle">Có vũ hội, nhưng Lọ Lem không được đi nên buồn khóc</text></g>
+</svg>

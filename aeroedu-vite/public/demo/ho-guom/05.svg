@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <circle cx="120" cy="90" r="40" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <rect x="0" y="360" width="800" height="240" fill="#4a90b8"/>
+  <g stroke="#7ec8e0" stroke-width="3" fill="none" opacity="0.55"><path d="M40 440 Q90 430 140 440"/><path d="M300 480 Q360 470 420 480"/><path d="M560 430 Q620 420 680 430"/></g>
+  <!-- thuyền -->
+  <g transform="translate(400,380)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <path d="M-130 30 Q0 70 130 30 L100 70 Q0 86 -100 70 Z" fill="#9c5a2b"/>
+    <!-- Lê Lợi đứng trên thuyền -->
+    <g transform="translate(0,-60)" stroke-linecap="round">
+      <path d="M-30 80 Q-34 24 0 20 Q34 24 30 80 Z" fill="#c0392b"/>
+      <circle cx="0" cy="-2" r="30" fill="#ffe0bd"/>
+      <path d="M-32 -6 Q-36 -40 0 -42 Q36 -40 32 -6 Q32 -28 0 -30 Q-32 -28 -32 -6 Z" fill="#2a2a2a"/>
+      <rect x="-22" y="-32" width="44" height="8" rx="3" fill="#c9a23a"/>
+      <path d="M-7 18 Q0 32 7 18 Q0 24 -7 18 Z" fill="#2a2a2a"/>
+      <circle cx="-10" cy="0" r="6.5" fill="#fff"/><circle cx="10" cy="0" r="6.5" fill="#fff"/><circle cx="-9" cy="1" r="3.2" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="1" r="3.2" fill="#2a2a2a" stroke="none"/>
+      <circle cx="-18" cy="10" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="18" cy="10" r="5.5" fill="#ff9ab0" stroke="none"/>
+      <path d="M-7 12 Q0 18 7 12" fill="none"/>
+    </g>
+  </g>
+  <g><rect x="160" y="36" width="480" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="18" font-weight="800" fill="#1c6a90" text-anchor="middle">Đất nước thanh bình, vua Lê dạo thuyền trên hồ</text></g>
+</svg>

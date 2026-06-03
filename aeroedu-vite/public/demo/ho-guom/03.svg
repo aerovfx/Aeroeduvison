@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#bfe0f0"/>
+  <path d="M0 380 Q400 360 800 380 L800 600 L0 600 Z" fill="#4a90b8" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#7ec8e0" stroke-width="3" fill="none" opacity="0.6"><path d="M40 460 Q90 450 140 460"/><path d="M600 500 Q660 490 720 500"/></g>
+  <!-- cây + chuôi gươm phát sáng -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><rect x="120" y="200" width="26" height="180" fill="#9c5a2b"/><circle cx="133" cy="180" r="50" fill="#3fa14a"/></g>
+  <g transform="translate(133,210)"><circle cx="0" cy="0" r="20" fill="#ffe89a" opacity="0.6"/><rect x="-7" y="-8" width="14" height="20" rx="3" fill="#caa23a" stroke="#46342a" stroke-width="2.5"/></g>
+  <!-- Lê Thận kéo lưới có lưỡi gươm -->
+  <g transform="translate(500,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="110" x2="-12" y2="138"/><line x1="12" y1="110" x2="12" y2="138"/>
+    <ellipse cx="-14" cy="142" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="142" rx="10" ry="6" fill="#5a3a22"/>
+    <path d="M-30 112 Q-34 60 0 56 Q34 60 30 112 Z" fill="#5a9ed8"/>
+    <line x1="-28" y1="80" x2="-50" y2="64"/><circle cx="-52" cy="61" r="7" fill="#ffe0bd"/>
+    <line x1="28" y1="78" x2="48" y2="60"/>
+    <path d="M48 60 L60 -6" stroke="#c9ced6" stroke-width="6"/><rect x="44" y="58" width="14" height="8" rx="2" fill="#caa23a"/>
+    <circle cx="0" cy="32" r="32" fill="#ffe0bd"/>
+    <path d="M-50 16 Q0 -2 50 16 Q40 -2 0 -6 Q-40 -2 -50 16 Z" fill="#caa15a"/>
+    <path d="M-34 28 Q-38 -4 0 -6 Q38 -4 34 28 Q34 6 0 4 Q-34 6 -34 28 Z" fill="#2a2a2a"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 55 7 48" fill="none"/>
+  </g>
+  <g><rect x="140" y="36" width="520" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="17" font-weight="800" fill="#1c6a90" text-anchor="middle">Lê Thận vớt được lưỡi gươm; Lê Lợi nhặt được chuôi gươm trên cây</text></g>
+</svg>

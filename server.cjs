@@ -3097,6 +3097,42 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         'Vua khen bánh vừa ngon vừa ý nghĩa, liền truyền ngôi cho Lang Liêu. Hết!',
       ],
     },
+    {
+      id: 'demo-ho-guom', slug: 'ho-guom', title: 'Sự Tích Hồ Gươm',
+      desc: 'Truyền thuyết Lê Lợi trả gươm thần cho Rùa Vàng. (Bản demo)',
+      pages: [
+        'Ngày xưa, giặc Minh đô hộ nước ta, dân chúng vô cùng khổ cực.',
+        'Lê Lợi dựng cờ khởi nghĩa ở Lam Sơn, kêu gọi mọi người cùng đánh giặc cứu nước.',
+        'Lê Thận đi đánh cá vớt được một lưỡi gươm; Lê Lợi lại nhặt được chuôi gươm nạm ngọc phát sáng trên cây.',
+        'Ghép lại thành thanh gươm thần, nghĩa quân khí thế ngút trời, đánh tan quân giặc.',
+        'Đất nước thanh bình, một hôm vua Lê dạo thuyền trên hồ Tả Vọng.',
+        'Rùa Vàng nổi lên xin lại gươm thần. Vua trả gươm; từ đó hồ mang tên Hoàn Kiếm. Hết!',
+      ],
+    },
+    {
+      id: 'demo-dua-hau', slug: 'dua-hau', title: 'Quả Dưa Hấu (Mai An Tiêm)',
+      desc: 'Sự tích quả dưa hấu — siêng năng, tự lập thì được đền đáp. (Bản demo)',
+      pages: [
+        'Ngày xưa có chàng Mai An Tiêm tài giỏi, được vua yêu quý.',
+        'An Tiêm tin rằng của cải do chính tay mình làm ra mới đáng quý. Vua giận, đày vợ chồng chàng ra đảo hoang.',
+        'Trên đảo, hai vợ chồng vất vả. Một hôm có chú chim mang đến những hạt lạ.',
+        'An Tiêm gieo hạt, chẳng bao lâu mọc thành dây, ra những quả dưa hấu vỏ xanh ruột đỏ ngọt lịm.',
+        'Chàng khắc tên lên quả dưa thả xuống biển. Thuyền buôn nhặt được, tìm đến đổi hàng, gia đình trở nên sung túc.',
+        'Vua nghe tin, hối hận và cho đón An Tiêm về, khen chàng siêng năng, tự lập. Hết!',
+      ],
+    },
+    {
+      id: 'demo-lo-lem', slug: 'lo-lem', title: 'Cô Bé Lọ Lem',
+      desc: 'Truyện cổ tích về cô bé hiền lành và đôi hài thủy tinh. (Bản demo)',
+      pages: [
+        'Ngày xưa có cô bé Lọ Lem hiền lành, sống cùng mẹ kế và hai người chị độc ác.',
+        'Lọ Lem bị bắt làm mọi việc nhà nặng nhọc suốt ngày.',
+        'Hoàng cung mở vũ hội. Hai chị diện áo đẹp đi dự, còn Lọ Lem phải ở nhà, tủi thân khóc.',
+        'Bỗng bà tiên hiện ra, hóa quả bí ngô thành cỗ xe, ban cho Lọ Lem váy đẹp và đôi hài thủy tinh, dặn phải về trước nửa đêm.',
+        'Ở vũ hội, hoàng tử say mê Lọ Lem. Chuông điểm mười hai giờ, nàng vội chạy về, đánh rơi một chiếc hài.',
+        'Hoàng tử đi tìm khắp nơi. Chiếc hài vừa khít chân Lọ Lem, chàng đón nàng về cung. Hết!',
+      ],
+    },
   ];
 
   async function _seedDemoStorybook() {
