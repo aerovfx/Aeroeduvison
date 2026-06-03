@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#fff2db"/>
+  <circle cx="400" cy="116" r="54" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3" stroke-linecap="round"><line x1="400" y1="38" x2="400" y2="18"/><line x1="322" y1="60" x2="308" y2="46"/><line x1="478" y1="60" x2="492" y2="46"/></g>
+  <path d="M0 470 Q400 435 800 470 L800 600 L0 600 Z" fill="#8fd89e" stroke="#46342a" stroke-width="3"/>
+  <g fill="#ff6b9d" stroke="#46342a" stroke-width="2"><path d="M170 170 q-12 -15 -24 -2 q-8 10 24 32 q32 -22 24 -32 q-12 -13 -24 2Z"/><path d="M630 160 q-12 -14 -23 -2 q-8 10 23 31 q33 -20 23 -31 q-12 -12 -23 2Z"/></g>
+  <!-- quả thị to -->
+  <g transform="translate(250,360)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><circle cx="0" cy="0" r="58" fill="#ffd24d"/><path d="M-12 -54 Q0 -66 12 -54 Q0 -46 -12 -54Z" fill="#3fa14a"/></g>
+  <!-- Tấm bước ra + Vua -->
+  <g transform="translate(470,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-34 50 Q-42 72 -34 122 Q0 132 34 122 Q42 72 34 50 Z" fill="#2a2a2a"/>
+    <path d="M-32 122 Q-36 66 0 62 Q36 66 32 122 Z" fill="#e88aae"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 32 Q-38 -8 0 -10 Q38 -8 34 32 Q34 6 0 4 Q-34 6 -34 32 Z" fill="#2a2a2a"/>
+    <polygon points="-22,-10 -11,5 0,-12 11,5 22,-10 17,-21 -17,-21" fill="#ffd24d"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 55 7 48" fill="#e0506a"/>
+  </g>
+  <g transform="translate(610,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-11" y1="120" x2="-11" y2="148"/><line x1="11" y1="120" x2="11" y2="148"/>
+    <ellipse cx="-13" cy="152" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="13" cy="152" rx="10" ry="6" fill="#5a3a22"/>
+    <path d="M-34 122 Q-40 64 0 60 Q40 64 34 122 Z" fill="#d4af37"/>
+    <line x1="-30" y1="92" x2="-52" y2="108"/><circle cx="-54" cy="111" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 30 Q-38 -8 0 -10 Q38 -8 34 30 Q34 6 0 4 Q-34 6 -34 30 Z" fill="#2a2a2a"/>
+    <polygon points="-26,-12 -14,6 0,-14 14,6 26,-12 20,-24 -20,-24" fill="#ffd24d"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 55 7 48" fill="none"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="900" fill="#c08a2a" text-anchor="middle">Tấm trở về, đoàn tụ cùng vua. Ở hiền gặp lành! Hết!</text></g>
+</svg>

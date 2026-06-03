@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <circle cx="120" cy="90" r="42" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <!-- cây khế -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="386" y="300" width="34" height="170" fill="#9c5a2b"/>
+    <circle cx="403" cy="270" r="92" fill="#3fa14a"/><circle cx="340" cy="300" r="56" fill="#56c45a"/><circle cx="466" cy="300" r="56" fill="#56c45a"/>
+    <g stroke="#46342a" stroke-width="2" fill="#ffd24d"><circle cx="360" cy="300" r="11"/><circle cx="420" cy="320" r="11"/><circle cx="450" cy="280" r="11"/><circle cx="390" cy="340" r="11"/></g>
+  </g>
+  <!-- chim phượng -->
+  <g transform="translate(560,300)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M40 20 Q150 -10 160 60 Q120 40 60 50 Z" fill="#ff9a3d"/>
+    <path d="M50 24 Q140 4 150 56" fill="none" stroke="#e8362d" stroke-width="3"/>
+    <ellipse cx="0" cy="20" rx="50" ry="40" fill="#ff7a3d"/>
+    <path d="M-20 10 Q-40 -8 -30 30 Q-10 24 -2 28 Z" fill="#ffb020"/>
+    <circle cx="-30" cy="-18" r="26" fill="#ff9a3d"/>
+    <path d="M-30 -36 Q-22 -58 -14 -36 Q-26 -42 -30 -36 Z" fill="#e8362d"/>
+    <circle cx="-38" cy="-22" r="7" fill="#fff"/><circle cx="-39" cy="-21" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <polygon points="-52,-18 -72,-12 -52,-6" fill="#ffd24d"/>
+    <line x1="-12" y1="58" x2="-12" y2="74"/><line x1="12" y1="58" x2="12" y2="74"/>
+  </g>
+  <g><rect x="180" y="34" width="440" height="64" rx="20" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="32" font-weight="900" fill="#e8a33a" text-anchor="middle">Ăn Khế Trả Vàng</text></g>
+</svg>

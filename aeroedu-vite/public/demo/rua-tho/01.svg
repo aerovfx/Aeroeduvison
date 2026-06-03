@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <circle cx="700" cy="86" r="44" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><rect x="120" y="320" width="28" height="110" fill="#9c5a2b"/><circle cx="134" cy="302" r="56" fill="#3fa14a"/></g>
+  <!-- Thỏ -->
+  <g transform="translate(300,310)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="150"/><line x1="12" y1="120" x2="12" y2="150"/>
+    <ellipse cx="-15" cy="154" rx="13" ry="7" fill="#f4f4f4"/><ellipse cx="15" cy="154" rx="13" ry="7" fill="#f4f4f4"/>
+    <path d="M-34 122 Q-40 60 0 56 Q40 60 34 122 Z" fill="#f4f4f4"/>
+    <line x1="-30" y1="80" x2="-50" y2="100"/><circle cx="-52" cy="103" r="7" fill="#f4f4f4"/>
+    <line x1="30" y1="80" x2="50" y2="100"/><circle cx="52" cy="103" r="7" fill="#f4f4f4"/>
+    <circle cx="0" cy="30" r="36" fill="#f4f4f4"/>
+    <path d="M-20 4 Q-30 -60 -14 -62 Q2 -58 -6 6 Z" fill="#f4f4f4"/><path d="M-19 -2 Q-25 -52 -15 -54 Q-6 -50 -10 0 Z" fill="#f7c0cf"/>
+    <path d="M20 4 Q30 -60 14 -62 Q-2 -58 6 6 Z" fill="#f4f4f4"/><path d="M19 -2 Q25 -52 15 -54 Q6 -50 10 0 Z" fill="#f7c0cf"/>
+    <circle cx="-12" cy="30" r="8" fill="#fff"/><circle cx="12" cy="30" r="8" fill="#fff"/>
+    <circle cx="-11" cy="32" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="32" r="4" fill="#2a2a2a" stroke="none"/>
+    <ellipse cx="0" cy="42" rx="5" ry="4" fill="#f08aa0" stroke="none"/>
+    <circle cx="-22" cy="44" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="44" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M0 46 Q0 54 -6 54 M0 46 Q0 54 6 54" fill="none"/>
+    <rect x="-6" y="52" width="5" height="7" fill="#fff"/><rect x="1" y="52" width="5" height="7" fill="#fff"/>
+  </g>
+  <!-- Rùa -->
+  <g transform="translate(540,400)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-30" cy="40" rx="12" ry="8" fill="#6fb86f"/><ellipse cx="30" cy="40" rx="12" ry="8" fill="#6fb86f"/>
+    <path d="M-66 20 Q-66 -34 0 -36 Q66 -34 66 20 Z" fill="#4a9e5e"/>
+    <path d="M-66 20 Q0 36 66 20" fill="#7cc47c"/>
+    <g stroke="#46342a" stroke-width="2.5" fill="#3a8a4e"><path d="M-30 -6 l-10 14 6 14 16 0 6 -14 -10 -14Z"/><path d="M14 -10 l-10 14 6 14 16 0 6 -14 -10 -14Z"/></g>
+    <circle cx="-78" cy="6" r="22" fill="#7cc47c"/>
+    <circle cx="-84" cy="2" r="5" fill="#fff"/><circle cx="-84" cy="3" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M-92 14 Q-84 18 -76 14" fill="none"/>
+    <circle cx="-72" cy="14" r="5" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <g><rect x="200" y="34" width="400" height="64" rx="20" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="34" font-weight="900" fill="#3fa14a" text-anchor="middle">Rùa và Thỏ</text></g>
+</svg>

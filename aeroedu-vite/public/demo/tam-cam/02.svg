@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e7e2d2"/>
+  <rect x="0" y="440" width="800" height="160" fill="#c8a86a" stroke="#46342a" stroke-width="3"/>
+  <!-- Tấm gánh nước -->
+  <g transform="translate(250,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="10" ry="6" fill="#5a3a22"/>
+    <path d="M-32 56 Q-40 78 -34 122 Q0 132 34 122 Q40 78 32 56 Z" fill="#2a2a2a"/>
+    <path d="M-30 122 Q-34 76 0 72 Q34 76 30 122 Z" fill="#e88aae"/>
+    <line x1="-60" y1="40" x2="60" y2="40" stroke="#8a5a2b" stroke-width="5"/>
+    <line x1="-30" y1="64" x2="-50" y2="44"/><line x1="30" y1="64" x2="50" y2="44"/>
+    <path d="M-72 44 Q-72 76 -48 76 Q-24 76 -24 44 Z" fill="#9c6b3f"/><path d="M24 44 Q24 76 48 76 Q72 76 72 44 Z" fill="#9c6b3f"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 34 Q-38 -4 0 -6 Q38 -4 34 34 Q34 6 0 4 Q-34 6 -34 34 Z" fill="#2a2a2a"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="38" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="38" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-6 50 Q0 46 6 50" fill="none"/>
+  </g>
+  <!-- dì ghẻ quát -->
+  <g transform="translate(560,310)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-11" y1="122" x2="-11" y2="150"/><line x1="11" y1="122" x2="11" y2="150"/>
+    <ellipse cx="-13" cy="154" rx="10" ry="6" fill="#5a3a22"/><ellipse cx="13" cy="154" rx="10" ry="6" fill="#5a3a22"/>
+    <path d="M-34 124 Q-40 64 0 60 Q40 64 34 124 Z" fill="#7a5a8a"/>
+    <line x1="-32" y1="86" x2="-56" y2="70"/><circle cx="-58" cy="67" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="36" r="32" fill="#ffe0bd"/>
+    <path d="M-34 32 Q-38 -8 0 -10 Q38 -8 34 32 Q34 8 0 6 Q-34 8 -34 32 Z" fill="#6b6b6b"/>
+    <circle cx="0" cy="-12" r="13" fill="#6b6b6b"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M-16 30 L-4 33 M16 30 L4 33" fill="none" stroke-width="2.5"/>
+    <path d="M-10 50 Q0 44 10 50" fill="none"/>
+  </g>
+  <g><rect x="320" y="120" width="200" height="50" rx="14" fill="#fff" stroke="#46342a" stroke-width="3"/><polygon points="470,168 492,168 510,196" fill="#fff" stroke="#46342a" stroke-width="3"/><text x="420" y="152" font-family="'Comic Sans MS',sans-serif" font-size="18" font-weight="800" fill="#7a5a8a" text-anchor="middle">Làm nhanh lên!</text></g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="800" fill="#7a5a8a" text-anchor="middle">Tấm hiền lành bị dì ghẻ bắt làm lụng vất vả</text></g>
+</svg>

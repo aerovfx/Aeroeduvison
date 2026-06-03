@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <!-- vạch xuất phát -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><rect x="120" y="250" width="14" height="220" fill="#a9712f"/><rect x="120" y="250" width="120" height="50" fill="#e8362d"/><text x="180" y="284" font-family="'Comic Sans MS',sans-serif" font-size="24" font-weight="900" fill="#fff" text-anchor="middle" stroke="none">START</text></g>
+  <g stroke="#fff" stroke-width="0"><g fill="#fff"><rect x="138" y="455" width="20" height="20"/><rect x="178" y="455" width="20" height="20"/><rect x="218" y="455" width="20" height="20"/></g></g>
+  <!-- Thỏ sẵn sàng -->
+  <g transform="translate(330,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-14" y1="118" x2="-22" y2="146"/><line x1="12" y1="118" x2="20" y2="148"/>
+    <ellipse cx="-24" cy="150" rx="13" ry="7" fill="#f4f4f4"/><ellipse cx="22" cy="150" rx="13" ry="7" fill="#f4f4f4"/>
+    <path d="M-32 120 Q-38 62 0 58 Q38 62 32 120 Z" fill="#f4f4f4"/>
+    <circle cx="0" cy="32" r="34" fill="#f4f4f4"/>
+    <path d="M-18 8 Q-28 -52 -14 -56 Q0 -50 -6 10 Z" fill="#f4f4f4"/><path d="M-17 2 Q-23 -44 -14 -48 Q-6 -42 -9 4 Z" fill="#f7c0cf"/>
+    <path d="M18 8 Q28 -52 14 -56 Q0 -50 6 10 Z" fill="#f4f4f4"/><path d="M17 2 Q23 -44 14 -48 Q6 -42 9 4 Z" fill="#f7c0cf"/>
+    <circle cx="-11" cy="32" r="7.5" fill="#fff"/><circle cx="11" cy="32" r="7.5" fill="#fff"/>
+    <circle cx="-10" cy="33" r="3.8" fill="#2a2a2a" stroke="none"/><circle cx="12" cy="33" r="3.8" fill="#2a2a2a" stroke="none"/>
+    <ellipse cx="0" cy="43" rx="5" ry="4" fill="#f08aa0" stroke="none"/>
+    <circle cx="-21" cy="45" r="6" fill="#ff9ab0" stroke="none"/><circle cx="21" cy="45" r="6" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <!-- Rùa sẵn sàng -->
+  <g transform="translate(520,400)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-26" cy="38" rx="11" ry="7" fill="#6fb86f"/><ellipse cx="26" cy="38" rx="11" ry="7" fill="#6fb86f"/>
+    <path d="M-58 18 Q-58 -30 0 -32 Q58 -30 58 18 Z" fill="#4a9e5e"/><path d="M-58 18 Q0 32 58 18" fill="#7cc47c"/>
+    <g stroke="#46342a" stroke-width="2.5" fill="#3a8a4e"><path d="M-12 -8 l-9 12 5 12 14 0 5 -12 -9 -12Z"/></g>
+    <circle cx="-70" cy="6" r="20" fill="#7cc47c"/><circle cx="-75" cy="2" r="4.5" fill="#fff"/><circle cx="-75" cy="3" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M-82 13 Q-74 17 -68 13" fill="none"/>
+  </g>
+  <g><rect x="170" y="36" width="460" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="22" font-weight="800" fill="#3fa14a" text-anchor="middle">Cuộc đua bắt đầu! Sẵn sàng… chạy!</text></g>
+</svg>

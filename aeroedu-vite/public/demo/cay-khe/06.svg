@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs><linearGradient id="sea6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aee0f5"/><stop offset="1" stop-color="#2f8fc0"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#sea6)"/>
+  <circle cx="120" cy="90" r="38" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 380 Q400 360 800 380 L800 600 L0 600 Z" fill="#2f8fc0" stroke="#46342a" stroke-width="3"/>
+  <g fill="#bfe7ff" stroke="#46342a" stroke-width="2" opacity="0.7"><path d="M0 420 Q60 405 120 420 T240 420 T360 420 T480 420 T600 420 T720 420 T800 420"/></g>
+  <!-- chim đuối, nghiêng -->
+  <g transform="translate(300,200) rotate(-18)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M40 20 Q150 -10 160 56 Q120 38 60 48 Z" fill="#ff9a3d"/>
+    <ellipse cx="0" cy="20" rx="50" ry="38" fill="#ff7a3d"/>
+    <circle cx="-30" cy="-12" r="24" fill="#ff9a3d"/>
+    <circle cx="-38" cy="-16" r="6.5" fill="#fff"/><circle cx="-39" cy="-15" r="3" fill="#2a2a2a" stroke="none"/>
+    <path d="M-46 -8 Q-40 -4 -34 -8" fill="none"/>
+    <polygon points="-50,-12 -70,-6 -50,0" fill="#ffd24d"/>
+  </g>
+  <!-- người anh + túi vàng rơi xuống biển -->
+  <g transform="translate(470,360)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M40 90 Q24 14 90 14 Q156 14 140 90 Z" fill="#b98a3a"/>
+    <g stroke="#46342a" stroke-width="2" fill="#ffd24d"><circle cx="80" cy="50" r="12"/><circle cx="110" cy="44" r="12"/></g>
+    <line x1="-10" y1="60" x2="-10" y2="84"/><line x1="10" y1="60" x2="10" y2="84"/>
+    <ellipse cx="-12" cy="86" rx="9" ry="5" fill="#5a3a22"/><ellipse cx="12" cy="86" rx="9" ry="5" fill="#5a3a22"/>
+    <path d="M-28 62 Q-32 18 0 14 Q32 18 28 62 Z" fill="#c8a23a"/>
+    <line x1="-26" y1="34" x2="-46" y2="18"/><circle cx="-48" cy="15" r="6" fill="#ffe0bd"/>
+    <circle cx="0" cy="-8" r="28" fill="#ffe0bd"/>
+    <path d="M-30 -10 Q-34 -44 0 -46 Q34 -44 30 -10 Q30 -30 0 -32 Q-30 -30 -30 -10 Z" fill="#2a2a2a"/>
+    <circle cx="-9" cy="-6" r="6" fill="#fff"/><circle cx="9" cy="-6" r="6" fill="#fff"/><circle cx="-9" cy="-7" r="3" fill="#2a2a2a" stroke="none"/><circle cx="9" cy="-7" r="3" fill="#2a2a2a" stroke="none"/>
+    <ellipse cx="0" cy="6" rx="8" ry="10" fill="#9a3a3a"/>
+  </g>
+  <g fill="#cfeaf8" stroke="#46342a" stroke-width="2"><ellipse cx="470" cy="448" rx="60" ry="14"/></g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="900" fill="#1c6a90" text-anchor="middle">Quá nặng, anh rơi xuống biển. Tham thì thâm! Hết!</text></g>
+</svg>

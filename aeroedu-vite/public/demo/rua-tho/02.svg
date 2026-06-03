@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <!-- Thỏ cười chế giễu -->
+  <g transform="translate(280,300)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="150"/><line x1="12" y1="120" x2="12" y2="150"/>
+    <ellipse cx="-15" cy="154" rx="13" ry="7" fill="#f4f4f4"/><ellipse cx="15" cy="154" rx="13" ry="7" fill="#f4f4f4"/>
+    <path d="M-34 122 Q-40 60 0 56 Q40 60 34 122 Z" fill="#f4f4f4"/>
+    <line x1="32" y1="76" x2="58" y2="60"/><circle cx="60" cy="57" r="7" fill="#f4f4f4"/>
+    <circle cx="0" cy="30" r="36" fill="#f4f4f4"/>
+    <path d="M-20 4 Q-32 -58 -16 -62 Q0 -56 -6 6 Z" fill="#f4f4f4"/><path d="M-19 -2 Q-26 -50 -16 -54 Q-7 -48 -10 0 Z" fill="#f7c0cf"/>
+    <path d="M18 6 Q34 -54 18 -60 Q4 -52 6 8 Z" fill="#f4f4f4"/><path d="M17 0 Q28 -46 18 -50 Q10 -44 8 2 Z" fill="#f7c0cf"/>
+    <circle cx="-12" cy="30" r="8" fill="#fff"/><circle cx="12" cy="30" r="8" fill="#fff"/>
+    <circle cx="-11" cy="30" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="30" r="4" fill="#2a2a2a" stroke="none"/>
+    <ellipse cx="0" cy="42" rx="5" ry="4" fill="#f08aa0" stroke="none"/>
+    <circle cx="-22" cy="44" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="44" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-10 48 Q0 58 10 48" fill="#c0506a"/>
+  </g>
+  <!-- Rùa nhỏ -->
+  <g transform="translate(560,410)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-26" cy="36" rx="11" ry="7" fill="#6fb86f"/><ellipse cx="26" cy="36" rx="11" ry="7" fill="#6fb86f"/>
+    <path d="M-58 18 Q-58 -30 0 -32 Q58 -30 58 18 Z" fill="#4a9e5e"/>
+    <path d="M-58 18 Q0 32 58 18" fill="#7cc47c"/>
+    <circle cx="-70" cy="6" r="20" fill="#7cc47c"/>
+    <circle cx="-75" cy="2" r="4.5" fill="#fff"/><circle cx="-75" cy="3" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M-82 14 Q-74 17 -68 13" fill="none"/>
+  </g>
+  <g><rect x="290" y="120" width="230" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <polygon points="330,174 354,174 320,206" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="405" y="156" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="800" fill="#e8362d" text-anchor="middle">Rùa chậm như sên!</text></g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="21" font-weight="800" fill="#3fa14a" text-anchor="middle">Thỏ chê Rùa chậm và thách thi chạy</text></g>
+</svg>

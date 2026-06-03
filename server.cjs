@@ -3013,6 +3013,54 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         'Bà ôm em bay lên cao, tới nơi không còn đói rét. Hãy yêu thương những người quanh ta nhé!',
       ],
     },
+    {
+      id: 'demo-rua-tho', slug: 'rua-tho', title: 'Rùa và Thỏ',
+      desc: 'Truyện ngụ ngôn dạy bé bài học kiên trì, không kiêu căng. (Bản demo)',
+      pages: [
+        'Ngày xửa ngày xưa, trong khu rừng có một chú Thỏ nhanh nhẹn và một bác Rùa chậm chạp.',
+        'Thỏ chê Rùa chậm như sên và thách Rùa thi chạy. Rùa điềm tĩnh nhận lời.',
+        'Cuộc đua bắt đầu. Thỏ phóng đi vun vút, bỏ xa Rùa phía sau.',
+        'Thấy Rùa còn xa, Thỏ tự cao nằm nghỉ dưới gốc cây rồi ngủ quên mất.',
+        'Còn Rùa cứ kiên trì bò từng bước, lặng lẽ vượt qua chú Thỏ đang ngủ.',
+        'Rùa về đích trước và thắng cuộc. Kiên trì, chăm chỉ sẽ thành công nhé! Hết!',
+      ],
+    },
+    {
+      id: 'demo-cay-khe', slug: 'cay-khe', title: 'Ăn Khế Trả Vàng',
+      desc: 'Truyện cổ tích dạy bé sống hiền lành, không tham lam. (Bản demo)',
+      pages: [
+        'Ngày xưa có hai anh em. Cha mẹ mất, người anh tham lam chiếm hết của cải, người em chỉ được một cây khế.',
+        'Người em hiền lành chăm sóc cây khế, cây ra quả ngọt trĩu cành.',
+        'Một con chim lớn đến ăn khế. Em than thở, chim liền nói: Ăn khế trả vàng, may túi ba gang, mang đi mà đựng.',
+        'Chim chở người em ra hòn đảo đầy vàng. Em chỉ lấy vừa đủ một túi ba gang rồi về, trở nên giàu có.',
+        'Người anh tham lam đòi đổi cây khế. Hắn may một cái túi thật to và lấy thật nhiều vàng.',
+        'Túi vàng quá nặng, chim đuối sức, người anh rơi xuống biển. Tham thì thâm! Hết!',
+      ],
+    },
+    {
+      id: 'demo-tam-cam', slug: 'tam-cam', title: 'Tấm Cám',
+      desc: 'Truyện cổ tích Việt Nam — ở hiền gặp lành. (Bản demo)',
+      pages: [
+        'Ngày xưa có cô Tấm hiền lành, mồ côi, sống cùng dì ghẻ và em là Cám.',
+        'Tấm chăm chỉ nhưng luôn bị dì ghẻ và Cám bắt làm lụng vất vả.',
+        'Một ngày, Bụt hiện ra giúp Tấm có quần áo đẹp để đi xem hội.',
+        'Trên đường đi hội, Tấm đánh rơi một chiếc hài. Nhà vua nhặt được và truyền tìm chủ nhân.',
+        'Chiếc hài vừa khít chân Tấm. Vua vui mừng đón nàng về làm hoàng hậu.',
+        'Trải qua bao thử thách, Tấm trở về đoàn tụ cùng vua. Ở hiền gặp lành! Hết!',
+      ],
+    },
+    {
+      id: 'demo-thach-sanh', slug: 'thach-sanh', title: 'Thạch Sanh',
+      desc: 'Truyện cổ tích về chàng dũng sĩ tốt bụng, dũng cảm. (Bản demo)',
+      pages: [
+        'Ngày xưa có chàng Thạch Sanh mồ côi, khỏe mạnh và tốt bụng, sống dưới gốc cây đa.',
+        'Hằng ngày Thạch Sanh lên rừng đốn củi để sống qua ngày.',
+        'Lý Thông gian xảo kết nghĩa anh em rồi lừa Thạch Sanh đi nộp mạng cho chằn tinh.',
+        'Thạch Sanh dũng cảm chiến đấu và chém chết con chằn tinh hung dữ.',
+        'Chàng còn bắn đại bàng tinh, cứu được nàng công chúa bị bắt cóc.',
+        'Tiếng đàn thần giúp Thạch Sanh được minh oan. Chàng cưới công chúa, lấy niêu cơm thần đãi quân sĩ. Hết!',
+      ],
+    },
   ];
 
   async function _seedDemoStorybook() {

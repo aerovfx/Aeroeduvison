@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#fff2db"/>
+  <circle cx="400" cy="116" r="52" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3" stroke-linecap="round"><line x1="400" y1="40" x2="400" y2="20"/><line x1="324" y1="62" x2="310" y2="48"/><line x1="476" y1="62" x2="490" y2="48"/></g>
+  <path d="M0 470 Q400 435 800 470 L800 600 L0 600 Z" fill="#8fd89e" stroke="#46342a" stroke-width="3"/>
+  <g fill="#ff6b9d" stroke="#46342a" stroke-width="2"><path d="M400 150 q-13 -16 -26 -2 q-9 11 26 34 q35 -23 26 -34 q-13 -14 -26 2Z"/></g>
+  <!-- niêu cơm thần -->
+  <g transform="translate(150,420)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><path d="M-44 -6 Q-44 50 0 50 Q44 50 44 -6 Z" fill="#9c6b3f"/><ellipse cx="0" cy="-6" rx="44" ry="14" fill="#fff7e6"/><ellipse cx="0" cy="-10" rx="34" ry="9" fill="#fff"/><circle cx="-10" cy="-10" r="4" fill="#fff"/><circle cx="8" cy="-12" r="4" fill="#fff"/></g>
+  <!-- Thạch Sanh gảy đàn -->
+  <g transform="translate(330,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-13" y1="118" x2="-13" y2="146"/><line x1="13" y1="118" x2="13" y2="146"/>
+    <ellipse cx="-15" cy="150" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="15" cy="150" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-30 120 Q-34 70 0 66 Q34 70 30 120 Z" fill="#e0a878"/>
+    <path d="M-30 108 Q0 98 30 108 L30 120 Q0 112 -30 120 Z" fill="#7a4a2a"/>
+    <ellipse cx="34" cy="96" rx="20" ry="26" fill="#c8843e"/><line x1="34" y1="72" x2="50" y2="20" stroke="#8a5a2b" stroke-width="5"/>
+    <line x1="-26" y1="84" x2="20" y2="92"/>
+    <circle cx="0" cy="34" r="32" fill="#ffd9b0"/>
+    <path d="M-34 28 Q-38 -8 0 -10 Q38 -8 34 28 Q34 6 0 4 Q-34 6 -34 28 Z" fill="#2a2a2a"/>
+    <rect x="-32" y="20" width="64" height="7" rx="3" fill="#c0392b"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 55 7 48" fill="none"/>
+  </g>
+  <!-- công chúa -->
+  <g transform="translate(540,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-36 50 Q-44 72 -36 122 Q0 132 36 122 Q44 72 36 50 Z" fill="#2a2a2a"/>
+    <path d="M-34 122 Q-38 66 0 62 Q38 66 34 122 Z" fill="#e85a9a"/>
+    <circle cx="0" cy="34" r="32" fill="#ffe0bd"/>
+    <path d="M-34 32 Q-38 -8 0 -10 Q38 -8 34 32 Q34 6 0 4 Q-34 6 -34 32 Z" fill="#2a2a2a"/>
+    <polygon points="-22,-10 -11,5 0,-12 11,5 22,-10 17,-21 -17,-21" fill="#ffd24d"/>
+    <circle cx="-10" cy="36" r="7" fill="#fff"/><circle cx="10" cy="36" r="7" fill="#fff"/><circle cx="-9" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="11" cy="37" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/><circle cx="19" cy="46" r="5.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 48 Q0 55 7 48" fill="#e0506a"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="60" rx="18" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="76" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="900" fill="#b45309" text-anchor="middle">Thạch Sanh được minh oan, cưới công chúa. Hết!</text></g>
+</svg>

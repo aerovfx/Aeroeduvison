@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><rect x="130" y="280" width="28" height="160" fill="#9c5a2b"/><circle cx="144" cy="262" r="62" fill="#3fa14a"/></g>
+  <!-- Thỏ ngủ (nhỏ, phía sau) -->
+  <g transform="translate(180,420)" stroke="#46342a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-54 18 Q-58 -8 -30 -10 L30 -10 Q58 -8 54 18 Z" fill="#f4f4f4"/>
+    <circle cx="-50" cy="0" r="24" fill="#f4f4f4"/>
+    <path d="M-70 -10 Q-92 -46 -80 -52 Q-66 -52 -60 -16 Z" fill="#f4f4f4"/>
+    <path d="M-60 0 Q-56 3 -52 0" fill="none" stroke-width="2"/><path d="M-46 0 Q-42 3 -38 0" fill="none" stroke-width="2"/>
+    <circle cx="-44" cy="8" r="5" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <text x="120" y="350" font-family="'Comic Sans MS',sans-serif" font-size="30" font-weight="900" fill="#7aa0c8">Z z</text>
+  <!-- Rùa kiên trì vượt lên -->
+  <g transform="translate(500,400)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-30" cy="40" rx="12" ry="8" fill="#6fb86f"/><ellipse cx="30" cy="40" rx="12" ry="8" fill="#6fb86f"/>
+    <path d="M-66 20 Q-66 -34 0 -36 Q66 -34 66 20 Z" fill="#4a9e5e"/><path d="M-66 20 Q0 36 66 20" fill="#7cc47c"/>
+    <g stroke="#46342a" stroke-width="2.5" fill="#3a8a4e"><path d="M-30 -6 l-10 14 6 14 16 0 6 -14 -10 -14Z"/><path d="M14 -10 l-10 14 6 14 16 0 6 -14 -10 -14Z"/></g>
+    <circle cx="78" cy="6" r="22" fill="#7cc47c"/>
+    <circle cx="84" cy="2" r="5" fill="#fff"/><circle cx="84" cy="3" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M76 12 Q84 17 92 12" fill="none"/>
+    <circle cx="72" cy="14" r="5" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <g fill="#cfa46a" stroke="#46342a" stroke-width="2" opacity="0.7"><circle cx="410" cy="430" r="9"/><circle cx="385" cy="442" r="7"/></g>
+  <g><rect x="160" y="36" width="480" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="22" font-weight="800" fill="#3fa14a" text-anchor="middle">Rùa cứ kiên trì bò, lặng lẽ vượt lên</text></g>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#9be08b" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><rect x="360" y="250" width="34" height="190" fill="#9c5a2b"/><circle cx="377" cy="220" r="86" fill="#3fa14a"/><circle cx="320" cy="248" r="54" fill="#56c45a"/><circle cx="440" cy="248" r="54" fill="#56c45a"/></g>
+  <!-- Thỏ ngủ dưới gốc cây -->
+  <g transform="translate(360,420)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-70 24 Q-74 -10 -40 -12 L40 -12 Q74 -10 70 24 Z" fill="#f4f4f4"/>
+    <circle cx="-66" cy="0" r="30" fill="#f4f4f4"/>
+    <path d="M-92 -12 Q-118 -56 -104 -64 Q-88 -66 -78 -20 Z" fill="#f4f4f4"/><path d="M-90 -16 Q-108 -48 -100 -54 Q-90 -54 -82 -22 Z" fill="#f7c0cf"/>
+    <path d="M-66 -14 Q-88 -60 -74 -68 Q-58 -68 -54 -22 Z" fill="#f4f4f4"/>
+    <path d="M-78 -2 Q-74 2 -70 -2" fill="none" stroke-width="2.5"/><path d="M-62 -2 Q-58 2 -54 -2" fill="none" stroke-width="2.5"/>
+    <ellipse cx="-58" cy="8" rx="5" ry="4" fill="#f08aa0" stroke="none"/>
+    <circle cx="-78" cy="10" r="6" fill="#ff9ab0" stroke="none"/>
+  </g>
+  <text x="300" y="300" font-family="'Comic Sans MS',sans-serif" font-size="34" font-weight="900" fill="#7aa0c8">z</text>
+  <text x="270" y="270" font-family="'Comic Sans MS',sans-serif" font-size="46" font-weight="900" fill="#7aa0c8">Z</text>
+  <!-- Rùa vượt qua phía sau -->
+  <g transform="translate(620,420)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-26" cy="36" rx="11" ry="7" fill="#6fb86f"/><ellipse cx="26" cy="36" rx="11" ry="7" fill="#6fb86f"/>
+    <path d="M-56 16 Q-56 -28 0 -30 Q56 -28 56 16 Z" fill="#4a9e5e"/><path d="M-56 16 Q0 30 56 16" fill="#7cc47c"/>
+    <circle cx="62" cy="6" r="20" fill="#7cc47c"/><circle cx="68" cy="2" r="4.5" fill="#fff"/><circle cx="68" cy="3" r="2.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M58 13 Q66 17 74 13" fill="none"/>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="21" font-weight="800" fill="#3fa14a" text-anchor="middle">Thỏ tự cao nằm ngủ quên dưới gốc cây</text></g>
+</svg>

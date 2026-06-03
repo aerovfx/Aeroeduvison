@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs><linearGradient id="sea4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe7ff"/><stop offset="1" stop-color="#5ec0e8"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#sea4)"/>
+  <circle cx="120" cy="100" r="40" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <g fill="#7fd6f0" stroke="#46342a" stroke-width="2" opacity="0.6"><path d="M0 470 Q60 455 120 470 T240 470 T360 470 T480 470 T600 470 T720 470 T800 470 L800 600 L0 600Z"/></g>
+  <!-- đảo vàng -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round"><ellipse cx="560" cy="480" rx="160" ry="50" fill="#e8c98a"/><g stroke="#46342a" stroke-width="2" fill="#ffd24d"><circle cx="500" cy="466" r="14"/><circle cx="560" cy="476" r="16"/><circle cx="620" cy="464" r="14"/><circle cx="535" cy="486" r="12"/><circle cx="592" cy="488" r="12"/></g></g>
+  <!-- chim chở người em bay -->
+  <g transform="translate(300,250)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M50 30 Q170 -6 184 70 Q140 46 70 58 Z" fill="#ff9a3d"/>
+    <ellipse cx="0" cy="30" rx="58" ry="44" fill="#ff7a3d"/>
+    <path d="M-30 14 Q-60 -10 -44 44 Q-16 34 -4 40 Z" fill="#ffb020"/>
+    <circle cx="-40" cy="-10" r="28" fill="#ff9a3d"/>
+    <path d="M-40 -32 Q-30 -56 -20 -32 Q-34 -40 -40 -32 Z" fill="#e8362d"/>
+    <circle cx="-50" cy="-14" r="7" fill="#fff"/><circle cx="-51" cy="-13" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <polygon points="-66,-10 -88,-4 -66,2" fill="#ffd24d"/>
+    <!-- người em ngồi trên lưng -->
+    <g transform="translate(20,-46)">
+      <path d="M-22 44 Q-26 8 0 4 Q26 8 22 44 Z" fill="#6f9bd0"/>
+      <circle cx="0" cy="-10" r="22" fill="#ffe0bd"/>
+      <path d="M-23 -12 Q-26 -40 0 -42 Q26 -40 23 -12 Q23 -28 0 -30 Q-23 -28 -23 -12 Z" fill="#2a2a2a"/>
+      <circle cx="-8" cy="-8" r="5" fill="#fff"/><circle cx="8" cy="-8" r="5" fill="#fff"/><circle cx="-7" cy="-7" r="2.5" fill="#2a2a2a" stroke="none"/><circle cx="9" cy="-7" r="2.5" fill="#2a2a2a" stroke="none"/>
+      <circle cx="-15" cy="0" r="5" fill="#ff9ab0" stroke="none"/><circle cx="15" cy="0" r="5" fill="#ff9ab0" stroke="none"/>
+      <path d="M-6 2 Q0 7 6 2" fill="none"/>
+      <rect x="14" y="18" width="22" height="22" rx="4" fill="#caa15a"/>
+    </g>
+  </g>
+  <g><rect x="150" y="36" width="500" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="800" fill="#1c7ba0" text-anchor="middle">Chim chở em ra đảo vàng, em lấy vừa đủ</text></g>
+</svg>

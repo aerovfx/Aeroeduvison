@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#ffeed0"/>
+  <g fill="#ffd24d" stroke="#46342a" stroke-width="2"><path d="M160 150 l5 12 12 1 -9 9 3 12 -11 -7 -11 7 3 -12 -9 -9 12 -1Z"/><path d="M640 140 l5 12 12 1 -9 9 3 12 -11 -7 -11 7 3 -12 -9 -9 12 -1Z"/></g>
+  <path d="M0 470 Q400 440 800 470 L800 600 L0 600 Z" fill="#8fd89e" stroke="#46342a" stroke-width="3"/>
+  <g fill="#ff6b9d" stroke="#46342a" stroke-width="2"><path d="M400 150 q-13 -16 -26 -2 q-9 11 26 34 q35 -23 26 -34 q-13 -14 -26 2Z"/></g>
+  <!-- Vua -->
+  <g transform="translate(300,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-36 122 Q-42 62 0 58 Q42 62 36 122 Z" fill="#d4af37"/>
+    <line x1="32" y1="90" x2="54" y2="106"/><circle cx="56" cy="109" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="34" fill="#ffe0bd"/>
+    <path d="M-36 30 Q-40 -8 0 -10 Q40 -8 36 30 Q36 6 0 4 Q-36 6 -36 30 Z" fill="#2a2a2a"/>
+    <polygon points="-30,-12 -18,8 0,-14 18,8 30,-12 24,-26 -24,-26" fill="#ffd24d"/>
+    <circle cx="-11" cy="36" r="7.5" fill="#fff"/><circle cx="11" cy="36" r="7.5" fill="#fff"/><circle cx="-10" cy="37" r="3.8" fill="#2a2a2a" stroke="none"/><circle cx="12" cy="37" r="3.8" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-20" cy="46" r="6" fill="#ff9ab0" stroke="none"/><circle cx="20" cy="46" r="6" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 48 Q0 55 8 48" fill="none"/>
+  </g>
+  <!-- Tấm hoàng hậu -->
+  <g transform="translate(500,320)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="120" x2="-12" y2="148"/><line x1="12" y1="120" x2="12" y2="148"/>
+    <ellipse cx="-14" cy="152" rx="11" ry="6" fill="#5a3a22"/><ellipse cx="14" cy="152" rx="11" ry="6" fill="#5a3a22"/>
+    <path d="M-36 50 Q-44 74 -36 122 Q0 132 36 122 Q44 74 36 50 Z" fill="#2a2a2a"/>
+    <path d="M-34 122 Q-38 66 0 62 Q38 66 34 122 Z" fill="#e88aae"/>
+    <line x1="-30" y1="92" x2="-52" y2="108"/><circle cx="-54" cy="111" r="7" fill="#ffe0bd"/>
+    <circle cx="0" cy="34" r="34" fill="#ffe0bd"/>
+    <path d="M-36 32 Q-40 -8 0 -10 Q40 -8 36 32 Q36 6 0 4 Q-36 6 -36 32 Z" fill="#2a2a2a"/>
+    <polygon points="-24,-10 -12,6 0,-12 12,6 24,-10 18,-22 -18,-22" fill="#ffd24d"/>
+    <circle cx="-11" cy="36" r="7.5" fill="#fff"/><circle cx="11" cy="36" r="7.5" fill="#fff"/><circle cx="-10" cy="37" r="3.8" fill="#2a2a2a" stroke="none"/><circle cx="12" cy="37" r="3.8" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-20" cy="46" r="6" fill="#ff9ab0" stroke="none"/><circle cx="20" cy="46" r="6" fill="#ff9ab0" stroke="none"/>
+    <path d="M-8 48 Q0 55 8 48" fill="#e0506a"/>
+  </g>
+  <g><rect x="160" y="36" width="480" height="56" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="73" font-family="'Comic Sans MS',sans-serif" font-size="19" font-weight="800" fill="#b48a1a" text-anchor="middle">Hài vừa chân Tấm — vua đón nàng làm hoàng hậu</text></g>
+</svg>
