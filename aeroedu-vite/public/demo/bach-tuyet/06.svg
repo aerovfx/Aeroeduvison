@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#d8e6c8"/>
+  <path d="M0 470 Q400 440 800 470 L800 600 L0 600 Z" fill="#7fb86a" stroke="#46342a" stroke-width="3"/>
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="540" y="300" width="200" height="160" rx="8" fill="#ffe3b3"/>
+    <polygon points="525,302 640,222 755,302" fill="#c0603f"/>
+    <rect x="575" y="370" width="50" height="90" rx="4" fill="#9c5a2b"/>
+  </g>
+  <!-- Bà lão (hoàng hậu giả) -->
+  <g transform="translate(230,300)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="170" x2="-12" y2="196"/><line x1="12" y1="170" x2="12" y2="196"/>
+    <ellipse cx="-14" cy="200" rx="11" ry="6" fill="#3a2a20"/><ellipse cx="14" cy="200" rx="11" ry="6" fill="#3a2a20"/>
+    <path d="M-42 172 Q-30 56 0 52 Q30 56 42 172 Z" fill="#6b5a3a"/>
+    <path d="M-44 60 Q0 0 44 60 Q44 30 0 28 Q-44 30 -44 60 Z" fill="#5a4a2e"/>
+    <line x1="44" y1="120" x2="74" y2="140"/><circle cx="80" cy="146" r="16" fill="#e8362d"/><path d="M80 130 L78 122" stroke-width="3"/>
+    <circle cx="0" cy="44" r="34" fill="#e8d3b0"/>
+    <path d="M-36 36 Q0 -16 36 36 Q36 18 0 18 Q-36 18 -36 36 Z" fill="#5a4a2e"/>
+    <circle cx="-12" cy="44" r="7" fill="#fff"/><circle cx="12" cy="44" r="7" fill="#fff"/>
+    <circle cx="-11" cy="45" r="3.5" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="45" r="3.5" fill="#2a2a2a" stroke="none"/>
+    <path d="M0 50 Q6 56 0 60" fill="none"/>
+    <path d="M-12 66 Q0 60 12 66" fill="none"/>
+    <line x1="-16" y1="38" x2="-6" y2="40" stroke-width="2"/><line x1="6" y1="40" x2="16" y2="38" stroke-width="2"/>
+  </g>
+  <!-- Bạch Tuyết -->
+  <g transform="translate(440,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="150" x2="-12" y2="180"/><line x1="12" y1="150" x2="12" y2="180"/>
+    <ellipse cx="-14" cy="184" rx="11" ry="6" fill="#3a2a20"/><ellipse cx="14" cy="184" rx="11" ry="6" fill="#3a2a20"/>
+    <path d="M-38 152 Q-44 108 0 104 Q44 108 38 152 Z" fill="#ffd24d"/>
+    <path d="M-25 110 Q-29 72 0 68 Q29 72 25 110 Z" fill="#4a7fd0"/>
+    <circle cx="-25" cy="82" r="11" fill="#e8362d"/><circle cx="25" cy="82" r="11" fill="#e8362d"/>
+    <line x1="-28" y1="90" x2="-50" y2="110"/><circle cx="-52" cy="113" r="7" fill="#ffe8d6"/>
+    <circle cx="0" cy="38" r="38" fill="#ffe8d6"/>
+    <path d="M-40 40 Q-44 -8 0 -10 Q44 -8 40 40 Q40 10 26 6 Q30 22 20 24 L-20 24 Q-30 22 -26 6 Q-40 10 -40 40 Z" fill="#2a2a2a"/>
+    <rect x="-28" y="4" width="56" height="8" rx="4" fill="#e8362d"/>
+    <circle cx="-12" cy="42" r="8.5" fill="#fff"/><circle cx="13" cy="42" r="8.5" fill="#fff"/>
+    <circle cx="-10" cy="44" r="4" fill="#2a2a2a" stroke="none"/><circle cx="15" cy="44" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="54" r="6.5" fill="#ff8aa8" stroke="none"/><circle cx="23" cy="54" r="6.5" fill="#ff8aa8" stroke="none"/>
+    <path d="M-6 58 Q0 63 6 58" fill="#e0506a"/>
+  </g>
+  <g><rect x="160" y="36" width="480" height="58" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="74" font-family="'Comic Sans MS',sans-serif" font-size="22" font-weight="800" fill="#6b4f8a" text-anchor="middle">Bà lão đưa quả táo độc cho Bạch Tuyết</text></g>
+</svg>

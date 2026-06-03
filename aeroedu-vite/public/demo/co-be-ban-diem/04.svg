@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#1c2950"/>
+  <g fill="#ffffff" opacity="0.85"><circle cx="120" cy="80" r="4"/><circle cx="640" cy="70" r="3"/><circle cx="700" cy="160" r="4"/><circle cx="80" cy="200" r="3"/></g>
+  <path d="M0 470 Q400 445 800 470 L800 600 L0 600 Z" fill="#e6eefc" stroke="#46342a" stroke-width="3"/>
+  <!-- glow ấm -->
+  <circle cx="540" cy="300" r="180" fill="#ffb347" opacity="0.22"/>
+  <circle cx="540" cy="300" r="120" fill="#ffd24d" opacity="0.25"/>
+  <!-- lò sưởi -->
+  <g transform="translate(540,300)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="-90" y="-70" width="180" height="170" rx="10" fill="#6b4636"/>
+    <rect x="-90" y="-92" width="180" height="26" rx="6" fill="#8a5a44"/>
+    <path d="M-58 100 Q-58 -30 0 -34 Q58 -30 58 100 Z" fill="#2a1a14"/>
+    <path d="M-34 100 Q-40 20 0 -8 Q40 20 34 100 Z" fill="#ff7a18" stroke="none"/>
+    <path d="M-20 100 Q-24 36 0 14 Q24 36 20 100 Z" fill="#ffd24d" stroke="none"/>
+    <rect x="-70" y="-126" width="50" height="34" rx="4" fill="#9aa6c0"/>
+  </g>
+  <!-- Cô bé ngồi (nhỏ) bên trái -->
+  <g transform="translate(190,370) scale(0.85)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-26" cy="86" rx="15" ry="9" fill="#ffe8d6"/><ellipse cx="24" cy="86" rx="15" ry="9" fill="#ffe8d6"/>
+    <path d="M-46 80 Q-52 6 0 0 Q52 6 46 80 Z" fill="#9aa6c0"/>
+    <path d="M-46 30 Q0 -8 46 30 Q24 16 0 18 Q-24 16 -46 30 Z" fill="#7a6a8a"/>
+    <circle cx="0" cy="-44" r="34" fill="#ffe8d6"/>
+    <path d="M-36 -40 Q-42 -84 0 -86 Q42 -84 36 -40 Q36 -64 20 -66 L-20 -66 Q-36 -64 -36 -40 Z" fill="#caa15a"/>
+    <path d="M-37 -50 Q0 -94 37 -50 Q37 -70 0 -72 Q-37 -70 -37 -50 Z" fill="#b08746"/>
+    <circle cx="-12" cy="-42" r="8" fill="#fff"/><circle cx="12" cy="-42" r="8" fill="#fff"/>
+    <circle cx="-11" cy="-40" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="-40" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="-30" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="-30" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 -26 Q0 -20 7 -26" fill="none"/>
+    <line x1="34" y1="20" x2="58" y2="-4"/><circle cx="60" cy="-7" r="7" fill="#ffe8d6"/>
+    <line x1="60" y1="-7" x2="72" y2="-24" stroke="#a9712f" stroke-width="3"/>
+    <path d="M72 -24 Q65 -38 72 -48 Q79 -38 72 -24 Z" fill="#ffb020" stroke="none"/>
+  </g>
+  <g><rect x="170" y="34" width="460" height="58" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="72" font-family="'Comic Sans MS',sans-serif" font-size="22" font-weight="800" fill="#c2410c" text-anchor="middle">Que thứ nhất — một lò sưởi ấm áp!</text></g>
+</svg>

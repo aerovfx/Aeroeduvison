@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cdeaff"/>
+  <circle cx="700" cy="84" r="42" fill="#ffd24d" stroke="#46342a" stroke-width="3"/>
+  <path d="M0 470 Q400 432 800 470 L800 600 L0 600 Z" fill="#8ad879" stroke="#46342a" stroke-width="3"/>
+  <!-- ngôi nhà nhỏ xinh của 7 chú lùn -->
+  <g stroke="#46342a" stroke-width="3.5" stroke-linejoin="round">
+    <rect x="430" y="300" width="240" height="160" rx="8" fill="#ffe3b3"/>
+    <polygon points="412,302 550,210 688,302" fill="#c0603f"/>
+    <rect x="470" y="370" width="56" height="90" rx="4" fill="#9c5a2b"/>
+    <circle cx="514" cy="416" r="4" fill="#ffd24d"/>
+    <rect x="575" y="340" width="56" height="48" rx="4" fill="#bfe7ff"/>
+    <line x1="603" y1="340" x2="603" y2="388"/><line x1="575" y1="364" x2="631" y2="364"/>
+    <rect x="80" y="320" width="28" height="130" fill="#9c5a2b"/><circle cx="94" cy="302" r="58" fill="#3fa14a"/>
+  </g>
+  <!-- 7 nấm nhỏ -->
+  <g stroke="#46342a" stroke-width="2.5"><g transform="translate(300,470)"><rect x="-4" y="0" width="8" height="18" fill="#fff"/><ellipse cx="0" cy="-2" rx="16" ry="10" fill="#e8362d"/><circle cx="-5" cy="-4" r="2.5" fill="#fff" stroke="none"/><circle cx="6" cy="-2" r="2.5" fill="#fff" stroke="none"/></g></g>
+  <!-- Bạch Tuyết trước cửa -->
+  <g transform="translate(220,330)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-12" y1="150" x2="-12" y2="180"/><line x1="12" y1="150" x2="12" y2="180"/>
+    <ellipse cx="-14" cy="184" rx="11" ry="6" fill="#3a2a20"/><ellipse cx="14" cy="184" rx="11" ry="6" fill="#3a2a20"/>
+    <path d="M-38 152 Q-44 108 0 104 Q44 108 38 152 Z" fill="#ffd24d"/>
+    <path d="M-25 110 Q-29 72 0 68 Q29 72 25 110 Z" fill="#4a7fd0"/>
+    <circle cx="-25" cy="82" r="11" fill="#e8362d"/><circle cx="25" cy="82" r="11" fill="#e8362d"/>
+    <line x1="28" y1="90" x2="50" y2="110"/><circle cx="52" cy="113" r="7" fill="#ffe8d6"/>
+    <circle cx="0" cy="38" r="38" fill="#ffe8d6"/>
+    <path d="M-40 40 Q-44 -8 0 -10 Q44 -8 40 40 Q40 10 26 6 Q30 22 20 24 L-20 24 Q-30 22 -26 6 Q-40 10 -40 40 Z" fill="#2a2a2a"/>
+    <rect x="-28" y="4" width="56" height="8" rx="4" fill="#e8362d"/>
+    <circle cx="-12" cy="42" r="8.5" fill="#fff"/><circle cx="13" cy="42" r="8.5" fill="#fff"/>
+    <circle cx="-10" cy="44" r="4" fill="#2a2a2a" stroke="none"/><circle cx="15" cy="44" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="54" r="6.5" fill="#ff8aa8" stroke="none"/><circle cx="23" cy="54" r="6.5" fill="#ff8aa8" stroke="none"/>
+    <path d="M-7 58 Q0 65 7 58" fill="#e0506a"/>
+  </g>
+  <g><rect x="120" y="36" width="560" height="58" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="74" font-family="'Comic Sans MS',sans-serif" font-size="21" font-weight="800" fill="#3fa14a" text-anchor="middle">Nàng thấy ngôi nhà nhỏ của bảy chú lùn</text></g>
+</svg>

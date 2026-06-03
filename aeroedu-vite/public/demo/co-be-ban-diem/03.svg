@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#1c2950"/>
+  <g fill="#ffffff" stroke="none" opacity="0.9"><circle cx="120" cy="90" r="4"/><circle cx="300" cy="70" r="3"/><circle cx="520" cy="110" r="4"/><circle cx="660" cy="80" r="3"/><circle cx="220" cy="180" r="3"/><circle cx="600" cy="200" r="4"/></g>
+  <!-- bức tường góc phố -->
+  <g stroke="#46342a" stroke-width="3"><rect x="0" y="120" width="250" height="360" fill="#33406a"/><rect x="40" y="160" width="50" height="60" fill="#22305a"/><rect x="140" y="160" width="50" height="60" fill="#22305a"/></g>
+  <path d="M0 470 Q400 445 800 470 L800 600 L0 600 Z" fill="#e6eefc" stroke="#46342a" stroke-width="3"/>
+  <ellipse cx="420" cy="500" rx="120" ry="22" fill="#dbe7fb" stroke="#46342a" stroke-width="2"/>
+  <!-- Cô bé ngồi co ro, quẹt diêm -->
+  <g transform="translate(400,360)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="-26" cy="86" rx="15" ry="9" fill="#ffe8d6"/><ellipse cx="24" cy="86" rx="15" ry="9" fill="#ffe8d6"/>
+    <path d="M-46 80 Q-52 6 0 0 Q52 6 46 80 Z" fill="#9aa6c0"/>
+    <path d="M-46 30 Q0 -8 46 30 Q24 16 0 18 Q-24 16 -46 30 Z" fill="#7a6a8a"/>
+    <circle cx="0" cy="-44" r="34" fill="#ffe8d6"/>
+    <path d="M-36 -40 Q-42 -84 0 -86 Q42 -84 36 -40 Q36 -64 20 -66 L-20 -66 Q-36 -64 -36 -40 Z" fill="#caa15a"/>
+    <path d="M-37 -50 Q0 -94 37 -50 Q37 -70 0 -72 Q-37 -70 -37 -50 Z" fill="#b08746"/>
+    <circle cx="-12" cy="-42" r="8" fill="#fff"/><circle cx="12" cy="-42" r="8" fill="#fff"/>
+    <circle cx="-11" cy="-40" r="4" fill="#2a2a2a" stroke="none"/><circle cx="13" cy="-40" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="-30" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="22" cy="-30" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 -26 Q0 -21 7 -26" fill="none"/>
+    <!-- tay cầm diêm -->
+    <line x1="34" y1="20" x2="58" y2="-4"/><circle cx="60" cy="-7" r="7" fill="#ffe8d6"/>
+    <line x1="60" y1="-7" x2="74" y2="-26" stroke="#a9712f" stroke-width="3"/>
+    <path d="M74 -26 Q66 -42 74 -52 Q82 -42 74 -26 Z" fill="#ffb020" stroke="none"/>
+    <path d="M74 -30 Q70 -40 74 -47 Q78 -40 74 -30 Z" fill="#fff3b0" stroke="none"/>
+  </g>
+  <g><rect x="150" y="34" width="500" height="58" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="72" font-family="'Comic Sans MS',sans-serif" font-size="20" font-weight="800" fill="#3b4f86" text-anchor="middle">Em nép vào góc tường, quẹt một que diêm cho ấm</text></g>
+</svg>

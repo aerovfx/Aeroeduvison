@@ -2970,26 +2970,66 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   }
 
   // Seed truyện DEMO "Cô Bé Quàng Khăn Đỏ" (tranh SVG tĩnh + caption đọc bằng giọng máy)
+  const DEMO_BOOKS = [
+    {
+      id: 'demo-khan-do', slug: 'khan-do', title: 'Cô Bé Quàng Khăn Đỏ',
+      desc: 'Truyện cổ tích kinh điển — bé lật từng trang, vừa xem tranh vừa nghe kể chuyện. (Bản demo)',
+      pages: [
+        'Ngày xửa ngày xưa, có một cô bé luôn quàng chiếc khăn đỏ xinh xắn nên mọi người gọi em là Cô Bé Quàng Khăn Đỏ.',
+        'Một hôm, mẹ đưa cho em một giỏ bánh và dặn: con mang đến biếu bà ngoại đang bị ốm nhé, nhớ đi thẳng đừng la cà.',
+        'Khăn Đỏ tung tăng đi vào rừng. Nắng vàng, hoa thơm, những chú bướm bay rập rờn thật là đẹp.',
+        'Bỗng nhiên, một con sói to lớn xuất hiện và hỏi bằng giọng ngọt ngào: cô bé ơi, cô đi đâu thế?',
+        'Khăn Đỏ ngây thơ trả lời rằng em đến thăm bà ngoại. Thế là sói liền chạy thật nhanh đến nhà bà trước.',
+        'Sói nhốt bà vào tủ rồi giả làm bà, đội mũ ngủ và nằm chờ trên giường.',
+        'Khi Khăn Đỏ hỏi sao tai bà to thế, sói định vồ lấy em. Vừa lúc đó, bác thợ săn đi ngang qua nghe thấy.',
+        'Bác thợ săn dũng cảm cứu được bà và Khăn Đỏ. Từ đó, Khăn Đỏ luôn nghe lời mẹ. Hết!',
+      ],
+    },
+    {
+      id: 'demo-bach-tuyet', slug: 'bach-tuyet', title: 'Nàng Bạch Tuyết và Bảy Chú Lùn',
+      desc: 'Truyện cổ tích về nàng công chúa tốt bụng và bảy chú lùn đáng yêu. (Bản demo)',
+      pages: [
+        'Ngày xửa ngày xưa, có một nàng công chúa da trắng như tuyết, môi đỏ như son, tên là Bạch Tuyết.',
+        'Hoàng hậu độc ác có một chiếc gương thần. Mụ hỏi: Gương kia ơi, ai đẹp nhất? Gương đáp: Bạch Tuyết đẹp nhất trần gian.',
+        'Ghen tức, hoàng hậu đuổi Bạch Tuyết đi. Nàng sợ hãi chạy trốn vào khu rừng sâu.',
+        'Trong rừng, Bạch Tuyết thấy một ngôi nhà nhỏ xinh xắn của bảy chú lùn. Nàng dọn dẹp rồi ngủ thiếp đi.',
+        'Bảy chú lùn đi làm về, thấy Bạch Tuyết liền yêu quý và cho nàng ở cùng.',
+        'Hoàng hậu giả làm bà lão, mang quả táo độc đến dụ Bạch Tuyết ăn.',
+        'Bạch Tuyết vừa cắn quả táo liền ngã ra ngủ mê man. Bảy chú lùn buồn bã khóc bên nàng.',
+        'Một hoàng tử đi qua, hôn lên trán Bạch Tuyết. Nàng tỉnh dậy, mọi người vui mừng. Hết!',
+      ],
+    },
+    {
+      id: 'demo-co-be-ban-diem', slug: 'co-be-ban-diem', title: 'Cô Bé Bán Diêm',
+      desc: 'Truyện cảm động của Andersen, dạy bé biết yêu thương và sẻ chia. (Bản demo)',
+      pages: [
+        'Đêm giao thừa giá rét, có một cô bé nghèo đi bán diêm trên phố, chân trần trong tuyết lạnh.',
+        'Trời mỗi lúc một lạnh, tuyết rơi đầy. Cả ngày em chẳng bán được bao diêm nào.',
+        'Em ngồi nép vào góc tường, co ro vì lạnh, rồi đánh liều quẹt một que diêm cho ấm.',
+        'Quẹt que diêm thứ nhất, em thấy một lò sưởi ấm áp rực hồng.',
+        'Quẹt que thứ hai, hiện ra bàn tiệc với con ngỗng quay thơm phức.',
+        'Quẹt que thứ ba, một cây thông Noel lộng lẫy đầy nến sáng hiện lên.',
+        'Em quẹt thêm que diêm nữa, và thấy bà nội hiền từ đang mỉm cười với em.',
+        'Bà ôm em bay lên cao, tới nơi không còn đói rét. Hãy yêu thương những người quanh ta nhé!',
+      ],
+    },
+  ];
+
   async function _seedDemoStorybook() {
     const pool = _getPool();
-    const demoPages = [
-      ['/demo/khan-do/01.svg', 'Ngày xửa ngày xưa, có một cô bé luôn quàng chiếc khăn đỏ xinh xắn nên mọi người gọi em là Cô Bé Quàng Khăn Đỏ.'],
-      ['/demo/khan-do/02.svg', 'Một hôm, mẹ đưa cho em một giỏ bánh và dặn: con mang đến biếu bà ngoại đang bị ốm nhé, nhớ đi thẳng đừng la cà.'],
-      ['/demo/khan-do/03.svg', 'Khăn Đỏ tung tăng đi vào rừng. Nắng vàng, hoa thơm, những chú bướm bay rập rờn thật là đẹp.'],
-      ['/demo/khan-do/04.svg', 'Bỗng nhiên, một con sói to lớn xuất hiện và hỏi bằng giọng ngọt ngào: cô bé ơi, cô đi đâu thế?'],
-      ['/demo/khan-do/05.svg', 'Khăn Đỏ ngây thơ trả lời rằng em đến thăm bà ngoại. Thế là sói liền chạy thật nhanh đến nhà bà trước.'],
-      ['/demo/khan-do/06.svg', 'Sói nhốt bà vào tủ rồi giả làm bà, đội mũ ngủ và nằm chờ trên giường.'],
-      ['/demo/khan-do/07.svg', 'Khi Khăn Đỏ hỏi sao tai bà to thế, sói định vồ lấy em. Vừa lúc đó, bác thợ săn đi ngang qua nghe thấy.'],
-      ['/demo/khan-do/08.svg', 'Bác thợ săn dũng cảm cứu được bà và Khăn Đỏ. Từ đó, Khăn Đỏ luôn nghe lời mẹ. Hết!'],
-    ].map(([imageUrl, caption], i) => ({ id: `khando-${i + 1}`, imageUrl, caption, audioUrl: '', flipAtSec: null }));
-    await pool.query(
-      `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
-       VALUES('demo-khan-do',$1,$2,$3,'perPage','',true,$4,true,'system-demo','AeroEduVision')
-       ON CONFLICT (id) DO NOTHING`,
-      ['Cô Bé Quàng Khăn Đỏ',
-       'Truyện cổ tích kinh điển — bé lật từng trang, vừa xem tranh vừa nghe kể chuyện. (Bản demo)',
-       '/demo/khan-do/01.svg', JSON.stringify(demoPages)]
-    );
+    for (const b of DEMO_BOOKS) {
+      const pages = b.pages.map((caption, i) => ({
+        id: `${b.slug}-${i + 1}`,
+        imageUrl: `/demo/${b.slug}/${String(i + 1).padStart(2, '0')}.svg`,
+        caption, audioUrl: '', flipAtSec: null,
+      }));
+      await pool.query(
+        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
+         VALUES($1,$2,$3,$4,'perPage','',true,$5,true,'system-demo','AeroEduVision')
+         ON CONFLICT (id) DO NOTHING`,
+        [b.id, b.title, b.desc, pages[0].imageUrl, JSON.stringify(pages)]
+      );
+    }
   }
 
   // Pre-render giọng Google TTS (vi-VN Wavenet) cho truyện demo → lưu MP3 lên GCS,
@@ -3010,33 +3050,36 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
 
   async function _prerenderDemoAudio() {
     if (!tts || !tts.synthesize) return;
-    const pool = _getPool();
-    const r = await pool.query(`SELECT pages FROM "KidsStorybook" WHERE id='demo-khan-do'`);
-    if (!r.rows[0]) return;
-    const pages = Array.isArray(r.rows[0].pages) ? r.rows[0].pages : [];
-    if (!pages.length || pages.every((p) => p.audioUrl)) return;  // đã có audio rồi
     const storage = _sbStorage();
     if (!storage) return;
-    let changed = false;
-    for (const p of pages) {
-      if (p.audioUrl || !p.caption) continue;
+    const pool = _getPool();
+    for (const b of DEMO_BOOKS) {
+      const r = await pool.query(`SELECT pages FROM "KidsStorybook" WHERE id=$1`, [b.id]);
+      if (!r.rows[0]) continue;
+      const pages = Array.isArray(r.rows[0].pages) ? r.rows[0].pages : [];
+      if (!pages.length || pages.every((p) => p.audioUrl)) continue;  // đã có audio rồi
+      let changed = false;
       try {
-        const buf = await tts.synthesize(p.caption, 'vi');   // throw nếu TTS chưa cấu hình
-        const gcsPath = `storybooks/demo/khan-do-${p.id}.mp3`;
-        await storage.bucket(_SB_BUCKET).file(gcsPath).save(buf, {
-          resumable: false, contentType: 'audio/mpeg',
-          metadata: { cacheControl: 'public, max-age=604800' },
-        });
-        p.audioUrl = `https://storage.googleapis.com/${_SB_BUCKET}/${gcsPath}`;
-        changed = true;
+        for (const p of pages) {
+          if (p.audioUrl || !p.caption) continue;
+          const buf = await tts.synthesize(p.caption, 'vi');   // throw nếu TTS chưa cấu hình
+          const gcsPath = `storybooks/demo/${p.id}.mp3`;
+          await storage.bucket(_SB_BUCKET).file(gcsPath).save(buf, {
+            resumable: false, contentType: 'audio/mpeg',
+            metadata: { cacheControl: 'public, max-age=604800' },
+          });
+          p.audioUrl = `https://storage.googleapis.com/${_SB_BUCKET}/${gcsPath}`;
+          changed = true;
+        }
       } catch (e) {
         console.warn('[storybook] TTS prerender dừng (chưa cấu hình?):', e.message);
-        break;  // không cấu hình được → dừng, để player tự fallback
+        if (changed) await pool.query(`UPDATE "KidsStorybook" SET pages=$2, updated_at=NOW() WHERE id=$1`, [b.id, JSON.stringify(pages)]);
+        return;  // TTS chưa cấu hình → dừng tất cả, player tự fallback
       }
-    }
-    if (changed) {
-      await pool.query(`UPDATE "KidsStorybook" SET pages=$2, updated_at=NOW() WHERE id='demo-khan-do'`, [JSON.stringify(pages)]);
-      console.log('[storybook] ✓ Đã pre-render giọng Google TTS cho truyện demo');
+      if (changed) {
+        await pool.query(`UPDATE "KidsStorybook" SET pages=$2, updated_at=NOW() WHERE id=$1`, [b.id, JSON.stringify(pages)]);
+        console.log(`[storybook] ✓ Pre-render giọng Google TTS: ${b.title}`);
+      }
     }
   }
 

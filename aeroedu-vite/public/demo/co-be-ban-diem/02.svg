@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs><linearGradient id="ns2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16224a"/><stop offset="1" stop-color="#33477c"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#ns2)"/>
+  <g fill="#ffffff" stroke="none" opacity="0.95"><circle cx="80" cy="90" r="5"/><circle cx="200" cy="150" r="4"/><circle cx="320" cy="70" r="5"/><circle cx="430" cy="160" r="4"/><circle cx="560" cy="90" r="5"/><circle cx="680" cy="150" r="4"/><circle cx="120" cy="300" r="4"/><circle cx="260" cy="260" r="5"/><circle cx="500" cy="280" r="4"/><circle cx="640" cy="320" r="5"/><circle cx="380" cy="330" r="4"/></g>
+  <g stroke="#46342a" stroke-width="3" stroke-linejoin="round">
+    <rect x="20" y="280" width="180" height="200" fill="#27345c"/><rect x="45" y="310" width="34" height="34" fill="#ffd24d"/><rect x="120" y="310" width="34" height="34" fill="#ffd24d"/><rect x="45" y="380" width="34" height="34" fill="#ffd24d"/>
+    <rect x="600" y="260" width="180" height="220" fill="#27345c"/><rect x="630" y="295" width="36" height="36" fill="#ffd24d"/><rect x="710" y="295" width="36" height="36" fill="#ffd24d"/>
+  </g>
+  <path d="M0 460 Q400 435 800 460 L800 600 L0 600 Z" fill="#eaf2ff" stroke="#46342a" stroke-width="3"/>
+  <!-- tuyết đống -->
+  <g fill="#dbe7fb" stroke="#46342a" stroke-width="2"><ellipse cx="150" cy="500" rx="60" ry="18"/><ellipse cx="640" cy="510" rx="70" ry="20"/></g>
+  <!-- Cô bé đi trong tuyết, cúi đầu -->
+  <g transform="translate(390,300)" stroke="#46342a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="-14" y1="150" x2="-22" y2="176"/><line x1="12" y1="150" x2="20" y2="178"/>
+    <ellipse cx="-24" cy="180" rx="11" ry="6" fill="#ffe8d6"/><ellipse cx="22" cy="182" rx="11" ry="6" fill="#ffe8d6"/>
+    <path d="M-38 152 Q-44 96 0 92 Q44 96 38 152 L24 140 L12 152 L0 140 L-12 152 L-24 140 Z" fill="#9aa6c0"/>
+    <path d="M-40 110 Q-30 64 0 60 Q30 64 40 110 Q20 96 0 100 Q-20 96 -40 110 Z" fill="#7a6a8a"/>
+    <line x1="-30" y1="100" x2="-50" y2="118"/><circle cx="-52" cy="121" r="7" fill="#ffe8d6"/>
+    <line x1="30" y1="100" x2="48" y2="116"/><circle cx="50" cy="119" r="7" fill="#ffe8d6"/>
+    <rect x="42" y="114" width="20" height="13" rx="2" fill="#d89a4a"/>
+    <circle cx="0" cy="40" r="37" fill="#ffe8d6"/>
+    <path d="M-40 44 Q-46 -4 0 -6 Q46 -4 40 44 Q40 14 24 12 L-24 12 Q-40 14 -40 44 Z" fill="#caa15a"/>
+    <path d="M-41 32 Q0 -18 41 32 Q41 10 0 8 Q-41 10 -41 32 Z" fill="#b08746"/>
+    <circle cx="-12" cy="44" r="8.5" fill="#fff"/><circle cx="13" cy="44" r="8.5" fill="#fff"/>
+    <path d="M-18 42 Q-12 38 -6 42 M6 42 Q12 38 18 42" fill="none" stroke-width="2.5"/>
+    <circle cx="-11" cy="46" r="4" fill="#2a2a2a" stroke="none"/><circle cx="15" cy="46" r="4" fill="#2a2a2a" stroke="none"/>
+    <circle cx="-22" cy="56" r="6.5" fill="#ff9ab0" stroke="none"/><circle cx="23" cy="56" r="6.5" fill="#ff9ab0" stroke="none"/>
+    <path d="M-7 62 Q0 58 7 62" fill="none"/>
+  </g>
+  <g><rect x="150" y="34" width="500" height="58" rx="16" fill="#fff" stroke="#46342a" stroke-width="3.5"/>
+     <text x="400" y="72" font-family="'Comic Sans MS',sans-serif" font-size="21" font-weight="800" fill="#3b4f86" text-anchor="middle">Cả ngày em chẳng bán được bao diêm nào</text></g>
+</svg>
