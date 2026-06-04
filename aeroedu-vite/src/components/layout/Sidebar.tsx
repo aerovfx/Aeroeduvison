@@ -14,7 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
-  Bot, MessageCircle, ClipboardEdit, Atom, Languages, Plug,
+  Bot, MessageCircle, ClipboardEdit, Atom, Languages, Plug, ArrowLeftRight,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -158,6 +158,7 @@ const teacherSections: RouteSection[] = [
       { icon: Sparkles, labelKey: 'routeAiContent',  href: '/teacher/create-module',             badge: 'AI' },
       { icon: Upload,   labelKey: 'routeDigitize',   href: '/teacher/document-digitization',     badge: 'AI' },
       { icon: FileEdit, labelKey: 'routeLatex',      href: '/teacher/latex-documents' },
+      { icon: ArrowLeftRight, labelKey: 'routeLatexConverter', href: '/teacher/latex-converter', badge: 'AI' },
       { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },

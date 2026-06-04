@@ -10986,6 +10986,122 @@ app.post('/api/latex-projects/compile', async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════════════
+// AI CHUYỂN ĐỔI LaTeX ↔ Word (DOCX) — cho tài khoản giáo viên
+//   • DOCX → LaTeX: mammoth (docx→HTML) → AI dựng lại mã LaTeX hoàn chỉnh.
+//   • LaTeX → DOCX: AI chuyển LaTeX → HTML sạch (công thức → Unicode) →
+//     html-to-docx sinh file .docx tải về.
+//   Dùng chung provider DeepSeek → Anthropic (đọc process.env, nay có cả lớp
+//   ghi đè runtime từ dashboard "Tích hợp API"). Gate Bearer qua _latexAuth.
+// ════════════════════════════════════════════════════════════════════════
+
+// Helper AI gọn: trả text hoàn chỉnh (không stream). Throw nếu chưa cấu hình.
+async function _aiComplete({ system, user, maxTokens = 4096, temperature = 0.2 }) {
+  const pref = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+  const hasDS = !!process.env.DEEPSEEK_API_KEY, hasAnt = !!process.env.ANTHROPIC_API_KEY;
+  const tryDeepseek = async () => {
+    const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: maxTokens, temperature }),
+    });
+    if (!r.ok) throw new Error(`DeepSeek HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+    const j = await r.json();
+    return { text: (j.choices?.[0]?.message?.content || '').trim(), provider: 'deepseek', model };
+  };
+  const tryAnthropic = async () => {
+    const model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, system, messages: [{ role: 'user', content: user }] }),
+    });
+    if (!r.ok) throw new Error(`Anthropic HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+    const j = await r.json();
+    const text = Array.isArray(j.content) ? j.content.filter(b => b.type === 'text').map(b => b.text).join('').trim() : '';
+    return { text, provider: 'anthropic', model };
+  };
+  const useDsFirst = (pref === 'deepseek' && hasDS) || (!hasAnt && hasDS);
+  const order = useDsFirst ? [tryDeepseek, tryAnthropic] : [tryAnthropic, tryDeepseek];
+  let lastErr;
+  for (const fn of order) {
+    const isDs = fn === tryDeepseek;
+    if ((isDs && !hasDS) || (!isDs && !hasAnt)) continue;
+    try { const out = await fn(); if (out.text) return out; lastErr = new Error('empty response'); }
+    catch (e) { lastErr = e; console.warn('[ai-convert]', e.message); }
+  }
+  throw lastErr || new Error('Chưa cấu hình AI (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY)');
+}
+
+// Bóc ``` fences nếu model lỡ bọc code block
+function _stripFences(s) {
+  let t = String(s || '').trim();
+  const m = t.match(/^```[a-zA-Z]*\n([\s\S]*?)\n```$/);
+  if (m) t = m[1].trim();
+  return t;
+}
+
+// POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }
+app.post('/api/latex/from-docx', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { docxBase64 } = req.body || {};
+    if (!docxBase64 || typeof docxBase64 !== 'string') return res.status(400).json({ error: 'Thiếu docxBase64' });
+    const b64 = docxBase64.includes(',') ? docxBase64.split(',').pop() : docxBase64;
+    const buf = Buffer.from(b64, 'base64');
+    if (buf.length > 15 * 1024 * 1024) return res.status(413).json({ error: 'File quá lớn (>15MB)' });
+    let mammoth; try { mammoth = require('mammoth'); } catch { return res.status(501).json({ error: 'Thiếu thư viện mammoth trên revision này' }); }
+    const { value: html } = await mammoth.convertToHtml({ buffer: buf });
+    if (!html || !html.trim()) return res.status(422).json({ error: 'Không trích được nội dung từ file Word' });
+    const system = 'Bạn là công cụ chuyển tài liệu sang LaTeX cho giáo viên Việt Nam. CHỈ trả về mã LaTeX hoàn chỉnh có thể biên dịch (XeLaTeX/tectonic), KHÔNG giải thích, KHÔNG bọc trong dấu ```.';
+    const user = `Chuyển nội dung tài liệu sau (trích từ Word dưới dạng HTML) thành tài liệu LaTeX hoàn chỉnh:
+- documentclass article, hỗ trợ tiếng Việt qua fontspec (\\usepackage{fontspec}) + \\usepackage{amsmath,amssymb};
+- giữ cấu trúc tiêu đề (\\section, \\subsection), danh sách (itemize/enumerate), in đậm/nghiêng;
+- bảng dùng môi trường tabular; công thức toán đặt trong $...$ hoặc \\[ \\];
+- nếu HTML có công thức dạng văn bản, hãy tái dựng thành LaTeX toán đúng.
+HTML nguồn:
+
+${html.slice(0, 60000)}`;
+    const out = await _aiComplete({ system, user, maxTokens: 8000 });
+    return res.json({ ok: true, latex: _stripFences(out.text), provider: out.provider, model: out.model });
+  } catch (e) {
+    console.error('[latex:from-docx]', e.message);
+    return res.status(502).json({ error: 'Lỗi chuyển đổi: ' + e.message });
+  }
+});
+
+// POST /api/latex/to-docx — { latex, filename? } → file .docx (attachment)
+app.post('/api/latex/to-docx', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { latex, filename } = req.body || {};
+    if (!latex || typeof latex !== 'string' || latex.trim().length < 5) return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
+    let htmlToDocx; try { htmlToDocx = require('html-to-docx'); } catch { return res.status(501).json({ error: 'Thiếu thư viện html-to-docx trên revision này' }); }
+    const system = 'Bạn là công cụ chuyển LaTeX sang HTML để xuất Word. CHỈ trả về phần HTML body (không <html>/<head>), KHÔNG giải thích, KHÔNG bọc trong ```.';
+    const user = `Chuyển tài liệu LaTeX sau thành HTML sạch để xuất ra Word:
+- \\section→<h1>, \\subsection→<h2>, \\subsubsection→<h3>; đoạn văn→<p>; itemize→<ul>, enumerate→<ol>; \\textbf→<b>, \\textit→<i>;
+- môi trường tabular→<table border="1"> với <tr>/<td>;
+- công thức toán: chuyển sang ký hiệu Unicode dễ đọc (vd \\frac{a}{b}→(a)/(b) hoặc a⁄b, x^{2}→x², x_{i}→xᵢ, \\alpha→α, \\beta→β, \\sum→∑, \\int→∫, \\sqrt{x}→√x, \\leq→≤, \\geq→≥, \\times→×, \\cdot→·, \\rightarrow→→); nếu không chuyển được thì giữ nguyên văn bản gốc;
+- bỏ phần preamble (\\documentclass, \\usepackage, \\begin{document}…), chỉ lấy nội dung thân.
+LaTeX nguồn:
+
+${latex.slice(0, 60000)}`;
+    const out = await _aiComplete({ system, user, maxTokens: 8000 });
+    const bodyHtml = _stripFences(out.text);
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${bodyHtml}</body></html>`;
+    const docxBuf = await htmlToDocx(fullHtml, null, { table: { row: { cantSplit: true } }, footer: false, header: false });
+    const safeName = String(filename || 'tai-lieu').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'tai-lieu';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.docx"`);
+    res.setHeader('X-AI-Provider', out.provider);
+    return res.end(Buffer.isBuffer(docxBuf) ? docxBuf : Buffer.from(docxBuf));
+  } catch (e) {
+    console.error('[latex:to-docx]', e.message);
+    return res.status(502).json({ error: 'Lỗi chuyển đổi: ' + e.message });
+  }
+});
+
 // (Proxy cũ disable — latex-service offline. Có thể bật lại khi service up)
 // app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
 

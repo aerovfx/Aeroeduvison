@@ -109,6 +109,8 @@ RUN npm config set fetch-timeout 600000 && \
       multer@1 \
       @google-cloud/storage@7 \
       @google-cloud/secret-manager@5 \
+      mammoth@1 \
+      html-to-docx@1.8.0 \
       otplib@13 \
       ws@8 \
       ioredis@5

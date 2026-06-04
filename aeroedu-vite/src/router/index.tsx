@@ -211,6 +211,7 @@ const ExamReportsPage          = lazy(() => import('@/pages/teacher/ExamReports'
 const DocumentDigitizationPage = lazy(() => import('@/pages/teacher/DocumentDigitization'))
 const DocumentDigitizationReviewPage = lazy(() => import('@/pages/teacher/DocumentDigitizationReview'))
 const LaTeXEditorDocumentPage = lazy(() => import('@/pages/teacher/LaTeXEditorDocument'))
+const LatexConverterPage    = lazy(() => import('@/pages/teacher/LatexConverter'))
 const LearningPathBuilderPage = lazy(() => import('@/pages/teacher/LearningPathBuilder'))
 const LessonPlansPage         = lazy(() => import('@/pages/teacher/LessonPlans'))
 const LessonPlanEditorPage    = lazy(() => import('@/pages/teacher/LessonPlanEditor'))
@@ -676,6 +677,7 @@ export function AppRouter() {
               <Route path="/teacher/transcript"             element={<TranscriptPage />} />
               <Route path="/teacher/create-module"          element={<CreateModulePage />} />
               <Route path="/teacher/latex-documents"        element={<LaTeXEditorPage />} />
+              <Route path="/teacher/latex-converter"        element={<LatexConverterPage />} />
 
               {/* Chưa port → PageFallback (specific trước, wildcard sau) */}
               <Route path="/teacher/agents"                        element={<AgentsPage />} />
