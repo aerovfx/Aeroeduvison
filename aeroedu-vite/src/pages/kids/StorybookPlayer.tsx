@@ -10,12 +10,13 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, Play, Pause, RotateCcw, Home,
-  Loader2, BookOpen, Volume2, Sparkles,
+  Loader2, BookOpen, Volume2, Sparkles, Music, VolumeX,
 } from 'lucide-react'
 import { getStorybook } from '@/services/storybook.service'
 import type { Storybook } from '@/types/storybook'
 import ShareMenu from '@/components/common/ShareMenu'
 import { api } from '@/services/api'
+import { StoryBgm, type BgmMood, type BgmPreset } from '@/lib/storyBgm'
 
 // URL giọng đọc Google TTS (vi-VN Neural2, SSML truyền cảm) cho 1 đoạn lời kể.
 // tone = tông cảm xúc của hồi (gentle/warm/excited/suspense/sad).
@@ -40,6 +41,10 @@ export default function StorybookPlayer() {
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null)
   const usingSpeechRef = useRef(false)   // trang hiện tại đang đọc bằng giọng máy (Web Speech)
   const endRef = useRef<() => void>(() => {})
+  // Nhạc nền điện ảnh
+  const bgmRef = useRef<StoryBgm | null>(null)
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [bgmMuted, setBgmMuted] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -77,6 +82,28 @@ export default function StorybookPlayer() {
     const t = setTimeout(() => setActIntro(null), 2800)
     return () => clearTimeout(t)
   }, [curAct, curActIdx, started])
+
+  // ── Nhạc nền điện ảnh ── (khởi động khi bấm Bắt đầu = có cử chỉ người dùng)
+  useEffect(() => {
+    if (!started || !book) return
+    if (book.bgmUrl) {
+      const ba = bgmAudioRef.current
+      if (ba) { ba.src = book.bgmUrl; ba.loop = true; ba.volume = bgmMuted ? 0 : 0.28; ba.play().catch(() => {}) }
+    } else if (book.bgmPreset && !bgmRef.current) {
+      const eng = new StoryBgm(book.bgmPreset as BgmPreset, (actForPage(page)?.tone as BgmMood) || 'warm')
+      eng.start(); eng.setMuted(bgmMuted); bgmRef.current = eng
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started])
+  // Đổi cung bậc nhạc theo hồi
+  useEffect(() => { bgmRef.current?.setMood((curAct?.tone as BgmMood) || 'warm') }, [curAct?.tone])
+  // Tắt/bật nhạc nền
+  useEffect(() => {
+    bgmRef.current?.setMuted(bgmMuted)
+    if (bgmAudioRef.current) bgmAudioRef.current.volume = bgmMuted ? 0 : 0.28
+  }, [bgmMuted])
+  // Dọn nhạc khi rời trang
+  useEffect(() => () => { bgmRef.current?.stop(); try { bgmAudioRef.current?.pause() } catch { /* noop */ } }, [])
 
   // Mốc lật cho narration (sắp xếp theo thời gian)
   const cues = useMemo(() => (
@@ -330,6 +357,12 @@ export default function StorybookPlayer() {
           <div className="w-12 h-12 rounded-full bg-white/90 shadow-lg flex items-center justify-center text-amber-500">
             <Volume2 className="w-6 h-6" />
           </div>
+          {(book.bgmUrl || book.bgmPreset) && (
+            <button onClick={() => setBgmMuted((m) => !m)} title={bgmMuted ? 'Bật nhạc nền' : 'Tắt nhạc nền'}
+              className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition ${bgmMuted ? 'bg-white/90 text-slate-400' : 'bg-gradient-to-br from-pink-400 to-purple-500 text-white'}`}>
+              {bgmMuted ? <VolumeX className="w-6 h-6" /> : <Music className="w-6 h-6" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -366,6 +399,8 @@ export default function StorybookPlayer() {
 
       <audio ref={audioRef} onEnded={onEnded} onTimeUpdate={onTimeUpdate}
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} preload="auto" />
+      {/* Nhạc nền từ file tải lên (preset thì dùng WebAudio, không cần thẻ này) */}
+      <audio ref={bgmAudioRef} loop preload="none" />
 
       <style>{`
         @keyframes sbFlipNext { from { transform: rotateY(-35deg); opacity: .3 } to { transform: rotateY(0); opacity: 1 } }

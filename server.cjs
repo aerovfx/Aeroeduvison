@@ -2969,6 +2969,9 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_owner ON "KidsStorybook"(owner_id)`);
     // Cấu trúc 3 hồi (mỗi hồi: title/description/startPage/tone) — JSONB, nullable
     await pool.query(`ALTER TABLE "KidsStorybook" ADD COLUMN IF NOT EXISTS acts JSONB`).catch(() => {});
+    // Nhạc nền: bgm_url (file tải lên) hoặc bgm_preset (nhạc tự sinh: cinematic/calm/epic)
+    await pool.query(`ALTER TABLE "KidsStorybook" ADD COLUMN IF NOT EXISTS bgm_url TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE "KidsStorybook" ADD COLUMN IF NOT EXISTS bgm_preset VARCHAR(20)`).catch(() => {});
   }
 
   // Seed truyện DEMO "Cô Bé Quàng Khăn Đỏ" (tranh SVG tĩnh + caption đọc bằng giọng máy)
@@ -3135,6 +3138,60 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         'Hoàng tử đi tìm khắp nơi. Chiếc hài vừa khít chân Lọ Lem, chàng đón nàng về cung. Hết!',
       ],
     },
+    {
+      id: 'demo-son-tinh-thuy-tinh', slug: 'son-tinh-thuy-tinh', title: 'Sơn Tinh Thủy Tinh',
+      desc: 'Truyền thuyết về cuộc giao tranh giữa thần núi và thần nước — cấu trúc 3 hồi, nhạc nền điện ảnh. (Bản demo)',
+      bgmPreset: 'cinematic',
+      acts: [
+        { id: 'act1', title: 'Mở đầu', description: 'Vua Hùng kén rể cho công chúa Mỵ Nương', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Cao trào', description: 'Cuộc đua sính lễ giành Mỵ Nương', startPage: 2, tone: 'suspense' },
+        { id: 'act3', title: 'Quyết chiến', description: 'Trận đại chiến núi và nước', startPage: 4, tone: 'excited' },
+      ],
+      pages: [
+        'Đời Hùng Vương thứ mười tám, nhà vua có nàng công chúa Mỵ Nương xinh đẹp, dịu hiền. Vua muốn kén cho con một người chồng thật tài giỏi.',
+        'Một hôm, hai chàng trai đến cầu hôn. Sơn Tinh là thần núi, vẫy tay liền dời non lấp bể. Thủy Tinh là thần nước, hô một tiếng là mưa gió ầm ầm kéo đến.',
+        'Cả hai đều tài giỏi, vua bèn ra điều kiện: ngày mai, ai mang sính lễ voi chín ngà, gà chín cựa, ngựa chín hồng mao đến trước sẽ được cưới Mỵ Nương.',
+        'Sáng sớm, Sơn Tinh mang đủ lễ vật đến trước, rước Mỵ Nương về núi. Thủy Tinh đến sau, không lấy được vợ, đùng đùng nổi giận.',
+        'Thủy Tinh hô mưa gọi gió, dâng nước cuồn cuộn đuổi theo. Sơn Tinh không hề nao núng, bốc từng quả đồi, dời từng dãy núi dựng thành ngăn lũ. Nước dâng cao bao nhiêu, núi cao lên bấy nhiêu.',
+        'Cuối cùng Thủy Tinh kiệt sức, đành rút lui. Nhưng oán nặng thù sâu, năm nào Thủy Tinh cũng dâng nước đánh Sơn Tinh — đó là vì sao nước ta hằng năm có mưa bão lũ lụt. Hết!',
+      ],
+    },
+    {
+      id: 'demo-ba-trung-ba-trieu', slug: 'ba-trung-ba-trieu', title: 'Hai Bà Trưng và Bà Triệu',
+      desc: 'Câu chuyện về những nữ anh hùng bất khuất của dân tộc — cấu trúc 3 hồi, nhạc nền hùng tráng. (Bản demo)',
+      bgmPreset: 'epic',
+      acts: [
+        { id: 'act1', title: 'Khởi nghĩa', description: 'Hai Bà Trưng phất cờ đánh giặc', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Chiến thắng', description: 'Đánh đuổi Tô Định, xưng Trưng Vương', startPage: 2, tone: 'excited' },
+        { id: 'act3', title: 'Tiếp nối', description: 'Bà Triệu cưỡi voi đánh giặc', startPage: 4, tone: 'excited' },
+      ],
+      pages: [
+        'Gần hai nghìn năm trước, nước ta bị giặc phương Bắc đô hộ. Thái thú Tô Định tham lam, tàn ác, khiến dân ta vô cùng khổ cực.',
+        'Ở đất Mê Linh có hai chị em Trưng Trắc và Trưng Nhị tài giỏi, văn võ song toàn. Căm thù giặc, hai bà quyết phất cờ khởi nghĩa, kêu gọi nhân dân đứng lên.',
+        'Năm 40, Hai Bà Trưng cưỡi voi ra trận. Nghĩa quân khí thế ngút trời, đánh đâu thắng đó, chiếm được sáu mươi lăm thành.',
+        'Tô Định hoảng sợ bỏ chạy về nước. Trưng Trắc lên làm vua, xưng là Trưng Vương, đem lại thái bình cho muôn dân.',
+        'Hơn hai trăm năm sau, ở đất Thanh Hóa, Bà Triệu khảng khái nói: Tôi muốn cưỡi cơn gió mạnh, đạp luồng sóng dữ, chứ không chịu khom lưng làm tì thiếp người ta.',
+        'Bà cưỡi voi vàng, mặc áo giáp vàng, dẫn quân đánh giặc khiến quân thù khiếp vía. Tinh thần bất khuất của Hai Bà Trưng và Bà Triệu mãi là niềm tự hào của dân tộc Việt Nam. Hết!',
+      ],
+    },
+    {
+      id: 'demo-chu-cuoi-chi-hang', slug: 'chu-cuoi-chi-hang', title: 'Chú Cuội và Chị Hằng',
+      desc: 'Sự tích chú Cuội ngồi gốc cây đa trên cung trăng — cấu trúc 3 hồi, nhạc nền nhẹ nhàng. (Bản demo)',
+      bgmPreset: 'calm',
+      acts: [
+        { id: 'act1', title: 'Cây đa thần', description: 'Cuội tìm được cây đa quý', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Cây bay lên', description: 'Lỡ tưới nước bẩn, cây đa bật gốc', startPage: 2, tone: 'suspense' },
+        { id: 'act3', title: 'Lên cung trăng', description: 'Chú Cuội bay lên ở cùng chị Hằng', startPage: 4, tone: 'gentle' },
+      ],
+      pages: [
+        'Ngày xưa có chàng tiều phu tên là Cuội. Một hôm vào rừng đốn củi, Cuội tình cờ tìm được một cây đa thần có phép cải tử hoàn sinh, cứu sống được cả người và vật.',
+        'Cuội đào cây đa quý mang về trồng ở góc vườn, ngày ngày chăm sóc. Chàng dặn vợ: Cây đa quý lắm, nhớ tưới bằng nước sạch, đừng tưới nước bẩn kẻo cây bay lên trời.',
+        'Một hôm Cuội đi vắng, người vợ quên lời dặn, lỡ tưới nước bẩn vào gốc đa. Lạ thay, cây đa rung chuyển rồi từ từ bật gốc, bay lên trời.',
+        'Vừa về tới nhà, Cuội hốt hoảng thấy cây đa đang bay lên. Chàng vội nhảy tới, bám chặt lấy rễ cây để giữ lại.',
+        'Nhưng cây đa cứ bay lên mãi, mang theo cả chú Cuội bay tít lên tận cung trăng, không sao xuống được nữa.',
+        'Từ đó, mỗi đêm rằm Trung thu trăng sáng, nhìn lên ta thấy một vệt đen — đó là chú Cuội ngồi gốc cây đa nhớ nhà. Bên chị Hằng Nga dịu hiền, các bé rước đèn phá cỗ vui Tết Trung thu. Hết!',
+      ],
+    },
   ];
 
   async function _seedDemoStorybook() {
@@ -3146,10 +3203,11 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         caption, audioUrl: '', flipAtSec: null,
       }));
       await pool.query(
-        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
-         VALUES($1,$2,$3,$4,'perPage','',true,$5,true,'system-demo','AeroEduVision')
+        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name,acts,bgm_preset)
+         VALUES($1,$2,$3,$4,'perPage','',true,$5,true,'system-demo','AeroEduVision',$6,$7)
          ON CONFLICT (id) DO NOTHING`,
-        [b.id, b.title, b.desc, pages[0].imageUrl, JSON.stringify(pages)]
+        [b.id, b.title, b.desc, pages[0].imageUrl, JSON.stringify(pages),
+         b.acts ? JSON.stringify(b.acts) : null, b.bgmPreset || null]
       );
     }
   }
@@ -3182,9 +3240,13 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       if (!pages.length || pages.every((p) => p.audioUrl)) continue;  // đã có audio rồi
       let changed = false;
       try {
-        for (const p of pages) {
+        for (let pi = 0; pi < pages.length; pi++) {
+          const p = pages[pi];
           if (p.audioUrl || !p.caption) continue;
-          const buf = await tts.synthesize(p.caption, 'vi', { expressive: true, tone: 'warm' });   // giọng truyền cảm; throw nếu TTS chưa cấu hình
+          // Tông giọng theo hồi chứa trang này (khớp cung bậc cảm xúc của truyện)
+          let tone = 'warm';
+          if (Array.isArray(b.acts)) { for (const a of b.acts) if (a.startPage <= pi) tone = a.tone || tone; }
+          const buf = await tts.synthesize(p.caption, 'vi', { expressive: true, tone });   // giọng truyền cảm; throw nếu TTS chưa cấu hình
           const gcsPath = `storybooks/demo/${p.id}.mp3`;
           await storage.bucket(_SB_BUCKET).file(gcsPath).save(buf, {
             resumable: false, contentType: 'audio/mpeg',
@@ -3251,12 +3313,15 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     })).sort((x, y) => x.startPage - y.startPage);
     return out.length ? out : null;
   }
+  const _SB_BGM = ['cinematic', 'calm', 'epic'];
+  const _sbBgmPreset = (v) => (_SB_BGM.includes(v) ? v : null);
   const _sbRow = (r) => ({
     id: r.id, title: r.title, description: r.description || '', coverUrl: r.cover_url || '',
     mode: r.mode === 'narration' ? 'narration' : 'perPage', narrationUrl: r.narration_url || '',
     autoAdvance: r.auto_advance !== false,
     pages: Array.isArray(r.pages) ? r.pages : (r.pages || []),
     acts: Array.isArray(r.acts) ? r.acts : (r.acts || null),
+    bgmUrl: r.bgm_url || '', bgmPreset: r.bgm_preset || null,
     published: !!r.published, ownerId: r.owner_id, ownerName: r.owner_name || '',
     createdAt: r.created_at, updatedAt: r.updated_at,
   });
@@ -3308,13 +3373,14 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const acts = _sbActs(b.acts);
       const pool = _getPool();
       await pool.query(
-        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name,acts)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name,acts,bgm_url,bgm_preset)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
          String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
          (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
          b.autoAdvance !== false, JSON.stringify(pages), !!b.published, uid,
-         String(d.name || d.fullName || d.email || '').slice(0, 200), acts ? JSON.stringify(acts) : null]
+         String(d.name || d.fullName || d.email || '').slice(0, 200), acts ? JSON.stringify(acts) : null,
+         String(b.bgmUrl || '').slice(0, 1200) || null, _sbBgmPreset(b.bgmPreset)]
       );
       const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [id]);
       return res.json({ storybook: _sbRow(r.rows[0]) });
@@ -3335,11 +3401,12 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const pages = _sbPages(b.pages);
       const acts = _sbActs(b.acts);
       await pool.query(
-        `UPDATE "KidsStorybook" SET title=$2,description=$3,cover_url=$4,mode=$5,narration_url=$6,auto_advance=$7,pages=$8,published=$9,acts=$10,updated_at=NOW() WHERE id=$1`,
+        `UPDATE "KidsStorybook" SET title=$2,description=$3,cover_url=$4,mode=$5,narration_url=$6,auto_advance=$7,pages=$8,published=$9,acts=$10,bgm_url=$11,bgm_preset=$12,updated_at=NOW() WHERE id=$1`,
         [req.params.id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
          String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
          (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
-         b.autoAdvance !== false, JSON.stringify(pages), !!b.published, acts ? JSON.stringify(acts) : null]
+         b.autoAdvance !== false, JSON.stringify(pages), !!b.published, acts ? JSON.stringify(acts) : null,
+         String(b.bgmUrl || '').slice(0, 1200) || null, _sbBgmPreset(b.bgmPreset)]
       );
       const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
       return res.json({ storybook: _sbRow(r.rows[0]) });

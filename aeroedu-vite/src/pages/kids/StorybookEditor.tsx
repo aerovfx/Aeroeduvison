@@ -42,6 +42,8 @@ export default function StorybookEditor() {
   const [coverUrl, setCoverUrl] = useState('')
   const [pages, setPages] = useState<StorybookPage[]>([])
   const [acts, setActs] = useState<StorybookAct[]>([])
+  const [bgmUrl, setBgmUrl] = useState('')
+  const [bgmPreset, setBgmPreset] = useState<'' | 'cinematic' | 'calm' | 'epic'>('')
   const [published, setPublished] = useState(false)
 
   const [loading, setLoading] = useState(editing)
@@ -55,7 +57,8 @@ export default function StorybookEditor() {
     getStorybook(id!).then((b: Storybook) => {
       setTitle(b.title); setDescription(b.description || ''); setMode(b.mode)
       setAutoAdvance(b.autoAdvance); setNarrationUrl(b.narrationUrl || '')
-      setCoverUrl(b.coverUrl || ''); setPages(b.pages || []); setActs(b.acts || []); setPublished(b.published)
+      setCoverUrl(b.coverUrl || ''); setPages(b.pages || []); setActs(b.acts || [])
+      setBgmUrl(b.bgmUrl || ''); setBgmPreset((b.bgmPreset as '' | 'cinematic' | 'calm' | 'epic') || ''); setPublished(b.published)
       setLoading(false)
     }).catch((e) => { setNote(e?.response?.data?.error || 'Không tải được sách'); setLoading(false) })
   }, [id, editing])
@@ -121,6 +124,10 @@ export default function StorybookEditor() {
     try { setBusy('Đang tải ảnh bìa…'); const url = await uploadFileToGcs(file, { folder: 'storybooks' }); setCoverUrl(url); setBusy(null) }
     catch (e: any) { setBusy(null); setNote('Lỗi ảnh bìa: ' + (e?.message || e)) }
   }
+  const onBgm = async (file: File) => {
+    try { setBusy('Đang tải nhạc nền…'); const url = await uploadFileToGcs(file, { folder: 'storybooks' }); setBgmUrl(url); setBgmPreset(''); setBusy(null) }
+    catch (e: any) { setBusy(null); setNote('Lỗi nhạc nền: ' + (e?.message || e)) }
+  }
 
   const markFlipHere = (pid: string) => {
     const t = narrationRef.current?.currentTime ?? 0
@@ -148,6 +155,7 @@ export default function StorybookEditor() {
       title: title.trim(), description, mode, autoAdvance, narrationUrl,
       coverUrl: coverUrl || pages[0]?.imageUrl, pages,
       acts: acts.length ? acts : null,
+      bgmUrl: bgmUrl || '', bgmPreset: bgmUrl ? null : (bgmPreset || null),
       published: alsoPublish ?? published,
     }
     try {
@@ -256,6 +264,31 @@ export default function StorybookEditor() {
               {coverUrl ? 'Đổi ảnh bìa' : 'Chọn ảnh bìa (tuỳ chọn)'}
               <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onCover(e.target.files[0])} />
             </label>
+          </div>
+
+          {/* Nhạc nền */}
+          <div className="rounded-xl border border-border p-3">
+            <div className="text-sm font-bold mb-2 flex items-center gap-1.5"><Music className="w-4 h-4 text-purple-500" /> Nhạc nền (tuỳ chọn)</div>
+            {bgmUrl ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <audio src={bgmUrl} controls className="h-9 max-w-[240px]" />
+                <button onClick={() => setBgmUrl('')} className="text-xs text-slate-400 hover:text-rose-500">Gỡ file nhạc</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                {([['', 'Không'], ['cinematic', '🎬 Điện ảnh'], ['calm', '🌙 Êm dịu'], ['epic', '⚔️ Hùng tráng']] as const).map(([v, label]) => (
+                  <button key={v} onClick={() => setBgmPreset(v)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition ${bgmPreset === v ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-600' : 'border-border'}`}>
+                    {label}
+                  </button>
+                ))}
+                <label className="text-xs text-purple-600 font-semibold cursor-pointer ml-1">
+                  hoặc tải file nhạc…
+                  <input type="file" accept="audio/*" hidden onChange={(e) => e.target.files?.[0] && onBgm(e.target.files[0])} />
+                </label>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 mt-1.5">Nhạc tự sinh (Điện ảnh / Êm dịu / Hùng tráng) đổi cung bậc theo từng hồi, không cần file.</p>
           </div>
         </section>
 

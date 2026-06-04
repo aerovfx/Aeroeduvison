@@ -37,6 +37,10 @@ export interface Storybook {
   pages: StorybookPage[]
   /** Cấu trúc 3 hồi (tuỳ chọn). Không có = truyện phẳng như cũ. */
   acts?: StorybookAct[] | null
+  /** Nhạc nền: file tải lên (ưu tiên). */
+  bgmUrl?: string
+  /** Nhạc nền tự sinh (WebAudio) nếu không có file: 'cinematic' | 'calm' | 'epic'. */
+  bgmPreset?: 'cinematic' | 'calm' | 'epic' | null
   published: boolean
   ownerId?: string
   ownerName?: string
