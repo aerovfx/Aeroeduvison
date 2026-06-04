@@ -11291,13 +11291,29 @@ async function _syncSecretToCloud(cloudName, value) {
   const projectId = await _gcpProjectId();
   if (!projectId) return { ok: false, reason: 'no-project', message: 'Không xác định được GCP project' };
   const parent = `projects/${projectId}`;
+  const secretPath = `${parent}/secrets/${cloudName}`;
+  const data = Buffer.from(String(value), 'utf8');
+  // Least-privilege: SA chỉ có secretVersionAdder + accessor (không có quyền tạo
+  // secret). Thử THÊM VERSION trước; nếu secret chưa tồn tại (NOT_FOUND) mới thử
+  // tạo — built-in đã pre-create lúc deploy nên luôn add được; secret tuỳ chỉnh
+  // mới sẽ cần admin thêm vào deploy-cloudbuild.sh rồi deploy lại.
   try {
-    try {
-      await sm.createSecret({ parent, secretId: cloudName, secret: { replication: { automatic: {} } } });
-    } catch (e) { if (!/already exists|ALREADY_EXISTS/i.test(e.message)) throw e; }
-    await sm.addSecretVersion({ parent: `${parent}/secrets/${cloudName}`, payload: { data: Buffer.from(String(value), 'utf8') } });
+    await sm.addSecretVersion({ parent: secretPath, payload: { data } });
     return { ok: true };
   } catch (e) {
+    if (/NOT_FOUND|not found|does not exist/i.test(e.message)) {
+      try {
+        await sm.createSecret({ parent, secretId: cloudName, secret: { replication: { automatic: {} } } });
+        await sm.addSecretVersion({ parent: secretPath, payload: { data } });
+        return { ok: true };
+      } catch (e2) {
+        const perm = /permission|PERMISSION_DENIED|IAM/i.test(e2.message);
+        return { ok: false, reason: perm ? 'need-precreate' : 'error',
+          message: perm
+            ? `Secret '${cloudName}' chưa tồn tại trên cloud và SA không có quyền tạo. Thêm '${cloudName}' vào MANAGED_SECRETS trong deploy-cloudbuild.sh rồi deploy lại để pre-create.`
+            : e2.message };
+      }
+    }
     const perm = /permission|PERMISSION_DENIED|IAM/i.test(e.message);
     return { ok: false, reason: perm ? 'forbidden' : 'error', message: e.message };
   }
@@ -11524,7 +11540,8 @@ app.post('/api/admin/integrations/:name/sync', async (req, res) => {
       return res.json({ ok: true, cloudName, note: 'Đã tạo version mới. Để revision Cloud Run nạp, cần map secret vào --update-secrets khi deploy.' });
     }
     await _audit(req, decoded, 'secret_sync_fail', name, { reason: result.reason });
-    return res.status(result.reason === 'unavailable' ? 501 : 502).json({ error: result.message, reason: result.reason });
+    const code = result.reason === 'unavailable' ? 501 : result.reason === 'need-precreate' ? 409 : 502;
+    return res.status(code).json({ error: result.message, reason: result.reason });
   } catch (e) { console.error('[integrations:sync]', e.message); return res.status(500).json({ error: 'Lỗi đồng bộ cloud' }); }
 });
 

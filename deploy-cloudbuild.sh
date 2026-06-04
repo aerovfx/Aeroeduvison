@@ -133,14 +133,24 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --role="roles/serviceusage.serviceUsageConsumer" \
   --condition=None --quiet >/dev/null 2>&1 || true
 
-# Cho runtime SA tạo secret + thêm version → dashboard admin "Tích hợp API" đẩy
-# key lên Google Secret Manager (đồng bộ cloud). secretmanager.admin để tạo
-# secret mới; nếu muốn siết quyền có thể đổi sang secretVersionAdder sau khi
-# secret đã tồn tại.
-gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/secretmanager.admin" \
-  --condition=None --quiet >/dev/null 2>&1 || true
+# ── Secret tích hợp do admin quản lý qua dashboard "Tích hợp API" ──────────
+# Least-privilege: pre-create secret rỗng + cấp SA quyền THÊM VERSION & ACCESS
+# trên TỪNG secret (KHÔNG dùng secretmanager.admin toàn project → giảm blast
+# radius nếu app bị xâm nhập). Backend /sync chỉ addSecretVersion (không cần
+# quyền tạo). Secret tuỳ chỉnh ngoài list này phải được thêm vào đây rồi deploy.
+MANAGED_SECRETS="ANTHROPIC_API_KEY=pixiai-anthropic-api-key DEEPSEEK_API_KEY=pixiai-deepseek-api-key OPENAI_API_KEY=pixiai-openai-api-key GOOGLE_TTS_API_KEY=pixiai-google-tts-api-key"
+for pair in ${MANAGED_SECRETS}; do
+  secname="${pair##*=}"
+  if ! gcloud secrets describe "${secname}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+    gcloud secrets create "${secname}" --replication-policy=automatic --project="${PROJECT_ID}" --quiet >/dev/null 2>&1 \
+      && echo "  ✅ Pre-created secret: ${secname}" || true
+  fi
+  for ROLE in "roles/secretmanager.secretVersionAdder" "roles/secretmanager.secretAccessor"; do
+    gcloud secrets add-iam-policy-binding "${secname}" --project="${PROJECT_ID}" \
+      --member="serviceAccount:${COMPUTE_SA}" --role="${ROLE}" \
+      --quiet >/dev/null 2>&1 || true
+  done
+done
 
 # Grant Cloud Build SA permission to push to Artifact Registry + act on Cloud Run
 for ROLE in "roles/artifactregistry.writer" "roles/run.admin" "roles/iam.serviceAccountUser"; do
@@ -287,19 +297,14 @@ _VITE_APP_URL=${VITE_APP_URL}" \
 
 echo "✅ Image built & pushed: ${IMAGE_NAME}:${TAG}"
 
-# ── Build chuỗi --update-secrets (gồm secret cố định + secret tích hợp do
-#    admin đẩy lên Secret Manager qua dashboard, nếu đã tồn tại) ────────────
+# ── Build chuỗi --update-secrets (secret cố định + secret tích hợp do admin
+#    đẩy version lên qua dashboard). CHỈ map khi secret đã có version ENABLED
+#    (nếu pre-create nhưng chưa có version, ':latest' sẽ làm deploy fail). ──
 SECRETS="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest,APPLE_IAP_PRIVATE_KEY=apple-iap-private-key:latest,APPLE_IAP_KEY_ID=apple-iap-key-id:latest,APPLE_IAP_ISSUER_ID=apple-iap-issuer-id:latest"
-for pair in \
-  "ANTHROPIC_API_KEY=pixiai-anthropic-api-key" \
-  "DEEPSEEK_API_KEY=pixiai-deepseek-api-key" \
-  "OPENAI_API_KEY=pixiai-openai-api-key" \
-  "GOOGLE_TTS_API_KEY=pixiai-google-tts-api-key"; do
+for pair in ${MANAGED_SECRETS}; do
   envname="${pair%%=*}"; secname="${pair##*=}"
-  if gcloud secrets describe "${secname}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
-    gcloud secrets add-iam-policy-binding "${secname}" --project="${PROJECT_ID}" \
-      --member="serviceAccount:${COMPUTE_SA}" --role="roles/secretmanager.secretAccessor" \
-      --quiet >/dev/null 2>&1 || true
+  if gcloud secrets versions list "${secname}" --project="${PROJECT_ID}" \
+       --filter="state=ENABLED" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
     SECRETS="${SECRETS},${envname}=${secname}:latest"
     echo "  🔗 Map secret: ${envname} ← ${secname}"
   fi
