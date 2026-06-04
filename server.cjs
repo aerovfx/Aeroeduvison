@@ -11095,6 +11095,68 @@ function _detectMathTypeOleCount(buf) {
 }
 const _MT_OLE_FIX = 'Cách khắc phục: mở file trong Word → menu MathType → "Convert Equations" → chọn "Office Math (OMML)", Lưu lại rồi tải lên lại (hoặc dùng "Insert → Equation" của Word).';
 
+// Claude vision: 1 ảnh trang (PNG base64) → LaTeX thân tài liệu. Cần ANTHROPIC.
+async function _aiVisionPageToLatex(b64png) {
+  const model = process.env.ANTHROPIC_VISION_MODEL || process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model, max_tokens: 4000,
+      system: 'Bạn là công cụ OCR→LaTeX cho tài liệu giáo dục. Chuyển NỘI DUNG trang trong ảnh thành LaTeX (CHỈ phần thân, KHÔNG preamble/documentclass). Công thức toán đặt trong $...$ hoặc \\[ \\] và phải chính xác. Giữ tiêu đề (\\section), danh sách, bảng (tabular). CHỈ trả LaTeX, KHÔNG giải thích, KHÔNG bọc trong ```.',
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: b64png } },
+        { type: 'text', text: 'Chuyển trang tài liệu này sang LaTeX (giữ chính xác mọi công thức toán).' },
+      ] }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Anthropic vision HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 160)}`);
+  const j = await r.json();
+  const text = Array.isArray(j.content) ? j.content.filter(b => b.type === 'text').map(b => b.text).join('').trim() : '';
+  return _stripFences(text);
+}
+
+// docx (có công thức MathType OLE) → LaTeX qua LibreOffice render → PDF → PNG →
+// Claude vision đọc từng trang. Trả LaTeX hoàn chỉnh hoặc null (thiếu công cụ/
+// key/ lỗi) → caller fallback. Cap 12 trang để giới hạn chi phí/thời gian.
+async function _docxToLatexViaVision(buf) {
+  if (!process.env.ANTHROPIC_API_KEY) return null; // vision cần Anthropic
+  let cp, fs, os, path;
+  try { cp = require('child_process'); fs = require('fs'); os = require('os'); path = require('path'); } catch { return null; }
+  let dir;
+  try { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v2l-')); } catch { return null; }
+  const cleanup = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* noop */ } };
+  const docxPath = path.join(dir, 'in.docx'), pdfPath = path.join(dir, 'in.pdf');
+  try { fs.writeFileSync(docxPath, buf); } catch { cleanup(); return null; }
+  // 1) docx → pdf (LibreOffice headless, profile riêng trong temp để tránh lỗi ghi HOME)
+  const pdfOk = await new Promise((resolve) => {
+    cp.execFile('soffice', ['--headless', '--norestore', '--nolockcheck',
+      `-env:UserInstallation=file://${path.join(dir, 'lo-profile')}`,
+      '--convert-to', 'pdf', '--outdir', dir, docxPath], { timeout: 120000 }, (err) => {
+      if (err) { if (err.code !== 'ENOENT') console.warn('[vision:soffice]', err.message); return resolve(false); }
+      resolve(fs.existsSync(pdfPath));
+    });
+  });
+  if (!pdfOk) { cleanup(); return null; }
+  // 2) pdf → png mỗi trang (poppler)
+  await new Promise((resolve) => {
+    cp.execFile('pdftoppm', ['-png', '-r', '150', pdfPath, path.join(dir, 'page')], { timeout: 90000 }, () => resolve());
+  });
+  let pages = [];
+  try { pages = fs.readdirSync(dir).filter(f => /^page.*\.png$/i.test(f)).sort(); } catch { /* noop */ }
+  if (!pages.length) { cleanup(); return null; }
+  // 3) vision từng trang (tuần tự, cap 12)
+  const parts = [];
+  for (const p of pages.slice(0, 12)) {
+    let b64; try { b64 = fs.readFileSync(path.join(dir, p)).toString('base64'); } catch { continue; }
+    try { const tex = await _aiVisionPageToLatex(b64); if (tex) parts.push(tex); }
+    catch (e) { console.warn('[vision:page]', p, e.message); }
+  }
+  cleanup();
+  if (!parts.length) return null;
+  return `\\documentclass{article}\n\\usepackage{fontspec}\n\\usepackage{amsmath,amssymb}\n\\begin{document}\n${parts.join('\n\n')}\n\\end{document}`;
+}
+
 // POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }
 app.post('/api/latex/from-docx', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
@@ -11105,8 +11167,17 @@ app.post('/api/latex/from-docx', async (req, res) => {
     const buf = Buffer.from(b64, 'base64');
     if (buf.length > 15 * 1024 * 1024) return res.status(413).json({ error: 'File quá lớn (>15MB)' });
 
-    // Cảnh báo công thức MathType OLE (không convert được) — đính kèm mọi kết quả
+    // Có công thức MathType OLE? → thử pipeline LibreOffice render → PNG →
+    // Claude vision đọc cả trang (pandoc/mammoth không đọc được OLE nhị phân).
     const mtOle = _detectMathTypeOleCount(buf);
+    if (mtOle > 0) {
+      const visionTex = await _docxToLatexViaVision(buf);
+      if (visionTex) {
+        return res.json({ ok: true, latex: visionTex, engine: 'libreoffice+vision', mathTypeOle: mtOle,
+          warning: `ℹ️ ${mtOle} công thức MathType (OLE) đã được nhận dạng bằng AI nhìn ảnh trang. Hãy KIỂM TRA lại độ chính xác, nhất là công thức phức tạp.` });
+      }
+    }
+    // Vision không khả dụng/lỗi → tiếp tục pandoc/mammoth, cảnh báo công thức OLE sẽ thiếu
     const mtWarn = mtOle > 0
       ? `⚠️ Phát hiện ${mtOle} công thức MathType dạng OLE (nhị phân) — công cụ không đọc được định dạng này nên các công thức đó KHÔNG có trong kết quả. ${_MT_OLE_FIX}`
       : null;
