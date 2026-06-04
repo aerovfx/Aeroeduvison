@@ -108,6 +108,7 @@ RUN npm config set fetch-timeout 600000 && \
       nodemailer@6 \
       multer@1 \
       @google-cloud/storage@7 \
+      @google-cloud/secret-manager@5 \
       otplib@13 \
       ws@8 \
       ioredis@5

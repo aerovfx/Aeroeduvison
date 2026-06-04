@@ -218,6 +218,7 @@ const CameraManagementPage         = lazy(() => import('@/pages/teacher/CameraMa
 const EnvironmentMonitoringPage    = lazy(() => import('@/pages/teacher/EnvironmentMonitoring'))
 const ProfessionalKGPage           = lazy(() => import('@/pages/teacher/ProfessionalKG'))
 const ApiKeysPage                  = lazy(() => import('@/pages/common/ApiKeys'))
+const AdminApiIntegrationsPage     = lazy(() => import('@/pages/admin/ApiIntegrations'))
 
 // ── Student Pages (đã port) ──────────────────────────────────
 const StudentDashboardPage            = lazy(() => import('@/pages/student/Dashboard'))
@@ -767,6 +768,7 @@ export function AppRouter() {
               <Route path="/admin/rs-experiments"      element={<AdminRsExperimentsPage />} />
               <Route path="/admin/knowledge-graph"     element={<ProfessionalKGPage />} />
               <Route path="/admin/api-keys"            element={<ApiKeysPage />} />
+              <Route path="/admin/integrations"        element={<AdminApiIntegrationsPage />} />
             </Route>
 
           </Route>{/* /DashboardLayout */}

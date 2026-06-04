@@ -14,7 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
-  Bot, MessageCircle, ClipboardEdit, Atom, Languages,
+  Bot, MessageCircle, ClipboardEdit, Atom, Languages, Plug,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -251,6 +251,7 @@ const adminSections: RouteSection[] = [
       { icon: CheckSquare, labelKey: 'routeNewsReview',    href: '/admin/news/review' },
       { icon: Kanban,      labelKey: 'routeScrum',         href: '/admin/scrumboard' },
       { icon: KeyRound,    labelKey: 'routeApiKeys',       href: '/admin/api-keys', badge: 'MCP' },
+      { icon: Plug,        labelKey: 'routeApiIntegrations', href: '/admin/integrations', badge: '🔐' },
       { icon: FlaskConical,labelKey: 'routeRsExperiments', href: '/admin/rs-experiments', badge: 'AI' },
     ],
   },

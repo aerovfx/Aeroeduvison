@@ -133,6 +133,15 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --role="roles/serviceusage.serviceUsageConsumer" \
   --condition=None --quiet >/dev/null 2>&1 || true
 
+# Cho runtime SA tạo secret + thêm version → dashboard admin "Tích hợp API" đẩy
+# key lên Google Secret Manager (đồng bộ cloud). secretmanager.admin để tạo
+# secret mới; nếu muốn siết quyền có thể đổi sang secretVersionAdder sau khi
+# secret đã tồn tại.
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/secretmanager.admin" \
+  --condition=None --quiet >/dev/null 2>&1 || true
+
 # Grant Cloud Build SA permission to push to Artifact Registry + act on Cloud Run
 for ROLE in "roles/artifactregistry.writer" "roles/run.admin" "roles/iam.serviceAccountUser"; do
   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
@@ -278,6 +287,24 @@ _VITE_APP_URL=${VITE_APP_URL}" \
 
 echo "✅ Image built & pushed: ${IMAGE_NAME}:${TAG}"
 
+# ── Build chuỗi --update-secrets (gồm secret cố định + secret tích hợp do
+#    admin đẩy lên Secret Manager qua dashboard, nếu đã tồn tại) ────────────
+SECRETS="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest,APPLE_IAP_PRIVATE_KEY=apple-iap-private-key:latest,APPLE_IAP_KEY_ID=apple-iap-key-id:latest,APPLE_IAP_ISSUER_ID=apple-iap-issuer-id:latest"
+for pair in \
+  "ANTHROPIC_API_KEY=pixiai-anthropic-api-key" \
+  "DEEPSEEK_API_KEY=pixiai-deepseek-api-key" \
+  "OPENAI_API_KEY=pixiai-openai-api-key" \
+  "GOOGLE_TTS_API_KEY=pixiai-google-tts-api-key"; do
+  envname="${pair%%=*}"; secname="${pair##*=}"
+  if gcloud secrets describe "${secname}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+    gcloud secrets add-iam-policy-binding "${secname}" --project="${PROJECT_ID}" \
+      --member="serviceAccount:${COMPUTE_SA}" --role="roles/secretmanager.secretAccessor" \
+      --quiet >/dev/null 2>&1 || true
+    SECRETS="${SECRETS},${envname}=${secname}:latest"
+    echo "  🔗 Map secret: ${envname} ← ${secname}"
+  fi
+done
+
 # ── Step 6.5: Deploy to Cloud Run using the image we just built ────
 echo ""
 echo "Step 6.5: Deploying ${SERVICE_NAME} to Cloud Run..."
@@ -297,7 +324,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --cpu-boost \
   --execution-environment=gen2 \
   --update-env-vars="${ENV_VARS}" \
-  --update-secrets="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest,APPLE_IAP_PRIVATE_KEY=apple-iap-private-key:latest,APPLE_IAP_KEY_ID=apple-iap-key-id:latest,APPLE_IAP_ISSUER_ID=apple-iap-issuer-id:latest" \
+  --update-secrets="${SECRETS}" \
   --tag="t${TAG}" \
   --quiet
 

@@ -11010,7 +11010,11 @@ function _akVerify(token) {
 // (đăng ký phía sau dòng này). FE admin gọi qua axios `api` đã tự gắn Bearer
 // nên admin đăng nhập không bị ảnh hưởng. Endpoint proxy (students/payments/
 // teachers) KHÔNG nằm trong danh sách → giữ nguyên hành vi.
-const _ADMIN_GUARD_PREFIXES = ['/api/admin/overview', '/api/admin/analytics', '/api/admin/insights', '/api/admin/operations', '/api/admin/payments'];
+// MỞ RỘNG: gate TOÀN BỘ /api/admin/* (trước đây chỉ phủ vài prefix → một số
+// route admin đăng ký phía sau có thể hở). FE admin gọi qua axios `api` (Bearer)
+// nên không ảnh hưởng. Endpoint proxy ngoài /api/admin (students/teachers) không
+// bị đụng. Vẫn liệt kê các prefix cũ để rõ ràng (mọi prefix con đều khớp '/api/admin').
+const _ADMIN_GUARD_PREFIXES = ['/api/admin'];
 
 // Kiểm tra 1 request có quyền ADMIN không. Trả 'ok' | 'noauth' | 'forbidden'.
 // QUAN TRỌNG: token JWT dùng ignoreExpiration nên role trong token có thể CŨ
@@ -11035,6 +11039,7 @@ async function _isAdminRequest(req) {
 }
 
 app.use(async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next(); // không chặn CORS preflight
   if (!_ADMIN_GUARD_PREFIXES.some(p => req.path.startsWith(p))) return next();
   const verdict = await _isAdminRequest(req);
   if (verdict === 'noauth') return res.status(401).json({ error: 'Unauthorized' });
@@ -11162,6 +11167,394 @@ app.post('/api/auth/validate-key', async (req, res) => {
     }
     return res.status(401).json({ ok: false, error: 'Key không hợp lệ hoặc đã bị thu hồi' });
   } catch (e) { console.error('[api-keys:validate]', e.message); return res.status(500).json({ error: 'Lỗi xác thực key' }); }
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// QUẢN LÝ TÍCH HỢP API (admin) + BẢO MẬT NHIỀU LỚP
+//   • Lưu API key/secret bên thứ 3 vào DB (mã hoá AES-256-GCM). Khi lưu sẽ
+//     ghi đè process.env lúc chạy → key đổi có hiệu lực NGAY (không cần deploy);
+//     refresh định kỳ 60s để lan sang các instance Cloud Run khác.
+//   • Đồng bộ Google Secret Manager (bền vững qua revision/deploy) — tự degrade
+//     nếu thiếu @google-cloud/secret-manager hoặc thiếu quyền IAM.
+//   • Step-up auth: nhập lại mật khẩu (+ TOTP nếu bật) → phiên nâng quyền 10'.
+//   • Audit log mọi thao tác; che secret (chỉ hiện 4 ký tự cuối); rate-limit
+//     + khoá tạm chống brute-force step-up.
+// PHẢI đặt trước catch-all /api proxy. Gate ADMIN qua _ADMIN_GUARD_PREFIXES.
+// ════════════════════════════════════════════════════════════════════════
+const _secCrypto = require('crypto');
+
+// — Mã hoá AES-256-GCM: key suy ra từ SECRET_ENC_KEY|JWT_SECRET qua scrypt —
+let _secEncKeyCache = null;
+function _secEncKey() {
+  if (_secEncKeyCache) return _secEncKeyCache;
+  const base = process.env.SECRET_ENC_KEY || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+  _secEncKeyCache = _secCrypto.scryptSync(base, 'aeroedu-integration-secret-v1', 32);
+  return _secEncKeyCache;
+}
+function _encSecret(plain) {
+  const iv = _secCrypto.randomBytes(12);
+  const cipher = _secCrypto.createCipheriv('aes-256-gcm', _secEncKey(), iv);
+  const enc = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString('base64');
+}
+function _decSecret(b64) {
+  const buf = Buffer.from(String(b64), 'base64');
+  const iv = buf.subarray(0, 12), tag = buf.subarray(12, 28), enc = buf.subarray(28);
+  const decipher = _secCrypto.createDecipheriv('aes-256-gcm', _secEncKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
+}
+function _last4(s) { s = String(s || ''); return s.length <= 4 ? '••' : '••••' + s.slice(-4); }
+
+// — Danh mục tích hợp dựng sẵn (admin có thể thêm key tuỳ chỉnh ngoài list) —
+const INTEGRATION_CATALOG = [
+  { name: 'ANTHROPIC_API_KEY', label: 'Anthropic (Claude)', category: 'AI', placeholder: 'sk-ant-...', cloud: 'pixiai-anthropic-api-key' },
+  { name: 'DEEPSEEK_API_KEY', label: 'DeepSeek', category: 'AI', placeholder: 'sk-...', cloud: 'pixiai-deepseek-api-key' },
+  { name: 'OPENAI_API_KEY', label: 'OpenAI', category: 'AI', placeholder: 'sk-...', cloud: 'pixiai-openai-api-key' },
+  { name: 'FAL_API_KEY', label: 'fal.ai', category: 'AI', placeholder: 'key_id:secret', cloud: 'fal-api-key' },
+  { name: 'GOOGLE_TTS_API_KEY', label: 'Google Cloud TTS', category: 'Media', placeholder: 'AIza...', cloud: 'pixiai-google-tts-api-key' },
+  { name: 'TELEGRAM_BOT_TOKEN', label: 'Telegram Bot', category: 'Bot', placeholder: '123456:ABC-...', cloud: 'telegram-bot-token' },
+  { name: 'SMTP_PASS', label: 'SMTP (email)', category: 'Email', placeholder: '••••••', cloud: 'smtp-pass' },
+];
+const _catalogByName = Object.fromEntries(INTEGRATION_CATALOG.map(c => [c.name, c]));
+function _validSecretName(n) { return /^[A-Z][A-Z0-9_]{1,63}$/.test(String(n || '')); }
+function _cloudNameFor(name) {
+  return _catalogByName[name]?.cloud || ('pixiai-managed-' + _slugVi(name).replace(/_/g, '-'));
+}
+
+// — Bảng lưu secret tích hợp + audit log (lazy migration) —
+let _secTablesReady = false;
+async function _ensureSecretTables() {
+  if (_secTablesReady) return;
+  const pool = _getPool();
+  await pool.query(`CREATE TABLE IF NOT EXISTS app_integration_secrets (
+    name        VARCHAR(80) PRIMARY KEY,
+    label       VARCHAR(160),
+    category    VARCHAR(40) NOT NULL DEFAULT 'Khác',
+    value_enc   TEXT,
+    last4       VARCHAR(16),
+    updated_by  VARCHAR(255),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    synced_at   TIMESTAMPTZ,
+    cloud_name  VARCHAR(120)
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id          VARCHAR(36) PRIMARY KEY,
+    actor_id    VARCHAR(255),
+    actor_email VARCHAR(255),
+    action      VARCHAR(60) NOT NULL,
+    target      VARCHAR(160),
+    detail      JSONB,
+    ip          VARCHAR(64),
+    ua          VARCHAR(300),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_log(created_at DESC)`);
+  _secTablesReady = true;
+}
+
+// — Ghi đè process.env lúc chạy bằng giá trị DB (đã mã hoá) → có hiệu lực ngay
+//   cho MỌI chỗ đọc process.env.X sẵn có (Anthropic/DeepSeek/FAL/TTS/Telegram…) —
+async function _loadManagedSecrets() {
+  try {
+    await _ensureSecretTables();
+    const { rows } = await _getPool().query(`SELECT name, value_enc FROM app_integration_secrets WHERE value_enc IS NOT NULL`);
+    for (const r of rows) {
+      try { const v = _decSecret(r.value_enc); if (v) process.env[r.name] = v; } catch (e) { console.warn('[secrets] decrypt', r.name, e.message); }
+    }
+  } catch (e) { /* bảng có thể chưa tồn tại — bỏ qua */ }
+}
+// Nạp lúc khởi động + refresh 60s (lan giá trị mới sang các instance khác)
+setTimeout(() => { _loadManagedSecrets().catch(() => {}); }, 2500);
+setInterval(() => { _loadManagedSecrets().catch(() => {}); }, 60000).unref?.();
+
+// — Google Secret Manager (lazy, degrade nếu thiếu package/quyền) —
+let _smClientCache; // undefined=chưa thử, null=không khả dụng
+function _getSecretManager() {
+  if (_smClientCache !== undefined) return _smClientCache;
+  try {
+    const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+    _smClientCache = new SecretManagerServiceClient();
+  } catch (e) { console.warn('[secrets] secret-manager không khả dụng:', e.message); _smClientCache = null; }
+  return _smClientCache;
+}
+async function _gcpProjectId() {
+  if (process.env.GOOGLE_CLOUD_PROJECT) return process.env.GOOGLE_CLOUD_PROJECT;
+  if (process.env.GCP_PROJECT) return process.env.GCP_PROJECT;
+  const sm = _getSecretManager();
+  try { return sm ? await sm.getProjectId() : null; } catch { return null; }
+}
+async function _syncSecretToCloud(cloudName, value) {
+  const sm = _getSecretManager();
+  if (!sm) return { ok: false, reason: 'unavailable', message: 'Chưa cài @google-cloud/secret-manager trên revision này' };
+  const projectId = await _gcpProjectId();
+  if (!projectId) return { ok: false, reason: 'no-project', message: 'Không xác định được GCP project' };
+  const parent = `projects/${projectId}`;
+  try {
+    try {
+      await sm.createSecret({ parent, secretId: cloudName, secret: { replication: { automatic: {} } } });
+    } catch (e) { if (!/already exists|ALREADY_EXISTS/i.test(e.message)) throw e; }
+    await sm.addSecretVersion({ parent: `${parent}/secrets/${cloudName}`, payload: { data: Buffer.from(String(value), 'utf8') } });
+    return { ok: true };
+  } catch (e) {
+    const perm = /permission|PERMISSION_DENIED|IAM/i.test(e.message);
+    return { ok: false, reason: perm ? 'forbidden' : 'error', message: e.message };
+  }
+}
+
+// — Step-up auth: phiên nâng quyền (elevation) ngắn hạn —
+const _elevFails = new Map(); // userId → { fails, lockedUntil }
+function _clientIpOf(req) {
+  return (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim().slice(0, 60);
+}
+function _checkElevation(req) {
+  const h = (req.headers['x-admin-elevation'] || '').toString();
+  if (!h) return null;
+  try { const d = _akJwt.verify(h, _akSecret()); return (d && d.elev) ? d : null; } catch { return null; }
+}
+async function _audit(req, decoded, action, target, detail) {
+  try {
+    await _ensureSecretTables();
+    await _getPool().query(
+      `INSERT INTO admin_audit_log(id, actor_id, actor_email, action, target, detail, ip, ua) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [_secCrypto.randomUUID(), decoded?.sub || null, decoded?.email || null, action, target || null,
+       detail ? JSON.stringify(detail) : null, _clientIpOf(req), (req.headers['user-agent'] || '').toString().slice(0, 300)]
+    );
+  } catch (e) { console.warn('[audit]', e.message); }
+}
+// Helper xác thực admin + (tuỳ chọn) yêu cầu elevation. Trả {decoded} hoặc null (đã res).
+async function _requireAdmin(req, res, { elevated = false } = {}) {
+  const verdict = await _isAdminRequest(req);
+  if (verdict === 'noauth') { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  if (verdict === 'forbidden') { res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null; }
+  let decoded; try { decoded = _akVerify((req.headers.authorization || '').slice(7)); } catch { decoded = {}; }
+  if (elevated && !_checkElevation(req)) { res.status(401).json({ error: 'Cần xác thực nâng cao', code: 'STEP_UP_REQUIRED' }); return null; }
+  return decoded;
+}
+
+// POST /api/admin/security/elevate — nhập lại mật khẩu (+TOTP nếu bật) → token 10'
+app.post('/api/admin/security/elevate', async (req, res) => {
+  const decoded = await _requireAdmin(req, res);
+  if (!decoded) return;
+  const uid = decoded.sub || decoded.userId || decoded.id;
+  try {
+    const now = Date.now();
+    const st = _elevFails.get(uid) || { fails: 0, lockedUntil: 0 };
+    if (st.lockedUntil > now) {
+      await _audit(req, decoded, 'elevate_locked', uid, {});
+      return res.status(429).json({ error: `Đã khoá tạm do thử sai nhiều lần. Thử lại sau ${Math.ceil((st.lockedUntil - now) / 60000)} phút` });
+    }
+    const { password, code } = req.body || {};
+    const pool = _getPool();
+    const { rows } = await pool.query('SELECT id, email, password, "twoFactorEnabled" FROM "User" WHERE id=$1 LIMIT 1', [uid]);
+    const user = rows[0];
+    if (!user || !user.password) return res.status(400).json({ error: 'Tài khoản không dùng mật khẩu (đăng nhập Google) — không thể step-up' });
+    const okPw = await _akBcrypt.compare(String(password || ''), user.password);
+    let okTotp = true;
+    if (user.twoFactorEnabled) {
+      // TOTP best-effort: chỉ áp dụng nếu DB có cột chứa secret và đã set
+      try {
+        const tf = await pool.query(`SELECT COALESCE("twoFactorSecret", two_factor_secret) AS s FROM "User" WHERE id=$1`, [uid]);
+        const secret = tf.rows[0]?.s;
+        if (secret) okTotp = _verifyTotp(secret, String(code || ''));
+      } catch { /* cột không tồn tại → bỏ qua TOTP */ }
+    }
+    if (!okPw || !okTotp) {
+      st.fails += 1;
+      if (st.fails >= 5) { st.lockedUntil = now + 15 * 60000; st.fails = 0; }
+      _elevFails.set(uid, st);
+      await _audit(req, decoded, 'elevate_fail', uid, { reason: !okPw ? 'password' : 'totp' });
+      return res.status(401).json({ error: 'Mật khẩu hoặc mã xác thực không đúng' });
+    }
+    _elevFails.delete(uid);
+    const token = _akJwt.sign({ sub: uid, email: user.email, elev: true }, _akSecret(), { expiresIn: '10m' });
+    await _audit(req, decoded, 'elevate_ok', uid, {});
+    return res.json({ ok: true, elevationToken: token, expiresInSec: 600 });
+  } catch (e) { console.error('[elevate]', e.message); return res.status(500).json({ error: 'Lỗi xác thực nâng cao' }); }
+});
+
+// TOTP RFC 6238 (sha1, 6 số, cửa sổ ±1) — chỉ dùng khi DB có secret
+function _b32ToBuf(b32) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; const bytes = []; let bits = 0, val = 0;
+  for (const c of String(b32).toUpperCase()) { const i = A.indexOf(c); if (i < 0) continue; val = (val << 5) | i; bits += 5; if (bits >= 8) { bytes.push((val >>> (bits - 8)) & 255); bits -= 8; } }
+  return Buffer.from(bytes);
+}
+function _totpAt(secret, step) {
+  const key = _b32ToBuf(secret); const t = Buffer.alloc(8); t.writeBigInt64BE(BigInt(step));
+  const h = _secCrypto.createHmac('sha1', key).update(t).digest(); const o = h[h.length - 1] & 0xf;
+  const bin = ((h[o] & 0x7f) << 24) | ((h[o + 1] & 0xff) << 16) | ((h[o + 2] & 0xff) << 8) | (h[o + 3] & 0xff);
+  return (bin % 1e6).toString().padStart(6, '0');
+}
+function _verifyTotp(secret, code) {
+  if (!/^\d{6}$/.test(String(code || ''))) return false;
+  const step = Math.floor(Date.now() / 1000 / 30);
+  return [step - 1, step, step + 1].some(s => _totpAt(secret, s) === code);
+}
+
+// GET /api/admin/security/status — trạng thái bảo mật của admin hiện tại
+app.get('/api/admin/security/status', async (req, res) => {
+  const decoded = await _requireAdmin(req, res);
+  if (!decoded) return;
+  let twoFactorEnabled = false;
+  try {
+    const { rows } = await _getPool().query('SELECT "twoFactorEnabled" FROM "User" WHERE id=$1', [decoded.sub]);
+    twoFactorEnabled = !!rows[0]?.twoFactorEnabled;
+  } catch { /* noop */ }
+  return res.json({ ok: true, elevated: !!_checkElevation(req), twoFactorEnabled, cloudSync: _getSecretManager() ? 'available' : 'unavailable' });
+});
+
+// GET /api/admin/security/audit — nhật ký thao tác gần đây
+app.get('/api/admin/security/audit', async (req, res) => {
+  const decoded = await _requireAdmin(req, res);
+  if (!decoded) return;
+  try {
+    await _ensureSecretTables();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    const { rows } = await _getPool().query(
+      `SELECT id, actor_email, action, target, detail, ip, created_at FROM admin_audit_log ORDER BY created_at DESC LIMIT $1`, [limit]);
+    return res.json({ ok: true, events: rows });
+  } catch (e) { console.error('[audit:list]', e.message); return res.json({ ok: true, events: [] }); }
+});
+
+// GET /api/admin/integrations — danh sách tích hợp + trạng thái (CHE secret)
+app.get('/api/admin/integrations', async (req, res) => {
+  const decoded = await _requireAdmin(req, res);
+  if (!decoded) return;
+  try {
+    await _ensureSecretTables();
+    const { rows } = await _getPool().query(`SELECT name, label, category, last4, updated_by, updated_at, synced_at FROM app_integration_secrets`);
+    const dbByName = Object.fromEntries(rows.map(r => [r.name, r]));
+    const seen = new Set();
+    const items = [];
+    for (const c of INTEGRATION_CATALOG) {
+      seen.add(c.name);
+      const db = dbByName[c.name];
+      const inEnv = !!process.env[c.name];
+      items.push({
+        name: c.name, label: c.label, category: c.category, placeholder: c.placeholder, builtin: true,
+        configured: !!db?.value_enc || inEnv,
+        source: db?.value_enc ? 'db' : (inEnv ? 'env' : 'none'),
+        last4: db?.last4 || null, updatedAt: db?.updated_at || null, updatedBy: db?.updated_by || null, syncedAt: db?.synced_at || null,
+      });
+    }
+    for (const r of rows) {
+      if (seen.has(r.name)) continue;
+      items.push({
+        name: r.name, label: r.label || r.name, category: r.category || 'Khác', builtin: false,
+        configured: true, source: 'db', last4: r.last4, updatedAt: r.updated_at, updatedBy: r.updated_by, syncedAt: r.synced_at,
+      });
+    }
+    return res.json({ ok: true, integrations: items });
+  } catch (e) { console.error('[integrations:list]', e.message); return res.status(500).json({ error: 'Lỗi tải danh sách tích hợp' }); }
+});
+
+// POST /api/admin/integrations — tạo/cập nhật giá trị key (CẦN elevation)
+app.post('/api/admin/integrations', async (req, res) => {
+  const decoded = await _requireAdmin(req, res, { elevated: true });
+  if (!decoded) return;
+  try {
+    const { name, value, label, category } = req.body || {};
+    if (!_validSecretName(name)) return res.status(400).json({ error: 'Tên biến không hợp lệ (CHỮ HOA, số, _ — vd ANTHROPIC_API_KEY)' });
+    if (!value || String(value).length < 3) return res.status(400).json({ error: 'Giá trị key quá ngắn' });
+    await _ensureSecretTables();
+    const cat = _catalogByName[name]?.category || category || 'Khác';
+    const lbl = _catalogByName[name]?.label || label || name;
+    const enc = _encSecret(value);
+    await _getPool().query(
+      `INSERT INTO app_integration_secrets(name, label, category, value_enc, last4, updated_by, updated_at, cloud_name)
+       VALUES($1,$2,$3,$4,$5,$6,NOW(),$7)
+       ON CONFLICT (name) DO UPDATE SET label=$2, category=$3, value_enc=$4, last4=$5, updated_by=$6, updated_at=NOW(), cloud_name=$7`,
+      [name, lbl, cat, enc, _last4(value), decoded.email || decoded.sub, _cloudNameFor(name)]
+    );
+    process.env[name] = String(value); // hiệu lực ngay trên instance này
+    await _audit(req, decoded, 'secret_update', name, { last4: _last4(value) });
+    return res.json({ ok: true, name, last4: _last4(value) });
+  } catch (e) { console.error('[integrations:save]', e.message); return res.status(500).json({ error: 'Lỗi lưu key' }); }
+});
+
+// POST /api/admin/integrations/:name/reveal — xem full value (CẦN elevation + audit)
+app.post('/api/admin/integrations/:name/reveal', async (req, res) => {
+  const decoded = await _requireAdmin(req, res, { elevated: true });
+  if (!decoded) return;
+  try {
+    const name = req.params.name;
+    const { rows } = await _getPool().query(`SELECT value_enc FROM app_integration_secrets WHERE name=$1`, [name]);
+    if (!rows[0]?.value_enc) {
+      // fallback: giá trị từ env (chưa lưu DB)
+      if (process.env[name]) { await _audit(req, decoded, 'secret_reveal', name, { source: 'env' }); return res.json({ ok: true, value: process.env[name], source: 'env' }); }
+      return res.status(404).json({ error: 'Không có giá trị để hiển thị' });
+    }
+    const value = _decSecret(rows[0].value_enc);
+    await _audit(req, decoded, 'secret_reveal', name, { source: 'db' });
+    return res.json({ ok: true, value, source: 'db' });
+  } catch (e) { console.error('[integrations:reveal]', e.message); return res.status(500).json({ error: 'Lỗi giải mã' }); }
+});
+
+// POST /api/admin/integrations/:name/sync — đẩy lên Google Secret Manager (CẦN elevation)
+app.post('/api/admin/integrations/:name/sync', async (req, res) => {
+  const decoded = await _requireAdmin(req, res, { elevated: true });
+  if (!decoded) return;
+  try {
+    const name = req.params.name;
+    const { rows } = await _getPool().query(`SELECT value_enc, cloud_name FROM app_integration_secrets WHERE name=$1`, [name]);
+    const enc = rows[0]?.value_enc;
+    if (!enc) return res.status(404).json({ error: 'Chưa có giá trị trong DB để đồng bộ' });
+    const value = _decSecret(enc);
+    const cloudName = rows[0].cloud_name || _cloudNameFor(name);
+    const result = await _syncSecretToCloud(cloudName, value);
+    if (result.ok) {
+      await _getPool().query(`UPDATE app_integration_secrets SET synced_at=NOW() WHERE name=$1`, [name]);
+      await _audit(req, decoded, 'secret_sync', name, { cloudName });
+      return res.json({ ok: true, cloudName, note: 'Đã tạo version mới. Để revision Cloud Run nạp, cần map secret vào --update-secrets khi deploy.' });
+    }
+    await _audit(req, decoded, 'secret_sync_fail', name, { reason: result.reason });
+    return res.status(result.reason === 'unavailable' ? 501 : 502).json({ error: result.message, reason: result.reason });
+  } catch (e) { console.error('[integrations:sync]', e.message); return res.status(500).json({ error: 'Lỗi đồng bộ cloud' }); }
+});
+
+// POST /api/admin/integrations/:name/test — kiểm tra kết nối nhẹ
+app.post('/api/admin/integrations/:name/test', async (req, res) => {
+  const decoded = await _requireAdmin(req, res);
+  if (!decoded) return;
+  const name = req.params.name;
+  const key = process.env[name];
+  if (!key) return res.json({ ok: false, status: 'missing', message: 'Chưa cấu hình' });
+  const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+  try {
+    if (name === 'TELEGRAM_BOT_TOKEN') {
+      const r = await withTimeout(fetch(`https://api.telegram.org/bot${key}/getMe`));
+      const j = await r.json().catch(() => ({}));
+      return res.json({ ok: !!j.ok, status: j.ok ? 'up' : 'down', message: j.ok ? `@${j.result?.username}` : (j.description || 'Token sai') });
+    }
+    if (name === 'ANTHROPIC_API_KEY') {
+      const r = await withTimeout(fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' } }));
+      return res.json({ ok: r.ok, status: r.ok ? 'up' : 'down', message: r.ok ? 'Kết nối OK' : `HTTP ${r.status}` });
+    }
+    if (name === 'DEEPSEEK_API_KEY') {
+      const r = await withTimeout(fetch('https://api.deepseek.com/models', { headers: { Authorization: `Bearer ${key}` } }));
+      return res.json({ ok: r.ok, status: r.ok ? 'up' : 'down', message: r.ok ? 'Kết nối OK' : `HTTP ${r.status}` });
+    }
+    if (name === 'OPENAI_API_KEY') {
+      const r = await withTimeout(fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` } }));
+      return res.json({ ok: r.ok, status: r.ok ? 'up' : 'down', message: r.ok ? 'Kết nối OK' : `HTTP ${r.status}` });
+    }
+    return res.json({ ok: true, status: 'configured', message: 'Đã cấu hình (không có test trực tuyến)' });
+  } catch (e) { return res.json({ ok: false, status: 'error', message: e.message }); }
+});
+
+// DELETE /api/admin/integrations/:name — gỡ override DB (về lại giá trị env) (CẦN elevation)
+app.delete('/api/admin/integrations/:name', async (req, res) => {
+  const decoded = await _requireAdmin(req, res, { elevated: true });
+  if (!decoded) return;
+  try {
+    const name = req.params.name;
+    const { rowCount } = await _getPool().query(`DELETE FROM app_integration_secrets WHERE name=$1`, [name]);
+    await _audit(req, decoded, 'secret_delete', name, {});
+    // Lưu ý: không xoá process.env trên instance này (giá trị deploy-time vẫn còn);
+    // chỉ ngừng override từ DB. Cảnh báo: instance khác sẽ giữ giá trị cũ tới refresh.
+    return res.json({ ok: true, removed: rowCount });
+  } catch (e) { console.error('[integrations:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
 });
 
 // ── Classes (GV tạo/xem/xoá lớp) — PHẢI trước catch-all /api proxy ────────
