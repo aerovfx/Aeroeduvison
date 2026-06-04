@@ -340,6 +340,10 @@ const LEVELS: Level[] = [
         { center: [2, 6, -16], radius: 8, speed: 0.6 },
         { center: [-8, 8, -22], radius: 6, speed: 0.9 },
         { center: [12, 5, -12], radius: 7, speed: 0.75 },
+        { center: [-4, 7, -10], radius: 7, speed: 0.8 },
+        { center: [8, 9, -24], radius: 6, speed: 1.0 },
+        { center: [-14, 6, -16], radius: 7, speed: 0.7 },
+        { center: [0, 10, -30], radius: 8, speed: 0.85 },
       ],
       poles: [
         { pos: [3, 0, -12], h: 10 }, { pos: [-4, 0, -18], h: 12 },
@@ -2078,34 +2082,90 @@ function EnemyDrones({ posRef, specs, onHit, shared }: {
   shared?: React.MutableRefObject<EnemyShared | null>
 }) {
   const refs = useRef<(THREE.Group | null)[]>([])
-  const phase = useRef(specs.map((_, i) => i * 1.9))
   const lastHit = useRef(0)
-  // bộ chia sẻ cho hệ đạn (vị trí + sống/hồi sinh)
   const local = useRef<EnemyShared>({ pos: specs.map(() => new THREE.Vector3()), alive: specs.map(() => true), respawnAt: specs.map(() => 0) })
+  const vel = useRef(specs.map(() => new THREE.Vector3()))
+  const atk = useRef(specs.map(() => ({ attacking: false, until: 0 })))   // trạng thái tấn công/cooldown
+  const nextWave = useRef(performance.now() + 2200)
+  const inited = useRef(false)
   useEffect(() => { if (shared) shared.current = local.current }, [shared])
-  useFrame((_s, dt) => {
+  const T = useMemo(() => ({ a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), center: new THREE.Vector3(), avg: new THREE.Vector3(), steer: new THREE.Vector3() }), [])
+
+  useFrame((_s, dtRaw) => {
+    const dt = Math.min(dtRaw, 1 / 30)
     const dp = posRef.current
     const st = local.current
     const now = performance.now()
+    if (!inited.current) {
+      specs.forEach((sp, i) => st.pos[i].set(sp.center[0] + Math.cos(i) * sp.radius, sp.center[1] + 3, sp.center[2] + Math.sin(i) * sp.radius))
+      inited.current = true
+    }
+    const aliveIdx: number[] = []
+    for (let i = 0; i < specs.length; i++) if (st.alive[i]) aliveIdx.push(i)
+
+    // Tâm bầy
+    T.center.set(0, 0, 0)
+    for (const i of aliveIdx) T.center.add(st.pos[i])
+    if (aliveIdx.length) T.center.multiplyScalar(1 / aliveIdx.length)
+
+    // CHIẾN THUẬT THEO ĐỢT: cứ vài giây cử ~1/3 bầy lao vào tấn công (so le)
+    const nAttacking = aliveIdx.filter((i) => atk.current[i].attacking).length
+    if (now > nextWave.current && aliveIdx.length && nAttacking < Math.max(1, Math.ceil(aliveIdx.length / 3))) {
+      const cand = aliveIdx.filter((i) => !atk.current[i].attacking && now > atk.current[i].until)
+      if (cand.length) {
+        const pick = cand[Math.floor(Math.random() * cand.length)]
+        atk.current[pick].attacking = true
+        atk.current[pick].until = now + 3800
+        nextWave.current = now + 1500 + Math.random() * 1300
+      } else nextWave.current = now + 700
+    }
+
     specs.forEach((sp, i) => {
-      const g = refs.current[i]
-      if (!g) return
-      if (!st.alive[i]) { // bị bắn rơi → ẩn, hồi sinh sau 4s
-        g.visible = false
-        if (now > st.respawnAt[i]) st.alive[i] = true
-        return
-      }
+      const g = refs.current[i]; if (!g) return
+      if (!st.alive[i]) { g.visible = false; if (now > st.respawnAt[i]) { st.alive[i] = true; atk.current[i].attacking = false } return }
       g.visible = true
-      phase.current[i] += dt * sp.speed
-      const a = phase.current[i]
-      const ep = st.pos[i].set(
-        sp.center[0] + Math.cos(a) * sp.radius,
-        sp.center[1] + Math.sin(a * 0.7) * 1.6,
-        sp.center[2] + Math.sin(a) * sp.radius,
-      )
-      if (ep.distanceTo(dp) < 16) ep.lerp(dp, 0.015) // bám nhẹ khi gần
-      g.position.copy(ep); g.rotation.y += dt * 5
-      if (ep.distanceTo(dp) < 1.3) { if (now - lastHit.current > 1200) { lastHit.current = now; onHit() } }
+      const p = st.pos[i], v = vel.current[i]
+      const base = sp.speed * 3 + 9   // tốc độ nền (m/s)
+      T.steer.set(0, 0, 0)
+
+      // ── BOIDS: tách (separation) · đồng hướng (alignment) · quây (cohesion) ──
+      let aliN = 0; T.avg.set(0, 0, 0)
+      for (const j of aliveIdx) {
+        if (j === i) continue
+        const d = p.distanceTo(st.pos[j])
+        if (d > 0.001 && d < 4.2) { T.b.copy(p).sub(st.pos[j]).multiplyScalar(1.8 / d); T.steer.add(T.b) }   // separation
+        if (d < 15) { T.avg.add(vel.current[j]); aliN++ }
+      }
+      if (aliN) { T.avg.multiplyScalar(1 / aliN).sub(v); if (T.avg.lengthSq() > 1e-4) T.steer.addScaledVector(T.avg.normalize(), 0.8) }  // alignment
+      T.a.copy(T.center).sub(p); if (T.a.lengthSq() > 1e-4) T.steer.addScaledVector(T.a.normalize(), 0.35)  // cohesion
+
+      const toP = T.b.copy(dp).sub(p); const dPlayer = toP.length(); if (dPlayer > 1e-3) toP.normalize()
+
+      if (atk.current[i].attacking) {
+        // ── ĐÒN BỔ NHÀO: lao thẳng vào người chơi, tốc độ cao ──
+        T.steer.addScaledVector(toP, 5)
+        if (dPlayer < 2.2 || now > atk.current[i].until) { atk.current[i].attacking = false; atk.current[i].until = now + 2400 + Math.random() * 2200 }
+      } else {
+        // ── BAO VÂY: giữ vị trí quanh người chơi ở cự ly chờ (encircle) ──
+        const ang = (i / Math.max(1, specs.length)) * Math.PI * 2 + now * 0.0002
+        T.a.set(dp.x + Math.cos(ang) * 20, dp.y + 4 + Math.sin(i * 1.3) * 3, dp.z + Math.sin(ang) * 20).sub(p)
+        if (T.a.lengthSq() > 1e-4) T.steer.addScaledVector(T.a.normalize(), 1.7)
+      }
+
+      // Tích phân vận tốc + giới hạn + cản
+      v.addScaledVector(T.steer, base * dt * 2.2)
+      const vmax = atk.current[i].attacking ? base * 1.9 : base
+      if (v.length() > vmax) v.setLength(vmax)
+      v.multiplyScalar(0.95)
+      p.addScaledVector(v, dt)
+      if (p.y < 1) { p.y = 1; if (v.y < 0) v.y = -v.y * 0.3 }
+
+      g.position.copy(p)
+      if (v.lengthSq() > 0.15) g.rotation.y = Math.atan2(v.x, v.z)
+      g.rotation.z = Math.sin(now * 0.012 + i) * 0.18   // nghiêng cánh
+      g.scale.setScalar(atk.current[i].attacking ? 1.18 : 1)   // phình to khi bổ nhào
+
+      if (dPlayer < 1.5 && now - lastHit.current > 900) { lastHit.current = now; onHit() }
     })
   })
   return <>{specs.map((_, i) => (<group key={i} ref={(el) => { refs.current[i] = el }}><EnemyMesh /></group>))}</>
