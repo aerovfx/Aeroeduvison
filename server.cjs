@@ -11329,8 +11329,21 @@ async function _requireAdmin(req, res, { elevated = false } = {}) {
   if (verdict === 'noauth') { res.status(401).json({ error: 'Unauthorized' }); return null; }
   if (verdict === 'forbidden') { res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null; }
   let decoded; try { decoded = _akVerify((req.headers.authorization || '').slice(7)); } catch { decoded = {}; }
-  if (elevated && !_checkElevation(req)) { res.status(401).json({ error: 'Cần xác thực nâng cao', code: 'STEP_UP_REQUIRED' }); return null; }
+  if (elevated) {
+    const el = _checkElevation(req);
+    const uid = decoded.sub || decoded.userId || decoded.id;
+    // Token elevation phải còn hạn VÀ thuộc đúng admin đang gọi (không dùng chéo)
+    if (!el || el.sub !== uid) { res.status(401).json({ error: 'Cần xác thực nâng cao', code: 'STEP_UP_REQUIRED' }); return null; }
+  }
   return decoded;
+}
+
+// Chỉ cho thao tác trên secret THUỘC danh mục quản lý (catalog dựng sẵn hoặc đã
+// lưu DB) — tránh lộ/đụng các env nhạy cảm khác (JWT_SECRET, DATABASE_URL…).
+async function _isManagedName(name) {
+  if (_catalogByName[name]) return true;
+  try { const { rows } = await _getPool().query('SELECT 1 FROM app_integration_secrets WHERE name=$1', [name]); return rows.length > 0; }
+  catch { return false; }
 }
 
 // POST /api/admin/security/elevate — nhập lại mật khẩu (+TOTP nếu bật) → token 10'
@@ -11479,10 +11492,12 @@ app.post('/api/admin/integrations/:name/reveal', async (req, res) => {
   if (!decoded) return;
   try {
     const name = req.params.name;
+    if (!(await _isManagedName(name))) return res.status(404).json({ error: 'Không thuộc danh mục tích hợp quản lý' });
     const { rows } = await _getPool().query(`SELECT value_enc FROM app_integration_secrets WHERE name=$1`, [name]);
     if (!rows[0]?.value_enc) {
-      // fallback: giá trị từ env (chưa lưu DB)
-      if (process.env[name]) { await _audit(req, decoded, 'secret_reveal', name, { source: 'env' }); return res.json({ ok: true, value: process.env[name], source: 'env' }); }
+      // fallback: giá trị từ env — CHỈ cho secret dựng sẵn (catalog), tránh lộ
+      // các env nhạy cảm khác như JWT_SECRET / DATABASE_URL.
+      if (_catalogByName[name] && process.env[name]) { await _audit(req, decoded, 'secret_reveal', name, { source: 'env' }); return res.json({ ok: true, value: process.env[name], source: 'env' }); }
       return res.status(404).json({ error: 'Không có giá trị để hiển thị' });
     }
     const value = _decSecret(rows[0].value_enc);
@@ -11518,6 +11533,7 @@ app.post('/api/admin/integrations/:name/test', async (req, res) => {
   const decoded = await _requireAdmin(req, res);
   if (!decoded) return;
   const name = req.params.name;
+  if (!(await _isManagedName(name))) return res.status(404).json({ error: 'Không thuộc danh mục tích hợp quản lý' });
   const key = process.env[name];
   if (!key) return res.json({ ok: false, status: 'missing', message: 'Chưa cấu hình' });
   const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
