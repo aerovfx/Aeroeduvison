@@ -1287,6 +1287,15 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
   return `// Auto-generated từ Wokwi diagram (${d.board})\n${decls}\n\nvoid setup() {\n  ${header}\n${setups}\n}\n\nvoid loop() {\n${loops}\n}\n`
 }
 
+// Phân nhóm danh mục cho thanh danh sách mạch trong lab (đồng bộ với hub
+// IoTIndex). Dùng map theo id để khỏi sửa rải rác CIRCUITS; mạch chưa gán nhóm
+// rơi vào "Khác" nên không bao giờ bị ẩn.
+const CIRCUIT_GROUPS: { id: string; label: string; emoji: string; ids: string[] }[] = [
+  { id: 'arduino', label: 'Arduino — Cơ bản', emoji: '💡', ids: ['blink-uno', 'blink-esp32', 'traffic-light', 'button-led', 'chaser'] },
+  { id: 'sensor', label: 'Cảm biến & Điều khiển', emoji: '🎚️', ids: ['pwm-dimmer', 'servo-sweep', 'ultrasonic', 'dht22'] },
+  { id: 'network', label: 'IoT / Mạng', emoji: '📡', ids: ['esp32-web', 'esp32-ntp-lcd'] },
+]
+
 export default function IoTLab() {
   usePageTitle('IoT Lab — Mạch điện & Arduino')
   const navigate = useNavigate()
@@ -1634,32 +1643,58 @@ export default function IoTLab() {
             <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 py-1">
               {filtered.length} mạch
             </div>
-            <div className="space-y-1 max-h-[70vh] overflow-y-auto pr-1">
-              {filtered.map(c => {
-                const isActive = c.id === active.id
+            <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+              {(() => {
+                const renderBtn = (c: typeof filtered[number]) => {
+                  const isActive = c.id === active.id
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => goToSketch(c.id)}
+                      className={`w-full text-left rounded-lg px-3 py-2 transition border ${
+                        isActive
+                          ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-100'
+                          : 'border-transparent hover:bg-accent dark:hover:bg-zinc-800/60 text-foreground/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className="text-sm font-medium truncate">{c.name}</span>
+                        {c.board === 'ESP32'
+                          ? <Cpu className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          : <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <DifficultyPill level={c.difficulty} />
+                        <span className="text-[10px] text-zinc-500">{c.xp} XP</span>
+                      </div>
+                    </button>
+                  )
+                }
+                // Nhóm theo danh mục (tôn trọng bộ lọc board hiện tại qua `filtered`)
+                const grouped = new Set<string>()
+                const sections = CIRCUIT_GROUPS.map((g) => {
+                  const items = filtered.filter((c) => g.ids.includes(c.id))
+                  items.forEach((c) => grouped.add(c.id))
+                  return { g, items }
+                }).filter((s) => s.items.length > 0)
+                const others = filtered.filter((c) => !grouped.has(c.id))
                 return (
-                  <button
-                    key={c.id}
-                    onClick={() => goToSketch(c.id)}
-                    className={`w-full text-left rounded-lg px-3 py-2 transition border ${
-                      isActive
-                        ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-100'
-                        : 'border-transparent hover:bg-accent dark:hover:bg-zinc-800/60 text-foreground/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-sm font-medium truncate">{c.name}</span>
-                      {c.board === 'ESP32'
-                        ? <Cpu className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        : <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <DifficultyPill level={c.difficulty} />
-                      <span className="text-[10px] text-zinc-500">{c.xp} XP</span>
-                    </div>
-                  </button>
+                  <>
+                    {sections.map(({ g, items }) => (
+                      <div key={g.id} className="space-y-1">
+                        <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 pt-1">{g.emoji} {g.label}</div>
+                        {items.map(renderBtn)}
+                      </div>
+                    ))}
+                    {others.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 pt-1">🔌 Khác</div>
+                        {others.map(renderBtn)}
+                      </div>
+                    )}
+                  </>
                 )
-              })}
+              })()}
             </div>
           </aside>
 
