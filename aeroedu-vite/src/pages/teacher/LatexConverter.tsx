@@ -161,7 +161,7 @@ export default function LatexConverter() {
           </button>
           {doneT2D && <div className="text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-400/30 rounded-lg px-3 py-2 inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Đã tạo file Word</div>}
           {errT2D && <div className="text-sm text-rose-300 bg-rose-500/10 border border-rose-400/30 rounded-lg px-3 py-2">{errT2D}</div>}
-          <p className="text-xs text-slate-500">Lưu ý: công thức toán phức tạp sẽ được chuyển sang ký hiệu Unicode dễ đọc (vd α, ∑, x²). Để giữ công thức chuẩn, dùng nút biên dịch PDF trong trình soạn thảo LaTeX.</p>
+          <p className="text-xs text-slate-500">Công thức toán được xuất thành <b className="text-slate-400">Office Math (OMML)</b> — chỉnh sửa trực tiếp trong Word — qua pandoc. Nếu máy chủ chưa có pandoc, hệ thống tự chuyển công thức sang ký hiệu Unicode (α, ∑, x²).</p>
         </div>
       )}
     </div>

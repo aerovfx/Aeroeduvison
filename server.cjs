@@ -11044,6 +11044,25 @@ function _stripFences(s) {
   return t.trim();
 }
 
+// LaTeX → DOCX qua pandoc (công thức Office Math/OMML chuẩn). Trả Buffer, hoặc
+// null nếu pandoc không có trong image / lỗi parse → caller fallback sang AI.
+function _latexToDocxViaPandoc(latex) {
+  return new Promise((resolve) => {
+    let cp, fs, os, path;
+    try { cp = require('child_process'); fs = require('fs'); os = require('os'); path = require('path'); } catch { return resolve(null); }
+    let dir;
+    try { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'l2d-')); } catch { return resolve(null); }
+    const inPath = path.join(dir, 'in.tex'), outPath = path.join(dir, 'out.docx');
+    const done = (buf) => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* noop */ } resolve(buf); };
+    try { fs.writeFileSync(inPath, String(latex), 'utf8'); } catch { return done(null); }
+    cp.execFile('pandoc', [inPath, '-f', 'latex', '-t', 'docx', '-o', outPath], { timeout: 30000 }, (err) => {
+      if (err) { if (err.code !== 'ENOENT') console.warn('[latex:pandoc]', err.message); return done(null); }
+      let buf = null; try { buf = fs.readFileSync(outPath); } catch { /* noop */ }
+      return done(buf && buf.length ? buf : null);
+    });
+  });
+}
+
 // POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }
 app.post('/api/latex/from-docx', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
@@ -11079,7 +11098,19 @@ app.post('/api/latex/to-docx', async (req, res) => {
   try {
     const { latex, filename } = req.body || {};
     if (!latex || typeof latex !== 'string' || latex.trim().length < 5) return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
-    let htmlToDocx; try { htmlToDocx = require('html-to-docx'); } catch { return res.status(501).json({ error: 'Thiếu thư viện html-to-docx trên revision này' }); }
+    const safeName = String(filename || 'tai-lieu').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'tai-lieu';
+
+    // 1) Ưu tiên pandoc → công thức Office Math (OMML) chuẩn, giữ nguyên cấu trúc.
+    const pandocBuf = await _latexToDocxViaPandoc(latex);
+    if (pandocBuf) {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeName}.docx"`);
+      res.setHeader('X-Convert-Engine', 'pandoc');
+      return res.end(pandocBuf);
+    }
+
+    // 2) Fallback (pandoc không có/parse lỗi): AI → HTML → html-to-docx (toán dạng Unicode).
+    let htmlToDocx; try { htmlToDocx = require('html-to-docx'); } catch { return res.status(501).json({ error: 'pandoc không khả dụng và thiếu thư viện html-to-docx' }); }
     const system = 'Bạn là công cụ chuyển LaTeX sang HTML để xuất Word. CHỈ trả về phần HTML body (không <html>/<head>), KHÔNG giải thích, KHÔNG bọc trong ```.';
     const user = `Chuyển tài liệu LaTeX sau thành HTML sạch để xuất ra Word:
 - \\section→<h1>, \\subsection→<h2>, \\subsubsection→<h3>; đoạn văn→<p>; itemize→<ul>, enumerate→<ol>; \\textbf→<b>, \\textit→<i>;
@@ -11093,9 +11124,9 @@ ${latex.slice(0, 60000)}`;
     const bodyHtml = _stripFences(out.text);
     const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${bodyHtml}</body></html>`;
     const docxBuf = await htmlToDocx(fullHtml, null, { table: { row: { cantSplit: true } }, footer: false, header: false });
-    const safeName = String(filename || 'tai-lieu').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'tai-lieu';
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}.docx"`);
+    res.setHeader('X-Convert-Engine', 'ai');
     res.setHeader('X-AI-Provider', out.provider);
     return res.end(Buffer.isBuffer(docxBuf) ? docxBuf : Buffer.from(docxBuf));
   } catch (e) {

@@ -85,6 +85,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz" \
       | tar xz -C /usr/local/bin && \
     chmod +x /usr/local/bin/tectonic && \
+    # Pandoc (binary tĩnh) — chuyển LaTeX→DOCX với công thức Office Math (OMML)
+    # chuẩn. Fail-soft: nếu tải lỗi thì runtime tự fallback sang AI→HTML→docx.
+    ( curl -fsSL "https://github.com/jgm/pandoc/releases/download/3.1.11/pandoc-3.1.11-linux-amd64.tar.gz" \
+        | tar xz -C /tmp \
+      && cp /tmp/pandoc-3.1.11/bin/pandoc /usr/local/bin/pandoc \
+      && chmod +x /usr/local/bin/pandoc \
+      && rm -rf /tmp/pandoc-3.1.11 \
+      && echo "  ✓ pandoc $(pandoc --version | head -1)" ) \
+      || echo "⚠ pandoc tải lỗi — runtime sẽ fallback AI→HTML→docx" ; \
     fc-cache -fv && \
     apt-get purge -y curl xz-utils && apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* && \
