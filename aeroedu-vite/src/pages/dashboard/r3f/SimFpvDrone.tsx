@@ -1391,13 +1391,13 @@ function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }:
         <div style={{ position: 'absolute', left: '50%', top: 4, bottom: 4, width: 1, background: 'rgba(255,255,255,0.15)' }} />
         {/* Axis labels */}
         <div style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)',
-          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.y}+</div>
+          fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>{axisLabels.y}+</div>
         <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)',
-          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.y}-</div>
+          fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>{axisLabels.y}-</div>
         <div style={{ position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)',
-          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.x}+</div>
+          fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>{axisLabels.x}+</div>
         <div style={{ position: 'absolute', top: '50%', left: 4, transform: 'translateY(-50%)',
-          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.x}-</div>
+          fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>{axisLabels.x}-</div>
         {/* Knob */}
         <div style={{
           position: 'absolute', top: '50%', left: '50%',
@@ -3114,7 +3114,7 @@ function GameScreen({
             const maxSpd = PHYSICS.maxSpeed * 3.6 * rangeMult  // ~418 km/h
             const bar = (label: string, frac: number, col: string) => (
               <div style={{ textAlign: 'center', minWidth: 46 }}>
-                <div style={{ fontSize: 8, color: '#7dd3fc', marginBottom: 3 }}>{label}</div>
+                <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700, marginBottom: 3 }}>{label}</div>
                 <div style={{ width: 44, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, height: '100%', background: col }} />
                 </div>
@@ -3123,7 +3123,7 @@ function GameScreen({
             return (
               <>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>CẤP</div>
+                  <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>CẤP</div>
                   <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{lvlNum}</div>
                 </div>
                 {bar('MÁU', hp / HP_MAX, hp < 30 ? '#ef4444' : '#f87171')}
@@ -3131,19 +3131,19 @@ function GameScreen({
                 {bar('PIN', (telemetry?.battery ?? 0) / 100, telemetry && telemetry.battery < 20 ? '#ef4444' : '#22c55e')}
                 {bar('TẦM BAY', (rangeMult - 1) / 0.6 + 0.2, '#a855f7')}
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>BOOST</div>
+                  <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>BOOST</div>
                   <div style={{ fontSize: 14, color: boostOn ? '#a855f7' : '#475569' }}>{boostOn ? '⚡ON' : '—'}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐẠN</div>
+                  <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>ĐẠN</div>
                   <div style={{ fontSize: 16, fontWeight: 'bold', color: ammo > 0 ? '#fde047' : '#ef4444' }}>{ammo}</div>
                 </div>
                 <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: 10 }}>
-                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>ĐIỂM MÀN</div>
+                  <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>ĐIỂM MÀN</div>
                   <div style={{ fontSize: 16, fontWeight: 'bold', color: '#fde68a' }}>{runScore}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 8, color: '#7dd3fc' }}>TỔNG</div>
+                  <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>TỔNG</div>
                   <div style={{ fontSize: 14, color: '#cbd5e1' }}>{points + runScore}</div>
                 </div>
               </>
