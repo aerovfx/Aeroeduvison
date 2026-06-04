@@ -11082,6 +11082,19 @@ function _docxToLatexViaPandoc(buf) {
   });
 }
 
+// Phát hiện công thức MathType/Equation dạng OLE nhị phân (MTEF) trong .docx.
+// Zip lưu tên file dạng cleartext nên quét byte là đủ, không cần thư viện.
+// pandoc/mammoth KHÔNG đọc được định dạng nhị phân này → cần cảnh báo để giáo
+// viên Convert sang Office Math (OMML) trong Word trước.
+function _detectMathTypeOleCount(buf) {
+  try {
+    const s = buf.toString('latin1');
+    const m = s.match(/word\/embeddings\/oleObject\d+\.bin/gi);
+    return m ? new Set(m.map(x => x.toLowerCase())).size : 0;
+  } catch { return 0; }
+}
+const _MT_OLE_FIX = 'Cách khắc phục: mở file trong Word → menu MathType → "Convert Equations" → chọn "Office Math (OMML)", Lưu lại rồi tải lên lại (hoặc dùng "Insert → Equation" của Word).';
+
 // POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }
 app.post('/api/latex/from-docx', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
@@ -11091,6 +11104,12 @@ app.post('/api/latex/from-docx', async (req, res) => {
     const b64 = docxBase64.includes(',') ? docxBase64.split(',').pop() : docxBase64;
     const buf = Buffer.from(b64, 'base64');
     if (buf.length > 15 * 1024 * 1024) return res.status(413).json({ error: 'File quá lớn (>15MB)' });
+
+    // Cảnh báo công thức MathType OLE (không convert được) — đính kèm mọi kết quả
+    const mtOle = _detectMathTypeOleCount(buf);
+    const mtWarn = mtOle > 0
+      ? `⚠️ Phát hiện ${mtOle} công thức MathType dạng OLE (nhị phân) — công cụ không đọc được định dạng này nên các công thức đó KHÔNG có trong kết quả. ${_MT_OLE_FIX}`
+      : null;
 
     // 1) Ưu tiên pandoc docx→latex: công thức từ OMML chuyển sang LaTeX CHÍNH XÁC,
     //    rồi AI tinh chỉnh thành tài liệu sạch (giữ nguyên toán). AI lỗi → trả
@@ -11108,10 +11127,10 @@ LaTeX nguồn (pandoc):
 ${pandocTex.slice(0, 60000)}`;
       try {
         const out = await _aiComplete({ system: psys, user: puser, maxTokens: 8000 });
-        return res.json({ ok: true, latex: _stripFences(out.text), engine: 'pandoc+ai', provider: out.provider, model: out.model });
+        return res.json({ ok: true, latex: _stripFences(out.text), engine: 'pandoc+ai', provider: out.provider, model: out.model, mathTypeOle: mtOle, warning: mtWarn });
       } catch (e) {
         console.warn('[from-docx] AI tinh chỉnh lỗi, trả pandoc thô:', e.message);
-        return res.json({ ok: true, latex: pandocTex, engine: 'pandoc' });
+        return res.json({ ok: true, latex: pandocTex, engine: 'pandoc', mathTypeOle: mtOle, warning: mtWarn });
       }
     }
 
@@ -11129,7 +11148,7 @@ HTML nguồn:
 
 ${html.slice(0, 60000)}`;
     const out = await _aiComplete({ system, user, maxTokens: 8000 });
-    return res.json({ ok: true, latex: _stripFences(out.text), engine: 'mammoth+ai', provider: out.provider, model: out.model });
+    return res.json({ ok: true, latex: _stripFences(out.text), engine: 'mammoth+ai', provider: out.provider, model: out.model, mathTypeOle: mtOle, warning: mtWarn });
   } catch (e) {
     console.error('[latex:from-docx]', e.message);
     return res.status(502).json({ error: 'Lỗi chuyển đổi: ' + e.message });

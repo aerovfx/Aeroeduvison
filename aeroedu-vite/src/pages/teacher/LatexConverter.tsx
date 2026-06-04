@@ -21,6 +21,7 @@ export default function LatexConverter() {
   const [latexOut, setLatexOut] = useState('')
   const [busyD2T, setBusyD2T] = useState(false)
   const [errD2T, setErrD2T] = useState('')
+  const [warnD2T, setWarnD2T] = useState('')
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -39,10 +40,11 @@ export default function LatexConverter() {
 
   const convertDocxToTex = async () => {
     if (!docxBase64) { setErrD2T('Hãy chọn file Word trước'); return }
-    setBusyD2T(true); setErrD2T(''); setLatexOut('')
+    setBusyD2T(true); setErrD2T(''); setLatexOut(''); setWarnD2T('')
     try {
       const { data } = await api.post('/latex/from-docx', { docxBase64, filename: docxName }, { timeout: 120000 })
       setLatexOut(data.latex || '')
+      if (data.warning) setWarnD2T(data.warning)
     } catch (e: unknown) {
       setErrD2T((e as { response?: { data?: { error?: string } } }).response?.data?.error || 'Chuyển đổi thất bại')
     } finally { setBusyD2T(false) }
@@ -130,6 +132,7 @@ export default function LatexConverter() {
             {busyD2T ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang chuyển đổi…</> : <>Chuyển sang LaTeX</>}
           </button>
           {errD2T && <div className="text-sm text-rose-300 bg-rose-500/10 border border-rose-400/30 rounded-lg px-3 py-2">{errD2T}</div>}
+          {warnD2T && <div className="text-sm text-amber-200 bg-amber-500/10 border border-amber-400/40 rounded-lg px-3 py-2.5">{warnD2T}</div>}
 
           {latexOut && (
             <div>
