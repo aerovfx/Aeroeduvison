@@ -1626,8 +1626,11 @@ export default function IoTLab() {
         {/* Two-pane layout (Arduino mode) */}
         {mode === 'arduino' && (
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
-          {/* Sidebar — circuit list */}
-          <aside className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-3 h-fit sticky top-4">
+          {/* Sidebar — circuit list. CHỈ sticky trên desktop (lg): ở mobile layout
+              gộp 1 cột, nếu sticky thì thanh này ghim đầu trang trong khi sơ đồ
+              mạch + code cuộn LÊN phía sau nền bán trong suốt → text/hình đè lên
+              nhau. Bỏ sticky ở mobile (cuộn bình thường) khắc phục chồng lấn. */}
+          <aside className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-3 h-fit lg:sticky lg:top-4 lg:z-10">
             <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 py-1">
               {filtered.length} mạch
             </div>
