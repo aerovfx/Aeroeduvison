@@ -3192,6 +3192,78 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         'Từ đó, mỗi đêm rằm Trung thu trăng sáng, nhìn lên ta thấy một vệt đen — đó là chú Cuội ngồi gốc cây đa nhớ nhà. Bên chị Hằng Nga dịu hiền, các bé rước đèn phá cỗ vui Tết Trung thu. Hết!',
       ],
     },
+    {
+      id: 'demo-thay-boi-xem-voi', slug: 'thay-boi-xem-voi', title: 'Thầy Bói Xem Voi',
+      desc: 'Truyện ngụ ngôn vui dạy bé phải nhìn nhận sự vật toàn diện — cấu trúc 3 hồi, nhạc nền nhẹ nhàng. (Bản demo)',
+      bgmPreset: 'calm',
+      acts: [
+        { id: 'act1', title: 'Rủ nhau xem voi', description: 'Năm thầy bói mù tò mò về con voi', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Mỗi người một kiểu', description: 'Mỗi thầy sờ một bộ phận của voi', startPage: 2, tone: 'excited' },
+        { id: 'act3', title: 'Cãi nhau toạc đầu', description: 'Ai cũng cho mình đúng', startPage: 4, tone: 'gentle' },
+      ],
+      pages: [
+        'Nhân buổi ế hàng, năm ông thầy bói mù ngồi tán gẫu với nhau. Ông nào cũng phàn nàn rằng chưa biết hình thù con voi nó ra làm sao.',
+        'Chợt nghe người ta nói có voi đi qua, năm ông chung nhau tiền biếu người quản voi, xin cho con voi đứng lại để cùng sờ mà xem.',
+        'Thầy thì sờ vòi, thầy thì sờ ngà, thầy thì sờ tai, thầy thì sờ chân, thầy thì sờ đuôi. Mỗi ông sờ một bộ phận của con voi to lớn.',
+        'Ông sờ vòi bảo voi sun sun như con đỉa. Ông sờ ngà cãi voi chần chẫn như cái đòn càn. Ông sờ tai khăng khăng voi bè bè như cái quạt thóc.',
+        'Ông sờ chân quả quyết voi sừng sững như cái cột đình. Ông sờ đuôi lại bảo không phải, voi tua tủa như cái chổi sể cùn. Năm ông ai cũng cho là chỉ mình mình đúng.',
+        'Không ai chịu ai, năm thầy xô xát đánh nhau toạc đầu chảy máu. Muốn hiểu đúng sự vật, ta phải xem xét cho toàn diện, đừng chỉ nhìn một phần mà vội kết luận! Hết!',
+      ],
+    },
+    {
+      id: 'demo-ech-ngoi-day-gieng', slug: 'ech-ngoi-day-gieng', title: 'Ếch Ngồi Đáy Giếng',
+      desc: 'Truyện ngụ ngôn dạy bé không kiêu căng, chủ quan — cấu trúc 3 hồi, nhạc nền điện ảnh. (Bản demo)',
+      bgmPreset: 'cinematic',
+      acts: [
+        { id: 'act1', title: 'Chúa tể đáy giếng', description: 'Ếch tưởng mình oai nhất', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Trời bằng cái vung', description: 'Ếch nghĩ bầu trời bé tí', startPage: 2, tone: 'suspense' },
+        { id: 'act3', title: 'Ra khỏi giếng', description: 'Cái kết cho thói nghênh ngang', startPage: 4, tone: 'excited' },
+      ],
+      pages: [
+        'Có một con ếch sống lâu ngày trong một cái giếng nọ. Xung quanh nó chỉ có vài con cua, con ốc, con nhái bé nhỏ.',
+        'Hằng ngày, ếch cất tiếng kêu ồm ộp vang động cả giếng khiến các con vật bé nhỏ đều hoảng sợ. Ếch cứ tưởng mình oai phong như một vị chúa tể.',
+        'Ngồi dưới đáy giếng nhìn lên, ếch chỉ thấy bầu trời bé bằng cái vung. Nó đắc ý nghĩ rằng bầu trời chỉ nhỏ như thế, còn mình thì tài giỏi vô cùng.',
+        'Một năm nọ, trời mưa tầm tã suốt mấy ngày liền. Nước trong giếng dâng lên cao, tràn cả bờ, đưa ếch ra ngoài.',
+        'Quen thói cũ, ếch nghênh ngang đi lại khắp nơi, nhâng nháo đưa cặp mắt nhìn lên bầu trời, chẳng thèm để ý gì đến xung quanh.',
+        'Mải nhìn lên trời, ếch không trông thấy con trâu đi tới, liền bị nó giẫm bẹp. Chớ kiêu căng, chủ quan, coi thường người khác mà mang họa vào thân! Hết!',
+      ],
+    },
+    {
+      id: 'demo-deo-cay-giua-duong', slug: 'deo-cay-giua-duong', title: 'Đẽo Cày Giữa Đường',
+      desc: 'Truyện ngụ ngôn dạy bé phải có chính kiến — cấu trúc 3 hồi, nhạc nền nhẹ nhàng. (Bản demo)',
+      bgmPreset: 'calm',
+      acts: [
+        { id: 'act1', title: 'Bác thợ đẽo cày', description: 'Mua gỗ tốt, ngồi đẽo bên đường', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Ai nói cũng nghe', description: 'Mỗi người góp một ý', startPage: 2, tone: 'suspense' },
+        { id: 'act3', title: 'Mất cả chì lẫn chài', description: 'Bài học về chính kiến', startPage: 4, tone: 'gentle' },
+      ],
+      pages: [
+        'Ngày xưa có một bác thợ mộc dành dụm mãi mới mua được một đống gỗ tốt, định bụng đẽo thành những chiếc cày thật đẹp đem bán.',
+        'Thay vì ngồi trong nhà, bác lại đem gỗ ra đẽo ngay bên vệ đường, nơi người qua kẻ lại đông đúc, ai đi ngang cũng ngó vào.',
+        'Một người đi qua bảo: Phải đẽo cày cho cao, cho to thì mới dễ cày. Bác nghe bùi tai, liền đẽo cày vừa cao vừa to.',
+        'Người khác lại bảo: Cày thế to quá, phải đẽo nhỏ, đẽo thấp mới dễ dùng. Bác cũng cho là phải, lại hì hục đẽo cho nhỏ, cho thấp.',
+        'Rồi có người nói phải đẽo to gấp đôi để bán cho người ta cày ruộng voi mà lời nhiều. Bác lại tin theo, đem hết đống gỗ ra đẽo thật to.',
+        'Đẽo đi đẽo lại, cả đống gỗ to đẹp hỏng hết, chẳng được chiếc cày nào dùng được, bao nhiêu vốn liếng đi đời. Làm việc phải có chính kiến, đừng ai nói gì cũng nghe theo! Hết!',
+      ],
+    },
+    {
+      id: 'demo-tri-khon-cua-ta', slug: 'tri-khon-cua-ta', title: 'Trí Khôn Của Ta Đây',
+      desc: 'Truyện ngụ ngôn dạy bé trí khôn quý hơn sức mạnh — cấu trúc 3 hồi, nhạc nền điện ảnh. (Bản demo)',
+      bgmPreset: 'cinematic',
+      acts: [
+        { id: 'act1', title: 'Hổ thắc mắc', description: 'Vì sao trâu to khỏe lại nghe lời người?', startPage: 0, tone: 'warm' },
+        { id: 'act2', title: 'Xin xem trí khôn', description: 'Hổ tò mò đòi xem trí khôn của người', startPage: 2, tone: 'suspense' },
+        { id: 'act3', title: 'Mưu trí thắng sức', description: 'Bác nông dân trổ tài', startPage: 4, tone: 'excited' },
+      ],
+      pages: [
+        'Một con hổ to lớn từ trong rừng đi ra, thấy bác nông dân và con trâu đang cày ruộng. Trâu to khỏe là thế mà cứ cặm cụi kéo cày theo lời người.',
+        'Hổ lấy làm lạ lắm. Đợi lúc bác nông dân nghỉ tay, hổ lân la đến gần hỏi nhỏ trâu: Này anh trâu, anh to khỏe thế, sao lại để con người bé nhỏ sai khiến?',
+        'Trâu thở dài đáp: Con người tuy bé nhỏ nhưng họ có trí khôn. Hổ liền tìm đến bác nông dân, gằn giọng: Trí khôn của ngươi đâu, đưa cho ta xem một chút nào!',
+        'Bác nông dân nhanh trí nói: Trí khôn ta để quên ở nhà mất rồi. Để ta về lấy cho mà xem. Nhưng ta sợ ta đi khỏi, hổ lại ăn mất trâu, vậy hãy để ta trói hổ vào gốc cây đã.',
+        'Hổ nóng lòng muốn xem trí khôn nên ưng thuận. Bác nông dân trói thật chặt hổ vào gốc cây, rồi chất rơm khô xung quanh, châm lửa đốt và nói lớn: Trí khôn của ta đây!',
+        'Hổ giãy giụa, gầm thét mãi mới giật đứt dây thoát ra, nhưng bộ lông vàng đã bị lửa cháy sém thành những vằn đen dài. Từ đó, loài hổ có vằn. Trí khôn còn quý hơn cả sức mạnh! Hết!',
+      ],
+    },
   ];
 
   async function _seedDemoStorybook() {
