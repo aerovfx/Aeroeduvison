@@ -113,7 +113,7 @@ function makeMapLevel(name: string, lat: number, lon: number): Level {
     id: 100, name, emoji: '🗺️', difficulty: 'pro',
     description: 'Đua trên bản đồ thật (OpenStreetMap)',
     timeLimit: 180, reward: 0, type: 'gates',
-    map: { lat, lon, radius: 800 },
+    map: { lat, lon, radius: 1200 },
     gates: ([[0, 40, -90], [110, 55, -190], [-100, 60, -300], [70, 48, -410], [0, 45, -520]] as Vec3[]).map((p) => ({ pos: p, r: 3.2 })),
     hint: 'Đua qua các cổng giữa thành phố thật. Né toà nhà (box từ OSM). Theo mũi tên chỉ đường.',
   }
@@ -353,7 +353,7 @@ const LEVELS: Level[] = [
     id: 7, name: 'Bản đồ thật', emoji: '🗺️', difficulty: 'pro',
     description: 'Bay qua cổng giữa thành phố thật (OpenStreetMap) — toà nhà dựng từ địa hình thực',
     timeLimit: 150, reward: 2500, type: 'gates',
-    map: { lat: 21.0285, lon: 105.8542, radius: 700 }, // Hồ Gươm, Hà Nội
+    map: { lat: 21.0285, lon: 105.8542, radius: 1200 }, // Hồ Gươm, Hà Nội
     gates: [
       { pos: [0, 30, -70], r: 3 },
       { pos: [90, 45, -150], r: 3 },
@@ -1051,16 +1051,16 @@ function LevelEnvironment({ level, currentGate }: { level: Level; currentGate: n
       {/* Map thật → nền ẢNH VỆ TINH (Esri World Imagery); ngược lại → đồi procedural */}
       {level.map ? (
         <>
-          <ProceduralGround size={1200} segments={20} color="#5a6b56" />
+          <ProceduralGround size={3000} segments={24} color="#5a6b56" />
           <Suspense fallback={null}>
             <SatelliteGround lat={level.map.lat} lon={level.map.lon} radius={level.map.radius || 700} />
           </Suspense>
         </>
       ) : (
         <>
-          <ProceduralGround size={400} segments={60} />
+          <ProceduralGround size={2200} segments={90} />
           {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
-          <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
+          <gridHelper args={[240, 60, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
         </>
       )}
 
@@ -1120,11 +1120,14 @@ interface DroneState {
 }
 interface ControlInputs { throttle: number; yaw: number; pitch: number; roll: number; fire?: boolean }
 const PHYSICS = {
-  // FPV thật đạt 300-400 km/h: lực đẩy cao + cản RẤT thấp (airDrag gần 1 = giữ đà)
-  thrustGain: 42, yawRate: 3, pitchRate: 2.5, rollRate: 2.5,
-  airDrag: 0.992, gravity: 9.81, maxAltitude: 150, batteryDrain: 0.5,
+  // Thông số theo FPV tốc độ cao THỰC TẾ:
+  //  · thrustGain = gia tốc đẩy tối đa (m/s²). 70 ≈ 7G → TWR~7 (5" racing/freestyle),
+  //    0–100 km/h trong ~0.5–0.7s như drone đua thật.
+  //  · gravity 9.81 (thực). airDrag 0.985 → cruise ngang terminal ~200 km/h.
+  thrustGain: 70, yawRate: 3.2, pitchRate: 2.5, rollRate: 2.5,
+  airDrag: 0.985, gravity: 9.81, maxAltitude: 350, batteryDrain: 0.5,
   pitchAngle: 0.78, rollAngle: 0.6,   // góc nghiêng tối đa — vừa đủ dive, dễ kiểm soát
-  maxSpeed: 116,                       // ~418 km/h (m/s) — trần tốc độ an toàn
+  maxSpeed: 95,                        // ~342 km/h (m/s) — vùng tốc độ FPV cao/kỷ lục
 }
 
 function DroneRig({
@@ -3051,7 +3054,7 @@ function GameScreen({
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         <Canvas
           shadows
-          camera={{ fov: 90, near: 0.1, far: 1000, position: [0, 1.5, 0] }}
+          camera={{ fov: 90, near: 0.1, far: 3000, position: [0, 1.5, 0] }}
           style={{ background: '#0a0a0f', width: '100%', height: '100%' }}
         >
           <LevelEnvironment level={level} currentGate={gateProgress} />
