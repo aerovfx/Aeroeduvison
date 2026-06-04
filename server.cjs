@@ -11034,12 +11034,14 @@ async function _aiComplete({ system, user, maxTokens = 4096, temperature = 0.2 }
   throw lastErr || new Error('Chưa cấu hình AI (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY)');
 }
 
-// Bóc ``` fences nếu model lỡ bọc code block
+// Bóc ``` fences nếu model lỡ bọc code block (kể cả khi thiếu fence đóng)
 function _stripFences(s) {
   let t = String(s || '').trim();
-  const m = t.match(/^```[a-zA-Z]*\n([\s\S]*?)\n```$/);
-  if (m) t = m[1].trim();
-  return t;
+  if (t.startsWith('```')) {
+    t = t.replace(/^```[a-zA-Z]*\n?/, '');  // fence mở + nhãn ngôn ngữ
+    t = t.replace(/\n?```\s*$/, '');        // fence đóng (nếu có)
+  }
+  return t.trim();
 }
 
 // POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }

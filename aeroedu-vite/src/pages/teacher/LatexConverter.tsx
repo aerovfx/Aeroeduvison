@@ -41,7 +41,7 @@ export default function LatexConverter() {
     if (!docxBase64) { setErrD2T('Hãy chọn file Word trước'); return }
     setBusyD2T(true); setErrD2T(''); setLatexOut('')
     try {
-      const { data } = await api.post('/latex/from-docx', { docxBase64, filename: docxName })
+      const { data } = await api.post('/latex/from-docx', { docxBase64, filename: docxName }, { timeout: 120000 })
       setLatexOut(data.latex || '')
     } catch (e: unknown) {
       setErrD2T((e as { response?: { data?: { error?: string } } }).response?.data?.error || 'Chuyển đổi thất bại')
@@ -76,7 +76,7 @@ export default function LatexConverter() {
     if (latexIn.trim().length < 5) { setErrT2D('Hãy dán nội dung LaTeX'); return }
     setBusyT2D(true); setErrT2D(''); setDoneT2D(false)
     try {
-      const resp = await api.post('/latex/to-docx', { latex: latexIn, filename: 'tai-lieu' }, { responseType: 'blob' })
+      const resp = await api.post('/latex/to-docx', { latex: latexIn, filename: 'tai-lieu' }, { responseType: 'blob', timeout: 120000 })
       const blob = new Blob([resp.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
