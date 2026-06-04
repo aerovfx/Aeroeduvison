@@ -11063,6 +11063,25 @@ function _latexToDocxViaPandoc(latex) {
   });
 }
 
+// DOCX → LaTeX qua pandoc (công thức OMML→toán chuẩn). Trả chuỗi LaTeX hoặc null
+// nếu pandoc không có / lỗi → caller fallback sang mammoth→HTML→AI.
+function _docxToLatexViaPandoc(buf) {
+  return new Promise((resolve) => {
+    let cp, fs, os, path;
+    try { cp = require('child_process'); fs = require('fs'); os = require('os'); path = require('path'); } catch { return resolve(null); }
+    let dir;
+    try { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'd2l-')); } catch { return resolve(null); }
+    const inPath = path.join(dir, 'in.docx'), outPath = path.join(dir, 'out.tex');
+    const done = (txt) => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* noop */ } resolve(txt); };
+    try { fs.writeFileSync(inPath, buf); } catch { return done(null); }
+    cp.execFile('pandoc', [inPath, '-f', 'docx', '-t', 'latex', '-o', outPath], { timeout: 30000 }, (err) => {
+      if (err) { if (err.code !== 'ENOENT') console.warn('[docx:pandoc]', err.message); return done(null); }
+      let txt = null; try { txt = fs.readFileSync(outPath, 'utf8'); } catch { /* noop */ }
+      return done(txt && txt.trim() ? txt : null);
+    });
+  });
+}
+
 // POST /api/latex/from-docx — { docxBase64, filename? } → { ok, latex }
 app.post('/api/latex/from-docx', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
@@ -11072,7 +11091,32 @@ app.post('/api/latex/from-docx', async (req, res) => {
     const b64 = docxBase64.includes(',') ? docxBase64.split(',').pop() : docxBase64;
     const buf = Buffer.from(b64, 'base64');
     if (buf.length > 15 * 1024 * 1024) return res.status(413).json({ error: 'File quá lớn (>15MB)' });
-    let mammoth; try { mammoth = require('mammoth'); } catch { return res.status(501).json({ error: 'Thiếu thư viện mammoth trên revision này' }); }
+
+    // 1) Ưu tiên pandoc docx→latex: công thức từ OMML chuyển sang LaTeX CHÍNH XÁC,
+    //    rồi AI tinh chỉnh thành tài liệu sạch (giữ nguyên toán). AI lỗi → trả
+    //    bản pandoc thô (vẫn dùng được).
+    const pandocTex = await _docxToLatexViaPandoc(buf);
+    if (pandocTex) {
+      const psys = 'Bạn là biên tập viên LaTeX cho giáo viên Việt Nam. CHỈ trả về mã LaTeX hoàn chỉnh biên dịch được (XeLaTeX/tectonic), KHÔNG giải thích, KHÔNG bọc trong dấu ```.';
+      const puser = `Tinh chỉnh đoạn LaTeX dưới đây (pandoc sinh tự động từ file Word) thành tài liệu hoàn chỉnh, sạch sẽ:
+- GIỮ NGUYÊN 100% mọi công thức toán (môi trường math, $...$, \\[ \\], \\(...\\)) — TUYỆT ĐỐI không sửa nội dung toán;
+- documentclass article + \\usepackage{fontspec} (tiếng Việt) + \\usepackage{amsmath,amssymb};
+- chuẩn hoá tiêu đề (\\section/\\subsection), danh sách (itemize/enumerate), bảng (tabular);
+- loại bỏ lệnh thừa đặc thù pandoc không cần (\\tightlist, \\hypertarget, \\pandocbounded…) nhưng giữ toàn bộ nội dung văn bản.
+LaTeX nguồn (pandoc):
+
+${pandocTex.slice(0, 60000)}`;
+      try {
+        const out = await _aiComplete({ system: psys, user: puser, maxTokens: 8000 });
+        return res.json({ ok: true, latex: _stripFences(out.text), engine: 'pandoc+ai', provider: out.provider, model: out.model });
+      } catch (e) {
+        console.warn('[from-docx] AI tinh chỉnh lỗi, trả pandoc thô:', e.message);
+        return res.json({ ok: true, latex: pandocTex, engine: 'pandoc' });
+      }
+    }
+
+    // 2) Fallback (không có pandoc): mammoth → HTML → AI dựng LaTeX (toán dạng văn bản).
+    let mammoth; try { mammoth = require('mammoth'); } catch { return res.status(501).json({ error: 'pandoc không khả dụng và thiếu thư viện mammoth' }); }
     const { value: html } = await mammoth.convertToHtml({ buffer: buf });
     if (!html || !html.trim()) return res.status(422).json({ error: 'Không trích được nội dung từ file Word' });
     const system = 'Bạn là công cụ chuyển tài liệu sang LaTeX cho giáo viên Việt Nam. CHỈ trả về mã LaTeX hoàn chỉnh có thể biên dịch (XeLaTeX/tectonic), KHÔNG giải thích, KHÔNG bọc trong dấu ```.';
@@ -11085,7 +11129,7 @@ HTML nguồn:
 
 ${html.slice(0, 60000)}`;
     const out = await _aiComplete({ system, user, maxTokens: 8000 });
-    return res.json({ ok: true, latex: _stripFences(out.text), provider: out.provider, model: out.model });
+    return res.json({ ok: true, latex: _stripFences(out.text), engine: 'mammoth+ai', provider: out.provider, model: out.model });
   } catch (e) {
     console.error('[latex:from-docx]', e.message);
     return res.status(502).json({ error: 'Lỗi chuyển đổi: ' + e.message });
