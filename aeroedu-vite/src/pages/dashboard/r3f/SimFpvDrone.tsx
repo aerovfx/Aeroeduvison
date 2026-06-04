@@ -2878,6 +2878,16 @@ function GameScreen({
   const ammoRef = useRef(AMMO_MAX)
   const [ammo, setAmmo] = useState(AMMO_MAX)
   const enemySharedRef = useRef<EnemyShared | null>(null)
+  // Bầy địch tuần tra trên màn BẢN ĐỒ thật (PvE trong thành phố) — rải quanh khu vực
+  const mapEnemies = useMemo<Array<{ center: Vec3; radius: number; speed: number }>>(() => {
+    if (!level.map) return []
+    const n = 8
+    return Array.from({ length: n }, (_, k) => {
+      const ang = (k / n) * Math.PI * 2
+      const r = 45 + (k % 3) * 28
+      return { center: [Math.cos(ang) * r, 16 + (k % 4) * 7, Math.sin(ang) * r] as Vec3, radius: 12, speed: 0.7 + (k % 3) * 0.15 }
+    })
+  }, [level.map?.lat, level.map?.lon, level.map?.radius])
   const onShoot = useCallback(() => setAmmo(ammoRef.current), [])
   const onEnemyKill = useCallback(() => { setRunScore((s) => s + 40); setCollectMsg('💥 Hạ địch +40'); setTimeout(() => setCollectMsg(null), 1200) }, [])
   const onMotherNear = useCallback(() => {
@@ -3138,6 +3148,10 @@ function GameScreen({
                 onHitBuilding={() => { const dp = dronePosRef.current; explode(dp.x, dp.y, dp.z); damageRef.current(HP_MAX) }} />
             </Suspense>
           )}
+          {/* Bầy địch tuần tra trên màn bản đồ thật (PvE thành phố) */}
+          {level.map && mapEnemies.length > 0 && (
+            <EnemyDrones posRef={dronePosRef} specs={mapEnemies} onHit={onHit} shared={enemySharedRef} />
+          )}
           <WaypointGuide posRef={dronePosRef} target={guideTarget} />
           {level.type === 'cargo' && level.cargo && (
             <>
@@ -3159,7 +3173,13 @@ function GameScreen({
         </Canvas>
         <GameHUD telemetry={telemetry} gamepadId={gamepadId} level={level}
           gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining}
-          targets={radarTargets} />
+          targets={(() => {
+            // Vị trí địch TRỰC TIẾP lên radar (đỏ) — cập nhật mỗi khung qua telemetry
+            const es = enemySharedRef.current
+            if (!es) return radarTargets
+            const live = es.pos.flatMap((p, i) => es.alive[i] ? [{ x: p.x, z: p.z, color: '#ef4444' }] : [])
+            return live.length ? [...radarTargets.filter((t) => t.color !== '#ef4444'), ...live] : radarTargets
+          })()} />
         <VRButton glRef={glRef} />
         {/* Âm thanh động cơ (WebAudio) */}
         <DroneSound inputsRef={inputsRef} muted={muted} />
