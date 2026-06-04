@@ -1163,6 +1163,7 @@ function DroneRig({
   const { camera } = useThree()
   // Làm mượt kiểu UE5: input low-pass + camera lerp + FOV theo tốc độ
   const inSmooth = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
+  const thrustSpool = useRef(0.5)   // RPM động cơ (0..1) — tăng/giảm DẦN cho gia tốc có quán tính thật
   const camLook = useRef(new THREE.Vector3(0, 0.5, 1))
   const smooth = (dt: number, tau: number) => 1 - Math.exp(-dt / tau)
 
@@ -1189,7 +1190,13 @@ function DroneRig({
     const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), s.roll)
     const orient = yawQ.clone().multiply(pitchQ).multiply(rollQ)
     const thrustVec = new THREE.Vector3(0, 1, 0).applyQuaternion(orient)
-    const throttleMag = Math.max(0, (sm.throttle + 1) / 2)
+    // Expo throttle: mịn quanh điểm hover, mạnh ở biên → dễ căn & giữ độ cao.
+    const thrExpo = sm.throttle * (0.55 + 0.45 * sm.throttle * sm.throttle)
+    const throttleTarget = Math.max(0, (thrExpo + 1) / 2)
+    // Motor spool: động cơ lên/xuống RPM DẦN (tau~0.13s) → lực đẩy không tức thì,
+    // gia tốc có "sức nặng" như drone thật thay vì bụp ngay.
+    thrustSpool.current += (throttleTarget - thrustSpool.current) * smooth(dt, 0.13)
+    const throttleMag = thrustSpool.current
     // Nạp pin (trạm sạc / mother ship) + boost (nâng cấp) + tầm bay theo cấp độ
     if (respawnRef && respawnRef.current > 0) { s.pos.set(0, 3, 0); s.vel.set(0, 0, 0); s.battery = 100; respawnRef.current = 0 }
     if (rechargeRef && rechargeRef.current > 0) { s.battery = Math.min(100, s.battery + rechargeRef.current); rechargeRef.current = 0 }
@@ -2277,7 +2284,8 @@ function ScreenCorners() {
 }
 
 /** Thước dọc (tốc độ / độ cao) kiểu HUD máy bay. */
-function HudTape({ value, label, unit, side }: { value: number; label: string; unit: string; side: 'left' | 'right' }) {
+function HudTape({ value, label, unit, side, warn }: { value: number; label: string; unit: string; side: 'left' | 'right'; warn?: boolean }) {
+  const boxStroke = warn ? '#ffd24d' : HUD_C
   const H = 200, W = 64, step = 5, win = 20
   const ticks: { v: number; y: number }[] = []
   const startV = Math.ceil((value - win) / step) * step
@@ -2302,9 +2310,9 @@ function HudTape({ value, label, unit, side }: { value: number; label: string; u
         points={side === 'left'
           ? `${railX},${H / 2} ${railX - 8},${H / 2 - 12} ${W - 56},${H / 2 - 12} ${W - 56},${H / 2 + 12} ${railX - 8},${H / 2 + 12}`
           : `${railX},${H / 2} ${railX + 8},${H / 2 - 12} ${58},${H / 2 - 12} ${58},${H / 2 + 12} ${railX + 8},${H / 2 + 12}`}
-        fill={HUD_BG} stroke={HUD_C} strokeWidth={1.5}
+        fill={HUD_BG} stroke={boxStroke} strokeWidth={2}
       />
-      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 5} fontSize={16} fontWeight="bold" fill="#fff" textAnchor="middle" style={HUD_OUTLINE}>{value.toFixed(0)}</text>
+      <text x={side === 'left' ? W / 2 - 6 : W / 2 + 6} y={H / 2 + 6} fontSize={20} fontWeight="bold" fill={warn ? '#ffd24d' : '#fff'} textAnchor="middle" style={HUD_OUTLINE}>{value.toFixed(0)}</text>
       <text x={railX} y={H + 14} fontSize={9} fontWeight="bold" fill={HUD_DIM} textAnchor={side === 'left' ? 'end' : 'start'} style={HUD_OUTLINE}>{unit}</text>
     </svg>
   )
@@ -2414,6 +2422,11 @@ function GameHUD({
   }, [])
   if (!telemetry) return null
   const speed = telemetry.vel.length() * 3.6 // km/h cho cảm giác HUD
+  const altM = telemetry.pos.y               // độ cao trên mặt đất (m)
+  const climb = telemetry.vel.y              // tốc độ lên/xuống (m/s)
+  const altWarn = altM < 3                   // gần mặt đất → cảnh báo
+  const climbStr = climb > 0.4 ? `▲ ${Math.abs(climb).toFixed(1)}` : climb < -0.4 ? `▼ ${Math.abs(climb).toFixed(1)}` : '• 0.0'
+  const climbColor = climb > 0.4 ? '#7CFC9A' : climb < -0.4 ? '#ffb86b' : HUD_DIM
   const heading = ((telemetry.yaw * 180) / Math.PI % 360 + 360) % 360
   const battColor = telemetry.battery > 30 ? HUD_C : telemetry.battery > 15 ? '#f59e0b' : '#ef4444'
   const rel = targets.map((t) => ({ x: t.x - telemetry.pos.x, z: t.z - telemetry.pos.z, color: t.color }))
@@ -2430,6 +2443,9 @@ function GameHUD({
       position: 'absolute', inset: 0, pointerEvents: 'none',
       fontFamily: 'ui-monospace, monospace', color: HUD_C, fontWeight: 600,
       textShadow: HUD_TXT_SHADOW,
+      // Quầng tối quanh MỌI nét HUD → tương phản rõ cả khi bay trên nền TRỜI sáng
+      // (cyan/trắng trên trời xanh dễ chìm). Áp 1 lần cho toàn overlay, rẻ về GPU.
+      filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.92)) drop-shadow(0 0 2px rgba(0,0,0,0.8))',
       transform: `scale(${scale})`, transformOrigin: 'center center',
     }}>
       {/* Đường chân trời nhân tạo (sau tâm ngắm) */}
@@ -2452,7 +2468,7 @@ function GameHUD({
         <HudTape value={speed} label="SPD" unit="km/h" side="left" />
       </div>
       <div style={{ position: 'absolute', top: '50%', right: 26, transform: 'translateY(-50%)' }}>
-        <HudTape value={telemetry.pos.y} label="ALT" unit="m" side="right" />
+        <HudTape value={altM} label="ALT" unit="m" side="right" warn={altWarn} />
       </div>
 
       {/* Tâm ngắm + ladder */}
@@ -2466,10 +2482,20 @@ function GameHUD({
         </svg>
       </div>
 
-      {/* TỐC ĐỘ — số lớn rõ kiểu OSD FPV (ngay dưới tâm ngắm) */}
-      <div style={{ position: 'absolute', top: 'calc(50% + 44px)', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', fontFamily: 'monospace' }}>
-        <div style={{ fontSize: 34, fontWeight: 900, color: '#ffffff', lineHeight: 1, textShadow: HUD_TXT_SHADOW }}>{Math.round(speed)}</div>
-        <div style={{ fontSize: 13, fontWeight: 'bold', color: HUD_DIM, letterSpacing: 2 }}>KM/H</div>
+      {/* TỐC ĐỘ + ĐỘ CAO — số lớn rõ kiểu OSD FPV (ngay dưới tâm ngắm), độ cao
+          ngang hàng với tốc độ + mũi tên lên/xuống để dễ quan sát & căn độ cao */}
+      <div style={{ position: 'absolute', top: 'calc(50% + 40px)', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'flex-start', gap: 52, fontFamily: 'monospace', background: 'rgba(2,12,16,0.42)', borderRadius: 14, padding: '6px 18px 4px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 34, fontWeight: 900, color: '#ffffff', lineHeight: 1, textShadow: HUD_TXT_SHADOW }}>{Math.round(speed)}</div>
+          <div style={{ fontSize: 13, fontWeight: 'bold', color: HUD_DIM, letterSpacing: 2 }}>KM/H</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 34, fontWeight: 900, color: altWarn ? '#ffd24d' : '#ffffff', lineHeight: 1, textShadow: HUD_TXT_SHADOW }}>{Math.round(altM)}</div>
+          <div style={{ fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }}>
+            <span style={{ color: HUD_DIM }}>ALT m </span>
+            <span style={{ color: climbColor }}>{climbStr}</span>
+          </div>
+        </div>
       </div>
 
       {/* Objective + time — thanh trên */}
