@@ -236,8 +236,10 @@ export function useBroker(
   handlersRef.current = handlers
 
   useEffect(() => {
-    if (!token) return
-    const b = connectBroker({ token })
+    // Cho phép kết nối ẨN DANH khi có topic (vd phòng drone thách đấu — quét mã chơi
+    // không cần đăng nhập). Không token + không topic → bỏ qua như cũ.
+    if (!token && topics.length === 0) return
+    const b = connectBroker({ token: token || '' })
     clientRef.current = b
     if (topics.length > 0) b.subscribe(topics)
 

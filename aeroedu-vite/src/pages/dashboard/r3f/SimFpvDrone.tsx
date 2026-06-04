@@ -33,6 +33,48 @@ import { fetchOsmBuildings, OSM_PLACES, type OsmBox } from '@/lib/osm-buildings'
 // ── Multiplayer (Thách đấu) helpers ──
 type Peer = { name: string; pos: [number, number, number]; yaw: number; pitch: number; roll: number; t: number }
 const genRoomCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+/** Lấy mã phòng từ chuỗi quét QR (link ?droneRoom=... ) hoặc mã nhập tay. */
+function parseRoomCode(text: string): string {
+  try { const r = new URL(text).searchParams.get('droneRoom'); if (r) return r.toUpperCase().slice(0, 8) } catch { /* không phải URL */ }
+  return text.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+}
+/** Quét QR bằng camera (BarcodeDetector — Chrome/Android/Quest). iOS dùng camera máy. */
+function QrScanner({ onResult, onClose }: { onResult: (t: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    let stream: MediaStream | null = null, raf = 0, stopped = false
+    const Det = (window as any).BarcodeDetector
+    if (!Det) { setErr('Trình duyệt này không quét được trong app. Hãy dùng Camera điện thoại quét QR (sẽ mở link phòng), hoặc nhập mã thủ công bên dưới.'); return }
+    const detector = new Det({ formats: ['qr_code'] })
+    ;(async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+        const tick = async () => {
+          if (stopped) return
+          try {
+            const codes = await detector.detect(videoRef.current as HTMLVideoElement)
+            if (codes && codes[0]?.rawValue) { onResult(codes[0].rawValue as string); return }
+          } catch { /* khung lỗi → thử lại */ }
+          raf = requestAnimationFrame(tick)
+        }
+        raf = requestAnimationFrame(tick)
+      } catch { setErr('Không mở được camera. Cho phép quyền camera, hoặc nhập mã thủ công bên dưới.') }
+    })()
+    return () => { stopped = true; cancelAnimationFrame(raf); stream?.getTracks().forEach((t) => t.stop()) }
+  }, [onResult])
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: 'min(86vw,360px)', aspectRatio: '1', borderRadius: 16, overflow: 'hidden', border: '3px solid #22d3ee', background: '#000' }}>
+        <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{ position: 'absolute', inset: '18%', border: '3px solid rgba(34,211,238,0.8)', borderRadius: 12, pointerEvents: 'none' }} />
+      </div>
+      <div style={{ color: '#e2faff', fontSize: 14, fontWeight: 700, textAlign: 'center', maxWidth: 360 }}>{err || 'Đưa mã QR của phòng vào khung để tham gia'}</div>
+      <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: 999, border: 'none', background: '#22d3ee', color: '#04212b', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Đóng</button>
+    </div>
+  )
+}
 function myCallsign(): string {
   try {
     let n = localStorage.getItem('drone_callsign')
@@ -1006,10 +1048,21 @@ function LevelEnvironment({ level, currentGate }: { level: Level; currentGate: n
       {/* Hemisphere fill — sky/ground bounce */}
       <hemisphereLight args={['#87ceeb', '#1a4f3a', 0.4]} />
 
-      {/* Procedural undulating ground */}
-      <ProceduralGround size={400} segments={60} />
-      {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
-      <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
+      {/* Map thật → nền ẢNH VỆ TINH (Esri World Imagery); ngược lại → đồi procedural */}
+      {level.map ? (
+        <>
+          <ProceduralGround size={1200} segments={20} color="#5a6b56" />
+          <Suspense fallback={null}>
+            <SatelliteGround lat={level.map.lat} lon={level.map.lon} radius={level.map.radius || 700} />
+          </Suspense>
+        </>
+      ) : (
+        <>
+          <ProceduralGround size={400} segments={60} />
+          {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
+          <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
+        </>
+      )}
 
       {/* Per-level scenery (bỏ khi bay bản đồ thật để nhường chỗ cho OSM city) */}
       {!level.map && <LevelScenery levelId={level.id} />}
@@ -1759,6 +1812,35 @@ function OsmCity({ boxes, posRef, tile = 90, viewTiles = 4, onHitBuilding }: {
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial color="#7b8794" roughness={0.85} metalness={0.05} />
     </instancedMesh>
+  )
+}
+// Nền ẢNH VỆ TINH cho map thật: ảnh Esri World Imagery (miễn phí, không cần key)
+// căn theo (lat,lon) — trục khớp với box OSM (đông=+x, bắc=-z).
+function SatelliteGround({ lat, lon, radius }: { lat: number; lon: number; radius: number }) {
+  const [tex, setTex] = useState<THREE.Texture | null>(null)
+  useEffect(() => {
+    const dLat = radius / 110540
+    const dLon = radius / (111320 * Math.cos((lat * Math.PI) / 180))
+    const bbox = `${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat}`
+    const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&size=1024,1024&format=jpeg&transparent=false&f=image`
+    const loader = new THREE.TextureLoader()
+    loader.setCrossOrigin('anonymous')
+    let alive = true
+    loader.load(url, (t) => {
+      if (!alive) { t.dispose(); return }
+      ;(t as any).colorSpace = (THREE as any).SRGBColorSpace || 'srgb'
+      t.anisotropy = 4
+      setTex(t)
+    }, undefined, () => { /* lỗi tải → giữ nền procedural */ })
+    return () => { alive = false }
+  }, [lat, lon, radius])
+  if (!tex) return null
+  const size = radius * 2
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} receiveShadow>
+      <planeGeometry args={[size, size]} />
+      <meshStandardMaterial map={tex} roughness={1} metalness={0} />
+    </mesh>
   )
 }
 function OsmCityLoader({ lat, lon, radius = 700, posRef, onStatus, onHitBuilding }: {
@@ -3352,13 +3434,16 @@ function ModeScreen({ onMission, onChallenge }: { onMission: () => void; onChall
 // SCREEN: CHALLENGE — lobby thách đấu (mã/QR/link/người chơi)
 // ═════════════════════════════════════════════════════════════
 const ROOM_MAX = 10
-function ChallengeScreen({ initialRoom, initialLvl, initialMap, onStart, onBack }: {
+function ChallengeScreen({ initialRoom, initialLvl, initialMap, onStart, onBack, onJoin }: {
   initialRoom?: string; initialLvl?: number; initialMap?: { lat: number; lon: number; name: string }
   onStart: (level: Level, room: string, name: string) => void
   onBack: () => void
+  onJoin?: (code: string) => void
 }) {
   const isJoiner = !!initialRoom
   const [room] = useState(() => initialRoom || genRoomCode())
+  const [scanOpen, setScanOpen] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
   const [name, setName] = useState(() => myCallsign())
   const [mode, setMode] = useState<'level' | 'map'>(initialMap ? 'map' : 'level')
   const [levelId, setLevelId] = useState(() => initialLvl || 4)
@@ -3503,8 +3588,24 @@ function ChallengeScreen({ initialRoom, initialLvl, initialMap, onStart, onBack 
               style={{ marginTop: 10, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
               {copied ? '✓ Đã copy link' : '🔗 Copy link mời'}
             </button>
+            {!isJoiner && onJoin && (
+              <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 10 }}>
+                <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 6 }}>HOẶC THAM GIA PHÒNG KHÁC</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && joinCode.trim() && onJoin(parseRoomCode(joinCode))}
+                    placeholder="NHẬP MÃ" maxLength={8}
+                    style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34,211,238,0.3)', color: '#e2e8f0', borderRadius: 8, padding: '8px 10px', fontFamily: 'inherit', fontSize: 13, letterSpacing: 2, textAlign: 'center' }} />
+                  <button onClick={() => joinCode.trim() && onJoin(parseRoomCode(joinCode))} disabled={!joinCode.trim()}
+                    style={{ padding: '0 14px', borderRadius: 8, border: 'none', background: joinCode.trim() ? CYAN_GRAD : '#475569', color: '#04212b', fontWeight: 'bold', cursor: joinCode.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>Vào</button>
+                </div>
+                <button onClick={() => setScanOpen(true)}
+                  style={{ marginTop: 6, width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>📷 Quét mã QR tham gia</button>
+              </div>
+            )}
           </div>
         </div>
+        {scanOpen && <QrScanner onResult={(t) => { setScanOpen(false); const c = parseRoomCode(t); if (c) onJoin?.(c) }} onClose={() => setScanOpen(false)} />}
 
         <button onClick={() => !full && (mode === 'level' || picked) && onStart(level, room, name)} disabled={full || (mode === 'map' && !picked)}
           style={{ marginTop: 18, width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: full || (mode === 'map' && !picked) ? '#475569' : CYAN_GRAD, color: '#04212b', fontWeight: 'bold', fontSize: 16, cursor: full || (mode === 'map' && !picked) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: full || (mode === 'map' && !picked) ? 0.6 : 1 }}>
@@ -3591,9 +3692,11 @@ function FpvAppRoot() {
     case 'challenge':
       return (
         <ChallengeScreen
+          key={screen.room || 'host'}
           initialRoom={screen.room} initialLvl={screen.lvl} initialMap={screen.map}
           onStart={(level, room, name) => setScreen({ kind: 'game', level, room, playerName: name })}
           onBack={() => setScreen({ kind: 'mode' })}
+          onJoin={(code) => code && setScreen({ kind: 'challenge', room: code })}
         />
       )
     case 'setup':
