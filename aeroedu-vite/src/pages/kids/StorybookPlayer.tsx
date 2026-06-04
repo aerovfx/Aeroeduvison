@@ -17,10 +17,11 @@ import type { Storybook } from '@/types/storybook'
 import ShareMenu from '@/components/common/ShareMenu'
 import { api } from '@/services/api'
 
-// URL giọng đọc Google TTS (vi-VN Wavenet) cho 1 đoạn lời kể.
+// URL giọng đọc Google TTS (vi-VN Neural2, SSML truyền cảm) cho 1 đoạn lời kể.
+// tone = tông cảm xúc của hồi (gentle/warm/excited/suspense/sad).
 const ttsBase = (api.defaults.baseURL || '/api').replace(/\/$/, '')
-const ttsUrl = (text: string, lang: 'vi' | 'en' = 'vi') =>
-  `${ttsBase}/tts?lang=${lang}&text=${encodeURIComponent(text.slice(0, 380))}`
+const ttsUrl = (text: string, tone = 'gentle', lang: 'vi' | 'en' = 'vi') =>
+  `${ttsBase}/tts?lang=${lang}&tone=${tone}&text=${encodeURIComponent(text.slice(0, 380))}`
 
 export default function StorybookPlayer() {
   const { id } = useParams<{ id: string }>()
@@ -53,6 +54,29 @@ export default function StorybookPlayer() {
   const isNarration = book?.mode === 'narration'
   const total = pages.length
   const last = page >= total - 1
+
+  // ── Cấu trúc 3 hồi: tìm hồi của trang hiện tại + tông giọng tương ứng ──
+  const acts = useMemo(() => (book?.acts || []).filter((a) => a && typeof a.startPage === 'number'), [book?.acts])
+  const actForPage = useCallback((idx: number) => {
+    if (!acts.length) return null
+    let found = acts[0]
+    for (const a of acts) if (a.startPage <= idx) found = a
+    return found
+  }, [acts])
+  const curAct = actForPage(page)
+  const curActIdx = curAct ? acts.indexOf(curAct) : -1
+
+  // Banner giới thiệu hồi khi BƯỚC SANG hồi mới
+  const [actIntro, setActIntro] = useState<{ title: string; description?: string; n: number } | null>(null)
+  const lastActIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!started || !curAct) return
+    if (lastActIdRef.current === curAct.id) return
+    lastActIdRef.current = curAct.id
+    setActIntro({ title: curAct.title, description: curAct.description, n: curActIdx + 1 })
+    const t = setTimeout(() => setActIntro(null), 2800)
+    return () => clearTimeout(t)
+  }, [curAct, curActIdx, started])
 
   // Mốc lật cho narration (sắp xếp theo thời gian)
   const cues = useMemo(() => (
@@ -107,10 +131,11 @@ export default function StorybookPlayer() {
       a.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
     } else if (cap && a) {
       // Thử giọng Google TTS qua audio element; lỗi (501/mạng) → giọng trình duyệt.
+      const tone = actForPage(page)?.tone || 'gentle'
       let fellBack = false
       const fb = () => { if (fellBack) return; fellBack = true; a.onerror = null; speakCaption(cap) }
       a.onerror = fb
-      a.src = ttsUrl(cap); a.currentTime = 0
+      a.src = ttsUrl(cap, tone); a.currentTime = 0
       a.play().then(() => setPlaying(true)).catch(() => fb())
     } else {
       a?.removeAttribute('src'); setPlaying(false)
@@ -225,9 +250,16 @@ export default function StorybookPlayer() {
             <Home className="w-4 h-4" /> <span className="hidden sm:inline">Thư viện</span>
           </button>
         )}
-        <h1 className="flex-1 text-center text-lg sm:text-2xl font-black text-indigo-700 truncate drop-shadow-sm">
-          {book.title}
-        </h1>
+        <div className="flex-1 min-w-0 text-center">
+          <h1 className="text-lg sm:text-2xl font-black text-indigo-700 truncate drop-shadow-sm">
+            {book.title}
+          </h1>
+          {curAct && (
+            <div className="text-[11px] sm:text-xs font-bold text-pink-600/90 truncate">
+              Hồi {curActIdx + 1} · {curAct.title}
+            </div>
+          )}
+        </div>
         {!embed && (
           <ShareMenu path={`/kids/storybooks/${book.id}`} title={book.title} embeddable
             captureNode={() => bookRef.current} />
@@ -320,12 +352,25 @@ export default function StorybookPlayer() {
         </div>
       )}
 
+      {/* Banner giới thiệu hồi (hiện ~2.8s khi sang hồi mới) */}
+      {actIntro && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center p-6">
+          <div className="rounded-3xl bg-indigo-900/85 backdrop-blur-sm text-white px-8 py-6 text-center shadow-2xl border-2 border-amber-300/60"
+            style={{ animation: 'sbActIn .5s ease' }}>
+            <div className="text-amber-300 font-black text-sm tracking-widest mb-1">HỒI {actIntro.n}</div>
+            <div className="text-2xl sm:text-3xl font-black drop-shadow">{actIntro.title}</div>
+            {actIntro.description && <div className="text-white/85 mt-1.5 max-w-sm text-sm sm:text-base">{actIntro.description}</div>}
+          </div>
+        </div>
+      )}
+
       <audio ref={audioRef} onEnded={onEnded} onTimeUpdate={onTimeUpdate}
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} preload="auto" />
 
       <style>{`
         @keyframes sbFlipNext { from { transform: rotateY(-35deg); opacity: .3 } to { transform: rotateY(0); opacity: 1 } }
         @keyframes sbFlipPrev { from { transform: rotateY(35deg);  opacity: .3 } to { transform: rotateY(0); opacity: 1 } }
+        @keyframes sbActIn { from { transform: scale(.8); opacity: 0 } to { transform: scale(1); opacity: 1 } }
       `}</style>
     </div>
   )

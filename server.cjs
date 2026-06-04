@@ -2967,6 +2967,8 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_pub ON "KidsStorybook"(published)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_storybook_owner ON "KidsStorybook"(owner_id)`);
+    // Cấu trúc 3 hồi (mỗi hồi: title/description/startPage/tone) — JSONB, nullable
+    await pool.query(`ALTER TABLE "KidsStorybook" ADD COLUMN IF NOT EXISTS acts JSONB`).catch(() => {});
   }
 
   // Seed truyện DEMO "Cô Bé Quàng Khăn Đỏ" (tranh SVG tĩnh + caption đọc bằng giọng máy)
@@ -3182,7 +3184,7 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       try {
         for (const p of pages) {
           if (p.audioUrl || !p.caption) continue;
-          const buf = await tts.synthesize(p.caption, 'vi');   // throw nếu TTS chưa cấu hình
+          const buf = await tts.synthesize(p.caption, 'vi', { expressive: true, tone: 'warm' });   // giọng truyền cảm; throw nếu TTS chưa cấu hình
           const gcsPath = `storybooks/demo/${p.id}.mp3`;
           await storage.bucket(_SB_BUCKET).file(gcsPath).save(buf, {
             resumable: false, contentType: 'audio/mpeg',
@@ -3236,11 +3238,25 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       flipAtSec: (typeof p?.flipAtSec === 'number' && isFinite(p.flipAtSec)) ? Math.max(0, p.flipAtSec) : null,
     })).filter((p) => p.imageUrl);
   }
+  // Cấu trúc 3 hồi — tối đa 3 hồi, sắp tăng dần theo startPage. Trả null nếu rỗng.
+  const _SB_TONES = ['gentle', 'warm', 'excited', 'suspense', 'sad'];
+  function _sbActs(acts) {
+    if (!Array.isArray(acts) || acts.length === 0) return null;
+    const out = acts.slice(0, 3).map((a, i) => ({
+      id: String(a?.id || `act${i + 1}`),
+      title: String(a?.title || `Hồi ${i + 1}`).slice(0, 120),
+      description: a?.description ? String(a.description).slice(0, 600) : '',
+      startPage: (typeof a?.startPage === 'number' && isFinite(a.startPage)) ? Math.max(0, Math.floor(a.startPage)) : 0,
+      tone: _SB_TONES.includes(a?.tone) ? a.tone : 'gentle',
+    })).sort((x, y) => x.startPage - y.startPage);
+    return out.length ? out : null;
+  }
   const _sbRow = (r) => ({
     id: r.id, title: r.title, description: r.description || '', coverUrl: r.cover_url || '',
     mode: r.mode === 'narration' ? 'narration' : 'perPage', narrationUrl: r.narration_url || '',
     autoAdvance: r.auto_advance !== false,
     pages: Array.isArray(r.pages) ? r.pages : (r.pages || []),
+    acts: Array.isArray(r.acts) ? r.acts : (r.acts || null),
     published: !!r.published, ownerId: r.owner_id, ownerName: r.owner_name || '',
     createdAt: r.created_at, updatedAt: r.updated_at,
   });
@@ -3289,15 +3305,16 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const crypto = require('crypto');
       const id = (crypto.randomUUID ? crypto.randomUUID() : `sb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
       const pages = _sbPages(b.pages);
+      const acts = _sbActs(b.acts);
       const pool = _getPool();
       await pool.query(
-        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        `INSERT INTO "KidsStorybook"(id,title,description,cover_url,mode,narration_url,auto_advance,pages,published,owner_id,owner_name,acts)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
          String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
          (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
          b.autoAdvance !== false, JSON.stringify(pages), !!b.published, uid,
-         String(d.name || d.fullName || d.email || '').slice(0, 200)]
+         String(d.name || d.fullName || d.email || '').slice(0, 200), acts ? JSON.stringify(acts) : null]
       );
       const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [id]);
       return res.json({ storybook: _sbRow(r.rows[0]) });
@@ -3316,12 +3333,13 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       if (cur.rows[0].owner_id !== uid && role !== 'ADMIN') return res.status(403).json({ error: 'Không có quyền sửa' });
       const b = req.body || {};
       const pages = _sbPages(b.pages);
+      const acts = _sbActs(b.acts);
       await pool.query(
-        `UPDATE "KidsStorybook" SET title=$2,description=$3,cover_url=$4,mode=$5,narration_url=$6,auto_advance=$7,pages=$8,published=$9,updated_at=NOW() WHERE id=$1`,
+        `UPDATE "KidsStorybook" SET title=$2,description=$3,cover_url=$4,mode=$5,narration_url=$6,auto_advance=$7,pages=$8,published=$9,acts=$10,updated_at=NOW() WHERE id=$1`,
         [req.params.id, String(b.title || 'Truyện chưa đặt tên').slice(0, 300), String(b.description || '').slice(0, 2000),
          String(b.coverUrl || (pages[0] && pages[0].imageUrl) || '').slice(0, 1200),
          (b.mode === 'narration' ? 'narration' : 'perPage'), String(b.narrationUrl || '').slice(0, 1200),
-         b.autoAdvance !== false, JSON.stringify(pages), !!b.published]
+         b.autoAdvance !== false, JSON.stringify(pages), !!b.published, acts ? JSON.stringify(acts) : null]
       );
       const r = await pool.query(`SELECT * FROM "KidsStorybook" WHERE id=$1`, [req.params.id]);
       return res.json({ storybook: _sbRow(r.rows[0]) });

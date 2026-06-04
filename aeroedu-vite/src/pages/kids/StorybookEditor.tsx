@@ -11,12 +11,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, FileUp, ImagePlus, Music, Trash2, ArrowUp, ArrowDown,
-  Loader2, Save, Eye, Clock, X, BookOpen, Volume2, CheckCircle2,
+  Loader2, Save, Eye, Clock, X, BookOpen, Volume2, CheckCircle2, Film,
 } from 'lucide-react'
 import { uploadFileToGcs } from '@/lib/uploadFile'
 import { pdfToImageBlobs } from '@/lib/pdfToImages'
 import { getStorybook, createStorybook, updateStorybook, deleteStorybook } from '@/services/storybook.service'
-import type { Storybook, StorybookPage } from '@/types/storybook'
+import type { Storybook, StorybookPage, StorybookAct, StoryTone } from '@/types/storybook'
+
+const TONE_OPTS: { v: StoryTone; label: string }[] = [
+  { v: 'warm', label: '🌤️ Ấm áp (mở đầu)' },
+  { v: 'gentle', label: '🍃 Nhẹ nhàng' },
+  { v: 'excited', label: '✨ Hào hứng / vui' },
+  { v: 'suspense', label: '⚡ Hồi hộp (cao trào)' },
+  { v: 'sad', label: '💧 Buồn / lắng' },
+]
 
 const uid = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 const fmt = (s?: number | null) => (s == null ? '—' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`)
@@ -33,6 +41,7 @@ export default function StorybookEditor() {
   const [narrationUrl, setNarrationUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [pages, setPages] = useState<StorybookPage[]>([])
+  const [acts, setActs] = useState<StorybookAct[]>([])
   const [published, setPublished] = useState(false)
 
   const [loading, setLoading] = useState(editing)
@@ -46,7 +55,7 @@ export default function StorybookEditor() {
     getStorybook(id!).then((b: Storybook) => {
       setTitle(b.title); setDescription(b.description || ''); setMode(b.mode)
       setAutoAdvance(b.autoAdvance); setNarrationUrl(b.narrationUrl || '')
-      setCoverUrl(b.coverUrl || ''); setPages(b.pages || []); setPublished(b.published)
+      setCoverUrl(b.coverUrl || ''); setPages(b.pages || []); setActs(b.acts || []); setPublished(b.published)
       setLoading(false)
     }).catch((e) => { setNote(e?.response?.data?.error || 'Không tải được sách'); setLoading(false) })
   }, [id, editing])
@@ -118,6 +127,18 @@ export default function StorybookEditor() {
     patchPage(pid, { flipAtSec: Math.round(t * 10) / 10 })
   }
 
+  // ── Cấu trúc 3 hồi ──
+  const enableActs = () => {
+    const n = pages.length || 9
+    setActs([
+      { id: 'act1', title: 'Mở đầu', description: 'Giới thiệu nhân vật & bối cảnh', startPage: 0, tone: 'warm' },
+      { id: 'act2', title: 'Cao trào', description: 'Xung đột & thử thách', startPage: Math.max(1, Math.floor(n / 3)), tone: 'suspense' },
+      { id: 'act3', title: 'Kết thúc', description: 'Giải quyết & bài học rút ra', startPage: Math.max(2, Math.floor((2 * n) / 3)), tone: 'gentle' },
+    ])
+  }
+  const patchAct = (idx: number, patch: Partial<StorybookAct>) =>
+    setActs((as) => as.map((a, i) => (i === idx ? { ...a, ...patch } : a)))
+
   const valid = title.trim() && pages.length > 0
 
   const save = async (alsoPublish?: boolean) => {
@@ -126,6 +147,7 @@ export default function StorybookEditor() {
     const body: Partial<Storybook> = {
       title: title.trim(), description, mode, autoAdvance, narrationUrl,
       coverUrl: coverUrl || pages[0]?.imageUrl, pages,
+      acts: acts.length ? acts : null,
       published: alsoPublish ?? published,
     }
     try {
@@ -235,6 +257,48 @@ export default function StorybookEditor() {
               <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && onCover(e.target.files[0])} />
             </label>
           </div>
+        </section>
+
+        {/* Cấu trúc 3 hồi */}
+        <section className="rounded-2xl bg-white dark:bg-slate-800/60 border border-border p-4 sm:p-5 mb-5">
+          <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+            <div className="font-bold flex items-center gap-1.5"><Film className="w-4 h-4 text-pink-500" /> Cấu trúc 3 hồi <span className="text-xs font-normal text-slate-400">(tuỳ chọn)</span></div>
+            {acts.length === 0
+              ? <button onClick={enableActs} className="text-sm px-3 py-1.5 rounded-lg bg-pink-500 text-white font-bold">Chia truyện theo 3 hồi</button>
+              : <button onClick={() => setActs([])} className="text-sm text-slate-400 hover:text-rose-500 font-semibold">Bỏ chia hồi</button>}
+          </div>
+          {acts.length === 0 ? (
+            <p className="text-xs text-slate-500">Chia truyện thành <b>Mở đầu → Cao trào → Kết thúc</b>. Mỗi hồi có giọng đọc riêng và hiện tên hồi khi bé đọc tới.</p>
+          ) : (
+            <div className="space-y-2 mt-2">
+              {acts.map((a, i) => (
+                <div key={a.id} className="rounded-xl border border-border p-3 bg-background/60">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="w-7 h-7 rounded-full bg-pink-500 text-white text-xs font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                    <input value={a.title} onChange={(e) => patchAct(i, { title: e.target.value })}
+                      placeholder={`Tên hồi ${i + 1}`} className="flex-1 min-w-[140px] px-2.5 py-1.5 rounded-lg border border-border bg-background text-sm font-bold" />
+                    <label className="text-xs text-slate-500 flex items-center gap-1">
+                      Bắt đầu trang
+                      <select value={a.startPage} onChange={(e) => patchAct(i, { startPage: Number(e.target.value) })}
+                        className="px-2 py-1 rounded-lg border border-border bg-background text-sm">
+                        {pages.map((_, idx) => <option key={idx} value={idx}>{idx + 1}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs text-slate-500 flex items-center gap-1">
+                      Giọng
+                      <select value={a.tone || 'gentle'} onChange={(e) => patchAct(i, { tone: e.target.value as StoryTone })}
+                        className="px-2 py-1 rounded-lg border border-border bg-background text-sm">
+                        {TONE_OPTS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <input value={a.description || ''} onChange={(e) => patchAct(i, { description: e.target.value })}
+                    placeholder="Mô tả ngắn của hồi (hiện khi bé đọc tới)…" className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-sm" />
+                </div>
+              ))}
+              <p className="text-[11px] text-slate-500">💡 Giọng đọc của mỗi hồi áp dụng cho các trang trong hồi (chế độ Âm thanh theo trang dùng giọng máy Google TTS).</p>
+            </div>
+          )}
         </section>
 
         {/* Thêm trang */}
