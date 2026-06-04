@@ -1640,12 +1640,14 @@ function MotherShips({ specs, posRef, onNear }: {
 // ═════════════════════════════════════════════════════════════
 interface EnemyShared { pos: THREE.Vector3[]; alive: boolean[]; respawnAt: number[] }
 const playShoot = () => sfxTone(900, 0.06, 'square', 0.1)
-function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, enemyShared, peersRef, onEnemyKill, onPeerShot, onExplode }: {
+const playEmptyClick = () => sfxTone(150, 0.05, 'square', 0.07)
+function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, onEmpty, enemyShared, peersRef, onEnemyKill, onPeerShot, onExplode }: {
   posRef: React.MutableRefObject<THREE.Vector3>
   rotRef: React.MutableRefObject<{ yaw: number; pitch: number; roll: number }>
   inputs: React.MutableRefObject<ControlInputs>
   ammoRef: React.MutableRefObject<number>
   onShoot: () => void
+  onEmpty?: () => void
   enemyShared?: React.MutableRefObject<EnemyShared | null>
   peersRef?: React.MutableRefObject<Map<string, Peer>>
   onEnemyKill?: () => void
@@ -1656,10 +1658,11 @@ function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, enemyShared, pe
   const pool = useRef(Array.from({ length: MAX }, () => ({ active: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0 })))
   const refs = useRef<(THREE.Mesh | null)[]>([])
   const lastFire = useRef(0)
+  const lastEmpty = useRef(0)
   const e = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
   useFrame((_s, dt) => {
     const now = performance.now()
-    // Bắn (edge + cooldown 220ms)
+    // Bắn (edge + cooldown 220ms) — chỉ khi còn đạn
     if (inputs.current.fire && ammoRef.current > 0 && now - lastFire.current > 220) {
       lastFire.current = now
       ammoRef.current -= 1
@@ -1673,6 +1676,11 @@ function Projectiles({ posRef, rotRef, inputs, ammoRef, onShoot, enemyShared, pe
         slot.pos.copy(posRef.current).addScaledVector(dir, 1)
         slot.vel.copy(dir).multiplyScalar(SPEED)
       }
+    } else if (inputs.current.fire && ammoRef.current <= 0 && now - lastEmpty.current > 600) {
+      // Hết đạn: kêu lách cách + nhắc nạp ở tàu mẹ
+      lastEmpty.current = now
+      playEmptyClick()
+      onEmpty?.()
     }
     // Cập nhật đạn + va chạm
     const es = enemyShared?.current
@@ -2889,10 +2897,17 @@ function GameScreen({
     })
   }, [level.map?.lat, level.map?.lon, level.map?.radius])
   const onShoot = useCallback(() => setAmmo(ammoRef.current), [])
+  const [emptyWarn, setEmptyWarn] = useState(false)
+  const emptyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onEmpty = useCallback(() => {
+    setEmptyWarn(true)
+    if (emptyTimer.current) clearTimeout(emptyTimer.current)
+    emptyTimer.current = setTimeout(() => setEmptyWarn(false), 1500)
+  }, [])
   const onEnemyKill = useCallback(() => { setRunScore((s) => s + 40); setCollectMsg('💥 Hạ địch +40'); setTimeout(() => setCollectMsg(null), 1200) }, [])
   const onMotherNear = useCallback(() => {
     rechargeRef.current = Math.max(rechargeRef.current, 1.5)
-    if (ammoRef.current < AMMO_MAX) { ammoRef.current = AMMO_MAX; setAmmo(AMMO_MAX) }
+    if (ammoRef.current < AMMO_MAX) { ammoRef.current = AMMO_MAX; setAmmo(AMMO_MAX); setCollectMsg('🔫 Nạp đầy đạn!'); setTimeout(() => setCollectMsg(null), 1200) }
   }, [])
   // ── Thách đấu realtime: đồng bộ vị trí drone qua broker ──
   const peersRef = useRef<Map<string, Peer>>(new Map())
@@ -3138,7 +3153,7 @@ function GameScreen({
           <Pickups items={pickups} posRef={dronePosRef} onCollect={onCollect} />
           <MotherShips specs={motherships} posRef={dronePosRef} onNear={onMotherNear} />
           <Projectiles posRef={dronePosRef} rotRef={droneRotRef} inputs={inputsRef} ammoRef={ammoRef}
-            onShoot={onShoot} enemyShared={enemySharedRef} peersRef={peersRef}
+            onShoot={onShoot} onEmpty={onEmpty} enemyShared={enemySharedRef} peersRef={peersRef}
             onEnemyKill={onEnemyKill} onPeerShot={onPeerShot} onExplode={explode} />
           <Explosions fxRef={fxRef} />
           {room && <PeerDrones peersRef={peersRef} />}
@@ -3301,7 +3316,9 @@ function GameScreen({
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>ĐẠN</div>
-                  <div style={{ fontSize: 16, fontWeight: 'bold', color: ammo > 0 ? '#fde047' : '#ef4444' }}>{ammo}</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: ammo > 0 ? '#fde047' : '#ef4444' }}>
+                    {ammo}<span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>/{AMMO_MAX}</span>
+                  </div>
                 </div>
                 <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: 10 }}>
                   <div style={{ fontSize: 11, color: '#a8e0ff', fontWeight: 700 }}>ĐIỂM MÀN</div>
@@ -3316,14 +3333,27 @@ function GameScreen({
           })()}
         </div>
 
+        {/* Cảnh báo HẾT ĐẠN */}
+        {emptyWarn && (
+          <div style={{
+            position: 'absolute', top: '38%', left: '50%', transform: 'translateX(-50%)', zIndex: 13,
+            background: 'rgba(127,10,10,0.82)', border: '2px solid rgba(239,68,68,0.9)', borderRadius: 12,
+            padding: '8px 18px', color: '#fff', fontWeight: 800, fontSize: 15, pointerEvents: 'none',
+            textShadow: HUD_TXT_SHADOW, whiteSpace: 'nowrap',
+          }}>🔫 HẾT ĐẠN — bay về tàu mẹ để nạp</div>
+        )}
+
         {/* Nút BẮN (chạm/giữ) */}
         <button
           onPointerDown={(e) => { e.preventDefault(); inputsRef.current.fire = true }}
           onPointerUp={() => { inputsRef.current.fire = false }}
           onPointerLeave={() => { inputsRef.current.fire = false }}
+          title={ammo > 0 ? `Bắn (${ammo}/${AMMO_MAX} đạn)` : 'Hết đạn — về tàu mẹ nạp'}
           style={{
             position: 'absolute', bottom: 300, right: 24, zIndex: 11, width: 64, height: 64, borderRadius: '50%',
-            background: 'rgba(239,68,68,0.35)', border: '2px solid rgba(239,68,68,0.8)', color: '#fff',
+            background: ammo > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(100,116,139,0.25)',
+            border: ammo > 0 ? '2px solid rgba(239,68,68,0.8)' : '2px solid rgba(148,163,184,0.6)',
+            color: '#fff', opacity: ammo > 0 ? 1 : 0.55,
             fontSize: 26, cursor: 'pointer', userSelect: 'none', touchAction: 'none', pointerEvents: 'auto',
           }}>🔫</button>
 
