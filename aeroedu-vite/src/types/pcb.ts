@@ -21,6 +21,7 @@ export interface PcbLayout {
   board: { w: number; h: number }
   placements: Record<string, PcbPlacement>   // key = ref linh kiện
   traces: PcbTrace[]
+  pour?: { net: string; layer: 'top' | 'bottom' } | null  // phủ đồng (ground plane) cho 1 net
 }
 
 export interface PcbDoc {

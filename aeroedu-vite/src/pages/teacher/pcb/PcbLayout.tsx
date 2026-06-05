@@ -76,7 +76,12 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
     setDrc(out)
   }
 
-  const exportGerber = () => { const zip = makeZip(buildGerbers(comps, layout)); const a = document.createElement('a'); a.href = URL.createObjectURL(zip); a.download = `${title || 'board'}.gerber.zip`; a.click(); URL.revokeObjectURL(a.href) }
+  const exportGerber = () => { const zip = makeZip(buildGerbers(comps, nets, layout)); const a = document.createElement('a'); a.href = URL.createObjectURL(zip); a.download = `${title || 'board'}.gerber.zip`; a.click(); URL.revokeObjectURL(a.href) }
+
+  const togglePour = () => setLayout((l) => ({ ...l, pour: l.pour ? null : { net: nets.find((n) => /gnd|mass/i.test(n.name))?.name || nets[0]?.name || 'GND', layer: 'bottom' } }))
+  // các pad KHÔNG thuộc net phủ (để vẽ vòng hở đồng)
+  const pourNet = layout.pour ? nets.find((n) => n.name === layout.pour!.net) : null
+  const isPourPad = (ref: string, pin: string) => !!pourNet && pourNet.nodes.some((nd) => nd.comp === ref && nd.pin === pin)
 
   return (
     <div className="flex-1 flex min-h-0">
@@ -103,6 +108,9 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
           </div>
         )}
         {sel && <button onClick={rotate} className="w-full px-3 py-2 rounded-lg text-sm bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center justify-center gap-1.5"><RotateCw className="w-4 h-4" /> Xoay {sel} 90°</button>}
+        <button onClick={togglePour} className={`w-full px-3 py-2 rounded-lg text-sm font-bold inline-flex items-center justify-center gap-1.5 ${layout.pour ? 'bg-amber-600 text-white' : 'bg-slate-100 dark:bg-slate-800 border border-border'}`}>
+          <Layers className="w-4 h-4" /> {layout.pour ? `Phủ đồng GND: ${layout.pour.net} (dưới)` : 'Phủ đồng GND (lớp dưới)'}
+        </button>
         <div className="flex gap-1.5">
           <button onClick={runDrc} className="flex-1 px-3 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white inline-flex items-center justify-center gap-1"><ShieldCheck className="w-4 h-4" /> DRC</button>
           <button onClick={exportGerber} className="flex-1 px-3 py-2 rounded-lg text-sm font-bold bg-cyan-600 text-white inline-flex items-center justify-center gap-1"><FileDown className="w-4 h-4" /> Gerber</button>
@@ -118,6 +126,14 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
           {/* lưới */}
           <defs><pattern id="pg" width={5 * PX} height={5 * PX} patternUnits="userSpaceOnUse"><path d={`M ${5 * PX} 0 L 0 0 0 ${5 * PX}`} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={1} /></pattern></defs>
           <rect width={W * PX} height={H * PX} fill="url(#pg)" />
+
+          {/* phủ đồng (ground plane) — lớp dưới, mờ + hở quanh pad khác net */}
+          {layout.pour && (
+            <g opacity={0.5}>
+              <rect width={W * PX} height={H * PX} fill={layout.pour.layer === 'top' ? '#ef4444' : '#3b82f6'} opacity={0.18} />
+              {comps.flatMap((c) => { const pl = layout.placements[c.ref]; if (!pl) return []; return fpMap[c.ref].pads.filter((pad) => !isPourPad(c.ref, pad.name)).map((pad, i) => { const a = padAbs(pl, pad); return <circle key={c.ref + i} cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2 + 0.5) * PX} fill="#0b6b3a" /> }) })}
+            </g>
+          )}
 
           {/* ratsnest */}
           {nets.map((n) => n.nodes.slice(1).map((nd, i) => { const a = padPos(n.nodes[i].comp, n.nodes[i].pin); const b = padPos(nd.comp, nd.pin); if (!a || !b) return null; return <line key={n.id + i} x1={a.x * PX} y1={a.y * PX} x2={b.x * PX} y2={b.y * PX} stroke="#cbd5e1" strokeWidth={0.8} strokeDasharray="3 3" opacity={0.6} /> }))}

@@ -53,9 +53,13 @@ export function makeDroneTemplate(): { title: string; components: PcbComponent[]
   const nets: PcbNet[] = NETS.map((n, i) => ({ id: `dn${i}`, name: n.name, nodes: n.nodes.map(([comp, pin]) => ({ comp, pin })) }))
   const placements: PcbLayout['placements'] = {}
   DEFS.forEach((d) => { placements[d.ref] = { x: d.px, y: d.py, rot: 0 } })
+
+  // GND đã được PHỦ ĐỒNG (ground plane) ở lớp dưới — nối toàn bộ 14 chân GND,
+  // tự hở đồng quanh chân khác net (không chập). Đường nguồn/tín hiệu còn lại
+  // để GV/HS tự định tuyến theo ratsnest (tránh tự-route sai gây chập).
   return {
     title: 'Drone Flight Controller (mẫu)',
     components, nets,
-    layout: { board: { w: 60, h: 64 }, placements, traces: [] },
+    layout: { board: { w: 60, h: 64 }, placements, traces: [], pour: { net: 'GND', layer: 'bottom' } },
   }
 }
