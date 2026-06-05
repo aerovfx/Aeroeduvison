@@ -162,6 +162,7 @@ const teacherSections: RouteSection[] = [
       { icon: FileText, labelKey: 'routeOfficeDoc', href: '/teacher/office/list/doc', badge: 'Mới' },
       { icon: Presentation, labelKey: 'routeOfficeSlides', href: '/teacher/office/list/slides' },
       { icon: Grid3x3, labelKey: 'routeOfficeSheet', href: '/teacher/office/list/sheet' },
+      { icon: CircuitBoard, labelKey: 'routePcb', href: '/teacher/pcb', badge: 'AI' },
       { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },

@@ -1,6 +1,6 @@
 /** Kiểu dữ liệu cho bộ công cụ Văn phòng online (Văn bản · Trình chiếu · Bảng tính). */
 
-export type OfficeKind = 'doc' | 'sheet' | 'slides'
+export type OfficeKind = 'doc' | 'sheet' | 'slides' | 'pcb'
 
 export interface DocData { html: string }
 export interface SheetData { rows: number; cols: number; cells: Record<string, string> } // cells key = "r:c"

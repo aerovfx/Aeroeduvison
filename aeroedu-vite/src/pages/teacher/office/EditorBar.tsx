@@ -3,16 +3,17 @@ import { ArrowLeft, Check, Loader2, CloudOff } from 'lucide-react'
 import type { SaveStatus } from '@/services/office.service'
 
 /** Thanh trên dùng chung cho 3 trình soạn thảo Văn phòng. */
-export default function EditorBar({ title, onTitle, status, children }: {
+export default function EditorBar({ title, onTitle, status, children, backTo = '/teacher/office' }: {
   title: string
   onTitle: (v: string) => void
   status: SaveStatus
   children?: React.ReactNode  // nút xuất file
+  backTo?: string
 }) {
   const navigate = useNavigate()
   return (
     <div className="sticky top-0 z-20 flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-border">
-      <button onClick={() => navigate('/teacher/office')} className="p-2 rounded-lg hover:bg-accent dark:hover:bg-slate-800 text-slate-500 shrink-0" title="Về Văn phòng">
+      <button onClick={() => navigate(backTo)} className="p-2 rounded-lg hover:bg-accent dark:hover:bg-slate-800 text-slate-500 shrink-0" title="Quay lại">
         <ArrowLeft className="w-4 h-4" />
       </button>
       <input value={title} onChange={(e) => onTitle(e.target.value)} placeholder="Tên tài liệu"

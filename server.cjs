@@ -11451,7 +11451,7 @@ async function _ensureOfficeTable() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_office_owner ON "OfficeDoc"(owner_id, kind)`);
   _officeReady = true;
 }
-const _OFFICE_KINDS = ['doc', 'sheet', 'slides'];
+const _OFFICE_KINDS = ['doc', 'sheet', 'slides', 'pcb'];
 const _officeUid = (d) => d && (d.sub || d.userId || d.id);
 const _officeRow = (r) => ({ id: r.id, kind: r.kind, title: r.title, data: r.data || {}, ownerId: r.owner_id, ownerName: r.owner_name || '', createdAt: r.created_at, updatedAt: r.updated_at });
 
@@ -11546,6 +11546,25 @@ app.post('/api/office/to-docx', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${safe}.docx"`);
     return res.end(Buffer.isBuffer(buf) ? buf : Buffer.from(buf));
   } catch (e) { console.error('[office:to-docx]', e.message); return res.status(502).json({ error: e.message }); }
+});
+
+// ── PCB/Schematic: AI sinh mạch từ mô tả → netlist JSON (tool-calling nhẹ) ──
+// Dùng _aiComplete (DeepSeek→Anthropic). Trả {title,components,nets}. FE tự bố trí.
+app.post('/api/pcb/ai-generate', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    const prompt = String((req.body || {}).prompt || '').slice(0, 2000).trim();
+    if (!prompt) return res.status(400).json({ error: 'Thiếu mô tả mạch' });
+    const system = 'Bạn là kỹ sư thiết kế mạch điện tử. Từ mô tả của giáo viên, hãy trả về DUY NHẤT một JSON (KHÔNG giải thích, KHÔNG bọc trong ```) mô tả sơ đồ nguyên lý, đúng cú pháp:\n'
+      + '{"title":"tên mạch","components":[{"type":"R|C|LED|D|Q|SW|BAT|GND|VCC|MCU|IC|SENSOR|HDR","ref":"R1","value":"220Ω","pins":["1","2"]}],"nets":[{"name":"NET1","nodes":[{"comp":"R1","pin":"2"},{"comp":"D1","pin":"A"}]}]}\n'
+      + 'Quy tắc: mỗi linh kiện có ref DUY NHẤT (R1,C1,U1,D1...). pins khớp loại: R/C/SW 2 chân "1","2"; LED/D chân "A","K"; Q chân "B","C","E"; BAT "+","-"; GND chân "GND"; VCC chân "VCC"; MCU/IC/SENSOR/HDR liệt kê tên chân thực (vd ESP32: "3V3","GND","D2","D4"). nets nối các chân lại; luôn có GND và nguồn hợp lý. Giá trị linh kiện thực tế. CHỈ JSON.';
+    const out = await _aiComplete({ system, user: `Mô tả mạch: ${prompt}`, maxTokens: 3000, temperature: 0.3 });
+    let parsed;
+    try { parsed = JSON.parse(_stripFences(out.text)); } catch { return res.status(502).json({ error: 'AI trả về JSON không hợp lệ, thử mô tả rõ hơn' }); }
+    const comps = Array.isArray(parsed.components) ? parsed.components : [];
+    if (!comps.length) return res.status(502).json({ error: 'AI không tạo được linh kiện nào' });
+    return res.json({ title: String(parsed.title || prompt).slice(0, 200), components: comps, nets: Array.isArray(parsed.nets) ? parsed.nets : [], provider: out.provider });
+  } catch (e) { console.error('[pcb:ai]', e.message); return res.status(502).json({ error: 'Lỗi sinh mạch: ' + e.message }); }
 });
 
 // ── API Keys (MCP) — PHẢI trước catch-all /api proxy ────────

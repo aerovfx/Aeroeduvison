@@ -216,6 +216,8 @@ const OfficeHubPage         = lazy(() => import('@/pages/teacher/office/OfficeHu
 const OfficeDocPage         = lazy(() => import('@/pages/teacher/office/DocEditor'))
 const OfficeSheetPage       = lazy(() => import('@/pages/teacher/office/SheetEditor'))
 const OfficeSlidesPage      = lazy(() => import('@/pages/teacher/office/SlidesEditor'))
+const PcbHubPage            = lazy(() => import('@/pages/teacher/pcb/PcbHub'))
+const PcbEditorPage         = lazy(() => import('@/pages/teacher/pcb/PcbEditor'))
 const LearningPathBuilderPage = lazy(() => import('@/pages/teacher/LearningPathBuilder'))
 const LessonPlansPage         = lazy(() => import('@/pages/teacher/LessonPlans'))
 const LessonPlanEditorPage    = lazy(() => import('@/pages/teacher/LessonPlanEditor'))
@@ -687,6 +689,8 @@ export function AppRouter() {
               <Route path="/teacher/office/doc/:id"         element={<OfficeDocPage />} />
               <Route path="/teacher/office/sheet/:id"       element={<OfficeSheetPage />} />
               <Route path="/teacher/office/slides/:id"      element={<OfficeSlidesPage />} />
+              <Route path="/teacher/pcb"                    element={<PcbHubPage />} />
+              <Route path="/teacher/pcb/:id"                element={<PcbEditorPage />} />
 
               {/* Chưa port → PageFallback (specific trước, wildcard sau) */}
               <Route path="/teacher/agents"                        element={<AgentsPage />} />
