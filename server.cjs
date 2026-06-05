@@ -320,6 +320,11 @@ if (USE_NODEJS_AUTH) {
         const fetched = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
         user = fetched.rows[0];
         console.log(`[auth:google] 🆕 New user: ${email}`);
+
+        // 🎁 Dùng thử 3 tháng tự động cho tài khoản Google mới (mặc định nhóm Học sinh)
+        require('./lib/entitlements.cjs')
+          .startTrial(id, { audience: 'student', userEmail: email, userName: displayName })
+          .catch(e => console.warn('[auth:google] trial grant failed:', e.message));
       } else {
         // Update profile picture if missing
         if (!user.image && claims.picture) {
@@ -600,8 +605,18 @@ if (USE_NODEJS_AUTH) {
 
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
       const user = rows[0];
+
+      // 🎁 Dùng thử 3 tháng tự động cho tài khoản mới (theo nhóm tài khoản)
+      try {
+        await require('./lib/entitlements.cjs').startTrial(id, {
+          audience: accountType.toLowerCase(),
+          userEmail: user.email,
+          userName: displayName,
+        });
+      } catch (e) { console.warn('[auth:register] trial grant failed:', e.message); }
+
       const token = issueToken(user);
-      console.log(`[auth:register] ✅ ${user.email} role=${role} accountType=${accountType}`);
+      console.log(`[auth:register] ✅ ${user.email} role=${role} accountType=${accountType} +trial3m`);
       return res.status(201).json({
         user: { ...publicUser(user), accountType },
         tokens: { accessToken: token, refreshToken: '' },
@@ -1137,6 +1152,52 @@ function makeProxy(target, label, pathFilter) {
     } catch (err) {
       console.error('[payment:notify] ❌', err.message);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET gói hiện tại của user (cho trang /pricing) — gộp trial/paid/admin + đơn chờ
+  app.get('/api/payment/my-subscription', async (req, res) => {
+    const userKey = getUserKey(req);
+    if (!userKey) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const sub = await entitlements.getSubscription(userKey);
+      let pendingOrder = null, orderCount = 0, paidCount = 0, lifetimeSpend = 0;
+      try {
+        const pool = getPool();
+        const r = await pool.query(
+          `SELECT id,"planId","planName",amount,status,"createdAt"
+             FROM "PaymentOrder" WHERE "userId"=$1 ORDER BY "createdAt" DESC`,
+          [userKey]
+        );
+        orderCount = r.rows.length;
+        for (const o of r.rows) {
+          if (o.status === 'PAID') { paidCount++; lifetimeSpend += Number(o.amount) || 0; }
+        }
+        const pend = r.rows.find(o => o.status === 'AWAITING_REVIEW' || o.status === 'PENDING');
+        if (pend) pendingOrder = {
+          orderId: pend.id, planId: pend.planId, planName: pend.planName,
+          amount: Number(pend.amount) || 0, status: pend.status, createdAt: pend.createdAt,
+        };
+      } catch (e) { /* không có đơn cũng OK */ }
+
+      let activeSubscription = null;
+      if (sub && !sub.isExpired) {
+        const plan = orders.getPlan(sub.planId) || {};
+        activeSubscription = {
+          orderId: sub.source, planId: sub.planId, planName: plan.name || sub.planId,
+          audience: sub.audience, amount: plan.amount || 0,
+          startedAt: sub.startedAt, expiresAt: sub.expiresAt,
+          daysUsed: sub.daysUsed, daysRemaining: sub.daysRemaining,
+          durationDays: sub.durationDays, percentUsed: sub.percentUsed,
+          isExpiringSoon: sub.isExpiringSoon,
+          features: entitlements.listFeaturesForPlan(sub.planId),
+          source: sub.source, status: sub.status,
+        };
+      }
+      return res.json({ activeSubscription, pendingOrder, orderCount, paidCount, lifetimeSpend });
+    } catch (e) {
+      console.error('[payment:my-subscription]', e.message);
+      return res.json({ activeSubscription: null, pendingOrder: null, orderCount: 0, paidCount: 0, lifetimeSpend: 0 });
     }
   });
 
@@ -16322,62 +16383,115 @@ app.get('/api/admin/overview/full', async (req, res) => {
     }
   });
 
-  // GET người đăng ký — gom từ đơn PAID theo user (join User cho tên/ảnh/role)
-  app.get('/api/admin/payments/subscribers', async (_req, res) => {
+  // GET người đăng ký — gộp MỌI nguồn từ "sổ" UserSubscription
+  // (trial · paid · admin · apple-iap), join User cho tên/ảnh/role + tổng chi từ đơn PAID.
+  app.get('/api/admin/payments/subscribers', async (req, res) => {
     try {
       const pool = _getPool();
-      let rows = [];
-      try {
-        const r = await pool.query(`
-          SELECT po."userId",
-                 COALESCE(u.name, MAX(po."userName"))  AS name,
-                 COALESCE(u.email, MAX(po."userEmail")) AS email,
-                 u.image, u.role,
-                 COUNT(*)::int        AS order_count,
-                 SUM(po.amount)::float AS lifetime_spend,
-                 (array_agg(po."planId"   ORDER BY po."approvedAt" DESC))[1] AS plan_id,
-                 (array_agg(po."planName" ORDER BY po."approvedAt" DESC))[1] AS plan_name,
-                 MAX(po."approvedAt") AS last_approved
-          FROM "PaymentOrder" po
-          LEFT JOIN "User" u ON u.id = po."userId"
-          WHERE po.status = 'PAID'
-          GROUP BY po."userId", u.name, u.email, u.image, u.role
-          ORDER BY last_approved DESC NULLS LAST`);
-        rows = r.rows;
-      } catch (e) { console.warn('[admin:payments:subscribers]', e.message); }
+      const subsList = await _payEnt.listSubscriptions();
 
-      const now = Date.now();
-      const subscribers = rows.map(r => {
-        const plan = _payOrders.getPlan(r.plan_id) || {};
-        const durationDays = plan.durationDays || 30;
-        const started = r.last_approved ? new Date(r.last_approved) : new Date(now);
-        const expires = new Date(started.getTime() + durationDays * 86400000);
-        const daysUsed = Math.max(0, Math.floor((now - started.getTime()) / 86400000));
-        const daysRemaining = Math.max(0, Math.ceil((expires.getTime() - now) / 86400000));
+      // Tổng chi + số đơn theo user (từ đơn PAID)
+      const spendByUser = {};
+      try {
+        const r = await pool.query(
+          `SELECT "userId", COUNT(*)::int AS cnt, SUM(amount)::float AS spend
+             FROM "PaymentOrder" WHERE status='PAID' AND "userId" IS NOT NULL
+            GROUP BY "userId"`
+        );
+        for (const row of r.rows) spendByUser[row.userId] = { cnt: row.cnt, spend: row.spend };
+      } catch (e) { /* không có đơn cũng OK */ }
+
+      // Thông tin user (tên/email/ảnh/role)
+      const userInfo = {};
+      try {
+        const ids = [...new Set(subsList.map(s => s.userKey).filter(Boolean))];
+        if (ids.length) {
+          const r = await pool.query(`SELECT id,name,email,image,role FROM "User" WHERE id = ANY($1)`, [ids]);
+          for (const row of r.rows) userInfo[row.id] = row;
+        }
+      } catch (e) { /* best-effort */ }
+
+      const filter = String(req.query.filter || 'all');
+      const search = String(req.query.search || '').toLowerCase().trim();
+
+      let subscribers = subsList.map(s => {
+        const ui = userInfo[s.userKey] || {};
+        const sp = spendByUser[s.userKey] || { cnt: 0, spend: 0 };
+        const plan = _payOrders.getPlan(s.planId) || {};
         return {
-          userId: r.userId || null,
-          name: r.name || '(không tên)',
-          email: r.email || '',
-          image: r.image || null,
-          role: r.role || null,
-          activePlan: { id: r.plan_id, name: r.plan_name || plan.name || r.plan_id, priceVnd: plan.amount || 0, durationDays },
-          startedAt: started.toISOString(),
-          expiresAt: expires.toISOString(),
-          daysUsed,
-          daysRemaining,
-          percentUsed: durationDays > 0 ? Math.min(100, Math.round((daysUsed / durationDays) * 100)) : 0,
-          isExpiringSoon: daysRemaining > 0 && daysRemaining <= 7,
-          isExpired: expires.getTime() < now,
+          userId: s.userKey,
+          name: ui.name || s.userName || '(không tên)',
+          email: ui.email || s.userEmail || '',
+          image: ui.image || null,
+          role: ui.role || null,
+          source: s.source,           // trial | paid | admin | apple-iap
+          status: s.status,           // trialing | active | expired
+          activePlan: { id: s.planId, name: plan.name || s.planId, priceVnd: plan.amount || 0, durationDays: s.durationDays },
+          startedAt: s.startedAt,
+          expiresAt: s.expiresAt,
+          daysUsed: s.daysUsed,
+          daysRemaining: s.daysRemaining,
+          percentUsed: s.percentUsed,
+          isExpiringSoon: s.isExpiringSoon,
+          isExpired: s.isExpired,
           featuresAccessed: [],
           lastActivityAt: null,
-          lifetimeSpend: r.lifetime_spend || 0,
-          orderCount: r.order_count || 0,
+          lifetimeSpend: sp.spend || 0,
+          orderCount: sp.cnt || 0,
         };
       });
+
+      if (filter === 'active')        subscribers = subscribers.filter(s => !s.isExpired);
+      else if (filter === 'expiring') subscribers = subscribers.filter(s => s.isExpiringSoon);
+      else if (filter === 'expired')  subscribers = subscribers.filter(s => s.isExpired);
+      else if (filter === 'trial')    subscribers = subscribers.filter(s => s.source === 'trial');
+      if (search) subscribers = subscribers.filter(s => (`${s.name} ${s.email}`).toLowerCase().includes(search));
+      subscribers.sort((a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime());
+
       return res.json({ subscribers, total: subscribers.length });
     } catch (e) {
       console.error('[admin:payments:subscribers]', e.message);
       return res.json({ subscribers: [], total: 0 });
+    }
+  });
+
+  // POST cấp / gia hạn gói THỦ CÔNG cho 1 user (admin)
+  // Body: { userId? | email?, planId, days? }  — days override thời hạn, mặc định theo gói.
+  // Còn hạn → cộng dồn từ ngày hết hạn hiện tại (gia hạn); hết hạn → tính từ hôm nay.
+  app.post('/api/admin/payments/grant', async (req, res) => {
+    try {
+      const { userId, email, planId, days } = req.body || {};
+      if (!planId) return res.status(400).json({ error: 'Thiếu planId' });
+      const plan = _payOrders.getPlan(planId);
+      if (!plan) return res.status(400).json({ error: 'planId không hợp lệ: ' + planId });
+
+      const pool = _getPool();
+      let u = null;
+      if (userId) {
+        const r = await pool.query('SELECT id,email,name,role FROM "User" WHERE id=$1', [userId]);
+        u = r.rows[0] || null;
+      }
+      if (!u && email) {
+        const r = await pool.query('SELECT id,email,name,role FROM "User" WHERE LOWER(email)=$1', [String(email).toLowerCase().trim()]);
+        u = r.rows[0] || null;
+      }
+      if (!u) return res.status(404).json({ error: 'Không tìm thấy người dùng (kiểm tra email/userId)' });
+
+      const dur = Number(days) > 0 ? Number(days) : (plan.durationDays || 30);
+      const cur = await _payEnt.getSubscription(u.id);
+      const base = (cur && !cur.isExpired) ? new Date(cur.expiresAt).getTime() : Date.now();
+      const exp = new Date(base + dur * 86400000).toISOString();
+
+      await _payEnt.grantPlan(u.id, planId, { source: 'admin', expiresAt: exp });
+      const sub = await _payEnt.recordSubscription({
+        userKey: u.id, userEmail: u.email, userName: u.name,
+        planId, source: 'admin', expiresAt: exp,
+      });
+      console.log(`[admin:payments:grant] ${u.email} ← ${planId} (+${dur}d) → ${exp}`);
+      return res.json({ ok: true, userId: u.id, email: u.email, planId, days: dur, expiresAt: exp, subscription: sub });
+    } catch (e) {
+      console.error('[admin:payments:grant]', e.message);
+      return res.status(500).json({ error: 'Cấp/gia hạn gói thất bại' });
     }
   });
 
@@ -16387,7 +16501,24 @@ app.get('/api/admin/overview/full', async (req, res) => {
       const order = await _payOrders.getOrder(req.params.id);
       if (!order) return res.status(404).json({ error: 'Không tìm thấy đơn' });
       const updated = await _payOrders.setStatus(req.params.id, 'PAID');
-      // best-effort: sinh mã kích hoạt + gửi email (không chặn response nếu lỗi)
+
+      // "Thanh toán xong là có" — đơn gắn userId → cấp quyền NGAY, không cần nhập mã.
+      // Nếu đang còn hạn (vd dùng thử / gói cũ) thì cộng dồn từ ngày hết hạn hiện tại.
+      if (updated.userId) {
+        try {
+          const plan = _payOrders.getPlan(updated.planId) || {};
+          const cur = await _payEnt.getSubscription(updated.userId);
+          const base = (cur && !cur.isExpired) ? new Date(cur.expiresAt).getTime() : Date.now();
+          const exp = new Date(base + (plan.durationDays || 30) * 86400000).toISOString();
+          await _payEnt.grantPlan(updated.userId, updated.planId, { source: 'paid', expiresAt: exp });
+          await _payEnt.recordSubscription({
+            userKey: updated.userId, userEmail: updated.userEmail, userName: updated.userName,
+            planId: updated.planId, source: 'paid', expiresAt: exp,
+          });
+        } catch (e) { console.warn('[admin:payments:approve] auto-grant fail:', e.message); }
+      }
+
+      // best-effort: sinh mã kích hoạt + gửi email (dự phòng cho đơn KHÔNG gắn userId)
       try {
         const code = await _payEnt.generateActivationCode(updated);
         if (updated.userEmail) {

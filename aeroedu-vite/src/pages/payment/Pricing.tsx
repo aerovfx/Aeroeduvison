@@ -47,6 +47,8 @@ interface ActiveSubscription {
   percentUsed: number
   isExpiringSoon: boolean
   features: string[]
+  source?: string   // trial | paid | admin | apple-iap
+  status?: string   // trialing | active | expired
 }
 
 interface PendingOrder {
@@ -284,7 +286,9 @@ export default function PricingPage() {
             </div>
             <div style={{ flex: 1, minWidth: 240 }}>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
-                {activeSub.isExpiringSoon ? 'Gói sắp hết hạn — gia hạn ngay' : 'Bạn đang sử dụng'}
+                {activeSub.source === 'trial'
+                  ? (activeSub.isExpiringSoon ? '🎁 Bản dùng thử sắp kết thúc — đăng ký để giữ quyền' : '🎁 Đang dùng thử miễn phí 3 tháng')
+                  : (activeSub.isExpiringSoon ? 'Gói sắp hết hạn — gia hạn ngay' : 'Bạn đang sử dụng')}
                 {' · '}
                 <span style={{ color: activeSub.isExpiringSoon ? '#fbbf24' : '#34d399' }}>
                   {activeSub.planName}

@@ -14,6 +14,7 @@ import {
   CreditCard, CheckCircle2, XCircle, Search, RefreshCw,
   TrendingUp, DollarSign, Package, AlertCircle, Loader2,
   Copy, Users, AlertTriangle, Clock, Sparkles, ChevronDown,
+  Gift, Plus, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
@@ -28,12 +29,17 @@ interface SubscriberFeature {
   lastUsed: string | null
 }
 
+type SubSource = 'trial' | 'paid' | 'admin' | 'apple-iap'
+type SubState = 'trialing' | 'active' | 'expired'
+
 interface Subscriber {
   userId: string | null
   name: string
   email: string
   image: string | null
   role: string | null
+  source: SubSource
+  status: SubState
   activePlan: { id: string; name: string; priceVnd: number; durationDays: number }
   startedAt: string
   expiresAt: string
@@ -48,7 +54,14 @@ interface Subscriber {
   orderCount: number
 }
 
-type SubFilter = 'all' | 'active' | 'expiring' | 'expired'
+const SOURCE_BADGE: Record<SubSource, { label: string; cls: string }> = {
+  trial:       { label: '🎁 Dùng thử', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
+  paid:        { label: '💳 Đã mua',   cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' },
+  admin:       { label: '🛠 Admin cấp', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/40' },
+  'apple-iap': { label: ' App Store',  cls: 'bg-sky-500/15 text-sky-300 border-sky-500/40' },
+}
+
+type SubFilter = 'all' | 'active' | 'expiring' | 'expired' | 'trial'
 
 interface PaymentOrder {
   id: string
@@ -560,15 +573,23 @@ function SubscribersPanel({
   onRefresh: () => void
 }) {
   const totalActive = subs.filter(s => !s.isExpired).length
+  const totalTrial = subs.filter(s => s.source === 'trial' && !s.isExpired).length
   const totalExpiring = subs.filter(s => s.isExpiringSoon).length
   const totalExpired = subs.filter(s => s.isExpired).length
   const totalLifetime = subs.reduce((sum, s) => sum + (s.lifetimeSpend || 0), 0)
 
+  const [grantOpen, setGrantOpen] = useState(false)
+  const [grantPrefill, setGrantPrefill] = useState<{ email?: string; planId?: string }>({})
+  const openGrant = (prefill: { email?: string; planId?: string } = {}) => {
+    setGrantPrefill(prefill); setGrantOpen(true)
+  }
+
   return (
     <div className="space-y-4">
       {/* Header stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <SubStatCard icon={Users}        color="cyan"    label="Đang đăng ký"  value={String(totalActive)} />
+        <SubStatCard icon={Gift}         color="amber"   label="Đang dùng thử" value={String(totalTrial)} />
         <SubStatCard icon={AlertTriangle} color="amber"   label="Sắp hết hạn"   value={String(totalExpiring)} />
         <SubStatCard icon={XCircle}      color="rose"    label="Đã hết hạn"    value={String(totalExpired)} />
         <SubStatCard icon={DollarSign}   color="emerald" label="Tổng chi tiêu" value={formatVnd(totalLifetime)} mono />
@@ -580,6 +601,7 @@ function SubscribersPanel({
           {([
             ['all',      'Tất cả'],
             ['active',   'Đang dùng'],
+            ['trial',    '🎁 Dùng thử'],
             ['expiring', 'Sắp hết hạn (<7 ngày)'],
             ['expired',  'Đã hết hạn'],
           ] as const).map(([k, label]) => (
@@ -612,6 +634,13 @@ function SubscribersPanel({
           className="px-3 py-2 rounded-lg bg-white/[0.06] text-white/70 hover:bg-white/[0.1] flex items-center gap-2 text-sm"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Tải lại
+        </button>
+
+        <button
+          onClick={() => openGrant()}
+          className="px-3 py-2 rounded-lg bg-purple-500/20 text-purple-200 border border-purple-500/40 hover:bg-purple-500/30 flex items-center gap-2 text-sm font-semibold"
+        >
+          <Plus className="w-4 h-4" /> Cấp / Gia hạn gói
         </button>
       </div>
 
@@ -653,6 +682,7 @@ function SubscribersPanel({
                       isExpanded={isExpanded}
                       col={col}
                       onToggle={() => setExpandedUserId(isExpanded ? null : key)}
+                      onExtend={() => openGrant({ email: s.email, planId: s.activePlan.id })}
                     />
                   )
                 })}
@@ -661,15 +691,24 @@ function SubscribersPanel({
           </div>
         </div>
       )}
+
+      {grantOpen && (
+        <GrantModal
+          prefill={grantPrefill}
+          onClose={() => setGrantOpen(false)}
+          onDone={() => { setGrantOpen(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }
 
-function SubscriberRow({ s, isExpanded, col, onToggle }: {
+function SubscriberRow({ s, isExpanded, col, onToggle, onExtend }: {
   s: Subscriber
   isExpanded: boolean
   col: { bar: string; text: string }
   onToggle: () => void
+  onExtend: () => void
 }) {
   return (
     <>
@@ -694,7 +733,12 @@ function SubscriberRow({ s, isExpanded, col, onToggle }: {
                         {/* Plan */}
                         <td className="px-3 py-3 text-xs">
                           <div className="text-white/85 font-medium truncate max-w-[140px]">{s.activePlan.name}</div>
-                          <div className="text-[10px] text-white/40 font-mono">{s.activePlan.id}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${SOURCE_BADGE[s.source]?.cls || 'bg-white/5 text-white/50 border-white/10'}`}>
+                              {SOURCE_BADGE[s.source]?.label || s.source}
+                            </span>
+                            <span className="text-[10px] text-white/40 font-mono">{s.activePlan.id}</span>
+                          </div>
                         </td>
                         {/* Days used */}
                         <td className="px-3 py-3 text-right text-xs text-white/70 font-mono">
@@ -740,11 +784,20 @@ function SubscriberRow({ s, isExpanded, col, onToggle }: {
                             <div className="text-[10px] text-white/40">{s.orderCount} đơn</div>
                           )}
                         </td>
-                        {/* Expand chevron */}
+                        {/* Gia hạn + Expand chevron */}
                         <td className="px-2 py-3">
-                          <ChevronDown
-                            className={`w-4 h-4 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          />
+                          <div className="flex items-center gap-1 justify-end">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onExtend() }}
+                              className="px-2 py-1 rounded-md bg-purple-500/15 text-purple-200 border border-purple-500/30 hover:bg-purple-500/25 text-[10px] font-semibold whitespace-nowrap"
+                              title="Gia hạn / đổi gói cho người dùng này"
+                            >
+                              Gia hạn
+                            </button>
+                            <ChevronDown
+                              className={`w-4 h-4 text-white/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
                         </td>
                       </tr>
 
@@ -826,6 +879,123 @@ function SubStatCard({ icon: Icon, color, label, value, mono }: {
         {label}
       </div>
       <div className={mono ? 'text-lg font-bold font-mono' : 'text-2xl font-bold'}>{value}</div>
+    </div>
+  )
+}
+
+/* ── Modal: cấp / gia hạn gói thủ công ─────────────────── */
+
+interface GrantPlan { id: string; name: string; amount: number; durationDays: number; audience?: string }
+
+function GrantModal({ prefill, onClose, onDone }: {
+  prefill: { email?: string; planId?: string }
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [plans, setPlans] = useState<GrantPlan[]>([])
+  const [email, setEmail] = useState(prefill.email || '')
+  const [planId, setPlanId] = useState(prefill.planId || '')
+  const [days, setDays] = useState<string>('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    api.get<{ plans: GrantPlan[] }>('/payment/plans')
+      .then(r => {
+        const list = r.data.plans || []
+        setPlans(list)
+        if (!planId && list[0]) setPlanId(list[0].id)
+      })
+      .catch(() => toast.error('Không tải được danh sách gói'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const selected = plans.find(p => p.id === planId)
+  const effectiveDays = Number(days) > 0 ? Number(days) : (selected?.durationDays || 30)
+
+  const submit = async () => {
+    if (!email.trim()) { toast.error('Nhập email người dùng'); return }
+    if (!planId) { toast.error('Chọn gói'); return }
+    setBusy(true)
+    try {
+      const { data } = await api.post('/admin/payments/grant', {
+        email: email.trim(), planId,
+        days: Number(days) > 0 ? Number(days) : undefined,
+      })
+      toast.success(`✅ Đã cấp ${planId} cho ${data.email} (+${data.days} ngày)`)
+      onDone()
+    } catch (err: any) {
+      toast.error('Lỗi cấp gói: ' + (err?.response?.data?.error || err.message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 p-5 space-y-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Gift className="w-5 h-5 text-purple-400" /> Cấp / Gia hạn gói thủ công
+          </h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+
+        <p className="text-xs text-white/50">
+          Cấp quyền trực tiếp cho 1 tài khoản (không cần thanh toán). Nếu user còn hạn,
+          thời gian sẽ <b className="text-purple-300">cộng dồn</b> từ ngày hết hạn hiện tại.
+        </p>
+
+        <div className="space-y-1">
+          <label className="text-xs text-white/60">Email người dùng</label>
+          <input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="user@example.com"
+            className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.1] rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-white/60">Gói</label>
+          <select
+            value={planId}
+            onChange={e => setPlanId(e.target.value)}
+            className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.1] rounded-lg text-sm text-white focus:outline-none focus:border-purple-500/50"
+          >
+            {plans.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name} — {p.amount === 0 ? 'Miễn phí' : formatVnd(p.amount)} ({p.durationDays}d)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-white/60">Số ngày (để trống = theo gói: {selected?.durationDays || 30} ngày)</label>
+          <input
+            type="number" min={1}
+            value={days}
+            onChange={e => setDays(e.target.value)}
+            placeholder={String(selected?.durationDays || 30)}
+            className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.1] rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-white/60 hover:text-white text-sm">Huỷ</button>
+          <button
+            onClick={submit}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg bg-purple-500/25 text-purple-100 border border-purple-500/50 hover:bg-purple-500/35 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Cấp (+{effectiveDays} ngày)
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
