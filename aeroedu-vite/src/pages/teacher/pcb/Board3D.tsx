@@ -81,9 +81,10 @@ function Scene({ comps, layout }: { comps: PcbComponent[]; layout: PcbLayout }) 
 }
 
 export default function Board3D({ comps, layout }: { comps: PcbComponent[]; layout: PcbLayout }) {
+  const r = Math.max(layout.board.w, layout.board.h, 20) * S   // bán kính khung hình theo board
   return (
     <div className="w-full h-full bg-slate-800">
-      <Canvas camera={{ position: [0, 6, 7], fov: 45 }} dpr={[1, 1.8]}>
+      <Canvas camera={{ position: [0, r * 1.15, r * 1.3], fov: 45 }} dpr={[1, 1.8]}>
         <color attach="background" args={['#1e293b']} />
         <Scene comps={comps} layout={layout} />
       </Canvas>

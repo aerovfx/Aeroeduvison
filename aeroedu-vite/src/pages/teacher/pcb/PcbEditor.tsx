@@ -178,7 +178,7 @@ export default function PcbEditor() {
   const W = 1600, H = 1000
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-foreground flex flex-col">
+    <div className="h-[100dvh] bg-slate-100 dark:bg-slate-950 text-foreground flex flex-col overflow-hidden">
       <EditorBar title={title} onTitle={setTitle} status={status} backTo="/teacher/pcb">
         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 mr-1">
           {([['sch', 'Sơ đồ'], ['pcb', 'Bố trí'], ['3d', '3D']] as const).map(([m, l]) => (
