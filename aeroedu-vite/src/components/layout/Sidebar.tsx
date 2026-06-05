@@ -14,7 +14,7 @@ import {
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon, KeyRound,
-  Bot, MessageCircle, ClipboardEdit, Atom, Languages, Plug, ArrowLeftRight,
+  Bot, MessageCircle, ClipboardEdit, Atom, Languages, Plug, ArrowLeftRight, Presentation,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -159,7 +159,9 @@ const teacherSections: RouteSection[] = [
       { icon: Upload,   labelKey: 'routeDigitize',   href: '/teacher/document-digitization',     badge: 'AI' },
       { icon: FileEdit, labelKey: 'routeLatex',      href: '/teacher/latex-documents' },
       { icon: ArrowLeftRight, labelKey: 'routeLatexConverter', href: '/teacher/latex-converter', badge: 'AI' },
-      { icon: FileText, labelKey: 'routeOffice', href: '/teacher/office', badge: 'Mới' },
+      { icon: FileText, labelKey: 'routeOfficeDoc', href: '/teacher/office/list/doc', badge: 'Mới' },
+      { icon: Presentation, labelKey: 'routeOfficeSlides', href: '/teacher/office/list/slides' },
+      { icon: Grid3x3, labelKey: 'routeOfficeSheet', href: '/teacher/office/list/sheet' },
       { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },

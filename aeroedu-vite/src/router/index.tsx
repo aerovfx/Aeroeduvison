@@ -683,6 +683,7 @@ export function AppRouter() {
               <Route path="/teacher/latex-documents"        element={<LaTeXEditorPage />} />
               <Route path="/teacher/latex-converter"        element={<LatexConverterPage />} />
               <Route path="/teacher/office"                 element={<OfficeHubPage />} />
+              <Route path="/teacher/office/list/:kind"      element={<OfficeHubPage />} />
               <Route path="/teacher/office/doc/:id"         element={<OfficeDocPage />} />
               <Route path="/teacher/office/sheet/:id"       element={<OfficeSheetPage />} />
               <Route path="/teacher/office/slides/:id"      element={<OfficeSlidesPage />} />

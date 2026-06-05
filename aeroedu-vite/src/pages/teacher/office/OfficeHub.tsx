@@ -3,7 +3,7 @@
  * Soạn văn bản (doc) · Trình chiếu (slides) · Bảng tính (sheet).
  */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { FileText, Presentation, Grid3x3, Plus, Trash2, Loader2, Clock } from 'lucide-react'
 import { listOfficeDocs, createOfficeDoc, deleteOfficeDoc } from '@/services/office.service'
 import type { OfficeDoc, OfficeKind } from '@/types/office'
@@ -16,9 +16,12 @@ const KINDS: { kind: OfficeKind; label: string; icon: typeof FileText; color: st
 
 export default function OfficeHub() {
   const navigate = useNavigate()
+  const { kind: kindParam } = useParams<{ kind?: string }>()
+  const initialFilter = (['doc', 'sheet', 'slides'].includes(kindParam || '') ? kindParam : 'all') as OfficeKind | 'all'
   const [docs, setDocs] = useState<OfficeDoc[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<OfficeKind | 'all'>('all')
+  const [filter, setFilter] = useState<OfficeKind | 'all'>(initialFilter)
+  useEffect(() => { setFilter(initialFilter) }, [kindParam])  // eslint-disable-line react-hooks/exhaustive-deps
   const [creating, setCreating] = useState<OfficeKind | null>(null)
   const [err, setErr] = useState('')
 
