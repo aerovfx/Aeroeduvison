@@ -1,10 +1,11 @@
 /** Bố trí PCB 2 lớp: đặt linh kiện (footprint), định tuyến tay, ratsnest, DRC,
  *  xuất Gerber. Toạ độ MM; vẽ với PX_PER_MM. */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCw, Cable, FileDown, ShieldCheck, Layers } from 'lucide-react'
+import { RotateCw, Cable, FileDown, ShieldCheck, Layers, Wand2 } from 'lucide-react'
 import type { PcbComponent, PcbNet, PcbLayout as Layout, PcbTrace } from '@/types/pcb'
 import { footprintOf, padAbs, padOf } from './pcbFootprints'
 import { buildGerbers, makeZip } from './gerber'
+import { autoRoute } from './autorouter'
 
 const PX = 6
 const uid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
@@ -78,6 +79,13 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
 
   const exportGerber = () => { const zip = makeZip(buildGerbers(comps, nets, layout)); const a = document.createElement('a'); a.href = URL.createObjectURL(zip); a.download = `${title || 'board'}.gerber.zip`; a.click(); URL.revokeObjectURL(a.href) }
 
+  const runAuto = () => {
+    if ((layout.traces.length || (layout.vias || []).length) && !window.confirm('Tự động định tuyến sẽ THAY các đường mạch hiện có. Tiếp tục?')) return
+    const r = autoRoute(comps, nets, layout)
+    setLayout((l) => ({ ...l, traces: r.traces, vias: r.vias }))
+    setDrc([`✓ Tự động định tuyến: nối ${r.routed}/${r.routed + r.failed} kết nối${r.failed ? `, còn ${r.failed} chưa nối (xem ratsnest)` : ''}.`, `${r.vias.length} via, ${r.traces.length} đoạn mạch.`])
+  }
+
   const togglePour = () => setLayout((l) => ({ ...l, pour: l.pour ? null : { net: nets.find((n) => /gnd|mass/i.test(n.name))?.name || nets[0]?.name || 'GND', layer: 'bottom' } }))
   // các pad KHÔNG thuộc net phủ (để vẽ vòng hở đồng)
   const pourNet = layout.pour ? nets.find((n) => n.name === layout.pour!.net) : null
@@ -111,6 +119,7 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
         <button onClick={togglePour} className={`w-full px-3 py-2 rounded-lg text-sm font-bold inline-flex items-center justify-center gap-1.5 ${layout.pour ? 'bg-amber-600 text-white' : 'bg-slate-100 dark:bg-slate-800 border border-border'}`}>
           <Layers className="w-4 h-4" /> {layout.pour ? `Phủ đồng GND: ${layout.pour.net} (dưới)` : 'Phủ đồng GND (lớp dưới)'}
         </button>
+        <button onClick={runAuto} className="w-full px-3 py-2 rounded-lg text-sm font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white inline-flex items-center justify-center gap-1.5"><Wand2 className="w-4 h-4" /> Tự động định tuyến (A*)</button>
         <div className="flex gap-1.5">
           <button onClick={runDrc} className="flex-1 px-3 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white inline-flex items-center justify-center gap-1"><ShieldCheck className="w-4 h-4" /> DRC</button>
           <button onClick={exportGerber} className="flex-1 px-3 py-2 rounded-lg text-sm font-bold bg-cyan-600 text-white inline-flex items-center justify-center gap-1"><FileDown className="w-4 h-4" /> Gerber</button>
@@ -141,6 +150,9 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
           {/* traces */}
           {layout.traces.map((t) => <polyline key={t.id} points={t.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={t.layer === 'top' ? '#ef4444' : '#3b82f6'} strokeWidth={Math.max(1.5, t.width * PX)} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />)}
           {active && active.pts.length > 0 && <polyline points={active.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={layer === 'top' ? '#ef4444' : '#3b82f6'} strokeWidth={Math.max(1.5, width * PX)} strokeDasharray="4 3" opacity={0.7} />}
+
+          {/* vias */}
+          {(layout.vias || []).map((v, i) => <g key={'v' + i}><circle cx={v.x * PX} cy={v.y * PX} r={0.45 * PX} fill="#d4af37" stroke="#7c5b12" strokeWidth={1} /><circle cx={v.x * PX} cy={v.y * PX} r={0.2 * PX} fill="#0b6b3a" /></g>)}
 
           {/* components */}
           {comps.map((c) => {

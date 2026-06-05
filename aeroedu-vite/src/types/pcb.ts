@@ -16,11 +16,13 @@ export interface PcbNet { id: string; name: string; nodes: PcbNetNode[] }
 
 // ── Bố trí PCB (Giai đoạn 2) — toạ độ tính bằng MM ──
 export interface PcbPlacement { x: number; y: number; rot: number }  // rot: 0/90/180/270 độ
-export interface PcbTrace { id: string; layer: 'top' | 'bottom'; width: number; pts: { x: number; y: number }[] }
+export interface PcbTrace { id: string; layer: 'top' | 'bottom'; width: number; pts: { x: number; y: number }[]; net?: string }
+export interface PcbVia { x: number; y: number }
 export interface PcbLayout {
   board: { w: number; h: number }
   placements: Record<string, PcbPlacement>   // key = ref linh kiện
   traces: PcbTrace[]
+  vias?: PcbVia[]
   pour?: { net: string; layer: 'top' | 'bottom' } | null  // phủ đồng (ground plane) cho 1 net
 }
 

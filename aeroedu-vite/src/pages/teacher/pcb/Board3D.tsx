@@ -63,6 +63,13 @@ function Scene({ comps, layout }: { comps: PcbComponent[]; layout: PcbLayout }) 
         )
       })}
       {layout.traces.map((t) => <Trace3D key={t.id} t={t} W={W} H={H} />)}
+      {/* vias */}
+      {(layout.vias || []).map((v, i) => (
+        <mesh key={'v' + i} position={[(v.x - W / 2) * S, 0, (v.y - H / 2) * S]}>
+          <cylinderGeometry args={[0.45 * S, 0.45 * S, 0.2, 12]} />
+          <meshStandardMaterial color="#d4af37" metalness={0.9} roughness={0.25} />
+        </mesh>
+      ))}
       <OrbitControls enablePan target={[0, 0, 0]} />
     </>
   )

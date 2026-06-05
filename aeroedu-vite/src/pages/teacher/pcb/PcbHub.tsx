@@ -5,6 +5,7 @@ import { CircuitBoard, Plus, Trash2, Loader2, Clock, Sparkles, Plane } from 'luc
 import { listOfficeDocs, createOfficeDoc, deleteOfficeDoc } from '@/services/office.service'
 import type { OfficeDoc } from '@/types/office'
 import { makeDroneTemplate } from './droneTemplate'
+import { autoRoute } from './autorouter'
 
 export default function PcbHub() {
   const navigate = useNavigate()
@@ -23,7 +24,13 @@ export default function PcbHub() {
   }
   const createDrone = async () => {
     setBusy(true)
-    try { const t = makeDroneTemplate(); const doc = await createOfficeDoc('pcb', t.title, { components: t.components, nets: t.nets, layout: t.layout }); navigate(`/teacher/pcb/${doc.id}`) }
+    try {
+      const t = makeDroneTemplate()
+      const r = autoRoute(t.components, t.nets, t.layout)   // tự định tuyến sẵn (GND phủ đồng + còn lại A*)
+      t.layout.traces = r.traces; t.layout.vias = r.vias
+      const doc = await createOfficeDoc('pcb', t.title, { components: t.components, nets: t.nets, layout: t.layout })
+      navigate(`/teacher/pcb/${doc.id}`)
+    }
     catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } }).response?.data?.error || 'Tạo mẫu thất bại'); setBusy(false) }
   }
   const remove = async (d: OfficeDoc) => { if (!window.confirm(`Xoá "${d.title}"?`)) return; try { await deleteOfficeDoc(d.id); setDocs((x) => x.filter((y) => y.id !== d.id)) } catch { /* noop */ } }
