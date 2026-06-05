@@ -90,14 +90,11 @@ export default function LoginPage() {
         await googleLogin(response.credential)
         navigate(from, { replace: true })
       } catch (err: any) {
-        // Server có thể trả 503 + { retryable: true, error: "..." } khi DB
-        // quá tải — hiển thị thông điệp friendly thay vì generic.
+        // Hiện ĐÚNG lý do từ server (vd "Tài khoản đã bị khoá", "Google
+        // credential không hợp lệ", "Lỗi xác thực Google…") thay vì luôn báo
+        // generic → dễ chẩn đoán. Không có response (lỗi mạng) → generic.
         const data = err?.response?.data
-        if (data?.retryable && data?.error) {
-          setError(data.error)
-        } else {
-          setError(t('loginGoogleError'))
-        }
+        setError(data?.error || t('loginGoogleError'))
       } finally {
         setGoogleLoading(false)
       }
@@ -120,7 +117,7 @@ export default function LoginPage() {
       if (/cancel|canceled|cancelled|-5|user.*dismiss/i.test(msg)) { /* im lặng */ }
       else {
         const data = err?.response?.data
-        setError(data?.retryable && data?.error ? data.error : t('loginGoogleError'))
+        setError(data?.error || t('loginGoogleError'))
       }
     } finally {
       setGoogleLoading(false)
