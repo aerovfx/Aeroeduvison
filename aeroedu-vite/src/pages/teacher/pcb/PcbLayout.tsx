@@ -8,6 +8,11 @@ import { buildGerbers, makeZip } from './gerber'
 import { autoRoute } from './autorouter'
 
 const PX = 6
+// Bảng màu kiểu PCB chuyên nghiệp (board navy sẫm + đồng/vàng) — như bản sign-off
+const BOARD = '#0e1d2f'        // FR4 phủ mặt nạ navy sẫm
+const TRACE_TOP = '#e08a3c'    // đồng (lớp trên)
+const TRACE_BOT = '#5f97c6'    // thép-xanh (lớp dưới)
+const PAD_GOLD = '#e7c24b', PAD_RING = '#8a6b1e', PAD_SMD = '#d99b53'
 const uid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 
 export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
@@ -130,17 +135,17 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
 
       {/* Board canvas */}
       <div className="flex-1 overflow-auto bg-slate-200 dark:bg-slate-800 p-6">
-        <svg ref={svgRef} width={W * PX} height={H * PX} style={{ background: '#0b6b3a', borderRadius: 6, boxShadow: '0 4px 20px rgba(0,0,0,.3)' }}
+        <svg ref={svgRef} width={W * PX} height={H * PX} style={{ background: BOARD, borderRadius: 8, boxShadow: '0 6px 28px rgba(0,0,0,.45)', outline: '2px solid rgba(231,194,75,.25)' }}
           onClick={(e) => { if (e.target === svgRef.current) { if (routing && active) setActive((a) => a && { pts: [...a.pts, mm(e)] }); else setSel(null) } }}>
           {/* lưới */}
-          <defs><pattern id="pg" width={5 * PX} height={5 * PX} patternUnits="userSpaceOnUse"><path d={`M ${5 * PX} 0 L 0 0 0 ${5 * PX}`} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={1} /></pattern></defs>
+          <defs><pattern id="pg" width={5 * PX} height={5 * PX} patternUnits="userSpaceOnUse"><path d={`M ${5 * PX} 0 L 0 0 0 ${5 * PX}`} fill="none" stroke="rgba(231,194,75,0.07)" strokeWidth={1} /></pattern></defs>
           <rect width={W * PX} height={H * PX} fill="url(#pg)" />
 
           {/* phủ đồng (ground plane) — lớp dưới, mờ + hở quanh pad khác net */}
           {layout.pour && (
             <g opacity={0.5}>
-              <rect width={W * PX} height={H * PX} fill={layout.pour.layer === 'top' ? '#ef4444' : '#3b82f6'} opacity={0.18} />
-              {comps.flatMap((c) => { const pl = layout.placements[c.ref]; if (!pl) return []; return fpMap[c.ref].pads.filter((pad) => !isPourPad(c.ref, pad.name) && (layout.pour!.layer === 'top' || !pad.smd)).map((pad, i) => { const a = padAbs(pl, pad); return <circle key={c.ref + i} cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2 + 0.5) * PX} fill="#0b6b3a" /> }) })}
+              <rect width={W * PX} height={H * PX} fill={layout.pour.layer === 'top' ? TRACE_TOP : TRACE_BOT} opacity={0.13} />
+              {comps.flatMap((c) => { const pl = layout.placements[c.ref]; if (!pl) return []; return fpMap[c.ref].pads.filter((pad) => !isPourPad(c.ref, pad.name) && (layout.pour!.layer === 'top' || !pad.smd)).map((pad, i) => { const a = padAbs(pl, pad); return <circle key={c.ref + i} cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2 + 0.5) * PX} fill={BOARD} /> }) })}
             </g>
           )}
 
@@ -148,11 +153,11 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
           {nets.map((n) => n.nodes.slice(1).map((nd, i) => { const a = padPos(n.nodes[i].comp, n.nodes[i].pin); const b = padPos(nd.comp, nd.pin); if (!a || !b) return null; return <line key={n.id + i} x1={a.x * PX} y1={a.y * PX} x2={b.x * PX} y2={b.y * PX} stroke="#cbd5e1" strokeWidth={0.8} strokeDasharray="3 3" opacity={0.6} /> }))}
 
           {/* traces */}
-          {layout.traces.map((t) => <polyline key={t.id} points={t.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={t.layer === 'top' ? '#ef4444' : '#3b82f6'} strokeWidth={Math.max(1.5, t.width * PX)} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />)}
-          {active && active.pts.length > 0 && <polyline points={active.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={layer === 'top' ? '#ef4444' : '#3b82f6'} strokeWidth={Math.max(1.5, width * PX)} strokeDasharray="4 3" opacity={0.7} />}
+          {layout.traces.map((t) => <polyline key={t.id} points={t.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={t.layer === 'top' ? TRACE_TOP : TRACE_BOT} strokeWidth={Math.max(1.5, t.width * PX)} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />)}
+          {active && active.pts.length > 0 && <polyline points={active.pts.map((p) => `${p.x * PX},${p.y * PX}`).join(' ')} fill="none" stroke={layer === 'top' ? TRACE_TOP : TRACE_BOT} strokeWidth={Math.max(1.5, width * PX)} strokeDasharray="4 3" opacity={0.75} />}
 
           {/* vias */}
-          {(layout.vias || []).map((v, i) => <g key={'v' + i}><circle cx={v.x * PX} cy={v.y * PX} r={0.45 * PX} fill="#d4af37" stroke="#7c5b12" strokeWidth={1} /><circle cx={v.x * PX} cy={v.y * PX} r={0.2 * PX} fill="#0b6b3a" /></g>)}
+          {(layout.vias || []).map((v, i) => <g key={'v' + i}><circle cx={v.x * PX} cy={v.y * PX} r={0.45 * PX} fill={PAD_GOLD} stroke={PAD_RING} strokeWidth={1} /><circle cx={v.x * PX} cy={v.y * PX} r={0.2 * PX} fill={BOARD} /></g>)}
 
           {/* components */}
           {comps.map((c) => {
@@ -167,8 +172,8 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
                 {fp.pads.map((pad, i) => { const a = padAbs(pl, pad); return (
                   <g key={i}>
                     {pad.smd
-                      ? <rect x={(a.x - pad.w / 2) * PX} y={(a.y - pad.h / 2) * PX} width={pad.w * PX} height={pad.h * PX} rx={1} fill="#cd7f32" stroke="#7c5b12" strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} />
-                      : <><circle cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2) * PX} fill="#d4af37" stroke="#7c5b12" strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} /><circle cx={a.x * PX} cy={a.y * PX} r={(pad.drill / 2) * PX} fill="#0b6b3a" pointerEvents="none" /></>}
+                      ? <rect x={(a.x - pad.w / 2) * PX} y={(a.y - pad.h / 2) * PX} width={pad.w * PX} height={pad.h * PX} rx={1} fill={PAD_SMD} stroke={PAD_RING} strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} />
+                      : <><circle cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2) * PX} fill={PAD_GOLD} stroke={PAD_RING} strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} /><circle cx={a.x * PX} cy={a.y * PX} r={(pad.drill / 2) * PX} fill={BOARD} pointerEvents="none" /></>}
                   </g>
                 ) })}
               </g>

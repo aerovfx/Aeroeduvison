@@ -8,7 +8,7 @@ const S = 0.1 // 1mm = 0.1 đơn vị scene
 
 function Trace3D({ t, W, H }: { t: PcbTrace; W: number; H: number }) {
   const y = t.layer === 'top' ? 0.095 : -0.095
-  const color = t.layer === 'top' ? '#e53e3e' : '#3182ce'
+  const color = t.layer === 'top' ? '#e08a3c' : '#5f97c6'   // đồng / thép-xanh
   const segs: React.ReactNode[] = []
   for (let i = 1; i < t.pts.length; i++) {
     const a = t.pts[i - 1], b = t.pts[i]
@@ -34,7 +34,7 @@ function Scene({ comps, layout }: { comps: PcbComponent[]; layout: PcbLayout }) 
       {/* FR4 board */}
       <mesh position={[0, 0, 0]} receiveShadow>
         <boxGeometry args={[W * S, 0.16, H * S]} />
-        <meshStandardMaterial color="#0b6b3a" roughness={0.8} />
+        <meshStandardMaterial color="#0e1d2f" roughness={0.55} metalness={0.15} />
       </mesh>
       {/* Pads */}
       {comps.flatMap((c) => {

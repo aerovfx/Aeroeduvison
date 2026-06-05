@@ -6,9 +6,27 @@ import { footprintOf, padAbs } from './pcbFootprints'
 
 const GRID = 0.6
 const CLEAR = 0.35
-const VIA_COST = 16
+const VIA_COST = 34          // phạt đổi lớp cao → GIẢM TỐI ĐA via (ưu tiên đi cùng lớp)
 const TRACE_W = 0.3
 const PAD_BLOCK = 99999
+const CHAMFER = GRID * 2      // vát góc 90° thành 45° (đường mạch sạch kiểu sign-off)
+
+/** Vát mọi góc gãy 90° của 1 đường thành 2 đoạn 45° → "45° bends only". */
+function chamfer45(pts: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (pts.length < 3) return pts
+  const out = [pts[0]]
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1], p = pts[i], b = pts[i + 1]
+    const il = Math.hypot(p.x - a.x, p.y - a.y) || 1, ol = Math.hypot(b.x - p.x, b.y - p.y) || 1
+    const ix = (p.x - a.x) / il, iy = (p.y - a.y) / il, ox = (b.x - p.x) / ol, oy = (b.y - p.y) / ol
+    const c = Math.min(CHAMFER, il / 2, ol / 2)
+    if (Math.abs(ix * ox + iy * oy) < 0.99 && c > 1e-3) {   // có gãy hướng → vát
+      out.push({ x: p.x - ix * c, y: p.y - iy * c }); out.push({ x: p.x + ox * c, y: p.y + oy * c })
+    } else out.push(p)
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
 
 // Min-heap đơn giản theo f
 class Heap {
@@ -120,5 +138,6 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
     // Snap đầu đoạn về đúng tâm pad (bù sai số làm tròn lưới) — CHỈ trace của cạnh này
     if (traces.length > startIdx && traces[startIdx].pts.length) traces[startIdx].pts[0] = { x: e.a.x, y: e.a.y }
   }
+  traces.forEach((t) => { t.pts = chamfer45(t.pts) })   // vát 45° toàn bộ đường mạch
   return { traces, vias, routed, failed }
 }

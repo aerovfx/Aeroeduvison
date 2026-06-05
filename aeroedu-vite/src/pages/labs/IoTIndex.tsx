@@ -62,14 +62,20 @@ const LEVEL_COLOR: Record<string, string> = { 'Dễ': '#22c55e', 'Trung bình': 
 
 export default function IoTIndex() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-5 text-foreground">
+    <div className="min-h-screen bg-[#0b1626] p-5 text-foreground"
+      style={{ backgroundImage: 'radial-gradient(900px 380px at 50% -8%, rgba(224,138,60,.10), transparent 60%), linear-gradient(rgba(231,194,75,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(231,194,75,.035) 1px, transparent 1px)', backgroundSize: 'auto, 26px 26px, 26px 26px' }}>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Cpu className="text-cyan-400" /> IoT Lab — Thí nghiệm điện tử & vi điều khiển
+        {/* Bảng hero kiểu bo mạch — nền navy, viền/lỗ bắt vít vàng đồng */}
+        <div className="relative mb-6 rounded-2xl border border-amber-500/20 bg-gradient-to-br from-[#0e1d2f] to-[#13263b] p-5 overflow-hidden">
+          {(['top-2 left-2', 'top-2 right-2', 'bottom-2 left-2', 'bottom-2 right-2'] as const).map((p) => (
+            <span key={p} className={`absolute ${p} w-2.5 h-2.5 rounded-full bg-amber-400/70 ring-2 ring-amber-900/50`} />
+          ))}
+          <h1 className="text-2xl font-black flex items-center gap-2.5">
+            <span className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-400/30 grid place-items-center"><CircuitBoard className="w-6 h-6 text-amber-300" /></span>
+            <span className="bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text text-transparent">IoT Lab — Thí nghiệm điện tử & vi điều khiển</span>
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Mỗi thí nghiệm có đường dẫn riêng — bấm <b className="text-cyan-300">🔗</b> để chia sẻ hoặc nhúng vào bài học.
+          <p className="text-sm text-slate-400 mt-2 max-w-2xl">
+            Mỗi thí nghiệm có đường dẫn riêng — bấm <b className="text-amber-300">🔗</b> để chia sẻ hoặc nhúng vào bài học. Giao diện bo mạch chuẩn xưởng: đồng/vàng trên nền navy.
           </p>
         </div>
 
@@ -78,7 +84,7 @@ export default function IoTIndex() {
           if (!items.length) return null
           return (
             <section key={g.id} className="mb-7">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-amber-300/80 mb-3">
                 {g.emoji} {g.label} <span className="text-slate-600">({items.length})</span>
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -86,16 +92,17 @@ export default function IoTIndex() {
                   const Icon = it.icon
                   return (
                     <Link key={it.path} to={it.path}
-                      className="group relative p-4 rounded-xl bg-slate-900/60 border border-border hover:border-cyan-500/50 hover:scale-[1.01] transition-all">
+                      className="group relative p-4 rounded-xl bg-[#0f2034]/70 border border-amber-500/10 hover:border-amber-400/50 hover:shadow-[0_0_0_1px_rgba(231,194,75,.25)] hover:-translate-y-0.5 transition-all">
+                      <span className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full bg-amber-400/40" />
                       <div className="absolute top-2.5 right-2.5 z-10">
                         <ShareMenu path={it.path} title={it.name} embeddable />
                       </div>
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
-                          <Icon className="w-5 h-5 text-cyan-300" />
+                        <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-400/20 flex items-center justify-center flex-shrink-0">
+                          <Icon className="w-5 h-5 text-amber-300" />
                         </div>
                         <div className="flex-1 min-w-0 pr-6">
-                          <div className="font-semibold text-sm text-foreground group-hover:text-cyan-200 transition-colors">{it.name}</div>
+                          <div className="font-semibold text-sm text-slate-100 group-hover:text-amber-200 transition-colors">{it.name}</div>
                           <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">{it.desc}</div>
                           {it.level && (
                             <span className="inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
