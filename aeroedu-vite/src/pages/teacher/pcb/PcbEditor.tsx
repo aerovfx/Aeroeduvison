@@ -1,12 +1,16 @@
 /** Trình vẽ sơ đồ nguyên lý (schematic) + AI sinh mạch + xuất netlist. */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X } from 'lucide-react'
 import { getOfficeDoc, useOfficeAutosave } from '@/services/office.service'
 import { aiGenerateCircuit } from '@/services/pcb.service'
-import type { PcbComponent, PcbNet, PcbType, PcbDoc } from '@/types/pcb'
+import type { PcbComponent, PcbNet, PcbType, PcbDoc, PcbLayout as Layout } from '@/types/pcb'
 import { TEMPLATES, pinLocal, compSize, Glyph } from './pcbSymbols'
+import PcbLayout from './PcbLayout'
 import EditorBar from '../office/EditorBar'
+
+const Board3D = lazy(() => import('./Board3D'))
+const DEFAULT_LAYOUT: Layout = { board: { w: 60, h: 40 }, placements: {}, traces: [] }
 
 const uid = () => 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 const PREFIX: Record<PcbType, string> = { R: 'R', C: 'C', LED: 'D', D: 'D', Q: 'Q', SW: 'SW', BAT: 'BT', GND: 'GND', VCC: 'VCC', MCU: 'U', IC: 'U', SENSOR: 'U', HDR: 'J' }
@@ -18,6 +22,8 @@ export default function PcbEditor() {
   const [title, setTitle] = useState('Mạch')
   const [comps, setComps] = useState<PcbComponent[]>([])
   const [nets, setNets] = useState<PcbNet[]>([])
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT)
+  const [mode, setMode] = useState<'sch' | 'pcb' | '3d'>('sch')
   const [ready, setReady] = useState(false)
   const [sel, setSel] = useState<string | null>(null)
   const [pending, setPending] = useState<{ comp: string; pin: string } | null>(null)
@@ -32,11 +38,12 @@ export default function PcbEditor() {
     if (!id) return
     getOfficeDoc(id).then((d) => {
       const data = d.data as unknown as PcbDoc
-      setTitle(d.title); setComps(data?.components || []); setNets(data?.nets || []); setReady(true)
+      setTitle(d.title); setComps(data?.components || []); setNets(data?.nets || [])
+      setLayout(data?.layout && data.layout.board ? data.layout : DEFAULT_LAYOUT); setReady(true)
     }).catch(() => setReady(true))
   }, [id])
 
-  const status = useOfficeAutosave(id, ready, () => ({ title, data: { components: comps, nets } }), [title, comps, nets])
+  const status = useOfficeAutosave(id, ready, () => ({ title, data: { components: comps, nets, layout } }), [title, comps, nets, layout])
 
   const nextRef = (type: PcbType, list: PcbComponent[]) => {
     const p = PREFIX[type]; let max = 0
@@ -118,11 +125,21 @@ export default function PcbEditor() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-foreground flex flex-col">
       <EditorBar title={title} onTitle={setTitle} status={status} backTo="/teacher/pcb">
-        <button onClick={() => setShowBom((v) => !v)} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center gap-1"><ListTree className="w-3.5 h-3.5" /> Netlist</button>
-        <button onClick={exportNetlist} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 text-white inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Xuất</button>
+        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 mr-1">
+          {([['sch', 'Sơ đồ'], ['pcb', 'Bố trí'], ['3d', '3D']] as const).map(([m, l]) => (
+            <button key={m} onClick={() => setMode(m)} className={`px-2.5 py-1 rounded text-xs font-bold ${mode === m ? 'bg-cyan-600 text-white' : 'text-slate-500'}`}>{l}</button>
+          ))}
+        </div>
+        {mode === 'sch' && <>
+          <button onClick={() => setShowBom((v) => !v)} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center gap-1"><ListTree className="w-3.5 h-3.5" /> Netlist</button>
+          <button onClick={exportNetlist} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 text-white inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Xuất</button>
+        </>}
       </EditorBar>
 
-      <div className="flex-1 flex min-h-0">
+      {mode === 'pcb' && <PcbLayout comps={comps} nets={nets} layout={layout} setLayout={setLayout} title={title} />}
+      {mode === '3d' && <div className="flex-1 min-h-0"><Suspense fallback={<div className="grid place-items-center h-full"><Loader2 className="w-8 h-8 animate-spin text-cyan-500" /></div>}><Board3D comps={comps} layout={layout} /></Suspense></div>}
+
+      <div className="flex-1 flex min-h-0" style={{ display: mode === 'sch' ? undefined : 'none' }}>
         {/* Sidebar: AI + palette */}
         <div className="w-56 sm:w-64 shrink-0 border-r border-border bg-white dark:bg-slate-900 overflow-y-auto p-3 space-y-4">
           <div>

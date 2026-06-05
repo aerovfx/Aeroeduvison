@@ -13,8 +13,13 @@ Công cụ thiết kế mạch trong tài khoản giáo viên, từ sơ đồ ng
 - **AI sinh mạch từ mô tả** → netlist (components + nets), kèm cảnh báo kiểm chứng.
 - Netlist/BOM panel + xuất netlist JSON + lưu/đọc theo GV.
 
+## Đã làm (Giai đoạn 2 — Layout + Gerber + 3D)
+- Footprint MM cho mọi loại linh kiện (`pcbFootprints`); chế độ **Bố trí**: đặt/kéo/xoay linh kiện trên board, đổi kích thước board.
+- **Định tuyến tay 2 lớp** (trên/dưới, độ rộng tuỳ chỉnh) + **ratsnest** (đường khí); **DRC tối thiểu** (chân ngoài board, pad chồng, chưa đặt).
+- **Xuất Gerber** RS-274X (.gtl/.gbl/.gko) + Excellon (.drl), đóng gói **.zip tự viết** (CRC32 + store, không thêm dep) — đã verify zip hợp lệ.
+- **Xem board 3D** (R3F): nền FR4 + pad đồng + thân linh kiện + đường mạch 2 lớp.
+
 ## Lộ trình tiếp theo
-- **GĐ2**: PCB layout 2 lớp + footprint cơ bản + DRC tối thiểu + **xuất Gerber** + 3D board (R3F).
 - **GĐ3**: autorouter (Freerouting backend) + thư viện footprint lớn (KiCad/EasyEDA) + AI giải thích DRC/ERC + sinh BOM mua linh kiện + sinh firmware (đường AI sẵn có).
 - **GĐ4**: tích hợp `tscircuit`/`kicad-cli` (Docker) để đạt chuẩn xuất xưởng + đặt JLCPCB; mô phỏng SPICE làm "trọng tài" cho AI.
 
