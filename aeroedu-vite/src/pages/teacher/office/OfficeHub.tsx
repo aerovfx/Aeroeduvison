@@ -27,7 +27,9 @@ export default function OfficeHub() {
 
   const load = () => {
     setLoading(true)
-    listOfficeDocs().then((d) => { setDocs(d); setLoading(false) }).catch((e) => { setErr(e?.response?.data?.error || 'Không tải được'); setLoading(false) })
+    // CHỈ lấy tài liệu Văn phòng (doc/slides/sheet); loại 'pcb' (dùng store chung
+    // nhưng có hub riêng /teacher/pcb) để không crash ở meta(d.kind).
+    listOfficeDocs().then((d) => { setDocs(d.filter((x) => KINDS.some((k) => k.kind === x.kind))); setLoading(false) }).catch((e) => { setErr(e?.response?.data?.error || 'Không tải được'); setLoading(false) })
   }
   useEffect(() => { load() }, [])
 
@@ -42,7 +44,7 @@ export default function OfficeHub() {
     if (!window.confirm(`Xoá "${d.title}"?`)) return
     try { await deleteOfficeDoc(d.id); setDocs((xs) => xs.filter((x) => x.id !== d.id)) } catch { /* noop */ }
   }
-  const meta = (k: OfficeKind) => KINDS.find((x) => x.kind === k)!
+  const meta = (k: OfficeKind) => KINDS.find((x) => x.kind === k) ?? KINDS[0]   // fallback an toàn nếu gặp kind lạ
   const shown = filter === 'all' ? docs : docs.filter((d) => d.kind === filter)
 
   return (
