@@ -1,9 +1,10 @@
 /** Thư viện & khởi tạo dự án thiết kế mạch (PCB/Schematic) có AI hỗ trợ. */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CircuitBoard, Plus, Trash2, Loader2, Clock, Sparkles } from 'lucide-react'
+import { CircuitBoard, Plus, Trash2, Loader2, Clock, Sparkles, Plane } from 'lucide-react'
 import { listOfficeDocs, createOfficeDoc, deleteOfficeDoc } from '@/services/office.service'
 import type { OfficeDoc } from '@/types/office'
+import { makeDroneTemplate } from './droneTemplate'
 
 export default function PcbHub() {
   const navigate = useNavigate()
@@ -20,6 +21,11 @@ export default function PcbHub() {
     try { const doc = await createOfficeDoc('pcb', 'Mạch mới', { components: [], nets: [] }); navigate(`/teacher/pcb/${doc.id}`) }
     catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } }).response?.data?.error || 'Tạo thất bại'); setBusy(false) }
   }
+  const createDrone = async () => {
+    setBusy(true)
+    try { const t = makeDroneTemplate(); const doc = await createOfficeDoc('pcb', t.title, { components: t.components, nets: t.nets, layout: t.layout }); navigate(`/teacher/pcb/${doc.id}`) }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } }).response?.data?.error || 'Tạo mẫu thất bại'); setBusy(false) }
+  }
   const remove = async (d: OfficeDoc) => { if (!window.confirm(`Xoá "${d.title}"?`)) return; try { await deleteOfficeDoc(d.id); setDocs((x) => x.filter((y) => y.id !== d.id)) } catch { /* noop */ } }
 
   return (
@@ -33,11 +39,17 @@ export default function PcbHub() {
           </div>
         </div>
 
-        <button onClick={create} disabled={busy}
-          className="w-full sm:w-auto mt-4 mb-6 px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold inline-flex items-center gap-2 shadow disabled:opacity-60">
-          {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Tạo mạch mới
-          <span className="text-[11px] font-normal bg-white/20 px-2 py-0.5 rounded-md inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> kèm AI</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 mt-4 mb-6">
+          <button onClick={create} disabled={busy}
+            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold inline-flex items-center justify-center gap-2 shadow disabled:opacity-60">
+            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Tạo mạch mới
+            <span className="text-[11px] font-normal bg-white/20 px-2 py-0.5 rounded-md inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> kèm AI</span>
+          </button>
+          <button onClick={createDrone} disabled={busy}
+            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold inline-flex items-center justify-center gap-2 shadow disabled:opacity-60">
+            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plane className="w-5 h-5" />} Mẫu PCB Drone (Flight Controller)
+          </button>
+        </div>
 
         {err && <div className="mb-4 px-4 py-2.5 rounded-xl bg-rose-100 dark:bg-rose-900/30 text-rose-700 text-sm">{err}</div>}
 
