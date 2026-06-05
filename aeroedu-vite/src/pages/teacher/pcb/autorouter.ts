@@ -106,6 +106,7 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
     const path = route(e.a.x, e.a.y, e.b.x, e.b.y, e.nid, e.a.smd, e.b.smd)
     if (!path) { failed++; continue }
     routed++
+    const startIdx = traces.length   // trace đầu tiên SINH RA TỪ cạnh này (không phải cạnh trước cùng net)
     let seg: { x: number; y: number }[] = []; let segLayer = path[0].l
     const flush = () => { if (seg.length >= 2) traces.push({ id: `ar${tid++}`, layer: segLayer === 0 ? 'top' : 'bottom', width: TRACE_W, net: e.net, pts: seg }) }
     for (let i = 0; i < path.length; i++) {
@@ -116,8 +117,8 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
     }
     if (seg.length) seg[seg.length - 1] = { x: e.b.x, y: e.b.y }
     flush()
-    const first = traces.find((t) => t.net === e.net && t.pts.length)
-    if (first) first.pts[0] = { x: e.a.x, y: e.a.y }
+    // Snap đầu đoạn về đúng tâm pad (bù sai số làm tròn lưới) — CHỈ trace của cạnh này
+    if (traces.length > startIdx && traces[startIdx].pts.length) traces[startIdx].pts[0] = { x: e.a.x, y: e.a.y }
   }
   return { traces, vias, routed, failed }
 }

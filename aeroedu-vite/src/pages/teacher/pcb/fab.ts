@@ -2,7 +2,11 @@
  *  Toạ độ CPL trùng gốc với Gerber (góc dưới-trái board, mm, Y hướng lên). */
 import type { PcbComponent, PcbLayout } from '@/types/pcb'
 
-const q = (v: string | number) => { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+const q = (v: string | number) => {
+  let s = String(v)
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s   // chống chèn công thức (CSV injection) khi mở bằng Excel/Sheets
+  return /[",\n\r\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
 const row = (cells: (string | number)[]) => cells.map(q).join(',')
 
 // Tên footprint mô tả (người dùng chỉnh lại theo gói thật trước khi đặt lắp ráp).

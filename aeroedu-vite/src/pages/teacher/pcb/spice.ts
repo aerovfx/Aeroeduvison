@@ -62,8 +62,8 @@ export function simulate(comps: PcbComponent[], nets: PcbNet[], opts: { mode: 'd
     const v = parseSI(c.value)
     if (c.type === 'R' || c.type === 'SW') { const a = pinNode(c.ref, c.pins[0]), b = pinNode(c.ref, c.pins[1]); if (a === null || b === null) continue; els.push({ kind: 'R', a, b, val: c.type === 'SW' ? 1e-3 : (isFinite(v) && v > 0 ? v : 1000) }) }
     else if (c.type === 'C') { const a = pinNode(c.ref, c.pins[0]), b = pinNode(c.ref, c.pins[1]); if (a === null || b === null) continue; els.push({ kind: 'C', a, b, val: isFinite(v) && v > 0 ? v : 1e-7 }) }
-    else if (c.type === 'BAT') { const a = pinNode(c.ref, '+'), b = pinNode(c.ref, '-'); if (a === null && b === null) continue; vsrc.push({ kind: 'V', a: a ?? -1, b: b ?? -1, val: isFinite(v) ? v : 5 }) }
-    else if (c.type === 'VCC') { const a = pinNode(c.ref, c.pins[0]); if (a === null) continue; vsrc.push({ kind: 'V', a, b: -1, val: isFinite(v) ? v : 5 }) }
+    else if (c.type === 'BAT') { const a = pinNode(c.ref, '+'), b = pinNode(c.ref, '-'); if (a === null || b === null || a === b) continue; vsrc.push({ kind: 'V', a, b, val: isFinite(v) ? v : 5 }) }   // a===b: hai cực chập (vd cả 2 vào GND) → bỏ
+    else if (c.type === 'VCC') { const a = pinNode(c.ref, c.pins[0]); if (a === null || a < 0) continue; vsrc.push({ kind: 'V', a, b: -1, val: isFinite(v) ? v : 5 }) }   // a<0: chân nối thẳng GND → nguồn suy biến, bỏ
     else if (c.type === 'LED' || c.type === 'D') { const a = pinNode(c.ref, 'A'), b = pinNode(c.ref, 'K'); if (a === null || b === null) continue; els.push({ kind: 'D', a, b, val: 0, led: c.type === 'LED' }) }
   }
   if (!vsrc.length) notes.push('⚠ Không có nguồn (BAT/VCC) — kết quả có thể toàn 0V.')
@@ -96,14 +96,15 @@ export function simulate(comps: PcbComponent[], nets: PcbNet[], opts: { mode: 'd
           stampG(e.a, e.b, gd); stampI(e.a, e.b, Id - gd * vd)
         }
       }
+      for (let i = 0; i < nN; i++) A[i][i] += 1e-9    // gmin: rò 1nS mỗi node→đất, tránh ma trận suy biến (node thả nổi)
       // nguồn áp: thêm dòng nhánh
       vsrc.forEach((v, k) => { const r = nN + k; if (v.a >= 0) { A[v.a][r] += 1; A[r][v.a] += 1 } if (v.b >= 0) { A[v.b][r] -= 1; A[r][v.b] -= 1 } z[r] += v.val })
       const sol = solve(A.map((r) => r.slice()), z.slice())
       if (!sol) return null
       let maxd = 0; for (let i = 0; i < dim; i++) { maxd = Math.max(maxd, Math.abs(sol[i] - x[i])); x[i] = sol[i] }
-      if (maxd < 1e-7 && !limited) break
+      if (maxd < 1e-7 && !limited) return x   // đã hội tụ
     }
-    return x
+    return null   // không hội tụ sau 100 vòng (vd diode mắc thẳng vào nguồn, thiếu điện trở hạn dòng)
   }
 
   const dcx = step(null, 0)
