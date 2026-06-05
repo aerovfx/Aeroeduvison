@@ -162,18 +162,17 @@ export default function PcbEditor() {
     setModal('fw'); setFwCode(''); setFwBusy(true)
     aiGenerateFirmware(payload()).then((r) => { setFwCode(r.code); setFwBoard(r.board) }).catch((e) => setFwCode('// Lỗi: ' + (e?.response?.data?.error || 'không sinh được firmware'))).finally(() => setFwBusy(false))
   }
-  const exportBom = () => { const blob = new Blob(['﻿' + bomCsv(comps)], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'mach'}.bom.csv`; a.click(); URL.revokeObjectURL(a.href) }
   const dlFile = (name: string, data: BlobPart, mime: string) => { const blob = new Blob([data], { type: mime }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href) }
+  const exportBom = () => dlFile(`${title || 'mach'}.bom.csv`, '﻿' + bomCsv(comps), 'text/csv;charset=utf-8')
   const jlcBase = (title || 'board').replace(/[^\w.-]+/g, '_')
   const exportJlcGerber = () => dlFile(`${jlcBase}.JLCPCB.zip`, makeZip(buildGerbers(comps, nets, layout)), 'application/zip')
   const exportCpl = () => dlFile(`${jlcBase}.CPL.csv`, cplCsv(comps, layout), 'text/csv;charset=utf-8')
   const exportJlcBom = () => dlFile(`${jlcBase}.BOM.csv`, jlcBomCsv(comps), 'text/csv;charset=utf-8')
-  const dlFw = () => { const blob = new Blob([fwCode], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'firmware'}.ino`; a.click(); URL.revokeObjectURL(a.href) }
+  const dlFw = () => dlFile(`${title || 'firmware'}.ino`, fwCode, 'text/plain')
 
   const exportNetlist = () => {
     const data = { title, components: comps.map(({ id: _i, x: _x, y: _y, ...c }) => c), nets: nets.map(({ id: _i, ...n }) => n) }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'mach'}.netlist.json`; a.click(); URL.revokeObjectURL(a.href)
+    dlFile(`${title || 'mach'}.netlist.json`, JSON.stringify(data, null, 2), 'application/json')
   }
 
   const W = 1600, H = 1000

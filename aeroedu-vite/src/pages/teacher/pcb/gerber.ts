@@ -38,17 +38,22 @@ const VIA_PAD = 0.9
 const MASK_EXP = 0.05      // hở phủ xanh rộng hơn pad 0.05mm mỗi cạnh
 const SILK_W = 0.15
 
+// Bảng khẩu độ (aperture) dùng chung: cấp số D-code ≥10, sinh dòng %ADD, nhớ lại.
+function apertures() {
+  let ap = 10; let head = ''; const m = new Map<string, number>()
+  const C = (d: number) => { const k = 'C' + rnd(d); if (!m.has(k)) { head += `%ADD${ap}C,${rnd(d).toFixed(6)}*%\n`; m.set(k, ap++) } return m.get(k)! }
+  const R = (w: number, h: number) => { const k = 'R' + rnd(w) + 'x' + rnd(h); if (!m.has(k)) { head += `%ADD${ap}R,${rnd(w).toFixed(6)}X${rnd(h).toFixed(6)}*%\n`; m.set(k, ap++) } return m.get(k)! }
+  return { C, R, get head() { return head } }
+}
+
 function copperLayer(name: string, pads: GPad[], viaPads: { x: number; y: number; d: number }[], traces: GTrace[], pour: { w: number; h: number; net: string } | null): string {
-  let ap = 10; let head = ''
-  const apMap = new Map<string, number>()
-  const adC = (d: number) => { const k = 'C' + rnd(d); if (!apMap.has(k)) { head += `%ADD${ap}C,${rnd(d).toFixed(6)}*%\n`; apMap.set(k, ap++) } return apMap.get(k)! }
-  const adR = (w: number, h: number) => { const k = 'R' + rnd(w) + 'x' + rnd(h); if (!apMap.has(k)) { head += `%ADD${ap}R,${rnd(w).toFixed(6)}X${rnd(h).toFixed(6)}*%\n`; apMap.set(k, ap++) } return apMap.get(k)! }
+  const tbl = apertures(); const adC = tbl.C, adR = tbl.R
   const padAper = (p: { rect: boolean; d: number; w: number; h: number }) => p.rect ? adR(p.w, p.h) : adC(p.d)
   const clrAper = (p: { rect: boolean; d: number; w: number; h: number }) => p.rect ? adR(p.w + CLR * 2, p.h + CLR * 2) : adC(p.d + CLR * 2)
   pads.forEach((p) => padAper(p)); viaPads.forEach((v) => adC(v.d)); traces.forEach((t) => adC(t.width))
   if (pour) { pads.filter((p) => !p.pour).forEach((p) => clrAper(p)); viaPads.forEach((v) => adC(v.d + CLR * 2)); traces.filter((t) => t.net !== pour.net).forEach((t) => adC(t.width + CLR * 2)) }
 
-  let s = `G04 ${name}*\n` + HEADER + head
+  let s = `G04 ${name}*\n` + HEADER + tbl.head
   const drawTrace = (t: GTrace, w: number) => { s += `D${adC(w)}*\n`; t.pts.forEach((pt, i) => { s += `${xy(pt.x, pt.y)}D0${i === 0 ? 2 : 1}*\n` }) }
   if (pour) {
     s += `G04 Pour (${pour.net})*\nG36*\n${xy(0, 0)}D02*\n${xy(pour.w, 0)}D01*\n${xy(pour.w, pour.h)}D01*\n${xy(0, pour.h)}D01*\n${xy(0, 0)}D01*\nG37*\n%LPC*%\n`
@@ -65,14 +70,11 @@ function copperLayer(name: string, pads: GPad[], viaPads: { x: number; y: number
 
 // Lớp phủ xanh (solder mask): flash hở quanh mỗi pad, rộng hơn MASK_EXP.
 function maskLayer(name: string, pads: GPad[]): string {
-  let ap = 10; let head = ''; const m = new Map<string, number>()
-  const adC = (d: number) => { const k = 'C' + rnd(d); if (!m.has(k)) { head += `%ADD${ap}C,${rnd(d).toFixed(6)}*%\n`; m.set(k, ap++) } return m.get(k)! }
-  const adR = (w: number, h: number) => { const k = 'R' + rnd(w) + 'x' + rnd(h); if (!m.has(k)) { head += `%ADD${ap}R,${rnd(w).toFixed(6)}X${rnd(h).toFixed(6)}*%\n`; m.set(k, ap++) } return m.get(k)! }
-  const ape = (p: GPad) => p.rect ? adR(p.w + 2 * MASK_EXP, p.h + 2 * MASK_EXP) : adC(p.d + 2 * MASK_EXP)
-  pads.forEach(ape)
-  let s = `G04 ${name}*\n` + HEADER + head
-  for (const p of pads) s += `D${ape(p)}*\n${xy(p.x, p.y)}D03*\n`
-  return s + 'M02*\n'
+  const tbl = apertures()
+  const ape = (p: GPad) => p.rect ? tbl.R(p.w + 2 * MASK_EXP, p.h + 2 * MASK_EXP) : tbl.C(p.d + 2 * MASK_EXP)
+  let body = ''                                   // dựng thân trước → tbl.head đầy đủ rồi mới ghép (1 lượt qua pad)
+  for (const p of pads) body += `D${ape(p)}*\n${xy(p.x, p.y)}D03*\n`
+  return `G04 ${name}*\n` + HEADER + tbl.head + body + 'M02*\n'
 }
 
 // Lớp tên linh kiện (silkscreen): vẽ viền thân + mã linh kiện bằng nét.

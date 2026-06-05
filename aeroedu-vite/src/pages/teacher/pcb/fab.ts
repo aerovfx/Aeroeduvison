@@ -2,12 +2,15 @@
  *  Toạ độ CPL trùng gốc với Gerber (góc dưới-trái board, mm, Y hướng lên). */
 import type { PcbComponent, PcbLayout } from '@/types/pcb'
 
-const q = (v: string | number) => {
+/** Escape 1 ô CSV: bọc nháy nếu có ký tự đặc biệt + chặn chèn công thức (CSV
+ *  injection) khi mở bằng Excel/Sheets. Dùng chung cho mọi nơi xuất CSV. */
+export const csvField = (v: string | number) => {
   let s = String(v)
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s   // chống chèn công thức (CSV injection) khi mở bằng Excel/Sheets
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
   return /[",\n\r\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
-const row = (cells: (string | number)[]) => cells.map(q).join(',')
+const row = (cells: (string | number)[]) => cells.map(csvField).join(',')
+const isReal = (c: PcbComponent) => !['GND', 'VCC'].includes(c.type)   // bỏ chân ảo GND/VCC khỏi BOM/CPL
 
 // Tên footprint mô tả (người dùng chỉnh lại theo gói thật trước khi đặt lắp ráp).
 function footprintName(c: PcbComponent): string {
@@ -25,7 +28,7 @@ function footprintName(c: PcbComponent): string {
 /** BOM nhóm theo (giá trị + footprint) — định dạng JLCPCB. */
 export function jlcBomCsv(comps: PcbComponent[]): string {
   const groups = new Map<string, { comment: string; fp: string; refs: string[] }>()
-  for (const c of comps.filter((x) => !['GND', 'VCC'].includes(x.type))) {
+  for (const c of comps.filter(isReal)) {
     const fp = footprintName(c); const comment = c.value || c.type
     const k = comment + '|' + fp
     if (!groups.has(k)) groups.set(k, { comment, fp, refs: [] })
@@ -39,7 +42,7 @@ export function jlcBomCsv(comps: PcbComponent[]): string {
 /** CPL / Pick-and-Place — định dạng JLCPCB. */
 export function cplCsv(comps: PcbComponent[], layout: PcbLayout): string {
   const lines = ['Designator,Mid X,Mid Y,Layer,Rotation']
-  for (const c of comps.filter((x) => !['GND', 'VCC'].includes(x.type))) {
+  for (const c of comps.filter(isReal)) {
     const pl = layout.placements[c.ref]; if (!pl) continue
     lines.push(row([c.ref, `${pl.x.toFixed(4)}mm`, `${pl.y.toFixed(4)}mm`, 'Top', ((pl.rot || 0) % 360).toString()]))
   }
@@ -52,7 +55,7 @@ export function boardSpecs(comps: PcbComponent[], layout: PcbLayout) {
     w: layout.board.w, h: layout.board.h, layers: 2,
     components: Object.keys(layout.placements).length,
     vias: (layout.vias || []).length,
-    smd: comps.filter((c) => c.smd && !['GND', 'VCC'].includes(c.type)).length,
-    tht: comps.filter((c) => !c.smd && !['GND', 'VCC'].includes(c.type)).length,
+    smd: comps.filter((c) => c.smd && isReal(c)).length,
+    tht: comps.filter((c) => !c.smd && isReal(c)).length,
   }
 }

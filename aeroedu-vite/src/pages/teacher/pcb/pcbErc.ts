@@ -1,6 +1,7 @@
 /** Kiểm tra điện cơ bản (ERC) bằng luật + xuất BOM. */
 import type { PcbComponent, PcbNet } from '@/types/pcb'
 import { TEMPLATES } from './pcbSymbols'
+import { csvField } from './fab'
 
 export function ercCheck(comps: PcbComponent[], nets: PcbNet[]): string[] {
   const out: string[] = []
@@ -35,9 +36,8 @@ export function bomCsv(comps: PcbComponent[]): string {
     if (!map.has(key)) map.set(key, { type: c.type, value: c.value, refs: [] })
     map.get(key)!.refs.push(c.ref)
   })
-  const esc = (s: string) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   let csv = 'STT,Loại,Linh kiện,Giá trị,Số lượng,Mã (refs)\n'
   let i = 1
-  for (const v of map.values()) csv += [i++, esc(TEMPLATES[v.type as keyof typeof TEMPLATES]?.label || v.type), esc(v.type), esc(v.value), v.refs.length, esc(v.refs.join(' '))].join(',') + '\n'
+  for (const v of map.values()) csv += [i++, csvField(TEMPLATES[v.type as keyof typeof TEMPLATES]?.label || v.type), csvField(v.type), csvField(v.value), v.refs.length, csvField(v.refs.join(' '))].join(',') + '\n'
   return csv
 }

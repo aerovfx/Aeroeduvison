@@ -99,7 +99,7 @@ export function simulate(comps: PcbComponent[], nets: PcbNet[], opts: { mode: 'd
       for (let i = 0; i < nN; i++) A[i][i] += 1e-9    // gmin: rò 1nS mỗi node→đất, tránh ma trận suy biến (node thả nổi)
       // nguồn áp: thêm dòng nhánh
       vsrc.forEach((v, k) => { const r = nN + k; if (v.a >= 0) { A[v.a][r] += 1; A[r][v.a] += 1 } if (v.b >= 0) { A[v.b][r] -= 1; A[r][v.b] -= 1 } z[r] += v.val })
-      const sol = solve(A.map((r) => r.slice()), z.slice())
+      const sol = solve(A, z)   // A,z dựng mới mỗi vòng, không dùng lại sau solve → khỏi sao chép thủ
       if (!sol) return null
       let maxd = 0; for (let i = 0; i < dim; i++) { maxd = Math.max(maxd, Math.abs(sol[i] - x[i])); x[i] = sol[i] }
       if (maxd < 1e-7 && !limited) return x   // đã hội tụ
