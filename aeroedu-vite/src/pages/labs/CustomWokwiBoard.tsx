@@ -2415,6 +2415,7 @@ function SaveCircuitModal({
               onChange={(e) => setBoard(e.target.value)}
               className="w-full mt-1 px-2.5 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100"
             >
+              <option>Orbit Core</option>
               <option>Arduino UNO</option>
               <option>Arduino Nano</option>
               <option>Arduino Mega</option>
