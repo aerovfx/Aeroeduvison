@@ -43,6 +43,7 @@ export const translations: Record<Language, Record<string, string>> = {
     sectionExam:        'Ra đề & Kiểm tra',
     sectionGrading:     'Chấm thi & Báo cáo',
     sectionContent:     'Soạn bài & AI',
+    sectionHardware:    'Mạch điện & Phần cứng',
     sectionLMS:         'Khoá học LMS',
     sectionManage:      'Quản lý',
 
@@ -407,6 +408,7 @@ export const translations: Record<Language, Record<string, string>> = {
     sectionExam:        'Exams & Testing',
     sectionGrading:     'Grading & Reports',
     sectionContent:     'Content & AI',
+    sectionHardware:    'Electronics & Hardware',
     sectionLMS:         'LMS Courses',
     sectionManage:      'Management',
 

@@ -162,7 +162,6 @@ const teacherSections: RouteSection[] = [
       { icon: FileText, labelKey: 'routeOfficeDoc', href: '/teacher/office/list/doc', badge: 'Mới' },
       { icon: Presentation, labelKey: 'routeOfficeSlides', href: '/teacher/office/list/slides' },
       { icon: Grid3x3, labelKey: 'routeOfficeSheet', href: '/teacher/office/list/sheet' },
-      { icon: CircuitBoard, labelKey: 'routePcb', href: '/teacher/pcb', badge: 'AI' },
       { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },
@@ -194,13 +193,21 @@ const teacherSections: RouteSection[] = [
     ],
   },
   {
+    // Mạch điện & Phần cứng — thiết kế PCB (sơ đồ→layout→Gerber/JLCPCB + mô phỏng
+    // SPICE) và phòng lab mạch IoT; mảng điện tử/STEM phần cứng của nền tảng
+    titleKey: 'sectionHardware',
+    routes: [
+      { icon: CircuitBoard, labelKey: 'routePcb',     href: '/teacher/pcb',       badge: 'AI' },
+      { icon: Cpu,          labelKey: 'routeCircuit',  href: '/dashboard/iot-lab', badge: 'IoT' },
+    ],
+  },
+  {
     // Labs & Simulators — GV cần để minh hoạ dạy học, chuẩn bị thí nghiệm ảo
     titleKey: 'sectionLabsTools',
     routes: [
       { icon: FlaskConical,   labelKey: 'routeLabTwin',        href: '/dashboard/labtwin',          badge: 'Lab' },
       { icon: Sparkles,       labelKey: 'routeAura',           href: '/dashboard/aura',             badge: '3D' },
       { icon: Atom,           labelKey: 'routePeriodicTable',  href: '/dashboard/periodic-table', badge: 'Hoá' },
-      { icon: CircuitBoard,   labelKey: 'routeCircuit',        href: '/dashboard/iot-lab',          badge: 'IoT' },
       { icon: FunctionSquare, labelKey: 'routeGraph',          href: '/dashboard/graph-lab' },
       // /dashboard/stem REMOVED 2026-05-27 — GV dùng /teacher/stem-projects (Agile Scrum đầy đủ)
       { icon: Zap,            labelKey: 'routeStemProjects',   href: '/teacher/stem-projects',      badge: 'STEM' },
