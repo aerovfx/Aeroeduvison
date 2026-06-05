@@ -41,7 +41,12 @@ function Scene({ comps, layout }: { comps: PcbComponent[]; layout: PcbLayout }) 
         const pl = layout.placements[c.ref]; if (!pl) return []
         return footprintOf(c).pads.map((pad, i) => {
           const a = padAbs(pl, pad)
-          return (
+          return pad.smd ? (
+            <mesh key={c.ref + i} position={[(a.x - W / 2) * S, 0.085, (a.y - H / 2) * S]}>
+              <boxGeometry args={[pad.w * S, 0.04, pad.h * S]} />
+              <meshStandardMaterial color="#cd7f32" metalness={0.9} roughness={0.3} />
+            </mesh>
+          ) : (
             <mesh key={c.ref + i} position={[(a.x - W / 2) * S, 0.085, (a.y - H / 2) * S]}>
               <cylinderGeometry args={[(pad.d / 2) * S, (pad.d / 2) * S, 0.05, 16]} />
               <meshStandardMaterial color="#d4af37" metalness={0.9} roughness={0.25} />

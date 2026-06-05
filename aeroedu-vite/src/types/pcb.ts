@@ -10,6 +10,7 @@ export interface PcbComponent {
   pins: string[]     // tên các chân
   x: number
   y: number
+  smd?: boolean      // true = dán bề mặt (pad chữ nhật, 1 lớp, không khoan); mặc định THT
 }
 export interface PcbNetNode { comp: string; pin: string }  // comp = ref
 export interface PcbNet { id: string; name: string; nodes: PcbNetNode[] }

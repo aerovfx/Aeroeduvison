@@ -189,6 +189,12 @@ export default function PcbEditor() {
                 </button>
               ))}
             </div>
+            {comps.length > 0 && (() => { const allSmd = comps.every((c) => c.smd); return (
+              <button onClick={() => setComps((cs) => cs.map((c) => ({ ...c, smd: !allSmd })))}
+                className="mt-1.5 w-full px-2 py-1.5 rounded-lg border border-border text-xs font-semibold hover:bg-accent">
+                {allSmd ? '↺ Chuyển tất cả về THT (xuyên lỗ)' : '⬜ Chuyển tất cả sang SMD (dán)'}
+              </button>
+            ) })()}
           </div>
 
           {sel && (() => { const c = comps.find((x) => x.id === sel); if (!c) return null; return (
@@ -196,6 +202,7 @@ export default function PcbEditor() {
               <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold">{c.ref} · {TEMPLATES[c.type].label}</span><button onClick={() => removeComp(c.id)} className="text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button></div>
               <input value={c.value} onChange={(e) => patchComp(c.id, { value: e.target.value })} placeholder="Giá trị" className="w-full text-sm px-2 py-1.5 rounded border border-border bg-background mb-1" />
               <input value={c.ref} onChange={(e) => patchComp(c.id, { ref: e.target.value })} placeholder="Mã (R1…)" className="w-full text-sm px-2 py-1.5 rounded border border-border bg-background font-mono" />
+              <label className="flex items-center gap-1.5 text-xs mt-1.5"><input type="checkbox" checked={!!c.smd} onChange={(e) => patchComp(c.id, { smd: e.target.checked })} /> Dán bề mặt (SMD)</label>
             </div>
           ) })()}
 

@@ -140,7 +140,7 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
           {layout.pour && (
             <g opacity={0.5}>
               <rect width={W * PX} height={H * PX} fill={layout.pour.layer === 'top' ? '#ef4444' : '#3b82f6'} opacity={0.18} />
-              {comps.flatMap((c) => { const pl = layout.placements[c.ref]; if (!pl) return []; return fpMap[c.ref].pads.filter((pad) => !isPourPad(c.ref, pad.name)).map((pad, i) => { const a = padAbs(pl, pad); return <circle key={c.ref + i} cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2 + 0.5) * PX} fill="#0b6b3a" /> }) })}
+              {comps.flatMap((c) => { const pl = layout.placements[c.ref]; if (!pl) return []; return fpMap[c.ref].pads.filter((pad) => !isPourPad(c.ref, pad.name) && (layout.pour!.layer === 'top' || !pad.smd)).map((pad, i) => { const a = padAbs(pl, pad); return <circle key={c.ref + i} cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2 + 0.5) * PX} fill="#0b6b3a" /> }) })}
             </g>
           )}
 
@@ -166,8 +166,9 @@ export default function PcbLayout({ comps, nets, layout, setLayout, title }: {
                 <text x={cx} y={cy - (fp.body.h * PX) / 2 - 3} fontSize={9} fontWeight="bold" fill="#fff" textAnchor="middle">{c.ref}</text>
                 {fp.pads.map((pad, i) => { const a = padAbs(pl, pad); return (
                   <g key={i}>
-                    <circle cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2) * PX} fill="#d4af37" stroke="#7c5b12" strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} />
-                    <circle cx={a.x * PX} cy={a.y * PX} r={(pad.drill / 2) * PX} fill="#0b6b3a" pointerEvents="none" />
+                    {pad.smd
+                      ? <rect x={(a.x - pad.w / 2) * PX} y={(a.y - pad.h / 2) * PX} width={pad.w * PX} height={pad.h * PX} rx={1} fill="#cd7f32" stroke="#7c5b12" strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} />
+                      : <><circle cx={a.x * PX} cy={a.y * PX} r={(pad.d / 2) * PX} fill="#d4af37" stroke="#7c5b12" strokeWidth={1} style={{ cursor: routing ? 'crosshair' : 'default' }} onClick={(e) => { e.stopPropagation(); onPadClick(a) }} /><circle cx={a.x * PX} cy={a.y * PX} r={(pad.drill / 2) * PX} fill="#0b6b3a" pointerEvents="none" /></>}
                   </g>
                 ) })}
               </g>

@@ -29,41 +29,42 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
 
   const netId = new Map<string, number>(); nets.forEach((n, i) => netId.set(n.name, i + 1))
 
-  // owner: net "sở hữu" cell vì có pad ở đó (chặn các net khác) — pad THT chặn cả 2 lớp
-  const owner = new Int32Array(N)
+  // owner[l]: net "sở hữu" cell ở lớp l vì có pad. THT chặn cả 2 lớp, SMD chỉ lớp trên (0).
+  const owner = [new Int32Array(N), new Int32Array(N)]
   const padNet = new Map<string, string>(); nets.forEach((n) => n.nodes.forEach((nd) => padNet.set(nd.comp + '|' + nd.pin, n.name)))
   for (const c of comps) {
     const pl = layout.placements[c.ref]; if (!pl) continue
     for (const pad of footprintOf(c).pads) {
       const a = padAbs(pl, pad); const nn = padNet.get(c.ref + '|' + pad.name); const oid = nn ? netId.get(nn)! : PAD_BLOCK; const r = pad.d / 2 + CLEAR
+      const layers = pad.smd ? [0] : [0, 1]
       for (let gy = Math.max(0, Math.floor((a.y - r) / GRID)); gy <= Math.min(gh - 1, Math.ceil((a.y + r) / GRID)); gy++)
         for (let gx = Math.max(0, Math.floor((a.x - r) / GRID)); gx <= Math.min(gw - 1, Math.ceil((a.x + r) / GRID)); gx++)
-          if (Math.hypot(gx * GRID - a.x, gy * GRID - a.y) <= r) owner[idx(gx, gy)] = oid
+          if (Math.hypot(gx * GRID - a.x, gy * GRID - a.y) <= r) for (const l of layers) owner[l][idx(gx, gy)] = oid
     }
   }
   const occ = [new Int32Array(N), new Int32Array(N)]  // [top, bottom] net của đường đã route
 
   const padPos = (ref: string, pin: string) => {
     const c = comps.find((x) => x.ref === ref); const pl = layout.placements[ref]; if (!c || !pl) return null
-    const pad = footprintOf(c).pads.find((p) => p.name === pin); return pad ? padAbs(pl, pad) : null
+    const pad = footprintOf(c).pads.find((p) => p.name === pin); return pad ? { ...padAbs(pl, pad), smd: pad.smd } : null
   }
 
-  // A* 1 kết nối: trả path [{gx,gy,l}] hoặc null
-  function route(sx: number, sy: number, gxx: number, gyy: number, net: number): { gx: number; gy: number; l: number }[] | null {
+  // A* 1 kết nối: trả path [{gx,gy,l}] hoặc null. aTop/bTop = đầu/cuối chỉ ở lớp trên (SMD).
+  function route(sx: number, sy: number, gxx: number, gyy: number, net: number, aTop: boolean, bTop: boolean): { gx: number; gy: number; l: number }[] | null {
     const s = toCell(sx, sy), g = toCell(gxx, gyy)
-    const blocked = (cell: number, l: number) => { const o = owner[cell]; if (o && o !== net) return true; if (occ[l][cell] && occ[l][cell] !== net) return true; return false }
+    const blocked = (cell: number, l: number) => { const o = owner[l][cell]; if (o && o !== net) return true; if (occ[l][cell] && occ[l][cell] !== net) return true; return false }
     const dist = new Float64Array(N * 2).fill(Infinity)
     const prev = new Int32Array(N * 2).fill(-1)
     const key = (cell: number, l: number) => l * N + cell
     const h = (gx: number, gy: number) => (Math.abs(gx - g.gx) + Math.abs(gy - g.gy)) * GRID
     const heap = new Heap()
-    for (const l of [0, 1]) { const c = idx(s.gx, s.gy); dist[key(c, l)] = 0; heap.push(h(s.gx, s.gy), key(c, l)) }
+    for (const l of (aTop ? [0] : [0, 1])) { const c = idx(s.gx, s.gy); dist[key(c, l)] = 0; heap.push(h(s.gx, s.gy), key(c, l)) }
     const goalCell = idx(g.gx, g.gy)
     let found = -1
     while (heap.size) {
       const { k } = heap.pop(); const l = Math.floor(k / N); const cell = k % N
       const gx = cell % gw, gy = (cell / gw) | 0
-      if (cell === goalCell) { found = k; break }
+      if (cell === goalCell && (!bTop || l === 0)) { found = k; break }
       const d0 = dist[k]
       const nb: [number, number, number, number][] = [
         [gx + 1, gy, l, GRID], [gx - 1, gy, l, GRID], [gx, gy + 1, l, GRID], [gx, gy - 1, l, GRID], [gx, gy, 1 - l, VIA_COST],
@@ -84,11 +85,12 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
   }
 
   // MST (Prim) trên các chân của net → danh sách cạnh cần nối
-  type Edge = { net: string; nid: number; a: { x: number; y: number }; b: { x: number; y: number } }
+  type P = { x: number; y: number; smd: boolean }
+  type Edge = { net: string; nid: number; a: P; b: P }
   const edges: Edge[] = []
   for (const n of nets) {
     if (n.name === layout.pour?.net) continue  // GND đã phủ đồng
-    const pts = n.nodes.map((nd) => padPos(nd.comp, nd.pin)).filter(Boolean) as { x: number; y: number }[]
+    const pts = n.nodes.map((nd) => padPos(nd.comp, nd.pin)).filter(Boolean) as P[]
     if (pts.length < 2) continue
     const inMst = [0]; const out = pts.map((_, i) => i).slice(1)
     while (out.length) {
@@ -101,7 +103,7 @@ export function autoRoute(comps: PcbComponent[], nets: PcbNet[], layout: PcbLayo
 
   const traces: PcbTrace[] = []; const vias: PcbVia[] = []; let routed = 0, failed = 0; let tid = 0
   for (const e of edges) {
-    const path = route(e.a.x, e.a.y, e.b.x, e.b.y, e.nid)
+    const path = route(e.a.x, e.a.y, e.b.x, e.b.y, e.nid, e.a.smd, e.b.smd)
     if (!path) { failed++; continue }
     routed++
     let seg: { x: number; y: number }[] = []; let segLayer = path[0].l
