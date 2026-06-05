@@ -32,8 +32,14 @@ Công cụ thiết kế mạch trong tài khoản giáo viên, từ sơ đồ ng
 - **SMD** (dán bề mặt): footprint pad chữ nhật/không khoan/1 lớp; autorouter per-layer + via; Gerber aperture chữ nhật; toggle THT↔SMD; 3D pad phẳng. (drone all-SMD route 28/28, 0 chập, 12 via.)
 - **SPICE** (tự viết, Modified Nodal Analysis): DC điểm làm việc + quá độ (backward-Euler) cho R/C/diode/LED/nguồn; diode Newton + pnjlim. UI: nút "Mô phỏng (SPICE)" → bảng điện áp DC + đồ thị transient. Verify: chia áp 2.5V, RC τ=3.18V, LED 1.67V/10mA, diode Si 0.69V, diode ngược chặn.
 
+## Đã làm — XUẤT XƯỞNG JLCPCB
+- **Gerber đầy đủ 2 lớp** (trước chỉ đồng+viền+khoan): thêm **phủ xanh** (solder mask GTS/GBS — hở quanh pad +0.05mm) + **lớp tên linh kiện** (silkscreen GTO — viền thân + mã LK bằng phông nét tự viết `strokeFont.ts`). Đặt tên đuôi chuẩn JLCPCB tự nhận: GTL/GBL/GTS/GBS/GTO/GKO/DRL.
+- **Hồ sơ lắp ráp SMT** (`fab.ts`): **BOM** định dạng JLCPCB (Comment/Designator/Footprint/LCSC, gom linh kiện cùng giá trị) + **CPL/Pick-and-Place** (Designator/Mid X/Mid Y/Layer/Rotation, toạ độ mm trùng gốc Gerber).
+- UI: nút **"Xuất xưởng JLCPCB"** → bảng thông số board + tải Gerber.zip / BOM.csv / CPL.csv + link cart.jlcpcb.com/quote + hướng dẫn 3 bước.
+- Verify (drone-template, esbuild+node): 8 file, silk 352 nét, mask 58 hở pad, zip 58KB, BOM gom R1,R2 đúng, CPL header+toạ độ mm đúng. tsc + vite build sạch.
+
 ## Lộ trình tiếp theo (tuỳ chọn)
-- Thư viện footprint chuẩn KiCad/EasyEDA; tích hợp `kicad-cli`/`tscircuit` (Docker) xuất xưởng + đặt JLCPCB; SPICE nâng cao (transistor/op-amp, .model) qua ngspice-WASM; AI đọc kết quả SPICE để tự sửa giá trị.
+- Footprint package thật (0402/0603/SOIC/QFP…) để BOM/CPL khớp gói LCSC; tích hợp `kicad-cli`/`tscircuit` (Docker) kiểm DRC trước khi gửi; gọi API báo giá JLCPCB; SPICE nâng cao (transistor/op-amp, .model) qua ngspice-WASM; AI đọc kết quả SPICE để tự sửa giá trị.
 
 ## Giới hạn / nguyên tắc
 - LLM **không đảm bảo đúng điện** → luôn cần DRC/ERC (+ mô phỏng) kiểm chứng; AI chỉ gợi ý.

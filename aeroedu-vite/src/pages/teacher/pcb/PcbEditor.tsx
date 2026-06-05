@@ -1,13 +1,15 @@
 /** Trình vẽ sơ đồ nguyên lý (schematic) + AI sinh mạch + xuất netlist. */
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
-import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X, ShieldCheck, Cpu, Copy, FileDown, CheckCircle2, Activity } from 'lucide-react'
+import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X, ShieldCheck, Cpu, Copy, FileDown, CheckCircle2, Activity, Factory, ExternalLink } from 'lucide-react'
 import { getOfficeDoc, useOfficeAutosave } from '@/services/office.service'
 import { aiGenerateCircuit, aiReviewCircuit, aiGenerateFirmware } from '@/services/pcb.service'
 import type { PcbComponent, PcbNet, PcbType, PcbDoc, PcbLayout as Layout } from '@/types/pcb'
 import { TEMPLATES, pinLocal, compSize, Glyph } from './pcbSymbols'
 import { ercCheck, bomCsv } from './pcbErc'
 import { simulate, type SpiceResult } from './spice'
+import { jlcBomCsv, cplCsv, boardSpecs } from './fab'
+import { buildGerbers, makeZip } from './gerber'
 import PcbLayout from './PcbLayout'
 import EditorBar from '../office/EditorBar'
 
@@ -138,7 +140,7 @@ export default function PcbEditor() {
   }
 
   // ── AI ERC / Firmware / BOM (Giai đoạn 4) + SPICE ──
-  const [modal, setModal] = useState<null | 'erc' | 'fw' | 'sim'>(null)
+  const [modal, setModal] = useState<null | 'erc' | 'fw' | 'sim' | 'jlc'>(null)
   const [simMode, setSimMode] = useState<'dc' | 'tran'>('dc')
   const [simStopMs, setSimStopMs] = useState(10)
   const [sim, setSim] = useState<SpiceResult | null>(null)
@@ -161,6 +163,11 @@ export default function PcbEditor() {
     aiGenerateFirmware(payload()).then((r) => { setFwCode(r.code); setFwBoard(r.board) }).catch((e) => setFwCode('// Lỗi: ' + (e?.response?.data?.error || 'không sinh được firmware'))).finally(() => setFwBusy(false))
   }
   const exportBom = () => { const blob = new Blob(['﻿' + bomCsv(comps)], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'mach'}.bom.csv`; a.click(); URL.revokeObjectURL(a.href) }
+  const dlFile = (name: string, data: BlobPart, mime: string) => { const blob = new Blob([data], { type: mime }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href) }
+  const jlcBase = (title || 'board').replace(/[^\w.-]+/g, '_')
+  const exportJlcGerber = () => dlFile(`${jlcBase}.JLCPCB.zip`, makeZip(buildGerbers(comps, nets, layout)), 'application/zip')
+  const exportCpl = () => dlFile(`${jlcBase}.CPL.csv`, cplCsv(comps, layout), 'text/csv;charset=utf-8')
+  const exportJlcBom = () => dlFile(`${jlcBase}.BOM.csv`, jlcBomCsv(comps), 'text/csv;charset=utf-8')
   const dlFw = () => { const blob = new Blob([fwCode], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'firmware'}.ino`; a.click(); URL.revokeObjectURL(a.href) }
 
   const exportNetlist = () => {
@@ -208,6 +215,7 @@ export default function PcbEditor() {
             <button onClick={runFw} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-violet-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Cpu className="w-4 h-4" /> AI sinh firmware</button>
             <button onClick={() => runSim('dc')} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Activity className="w-4 h-4" /> Mô phỏng (SPICE)</button>
             <button onClick={exportBom} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><FileDown className="w-4 h-4" /> Xuất BOM (.csv)</button>
+            <button onClick={() => setModal('jlc')} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-orange-500 to-rose-500 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Factory className="w-4 h-4" /> Xuất xưởng JLCPCB</button>
           </div>
 
           <div>
@@ -294,12 +302,38 @@ export default function PcbEditor() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setModal(null)}>
           <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-border shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-              {modal === 'erc' ? <ShieldCheck className="w-5 h-5 text-emerald-500" /> : modal === 'fw' ? <Cpu className="w-5 h-5 text-violet-500" /> : <Activity className="w-5 h-5 text-amber-500" />}
-              <span className="font-bold">{modal === 'erc' ? 'AI kiểm tra mạch (ERC)' : modal === 'fw' ? `Firmware ${fwBoard || ''}` : 'Mô phỏng mạch (SPICE)'}</span>
+              {modal === 'erc' ? <ShieldCheck className="w-5 h-5 text-emerald-500" /> : modal === 'fw' ? <Cpu className="w-5 h-5 text-violet-500" /> : modal === 'jlc' ? <Factory className="w-5 h-5 text-orange-500" /> : <Activity className="w-5 h-5 text-amber-500" />}
+              <span className="font-bold">{modal === 'erc' ? 'AI kiểm tra mạch (ERC)' : modal === 'fw' ? `Firmware ${fwBoard || ''}` : modal === 'jlc' ? 'Xuất xưởng JLCPCB' : 'Mô phỏng mạch (SPICE)'}</span>
               <button onClick={() => setModal(null)} className="ml-auto p-1 rounded hover:bg-accent"><X className="w-5 h-5" /></button>
             </div>
             <div className="overflow-y-auto p-4 text-sm">
-              {modal === 'sim' ? (
+              {modal === 'jlc' ? (() => {
+                const sp = boardSpecs(comps, layout); const placed = Object.keys(layout.placements).length
+                return (
+                  <>
+                    {!placed && <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs">⚠ Chưa bố trí linh kiện. Mở tab <b>Bố trí</b> → đặt linh kiện + <b>Tự định tuyến</b> rồi quay lại để toạ độ Gerber/CPL chính xác.</div>}
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[['Kích thước', `${sp.w}×${sp.h} mm`], ['Số lớp', `${sp.layers}`], ['Linh kiện', `${sp.components}`], ['Via', `${sp.vias}`], ['SMD', `${sp.smd}`], ['Xuyên lỗ', `${sp.tht}`]].map(([k, v]) => (
+                        <div key={k} className="rounded-lg border border-border p-2 text-center"><div className="text-[10px] text-slate-400">{k}</div><div className="font-bold text-sm">{v}</div></div>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      <button onClick={exportJlcGerber} className="w-full px-3 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Tải Gerber (.zip) — gửi xưởng</button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={exportJlcBom} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold inline-flex items-center justify-center gap-1.5"><FileDown className="w-4 h-4" /> BOM.csv</button>
+                        <button onClick={exportCpl} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold inline-flex items-center justify-center gap-1.5"><FileDown className="w-4 h-4" /> CPL (vị trí).csv</button>
+                      </div>
+                      <a href="https://cart.jlcpcb.com/quote" target="_blank" rel="noopener noreferrer" className="w-full px-3 py-2.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-bold inline-flex items-center justify-center gap-2"><ExternalLink className="w-4 h-4" /> Mở JLCPCB để báo giá & đặt</a>
+                    </div>
+                    <ol className="mt-3 text-xs text-slate-500 space-y-1 list-decimal list-inside">
+                      <li>Tải <b>Gerber (.zip)</b> → vào jlcpcb.com/quote → <b>Add gerber file</b> (kéo nguyên file .zip).</li>
+                      <li>Chọn số lớp (2), kích thước tự nhận, màu phủ xanh, số lượng → xem báo giá.</li>
+                      <li>Muốn JLCPCB <b>hàn linh kiện sẵn</b> (SMT): bật <i>Assembly</i> → tải lên <b>BOM.csv</b> + <b>CPL.csv</b>, rồi điền mã <b>LCSC</b> cho từng linh kiện.</li>
+                    </ol>
+                    <p className="text-[10px] text-slate-400 mt-2">Gói gồm 2 lớp đồng + phủ xanh + lớp tên linh kiện + viền cắt + khoan, đặt tên đuôi chuẩn JLCPCB tự nhận. Đây là board GIÁO DỤC — JLCPCB sẽ chạy DRC khi báo giá; kiểm tra kỹ trước khi sản xuất.</p>
+                  </>
+                )
+              })() : modal === 'sim' ? (
                 <>
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
                     <button onClick={() => runSim('dc')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${simMode === 'dc' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 border border-border'}`}>Điểm DC</button>
