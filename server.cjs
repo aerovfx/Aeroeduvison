@@ -11429,6 +11429,125 @@ ${latex.slice(0, 60000)}`;
 // (Proxy cũ disable — latex-service offline. Có thể bật lại khi service up)
 // app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
 
+// ════════════════════════════════════════════════════════════════════════
+// VĂN PHÒNG ONLINE — Soạn văn bản / Trình chiếu / Bảng tính (cho giáo viên)
+//   1 bảng OfficeDoc, kind = 'doc' | 'sheet' | 'slides', data JSONB. Gate Bearer
+//   (_latexAuth dùng chung). Autosave từ FE qua PUT. PHẢI trước catch-all proxy.
+// ════════════════════════════════════════════════════════════════════════
+let _officeReady = false;
+async function _ensureOfficeTable() {
+  if (_officeReady) return;
+  const pool = _getPool();
+  await pool.query(`CREATE TABLE IF NOT EXISTS "OfficeDoc" (
+    id          VARCHAR(40)  PRIMARY KEY,
+    owner_id    VARCHAR(255) NOT NULL,
+    owner_name  VARCHAR(200),
+    kind        VARCHAR(12)  NOT NULL,
+    title       VARCHAR(300) NOT NULL DEFAULT 'Tài liệu mới',
+    data        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_office_owner ON "OfficeDoc"(owner_id, kind)`);
+  _officeReady = true;
+}
+const _OFFICE_KINDS = ['doc', 'sheet', 'slides'];
+const _officeUid = (d) => d && (d.sub || d.userId || d.id);
+const _officeRow = (r) => ({ id: r.id, kind: r.kind, title: r.title, data: r.data || {}, ownerId: r.owner_id, ownerName: r.owner_name || '', createdAt: r.created_at, updatedAt: r.updated_at });
+
+// Danh sách của tôi (KHÔNG kèm data nặng) — lọc theo kind nếu có
+app.get('/api/office/docs', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    await _ensureOfficeTable(); const pool = _getPool(); const uid = _officeUid(d);
+    const kind = String(req.query.kind || '');
+    const params = [uid]; let q = `SELECT id,owner_id,owner_name,kind,title,'{}'::jsonb AS data,created_at,updated_at FROM "OfficeDoc" WHERE owner_id=$1`;
+    if (_OFFICE_KINDS.includes(kind)) { params.push(kind); q += ` AND kind=$2`; }
+    q += ` ORDER BY updated_at DESC LIMIT 300`;
+    const { rows } = await pool.query(q, params);
+    return res.json({ docs: rows.map(_officeRow) });
+  } catch (e) { console.error('[office:list]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// Tạo mới
+app.post('/api/office/docs', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    await _ensureOfficeTable(); const pool = _getPool(); const uid = _officeUid(d);
+    const b = req.body || {};
+    const kind = _OFFICE_KINDS.includes(b.kind) ? b.kind : 'doc';
+    const id = require('crypto').randomUUID();
+    await pool.query(
+      `INSERT INTO "OfficeDoc"(id,owner_id,owner_name,kind,title,data) VALUES($1,$2,$3,$4,$5,$6)`,
+      [id, uid, String(d.name || d.fullName || d.email || '').slice(0, 200), kind, String(b.title || 'Tài liệu mới').slice(0, 300), JSON.stringify(b.data || {})]
+    );
+    const r = await pool.query(`SELECT * FROM "OfficeDoc" WHERE id=$1`, [id]);
+    return res.json({ doc: _officeRow(r.rows[0]) });
+  } catch (e) { console.error('[office:create]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// Lấy 1 tài liệu (đầy đủ data) — chỉ chủ sở hữu
+app.get('/api/office/docs/:id', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    await _ensureOfficeTable(); const pool = _getPool(); const uid = _officeUid(d);
+    const r = await pool.query(`SELECT * FROM "OfficeDoc" WHERE id=$1`, [req.params.id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    if (r.rows[0].owner_id !== uid) return res.status(403).json({ error: 'Không có quyền xem' });
+    return res.json({ doc: _officeRow(r.rows[0]) });
+  } catch (e) { console.error('[office:get]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// Cập nhật (autosave) — chỉ chủ sở hữu
+app.put('/api/office/docs/:id', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    await _ensureOfficeTable(); const pool = _getPool(); const uid = _officeUid(d);
+    const cur = await pool.query(`SELECT owner_id FROM "OfficeDoc" WHERE id=$1`, [req.params.id]);
+    if (!cur.rows[0]) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    if (cur.rows[0].owner_id !== uid) return res.status(403).json({ error: 'Không có quyền sửa' });
+    const b = req.body || {};
+    const sets = ['updated_at=NOW()']; const params = [req.params.id];
+    if (b.title !== undefined) { params.push(String(b.title).slice(0, 300)); sets.push(`title=$${params.length}`); }
+    if (b.data !== undefined) {
+      const js = JSON.stringify(b.data);
+      if (js.length > 6_000_000) return res.status(413).json({ error: 'Tài liệu quá lớn (>6MB)' });
+      params.push(js); sets.push(`data=$${params.length}`);
+    }
+    await pool.query(`UPDATE "OfficeDoc" SET ${sets.join(',')} WHERE id=$1`, params);
+    return res.json({ ok: true });
+  } catch (e) { console.error('[office:update]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// Xoá — chỉ chủ sở hữu
+app.delete('/api/office/docs/:id', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    await _ensureOfficeTable(); const pool = _getPool(); const uid = _officeUid(d);
+    const cur = await pool.query(`SELECT owner_id FROM "OfficeDoc" WHERE id=$1`, [req.params.id]);
+    if (!cur.rows[0]) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    if (cur.rows[0].owner_id !== uid) return res.status(403).json({ error: 'Không có quyền xoá' });
+    await pool.query(`DELETE FROM "OfficeDoc" WHERE id=$1`, [req.params.id]);
+    return res.json({ ok: true });
+  } catch (e) { console.error('[office:delete]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// Xuất Word từ HTML (dùng html-to-docx có sẵn ở backend) — cho trình soạn văn bản
+app.post('/api/office/to-docx', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    const { html, filename } = req.body || {};
+    if (!html || typeof html !== 'string') return res.status(400).json({ error: 'Thiếu nội dung' });
+    let htmlToDocx; try { htmlToDocx = require('html-to-docx'); } catch { return res.status(501).json({ error: 'Thiếu thư viện html-to-docx trên revision này' }); }
+    const full = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+    const buf = await htmlToDocx(full, null, { table: { row: { cantSplit: true } }, footer: false, header: false });
+    const safe = String(filename || 'tai-lieu').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'tai-lieu';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${safe}.docx"`);
+    return res.end(Buffer.isBuffer(buf) ? buf : Buffer.from(buf));
+  } catch (e) { console.error('[office:to-docx]', e.message); return res.status(502).json({ error: e.message }); }
+});
+
 // ── API Keys (MCP) — PHẢI trước catch-all /api proxy ────────
 // Xử lý /api/user/api-keys và /api/auth/validate-key tại đây (Node.js).
 // Không được proxy lên Rust backend vì backend không có các routes này.

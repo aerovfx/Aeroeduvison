@@ -212,6 +212,10 @@ const DocumentDigitizationPage = lazy(() => import('@/pages/teacher/DocumentDigi
 const DocumentDigitizationReviewPage = lazy(() => import('@/pages/teacher/DocumentDigitizationReview'))
 const LaTeXEditorDocumentPage = lazy(() => import('@/pages/teacher/LaTeXEditorDocument'))
 const LatexConverterPage    = lazy(() => import('@/pages/teacher/LatexConverter'))
+const OfficeHubPage         = lazy(() => import('@/pages/teacher/office/OfficeHub'))
+const OfficeDocPage         = lazy(() => import('@/pages/teacher/office/DocEditor'))
+const OfficeSheetPage       = lazy(() => import('@/pages/teacher/office/SheetEditor'))
+const OfficeSlidesPage      = lazy(() => import('@/pages/teacher/office/SlidesEditor'))
 const LearningPathBuilderPage = lazy(() => import('@/pages/teacher/LearningPathBuilder'))
 const LessonPlansPage         = lazy(() => import('@/pages/teacher/LessonPlans'))
 const LessonPlanEditorPage    = lazy(() => import('@/pages/teacher/LessonPlanEditor'))
@@ -678,6 +682,10 @@ export function AppRouter() {
               <Route path="/teacher/create-module"          element={<CreateModulePage />} />
               <Route path="/teacher/latex-documents"        element={<LaTeXEditorPage />} />
               <Route path="/teacher/latex-converter"        element={<LatexConverterPage />} />
+              <Route path="/teacher/office"                 element={<OfficeHubPage />} />
+              <Route path="/teacher/office/doc/:id"         element={<OfficeDocPage />} />
+              <Route path="/teacher/office/sheet/:id"       element={<OfficeSheetPage />} />
+              <Route path="/teacher/office/slides/:id"      element={<OfficeSlidesPage />} />
 
               {/* Chưa port → PageFallback (specific trước, wildcard sau) */}
               <Route path="/teacher/agents"                        element={<AgentsPage />} />
