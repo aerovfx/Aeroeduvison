@@ -28,8 +28,12 @@ Công cụ thiết kế mạch trong tài khoản giáo viên, từ sơ đồ ng
 - **ERC theo luật** (client): ref trùng, net ≤1 chân, chân chưa nối, MCU/IC thiếu nguồn/GND.
 - **Xuất BOM .csv** (gộp theo loại/giá trị + refs).
 
-## Lộ trình tiếp theo (tuỳ chọn nâng cao)
-- Thư viện footprint chuẩn KiCad/EasyEDA + **SMD pad**; tích hợp `kicad-cli`/`tscircuit` (Docker) để xuất xưởng + đặt JLCPCB; mô phỏng **SPICE** làm "trọng tài" cho AI.
+## Đã làm (nâng cao) — SMD + SPICE
+- **SMD** (dán bề mặt): footprint pad chữ nhật/không khoan/1 lớp; autorouter per-layer + via; Gerber aperture chữ nhật; toggle THT↔SMD; 3D pad phẳng. (drone all-SMD route 28/28, 0 chập, 12 via.)
+- **SPICE** (tự viết, Modified Nodal Analysis): DC điểm làm việc + quá độ (backward-Euler) cho R/C/diode/LED/nguồn; diode Newton + pnjlim. UI: nút "Mô phỏng (SPICE)" → bảng điện áp DC + đồ thị transient. Verify: chia áp 2.5V, RC τ=3.18V, LED 1.67V/10mA, diode Si 0.69V, diode ngược chặn.
+
+## Lộ trình tiếp theo (tuỳ chọn)
+- Thư viện footprint chuẩn KiCad/EasyEDA; tích hợp `kicad-cli`/`tscircuit` (Docker) xuất xưởng + đặt JLCPCB; SPICE nâng cao (transistor/op-amp, .model) qua ngspice-WASM; AI đọc kết quả SPICE để tự sửa giá trị.
 
 ## Giới hạn / nguyên tắc
 - LLM **không đảm bảo đúng điện** → luôn cần DRC/ERC (+ mô phỏng) kiểm chứng; AI chỉ gợi ý.

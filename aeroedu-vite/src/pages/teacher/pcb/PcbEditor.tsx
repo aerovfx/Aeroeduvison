@@ -1,14 +1,36 @@
 /** Trình vẽ sơ đồ nguyên lý (schematic) + AI sinh mạch + xuất netlist. */
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
-import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X, ShieldCheck, Cpu, Copy, FileDown, CheckCircle2 } from 'lucide-react'
+import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X, ShieldCheck, Cpu, Copy, FileDown, CheckCircle2, Activity } from 'lucide-react'
 import { getOfficeDoc, useOfficeAutosave } from '@/services/office.service'
 import { aiGenerateCircuit, aiReviewCircuit, aiGenerateFirmware } from '@/services/pcb.service'
 import type { PcbComponent, PcbNet, PcbType, PcbDoc, PcbLayout as Layout } from '@/types/pcb'
 import { TEMPLATES, pinLocal, compSize, Glyph } from './pcbSymbols'
 import { ercCheck, bomCsv } from './pcbErc'
+import { simulate, type SpiceResult } from './spice'
 import PcbLayout from './PcbLayout'
 import EditorBar from '../office/EditorBar'
+
+const TRACE_CLR = ['#06b6d4', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#eab308']
+function TranChart({ tran }: { tran: NonNullable<SpiceResult['tran']> }) {
+  const W = 540, H = 240, pl = 44, pb = 28, pt = 10, pr = 10
+  const names = Object.keys(tran.v); const t = tran.t; if (!t.length) return null
+  const tmax = t[t.length - 1] || 1
+  let vmin = Infinity, vmax = -Infinity
+  names.forEach((nm) => tran.v[nm].forEach((y) => { vmin = Math.min(vmin, y); vmax = Math.max(vmax, y) }))
+  if (!isFinite(vmin)) { vmin = 0; vmax = 1 }; if (vmax - vmin < 1e-6) vmax = vmin + 1
+  const X = (tt: number) => pl + (tt / tmax) * (W - pl - pr)
+  const Y = (v: number) => pt + (1 - (v - vmin) / (vmax - vmin)) * (H - pt - pb)
+  return (
+    <svg width={W} height={H} className="bg-slate-50 dark:bg-slate-950 rounded-lg">
+      <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#94a3b8" /><line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#94a3b8" />
+      {[0, 0.5, 1].map((f) => { const v = vmin + f * (vmax - vmin); return <text key={f} x={pl - 4} y={Y(v) + 3} fontSize={9} textAnchor="end" fill="#64748b">{v.toFixed(1)}V</text> })}
+      <text x={(W) / 2} y={H - 4} fontSize={9} textAnchor="middle" fill="#64748b">t (ms): 0 → {(tmax * 1000).toFixed(1)}</text>
+      {names.map((nm, i) => <polyline key={nm} fill="none" stroke={TRACE_CLR[i % TRACE_CLR.length]} strokeWidth={1.6} points={t.map((tt, k) => `${X(tt)},${Y(tran.v[nm][k])}`).join(' ')} />)}
+      {names.map((nm, i) => <g key={'l' + nm}><rect x={pl + 6 + i * 78} y={pt} width={10} height={4} fill={TRACE_CLR[i % TRACE_CLR.length]} /><text x={pl + 18 + i * 78} y={pt + 5} fontSize={9} fill="#475569">{nm.slice(0, 7)}</text></g>)}
+    </svg>
+  )
+}
 
 const Board3D = lazy(() => import('./Board3D'))
 const DEFAULT_LAYOUT: Layout = { board: { w: 60, h: 40 }, placements: {}, traces: [] }
@@ -115,8 +137,16 @@ export default function PcbEditor() {
     setAiBusy(false)
   }
 
-  // ── AI ERC / Firmware / BOM (Giai đoạn 4) ──
-  const [modal, setModal] = useState<null | 'erc' | 'fw'>(null)
+  // ── AI ERC / Firmware / BOM (Giai đoạn 4) + SPICE ──
+  const [modal, setModal] = useState<null | 'erc' | 'fw' | 'sim'>(null)
+  const [simMode, setSimMode] = useState<'dc' | 'tran'>('dc')
+  const [simStopMs, setSimStopMs] = useState(10)
+  const [sim, setSim] = useState<SpiceResult | null>(null)
+  const runSim = (mode: 'dc' | 'tran') => {
+    setModal('sim'); setSimMode(mode)
+    try { const ts = simStopMs / 1000; setSim(simulate(comps, nets, { mode, tStop: ts, tStep: ts / 200 })) }
+    catch (e) { setSim({ ok: false, error: String((e as Error)?.message || e), notes: [], nodes: [], dc: {} }) }
+  }
   const [ercRules, setErcRules] = useState<string[]>([])
   const [aiReview, setAiReview] = useState(''); const [reviewBusy, setReviewBusy] = useState(false)
   const [fwCode, setFwCode] = useState(''); const [fwBoard, setFwBoard] = useState(''); const [fwBusy, setFwBusy] = useState(false)
@@ -176,6 +206,7 @@ export default function PcbEditor() {
           <div className="grid grid-cols-1 gap-1.5">
             <button onClick={runErc} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><ShieldCheck className="w-4 h-4" /> AI kiểm tra mạch (ERC)</button>
             <button onClick={runFw} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-violet-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Cpu className="w-4 h-4" /> AI sinh firmware</button>
+            <button onClick={() => runSim('dc')} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Activity className="w-4 h-4" /> Mô phỏng (SPICE)</button>
             <button onClick={exportBom} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><FileDown className="w-4 h-4" /> Xuất BOM (.csv)</button>
           </div>
 
@@ -263,12 +294,28 @@ export default function PcbEditor() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setModal(null)}>
           <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-border shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-              {modal === 'erc' ? <ShieldCheck className="w-5 h-5 text-emerald-500" /> : <Cpu className="w-5 h-5 text-violet-500" />}
-              <span className="font-bold">{modal === 'erc' ? 'AI kiểm tra mạch (ERC)' : `Firmware ${fwBoard || ''}`}</span>
+              {modal === 'erc' ? <ShieldCheck className="w-5 h-5 text-emerald-500" /> : modal === 'fw' ? <Cpu className="w-5 h-5 text-violet-500" /> : <Activity className="w-5 h-5 text-amber-500" />}
+              <span className="font-bold">{modal === 'erc' ? 'AI kiểm tra mạch (ERC)' : modal === 'fw' ? `Firmware ${fwBoard || ''}` : 'Mô phỏng mạch (SPICE)'}</span>
               <button onClick={() => setModal(null)} className="ml-auto p-1 rounded hover:bg-accent"><X className="w-5 h-5" /></button>
             </div>
             <div className="overflow-y-auto p-4 text-sm">
-              {modal === 'erc' ? (
+              {modal === 'sim' ? (
+                <>
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <button onClick={() => runSim('dc')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${simMode === 'dc' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 border border-border'}`}>Điểm DC</button>
+                    <button onClick={() => runSim('tran')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${simMode === 'tran' ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 border border-border'}`}>Quá độ (transient)</button>
+                    {simMode === 'tran' && <label className="text-xs text-slate-500 flex items-center gap-1">Thời gian (ms) <input type="number" value={simStopMs} onChange={(e) => setSimStopMs(Math.max(0.1, +e.target.value || 10))} className="w-16 px-2 py-1 rounded border border-border bg-background" /> <button onClick={() => runSim('tran')} className="px-2 py-1 rounded bg-amber-500 text-white">Chạy</button></label>}
+                  </div>
+                  {sim && !sim.ok && <div className="text-rose-500 mb-2">{sim.error}</div>}
+                  {sim?.notes.map((n, i) => <div key={i} className="text-xs text-amber-600 mb-1">{n}</div>)}
+                  {sim?.ok && simMode === 'dc' && (
+                    <table className="w-full text-sm"><thead><tr className="text-left text-slate-500 text-xs"><th className="py-1">Net</th><th>Điện áp (DC)</th></tr></thead>
+                      <tbody>{sim.nodes.map((nm) => <tr key={nm} className="border-t border-border"><td className="py-1 font-mono font-bold text-emerald-600">{nm}</td><td className="font-mono">{sim.dc[nm].toFixed(3)} V</td></tr>)}<tr className="border-t border-border"><td className="py-1 font-mono text-slate-400">GND</td><td className="font-mono text-slate-400">0.000 V</td></tr></tbody></table>
+                  )}
+                  {sim?.ok && simMode === 'tran' && sim.tran && <TranChart tran={sim.tran} />}
+                  <p className="text-[10px] text-slate-400 mt-2">SPICE chỉ mô phỏng phần ANALOG (R/C/diode/LED/nguồn). MCU/IC số được bỏ qua.</p>
+                </>
+              ) : modal === 'erc' ? (
                 <>
                   <div className="text-xs font-bold text-slate-500 mb-1">Kiểm tra theo luật</div>
                   <div className="space-y-0.5 mb-4">{ercRules.map((l, i) => <div key={i} className={l.startsWith('⚠') ? 'text-amber-600' : 'text-emerald-600'}>{l}</div>)}</div>
