@@ -7,6 +7,7 @@ import {
   ArrowUpDown, Printer, ClipboardCheck, BarChart3, AlertCircle
 } from 'lucide-react';
 import { api } from '@/services/api';
+import CameraCapture from './CameraCapture';
 
 // ===================== HEIC CONVERSION =====================
 
@@ -2609,6 +2610,9 @@ export default function ScanGrading(props: ScanGradingProps) {
   const [showOverlay, setShowOverlay] = useState(true);
   const isScanningRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [showCamera, setShowCamera] = useState(false);
+  // Sau khi chụp bằng camera, tự nhảy sang "Xem lại" để hiện điểm + chi tiết ngay
+  const wantReviewRef = useRef(false);
 
   // Save graded results to database
   const saveGradedResults = useCallback(async () => {
@@ -2919,6 +2923,26 @@ export default function ScanGrading(props: ScanGradingProps) {
     [answerKey]
   );
 
+  // ── Chụp 1 phiếu bằng camera → chấm ngay → nhảy sang Xem lại ──
+  const handleCameraCapture = useCallback(async (file: File) => {
+    setShowCamera(false);
+    wantReviewRef.current = true;
+    setViewMode('review');
+    await addSheets([file]);
+  }, [addSheets]);
+
+  // Khi phiếu chụp xong đã chấm (không còn 'scanning'), chọn phiếu mới nhất
+  useEffect(() => {
+    if (!wantReviewRef.current) return;
+    if (sheets.length === 0) return;
+    const allDone = sheets.every(s => s.status !== 'scanning');
+    if (allDone) {
+      wantReviewRef.current = false;
+      const scanned = sheets.filter(s => s.status !== 'scanning');
+      if (scanned.length > 0) setCurrentSheetIdx(scanned.length - 1);
+    }
+  }, [sheets]);
+
   const updateDetectedAnswers = useCallback((sheetId: string, q: number, ans: 'A' | 'B' | 'C' | 'D' | null) => {
     setSheets(prev =>
       prev.map(s => {
@@ -3034,10 +3058,26 @@ export default function ScanGrading(props: ScanGradingProps) {
 
   return (
     <div className="space-y-4">
+      {/* Camera capture overlay (live, on-device) */}
+      {showCamera && (
+        <CameraCapture
+          title={`Chụp phiếu — ${answerKey.examCode || answerKey.examName || 'Chấm ngay'}`}
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       {/* View Mode Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-3xl font-bold text-foreground">Quét & Chấm Điểm</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => setShowCamera(true)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow hover:shadow-lg transition-all flex items-center gap-2"
+          >
+            <Camera className="w-4 h-4" />
+            Camera chấm ngay
+          </button>
           {['scan', 'review', 'results'].map(mode => (
             <button
               key={mode}
