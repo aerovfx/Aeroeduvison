@@ -19,9 +19,17 @@ Công cụ thiết kế mạch trong tài khoản giáo viên, từ sơ đồ ng
 - **Xuất Gerber** RS-274X (.gtl/.gbl/.gko) + Excellon (.drl), đóng gói **.zip tự viết** (CRC32 + store, không thêm dep) — đã verify zip hợp lệ.
 - **Xem board 3D** (R3F): nền FR4 + pad đồng + thân linh kiện + đường mạch 2 lớp.
 
-## Lộ trình tiếp theo
-- **GĐ3**: autorouter (Freerouting backend) + thư viện footprint lớn (KiCad/EasyEDA) + AI giải thích DRC/ERC + sinh BOM mua linh kiện + sinh firmware (đường AI sẵn có).
-- **GĐ4**: tích hợp `tscircuit`/`kicad-cli` (Docker) để đạt chuẩn xuất xưởng + đặt JLCPCB; mô phỏng SPICE làm "trọng tài" cho AI.
+## Đã làm (Giai đoạn 3 — Autorouter)
+- Autorouter A* lưới 2 lớp + via (in-app, không cần dịch vụ ngoài), tránh pad/đường khác net → không chập; MST + cạnh-ngắn-trước. Mẫu Drone route sẵn lúc tạo.
+
+## Đã làm (Giai đoạn 4 — AI trợ lý + kiểm chứng)
+- **AI kiểm tra mạch (ERC)**: /api/pcb/ai-review — phân tích netlist, chỉ lỗi/cảnh báo (nguồn/GND, tụ lọc, pull-up, hạn dòng, chân hở) + gợi ý.
+- **AI sinh firmware** khớp mạch: /api/pcb/ai-firmware — Arduino/ESP .ino theo đúng chân đã nối.
+- **ERC theo luật** (client): ref trùng, net ≤1 chân, chân chưa nối, MCU/IC thiếu nguồn/GND.
+- **Xuất BOM .csv** (gộp theo loại/giá trị + refs).
+
+## Lộ trình tiếp theo (tuỳ chọn nâng cao)
+- Thư viện footprint chuẩn KiCad/EasyEDA + **SMD pad**; tích hợp `kicad-cli`/`tscircuit` (Docker) để xuất xưởng + đặt JLCPCB; mô phỏng **SPICE** làm "trọng tài" cho AI.
 
 ## Giới hạn / nguyên tắc
 - LLM **không đảm bảo đúng điện** → luôn cần DRC/ERC (+ mô phỏng) kiểm chứng; AI chỉ gợi ý.

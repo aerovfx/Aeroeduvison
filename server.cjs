@@ -11567,6 +11567,39 @@ app.post('/api/pcb/ai-generate', async (req, res) => {
   } catch (e) { console.error('[pcb:ai]', e.message); return res.status(502).json({ error: 'Lỗi sinh mạch: ' + e.message }); }
 });
 
+// Tóm tắt netlist gọn để đưa cho AI
+function _pcbNetlistText(b) {
+  const comps = (b.components || []).map((c) => `${c.ref} [${c.type}] ${c.value || ''} chân: ${(c.pins || []).join(',')}`).join('\n');
+  const nets = (b.nets || []).map((n) => `${n.name}: ${(n.nodes || []).map((nd) => nd.comp + '.' + nd.pin).join(' — ')}`).join('\n');
+  return `Tên mạch: ${b.title || '(chưa đặt)'}\n\nLINH KIỆN:\n${comps}\n\nKẾT NỐI (net):\n${nets}`;
+}
+
+// ── PCB: AI kiểm tra mạch (ERC) — phân tích netlist, chỉ ra lỗi/cảnh báo ──
+app.post('/api/pcb/ai-review', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    const b = req.body || {};
+    if (!Array.isArray(b.components) || !b.components.length) return res.status(400).json({ error: 'Mạch trống' });
+    const system = 'Bạn là kỹ sư điện tử kiểm tra mạch (ERC). Phân tích netlist được cung cấp và trả về MARKDOWN tiếng Việt NGẮN GỌN gồm: (1) Tóm tắt mạch làm gì; (2) ⚠️ Lỗi/cảnh báo tiềm ẩn (chân nguồn/GND chưa nối, thiếu tụ lọc nguồn, thiếu điện trở hạn dòng LED, thiếu pull-up I2C, chân để hở, xung đột, dòng động cơ lớn cần dây to…); (3) ✅ Gợi ý cải thiện. KHÔNG bịa linh kiện không có trong netlist. Tối đa ~250 từ.';
+    const out = await _aiComplete({ system, user: _pcbNetlistText(b), maxTokens: 1500, temperature: 0.3 });
+    return res.json({ review: out.text, provider: out.provider });
+  } catch (e) { console.error('[pcb:review]', e.message); return res.status(502).json({ error: 'Lỗi kiểm tra: ' + e.message }); }
+});
+
+// ── PCB: AI sinh firmware khớp mạch (Arduino/ESP) theo chân đã nối ──
+app.post('/api/pcb/ai-firmware', async (req, res) => {
+  const d = _latexAuth(req, res); if (!d) return;
+  try {
+    const b = req.body || {};
+    if (!Array.isArray(b.components) || !b.components.length) return res.status(400).json({ error: 'Mạch trống' });
+    const mcu = (b.components || []).find((c) => c.type === 'MCU') || (b.components || []).find((c) => c.type === 'IC');
+    const board = mcu && /esp/i.test(mcu.value || '') ? 'ESP32' : (mcu ? mcu.value : 'Arduino UNO');
+    const system = `Bạn là lập trình viên nhúng. Viết firmware ${board} (Arduino C++ .ino) KHỚP với mạch theo netlist: dùng đúng tên chân/GPIO đã nối, khởi tạo I2C cho cảm biến nếu có, điều khiển LED/động cơ/đọc cảm biến hợp lý. CHỈ trả về MÃ NGUỒN (không giải thích, không bọc \`\`\`), có comment tiếng Việt ngắn ở mỗi phần.`;
+    const out = await _aiComplete({ system, user: _pcbNetlistText(b), maxTokens: 3000, temperature: 0.3 });
+    return res.json({ code: _stripFences(out.text), board, provider: out.provider });
+  } catch (e) { console.error('[pcb:fw]', e.message); return res.status(502).json({ error: 'Lỗi sinh firmware: ' + e.message }); }
+});
+
 // ── API Keys (MCP) — PHẢI trước catch-all /api proxy ────────
 // Xử lý /api/user/api-keys và /api/auth/validate-key tại đây (Node.js).
 // Không được proxy lên Rust backend vì backend không có các routes này.

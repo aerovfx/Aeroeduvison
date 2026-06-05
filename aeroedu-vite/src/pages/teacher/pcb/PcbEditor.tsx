@@ -1,11 +1,12 @@
 /** Trình vẽ sơ đồ nguyên lý (schematic) + AI sinh mạch + xuất netlist. */
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
-import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X } from 'lucide-react'
+import { Sparkles, Loader2, Trash2, Download, Cable, ListTree, X, ShieldCheck, Cpu, Copy, FileDown, CheckCircle2 } from 'lucide-react'
 import { getOfficeDoc, useOfficeAutosave } from '@/services/office.service'
-import { aiGenerateCircuit } from '@/services/pcb.service'
+import { aiGenerateCircuit, aiReviewCircuit, aiGenerateFirmware } from '@/services/pcb.service'
 import type { PcbComponent, PcbNet, PcbType, PcbDoc, PcbLayout as Layout } from '@/types/pcb'
 import { TEMPLATES, pinLocal, compSize, Glyph } from './pcbSymbols'
+import { ercCheck, bomCsv } from './pcbErc'
 import PcbLayout from './PcbLayout'
 import EditorBar from '../office/EditorBar'
 
@@ -114,6 +115,24 @@ export default function PcbEditor() {
     setAiBusy(false)
   }
 
+  // ── AI ERC / Firmware / BOM (Giai đoạn 4) ──
+  const [modal, setModal] = useState<null | 'erc' | 'fw'>(null)
+  const [ercRules, setErcRules] = useState<string[]>([])
+  const [aiReview, setAiReview] = useState(''); const [reviewBusy, setReviewBusy] = useState(false)
+  const [fwCode, setFwCode] = useState(''); const [fwBoard, setFwBoard] = useState(''); const [fwBusy, setFwBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const payload = () => ({ title, components: comps.map(({ ref, type, value, pins }) => ({ ref, type, value, pins })), nets: nets.map(({ name, nodes }) => ({ name, nodes })) })
+  const runErc = () => {
+    setModal('erc'); setErcRules(ercCheck(comps, nets)); setAiReview(''); setReviewBusy(true)
+    aiReviewCircuit(payload()).then(setAiReview).catch(() => setAiReview('(AI chưa sẵn sàng — xem kiểm tra theo luật ở trên)')).finally(() => setReviewBusy(false))
+  }
+  const runFw = () => {
+    setModal('fw'); setFwCode(''); setFwBusy(true)
+    aiGenerateFirmware(payload()).then((r) => { setFwCode(r.code); setFwBoard(r.board) }).catch((e) => setFwCode('// Lỗi: ' + (e?.response?.data?.error || 'không sinh được firmware'))).finally(() => setFwBusy(false))
+  }
+  const exportBom = () => { const blob = new Blob(['﻿' + bomCsv(comps)], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'mach'}.bom.csv`; a.click(); URL.revokeObjectURL(a.href) }
+  const dlFw = () => { const blob = new Blob([fwCode], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${title || 'firmware'}.ino`; a.click(); URL.revokeObjectURL(a.href) }
+
   const exportNetlist = () => {
     const data = { title, components: comps.map(({ id: _i, x: _x, y: _y, ...c }) => c), nets: nets.map(({ id: _i, ...n }) => n) }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -151,6 +170,13 @@ export default function PcbEditor() {
             </button>
             {aiErr && <div className="text-[11px] text-rose-500 mt-1">{aiErr}</div>}
             <p className="text-[10px] text-slate-400 mt-1">⚠ AI gợi ý sơ đồ — hãy kiểm tra lại giá trị & kết nối trước khi dùng thật.</p>
+          </div>
+
+          {/* Công cụ AI khác (GĐ4) */}
+          <div className="grid grid-cols-1 gap-1.5">
+            <button onClick={runErc} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><ShieldCheck className="w-4 h-4" /> AI kiểm tra mạch (ERC)</button>
+            <button onClick={runFw} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-violet-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><Cpu className="w-4 h-4" /> AI sinh firmware</button>
+            <button onClick={exportBom} disabled={!comps.length} className="px-2.5 py-2 rounded-lg text-sm font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center justify-center gap-1.5 disabled:opacity-50"><FileDown className="w-4 h-4" /> Xuất BOM (.csv)</button>
           </div>
 
           <div>
@@ -224,6 +250,40 @@ export default function PcbEditor() {
         )}
       </div>
       {!ready && <div className="fixed inset-0 grid place-items-center bg-slate-100/60 dark:bg-slate-950/60"><Loader2 className="w-8 h-8 animate-spin text-cyan-500" /></div>}
+
+      {/* Modal AI ERC / Firmware */}
+      {modal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setModal(null)}>
+          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-border shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+              {modal === 'erc' ? <ShieldCheck className="w-5 h-5 text-emerald-500" /> : <Cpu className="w-5 h-5 text-violet-500" />}
+              <span className="font-bold">{modal === 'erc' ? 'AI kiểm tra mạch (ERC)' : `Firmware ${fwBoard || ''}`}</span>
+              <button onClick={() => setModal(null)} className="ml-auto p-1 rounded hover:bg-accent"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="overflow-y-auto p-4 text-sm">
+              {modal === 'erc' ? (
+                <>
+                  <div className="text-xs font-bold text-slate-500 mb-1">Kiểm tra theo luật</div>
+                  <div className="space-y-0.5 mb-4">{ercRules.map((l, i) => <div key={i} className={l.startsWith('⚠') ? 'text-amber-600' : 'text-emerald-600'}>{l}</div>)}</div>
+                  <div className="text-xs font-bold text-slate-500 mb-1">Nhận xét của AI</div>
+                  {reviewBusy ? <div className="inline-flex items-center gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> AI đang phân tích…</div>
+                    : <div className="whitespace-pre-wrap leading-relaxed text-foreground/90">{aiReview || '(trống)'}</div>}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button onClick={() => { navigator.clipboard.writeText(fwCode); setCopied(true); setTimeout(() => setCopied(false), 1500) }} disabled={!fwCode} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 border border-border inline-flex items-center gap-1">{copied ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Đã chép</> : <><Copy className="w-3.5 h-3.5" /> Sao chép</>}</button>
+                    <button onClick={dlFw} disabled={!fwCode} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 text-white inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Tải .ino</button>
+                    <span className="text-[11px] text-slate-400">⚠ Kiểm tra trước khi nạp lên thiết bị thật.</span>
+                  </div>
+                  {fwBusy ? <div className="inline-flex items-center gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> AI đang viết firmware…</div>
+                    : <pre className="text-[11px] font-mono bg-slate-900 text-emerald-200 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{fwCode || '(trống)'}</pre>}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
