@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/services/api';
 import CameraCapture from './CameraCapture';
+import { OmrTemplate, OMR_TEMPLATES, DEFAULT_TEMPLATE, getTemplateById } from './omrTemplates';
 
 // ===================== HEIC CONVERSION =====================
 
@@ -90,6 +91,7 @@ export interface EssayQuestion {
 
 export interface AnswerKey {
   dbId?: string;
+  templateId?: string;
   examName: string;
   examCode: string;
   examDate: string;
@@ -838,24 +840,11 @@ function findMarkers(canvas: HTMLCanvasElement): DetectedMarker[] {
 // After perspective warp, these markers map to the canvas edges, so all bubble coordinates
 // must be expressed relative to this marker frame, NOT the full template.
 
-// Corner marker positions in template-absolute coordinates
-const MARKER_TL = { x: 0.022, y: 0.315 };
-const MARKER_BR = { x: 0.975, y: 0.980 };
-const MARKER_SCALE_X = MARKER_BR.x - MARKER_TL.x; // ≈ 0.953
-const MARKER_SCALE_Y = MARKER_BR.y - MARKER_TL.y; // ≈ 0.665
-
-/** Transform template-absolute coordinate to corner-marker-relative coordinate */
-function tmpl(tx: number, ty: number): { nx: number; ny: number } {
-  return {
-    nx: (tx - MARKER_TL.x) / MARKER_SCALE_X,
-    ny: (ty - MARKER_TL.y) / MARKER_SCALE_Y,
-  };
-}
-
 function mapBubbleCoordinates(
   markers: DetectedMarker[],
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
+  template: OmrTemplate = DEFAULT_TEMPLATE
 ): BubblePosition[] {
   // Reconstruct corner markers from legacy format, or use defaults
   let corners: CornerMarkers;
@@ -870,6 +859,16 @@ function mapBubbleCoordinates(
     corners = defaultCorners(imageWidth, imageHeight);
   }
 
+  // Marker frame (template-absolute) → marker-relative transform, theo template
+  const mTL = template.markerTL;
+  const mBR = template.markerBR;
+  const scaleX = mBR.x - mTL.x;
+  const scaleY = mBR.y - mTL.y;
+  const tmpl = (tx: number, ty: number) => ({
+    nx: (tx - mTL.x) / scaleX,
+    ny: (ty - mTL.y) / scaleY,
+  });
+
   const bubbles: BubblePosition[] = [];
   // mp takes TEMPLATE-ABSOLUTE coords, transforms to marker-relative, then maps to pixels
   const mp = (tx: number, ty: number) => {
@@ -877,109 +876,63 @@ function mapBubbleCoordinates(
     return mapNormToPixel(nx, ny, corners, imageWidth, imageHeight);
   };
 
-  // ─── PHẦN I: 40 câu trắc nghiệm ABCD ─────────────────────────
-  // All coordinates are in TEMPLATE-ABSOLUTE space (from template_config.py)
-  // The mp() function handles the transform to marker-relative space
-
-  const P1_FIRST_ROW_Y = 0.342;   // Y center of first bubble row (Q1/11/21/31)
-  const P1_LAST_ROW_Y = 0.555;    // Y center of last bubble row (Q10/20/30/40)
-  const P1_ROW_SPACING = (P1_LAST_ROW_Y - P1_FIRST_ROW_Y) / 9;
-
-  // Column groups — bubble center X positions for A, B, C, D
-  // Measured from standard template (template_config.py ground truth)
-  const P1_COLS = [
-    { qStart: 1,  optXs: [0.052, 0.082, 0.112, 0.142] },  // Column 1: Q1-10
-    { qStart: 11, optXs: [0.286, 0.316, 0.346, 0.376] },  // Column 2: Q11-20
-    { qStart: 21, optXs: [0.520, 0.550, 0.580, 0.610] },  // Column 3: Q21-30
-    { qStart: 31, optXs: [0.752, 0.782, 0.812, 0.842] },  // Column 4: Q31-40
-  ];
-
-  for (const col of P1_COLS) {
-    for (let r = 0; r < 10; r++) {
+  // ─── PHẦN I: trắc nghiệm nhiều lựa chọn ──────────────────────
+  const p1 = template.part1;
+  const p1RowSpacing = p1.rowsPerColumn > 1 ? (p1.lastRowY - p1.firstRowY) / (p1.rowsPerColumn - 1) : 0;
+  for (const col of p1.columns) {
+    for (let r = 0; r < p1.rowsPerColumn; r++) {
       const q = col.qStart + r;
-      const ty = P1_FIRST_ROW_Y + r * P1_ROW_SPACING;
-
-      for (let i = 0; i < 4; i++) {
+      if (q > p1.count) continue;
+      const ty = p1.firstRowY + r * p1RowSpacing;
+      for (let i = 0; i < p1.options.length; i++) {
         const { x, y } = mp(col.optXs[i], ty);
         bubbles.push({
           x, y,
-          label: `Q${q}-${SHEET_TEMPLATE.part1.options[i]}`,
+          label: `Q${q}-${p1.options[i]}`,
           section: 'part1',
           questionId: q,
-          optionLabel: SHEET_TEMPLATE.part1.options[i],
+          optionLabel: p1.options[i],
         });
       }
     }
   }
 
-  // ─── PHẦN II: 8 câu Đúng/Sai ─────────────────────────────────
-  // 4 groups of 2 questions each: (Câu 1,2), (Câu 3,4), (Câu 5,6), (Câu 7,8)
-  // Each question has 4 sub-items: a, b, c, d
-  // Each sub-item has 2 bubbles: Đúng (●) and Sai (●)
-
-  const P2_FIRST_ROW_Y = 0.618;   // Y center of first sub-item row (from template_config)
-  const P2_SUB_SPACING = 0.024;    // Y gap between sub-items (a→b→c→d) = (0.690 - 0.618) / 3
-  const P2_QUESTION_GAP = 0.003;   // Extra Y gap between questions within a group
-
-  // X positions from template_config PART2_LAYOUT.questions[].dung/sai
-  const P2_GROUPS = [
-    { qStart: 1, dongX: 0.048, saiX: 0.078, dongX2: 0.148, saiX2: 0.178 }, // Câu 1 + Câu 2
-    { qStart: 3, dongX: 0.268, saiX: 0.298, dongX2: 0.368, saiX2: 0.398 }, // Câu 3 + Câu 4
-    { qStart: 5, dongX: 0.510, saiX: 0.540, dongX2: 0.618, saiX2: 0.648 }, // Câu 5 + Câu 6
-    { qStart: 7, dongX: 0.738, saiX: 0.768, dongX2: 0.858, saiX2: 0.888 }, // Câu 7 + Câu 8
-  ];
-
-  for (const grp of P2_GROUPS) {
-    // Question 1 of group (e.g., Câu 1)
-    for (let s = 0; s < 4; s++) {
-      const ty = P2_FIRST_ROW_Y + s * P2_SUB_SPACING;
-      const sub = SHEET_TEMPLATE.part2.subItems[s];
-      const { x: dx, y: dy } = mp(grp.dongX, ty);
-      bubbles.push({ x: dx, y: dy, label: `Q${grp.qStart}-${sub}-Đ`, section: 'part2', questionId: grp.qStart, optionLabel: sub });
-      const { x: sx, y: sy } = mp(grp.saiX, ty);
-      bubbles.push({ x: sx, y: sy, label: `Q${grp.qStart}-${sub}-S`, section: 'part2', questionId: grp.qStart, optionLabel: sub });
-    }
-    // Question 2 of group (e.g., Câu 2)
-    for (let s = 0; s < 4; s++) {
-      const ty = P2_FIRST_ROW_Y + s * P2_SUB_SPACING;
-      const sub = SHEET_TEMPLATE.part2.subItems[s];
-      const { x: dx, y: dy } = mp(grp.dongX2, ty);
-      bubbles.push({ x: dx, y: dy, label: `Q${grp.qStart + 1}-${sub}-Đ`, section: 'part2', questionId: grp.qStart + 1, optionLabel: sub });
-      const { x: sx, y: sy } = mp(grp.saiX2, ty);
-      bubbles.push({ x: sx, y: sy, label: `Q${grp.qStart + 1}-${sub}-S`, section: 'part2', questionId: grp.qStart + 1, optionLabel: sub });
+  // ─── PHẦN II: Đúng/Sai (mỗi nhóm 2 câu, mỗi câu 4 ý a-d) ─────
+  const p2 = template.part2;
+  for (const grp of p2.groups) {
+    for (let s = 0; s < p2.subItems.length; s++) {
+      const ty = p2.firstRowY + s * p2.subSpacing;
+      const sub = p2.subItems[s];
+      if (grp.qStart <= p2.count) {
+        const { x: dx, y: dy } = mp(grp.dongX, ty);
+        bubbles.push({ x: dx, y: dy, label: `Q${grp.qStart}-${sub}-Đ`, section: 'part2', questionId: grp.qStart, optionLabel: sub });
+        const { x: sx, y: sy } = mp(grp.saiX, ty);
+        bubbles.push({ x: sx, y: sy, label: `Q${grp.qStart}-${sub}-S`, section: 'part2', questionId: grp.qStart, optionLabel: sub });
+      }
+      if (grp.qStart + 1 <= p2.count) {
+        const { x: dx, y: dy } = mp(grp.dongX2, ty);
+        bubbles.push({ x: dx, y: dy, label: `Q${grp.qStart + 1}-${sub}-Đ`, section: 'part2', questionId: grp.qStart + 1, optionLabel: sub });
+        const { x: sx, y: sy } = mp(grp.saiX2, ty);
+        bubbles.push({ x: sx, y: sy, label: `Q${grp.qStart + 1}-${sub}-S`, section: 'part2', questionId: grp.qStart + 1, optionLabel: sub });
+      }
     }
   }
 
-  // ─── PHẦN III: 6 câu trả lời ngắn ─────────────────────────────
-  // Each question has 5 digit columns × 12 rows
-  // Digit rows: -, comma, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-
-  const P3_FIRST_ROW_Y = 0.745;   // Y center of first digit row ('-') from template_config
-  const P3_LAST_ROW_Y = 0.968;    // Y center of last digit row ('9')
-  const P3_DIGIT_ROW_SPACING = (P3_LAST_ROW_Y - P3_FIRST_ROW_Y) / 11;  // = 0.02027
-
-  // Each question has 5 digit columns (from template_config PART3_LAYOUT)
-  const P3_QUESTIONS = [
-    { q: 1, cols: [0.042, 0.060, 0.078, 0.096, 0.114] },
-    { q: 2, cols: [0.205, 0.223, 0.241, 0.259, 0.277] },
-    { q: 3, cols: [0.370, 0.388, 0.406, 0.424, 0.442] },
-    { q: 4, cols: [0.535, 0.553, 0.571, 0.589, 0.607] },
-    { q: 5, cols: [0.695, 0.713, 0.731, 0.749, 0.767] },
-    { q: 6, cols: [0.860, 0.878, 0.896, 0.914, 0.932] },
-  ];
-
-  for (const pq of P3_QUESTIONS) {
-    for (let row = 0; row < 12; row++) {
-      const ty = P3_FIRST_ROW_Y + row * P3_DIGIT_ROW_SPACING;
-      for (let col = 0; col < 5; col++) {
-        const tx = pq.cols[col];
-        const { x, y } = mp(tx, ty);
+  // ─── PHẦN III: trả lời ngắn (lưới chữ số) ────────────────────
+  const p3 = template.part3;
+  const p3RowSpacing = p3.digitRows.length > 1 ? (p3.lastRowY - p3.firstRowY) / (p3.digitRows.length - 1) : 0;
+  for (const pq of p3.questions) {
+    if (pq.q > p3.count) continue;
+    for (let row = 0; row < p3.digitRows.length; row++) {
+      const ty = p3.firstRowY + row * p3RowSpacing;
+      for (let col = 0; col < pq.cols.length; col++) {
+        const { x, y } = mp(pq.cols[col], ty);
         bubbles.push({
           x, y,
-          label: `Q${pq.q}-col${col}-${SHEET_TEMPLATE.part3.digitRows[row]}`,
+          label: `Q${pq.q}-col${col}-${p3.digitRows[row]}`,
           section: 'part3',
           questionId: pq.q,
-          optionLabel: SHEET_TEMPLATE.part3.digitRows[row],
+          optionLabel: p3.digitRows[row],
         });
       }
     }
@@ -1078,6 +1031,7 @@ function BubbleOverlay({
   detectedPart2,
   detectedPart3,
   onBubbleClick,
+  template,
 }: {
   imageUrl: string;
   bubbles: BubblePosition[];
@@ -1086,6 +1040,7 @@ function BubbleOverlay({
   detectedPart2: Record<number, Record<string, boolean | null>>;
   detectedPart3: Record<number, string>;
   onBubbleClick: (bubble: BubblePosition) => void;
+  template: OmrTemplate;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1127,7 +1082,7 @@ function BubbleOverlay({
 
     // For Part I: determine which option is the correct answer per question
     const correctPart1: Record<number, string> = {};
-    for (let q = 1; q <= 40; q++) {
+    for (let q = 1; q <= template.part1.count; q++) {
       const val = answerKey.part1[q];
       if (val) correctPart1[q] = val;
     }
@@ -1191,7 +1146,7 @@ function BubbleOverlay({
         });
       }
     }
-  }, [imageLoaded, imageDims, bubbles, detectedAnswers, detectedPart2, detectedPart3, answerKey]);
+  }, [imageLoaded, imageDims, bubbles, detectedAnswers, detectedPart2, detectedPart3, answerKey, template]);
 
   // Handle click: convert display coords to natural coords
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1278,17 +1233,24 @@ function drawBubble(
 function AnswerComparisonGrid({
   sheet,
   answerKey,
+  template,
   updateDetectedAnswers,
   updateDetectedPart2,
   updateDetectedPart3,
 }: {
   sheet: ScannedSheet;
   answerKey: AnswerKey;
+  template: OmrTemplate;
   updateDetectedAnswers: (sheetId: string, q: number, ans: 'A' | 'B' | 'C' | 'D' | null) => void;
   updateDetectedPart2: (sheetId: string, q: number, sub: string, val: boolean | null) => void;
   updateDetectedPart3: (sheetId: string, q: number, val: string) => void;
 }) {
   const opts: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
+  const p1Count = template.part1.count;
+  const p2Count = template.part2.count;
+  const p3Count = template.part3.count;
+  const p1Columns = Math.max(1, Math.ceil(p1Count / template.part1.rowsPerColumn));
+  const p1RowsPerCol = template.part1.rowsPerColumn;
 
   // Helper: get bubble color for Part I
   const getPart1BubbleStyle = (q: number, opt: 'A' | 'B' | 'C' | 'D') => {
@@ -1338,7 +1300,7 @@ function AnswerComparisonGrid({
   const part1Stats = (() => {
     let correct = 0;
     let total = 0;
-    for (let q = 1; q <= 40; q++) {
+    for (let q = 1; q <= p1Count; q++) {
       const k = answerKey.part1[q];
       if (k !== null && k !== undefined) {
         total++;
@@ -1352,10 +1314,10 @@ function AnswerComparisonGrid({
   const part2Stats = (() => {
     let totalScore = 0;
     let totalQuestions = 0;
-    for (let q = 1; q <= 8; q++) {
+    for (let q = 1; q <= p2Count; q++) {
       const keyQ = answerKey.part2[q];
       if (!keyQ) continue;
-      const subs = ['a', 'b', 'c', 'd'];
+      const subs = template.part2.subItems;
       let correctSubs = 0;
       let totalSubs = 0;
       for (const sub of subs) {
@@ -1376,7 +1338,7 @@ function AnswerComparisonGrid({
   const part3Stats = (() => {
     let correct = 0;
     let total = 0;
-    for (let q = 1; q <= 6; q++) {
+    for (let q = 1; q <= p3Count; q++) {
       const k = answerKey.part3[q];
       if (!k || k.trim().length === 0) continue;
       total++;
@@ -1404,12 +1366,12 @@ function AnswerComparisonGrid({
               <div key={o} className="text-[10px] text-muted-foreground text-center font-bold">{o}</div>
             ))}
           </div>
-          {/* Question rows — 4 columns of 10 */}
-          <div className="grid grid-cols-4 gap-x-3 gap-y-0">
-            {[0, 1, 2, 3].map(col => (
+          {/* Question rows — N cột × rowsPerColumn câu */}
+          <div className="grid gap-x-3 gap-y-0" style={{ gridTemplateColumns: `repeat(${p1Columns}, minmax(0, 1fr))` }}>
+            {Array.from({ length: p1Columns }, (_, c) => c).map(col => (
               <div key={col} className="space-y-0.5">
-                {Array.from({ length: 10 }, (_, i) => col * 10 + i + 1).map(q => {
-                  if (q > 40) return null;
+                {Array.from({ length: p1RowsPerCol }, (_, i) => col * p1RowsPerCol + i + 1).map(q => {
+                  if (q > p1Count) return null;
                   const keyAns = answerKey.part1[q];
                   const detected = sheet.detectedAnswers[q];
                   const hasKey = keyAns !== null && keyAns !== undefined;
@@ -1467,9 +1429,9 @@ function AnswerComparisonGrid({
         </div>
         <div className="p-3">
           <div className="grid grid-cols-4 gap-3">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map(q => {
+            {Array.from({ length: p2Count }, (_, i) => i + 1).map(q => {
               const keyQ = answerKey.part2[q];
-              const subs = ['a', 'b', 'c', 'd'];
+              const subs = template.part2.subItems;
               let correctSubs = 0;
               let totalSubs = 0;
               for (const sub of subs) {
@@ -1536,7 +1498,7 @@ function AnswerComparisonGrid({
         </div>
         <div className="p-3">
           <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map(q => {
+            {Array.from({ length: p3Count }, (_, i) => i + 1).map(q => {
               const keyAns = answerKey.part3[q];
               const hasKey = keyAns && keyAns.trim().length > 0;
               const studentAns = sheet.detectedPart3[q]?.trim() || '';
@@ -1605,13 +1567,14 @@ function gradeAgainstKey(
   studentPart2: Record<number, Record<string, boolean | null>>,
   studentPart3: Record<number, string>,
   essayScores: Record<string, number>,
-  answerKey: AnswerKey
+  answerKey: AnswerKey,
+  template: OmrTemplate = DEFAULT_TEMPLATE
 ): { score: number; maxScore: number } {
   let score = 0;
   let maxScore = 0;
 
-  // Part I: Trắc nghiệm — 0.25đ mỗi câu (tối đa 40 câu = 10đ)
-  for (let q = 1; q <= 40; q++) {
+  // Part I: Trắc nghiệm — 0.25đ mỗi câu
+  for (let q = 1; q <= template.part1.count; q++) {
     const keyAnswer = answerKey.part1[q];
     // Chỉ tính câu đã có đáp án (không null, không undefined)
     if (keyAnswer !== null && keyAnswer !== undefined) {
@@ -1620,8 +1583,8 @@ function gradeAgainstKey(
     }
   }
 
-  // Part II: Đúng/Sai — 4 ý đúng hết = 1đ, 3 đúng = 0.5đ, ≤2 đúng = 0đ (tối đa 8 câu = 8đ)
-  for (let q = 1; q <= 8; q++) {
+  // Part II: Đúng/Sai — 4 ý đúng hết = 1đ, 3 đúng = 0.5đ, ≤2 đúng = 0đ
+  for (let q = 1; q <= template.part2.count; q++) {
     const keyQ = answerKey.part2[q];
     if (!keyQ) continue; // Chưa nhập đáp án cho câu này
 
@@ -1646,8 +1609,8 @@ function gradeAgainstKey(
     }
   }
 
-  // Part III: Trả lời ngắn — 1đ mỗi câu đúng (tối đa 6 câu = 6đ)
-  for (let q = 1; q <= 6; q++) {
+  // Part III: Trả lời ngắn — 1đ mỗi câu đúng
+  for (let q = 1; q <= template.part3.count; q++) {
     const keyAnswer = answerKey.part3[q];
     if (!keyAnswer || keyAnswer.trim().length === 0) continue;
 
@@ -1998,6 +1961,7 @@ function ProcessingView({ sheets, totalProgress }: { sheets: ScannedSheet[]; tot
 function ReviewView({
   sheets,
   answerKey,
+  template,
   currentSheetIdx,
   setCurrentSheetIdx,
   updateDetectedAnswers,
@@ -2012,6 +1976,7 @@ function ReviewView({
 }: {
   sheets: ScannedSheet[];
   answerKey: AnswerKey;
+  template: OmrTemplate;
   currentSheetIdx: number;
   setCurrentSheetIdx: (idx: number) => void;
   updateDetectedAnswers: (sheetId: string, q: number, ans: 'A' | 'B' | 'C' | 'D' | null) => void;
@@ -2069,7 +2034,7 @@ function ReviewView({
             ];
           }
 
-          const positions = mapBubbleCoordinates(effectiveMarkers, flatCanvas.width, flatCanvas.height);
+          const positions = mapBubbleCoordinates(effectiveMarkers, flatCanvas.width, flatCanvas.height, template);
 
           // === STEP 3: Detect pencil fills on the flat canvas ===
           const detected = detectBubbles(flatCanvas, positions);
@@ -2091,7 +2056,7 @@ function ReviewView({
     img.onerror = (e) => {
       console.error('[ReviewView] Image load error:', e);
     };
-  }, [sheet.preview]);
+  }, [sheet.preview, template]);
 
   const handleBubbleClick = (bubble: BubblePosition) => {
     if (bubble.section === 'part1') {
@@ -2135,6 +2100,7 @@ function ReviewView({
               detectedPart2={sheet.detectedPart2}
               detectedPart3={sheet.detectedPart3}
               onBubbleClick={handleBubbleClick}
+              template={template}
             />
           ) : (
             <img src={correctedImageUrl || sheet.preview} alt="Sheet" className="w-full rounded-lg" />
@@ -2173,6 +2139,7 @@ function ReviewView({
         <AnswerComparisonGrid
           sheet={sheet}
           answerKey={answerKey}
+          template={template}
           updateDetectedAnswers={updateDetectedAnswers}
           updateDetectedPart2={updateDetectedPart2}
           updateDetectedPart3={updateDetectedPart3}
@@ -2611,6 +2578,8 @@ export default function ScanGrading(props: ScanGradingProps) {
   const isScanningRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [showCamera, setShowCamera] = useState(false);
+  // Mẫu phiếu đang dùng (cấu hình toạ độ ô tô + số câu mỗi phần)
+  const [template, setTemplate] = useState<OmrTemplate>(() => getTemplateById(answerKey?.templateId));
   // Sau khi chụp bằng camera, tự nhảy sang "Xem lại" để hiện điểm + chi tiết ngay
   const wantReviewRef = useRef(false);
 
@@ -2767,7 +2736,7 @@ export default function ScanGrading(props: ScanGradingProps) {
                   { x: flatCorners.bottomRight.x, y: flatCorners.bottomRight.y, size: 10 },
                 ];
               }
-              const positions = mapBubbleCoordinates(effectiveMarkers, flatCanvas.width, flatCanvas.height);
+              const positions = mapBubbleCoordinates(effectiveMarkers, flatCanvas.width, flatCanvas.height, template);
 
               // === Step 3: Detect pencil fills ===
               const detected = detectBubbles(flatCanvas, positions);
@@ -2778,7 +2747,7 @@ export default function ScanGrading(props: ScanGradingProps) {
               const detectedPart3: Record<number, string> = {};
 
               // Part I: for each question, find the filled bubble option
-              for (let q = 1; q <= 40; q++) {
+              for (let q = 1; q <= template.part1.count; q++) {
                 const qBubbles = detected.filter(b => b.section === 'part1' && b.questionId === q && b.filled);
                 if (qBubbles.length === 1) {
                   detectedAnswers[q] = qBubbles[0].optionLabel as 'A' | 'B' | 'C' | 'D';
@@ -2792,9 +2761,9 @@ export default function ScanGrading(props: ScanGradingProps) {
               }
 
               // Part II: Đúng/Sai — detect filled Đúng or Sai per sub-item
-              for (let q = 1; q <= 8; q++) {
+              for (let q = 1; q <= template.part2.count; q++) {
                 detectedPart2[q] = {};
-                for (const sub of ['a', 'b', 'c', 'd']) {
+                for (const sub of template.part2.subItems) {
                   const dongBubbles = detected.filter(
                     b => b.section === 'part2' && b.questionId === q &&
                          b.optionLabel === sub && b.label.endsWith('-Đ') && b.filled
@@ -2814,9 +2783,9 @@ export default function ScanGrading(props: ScanGradingProps) {
               }
 
               // Part III: short answer — read filled digit bubbles per column
-              for (let q = 1; q <= 6; q++) {
+              for (let q = 1; q <= template.part3.count; q++) {
                 let answer = '';
-                for (let col = 0; col < 4; col++) {
+                for (let col = 0; col < template.part3.digitsRead; col++) {
                   const colBubbles = detected.filter(
                     b => b.section === 'part3' && b.questionId === q &&
                          b.label.includes(`col${col}`) && b.filled
@@ -2891,7 +2860,8 @@ export default function ScanGrading(props: ScanGradingProps) {
                   scanResult.detectedPart2,
                   scanResult.detectedPart3,
                   {},
-                  answerKey
+                  answerKey,
+                  template
                 );
                 return {
                   ...s,
@@ -2920,7 +2890,7 @@ export default function ScanGrading(props: ScanGradingProps) {
         }
       }
     },
-    [answerKey]
+    [answerKey, template]
   );
 
   // ── Chụp 1 phiếu bằng camera → chấm ngay → nhảy sang Xem lại ──
@@ -2948,7 +2918,7 @@ export default function ScanGrading(props: ScanGradingProps) {
       prev.map(s => {
         if (s.id === sheetId) {
           const newAnswers = { ...s.detectedAnswers, [q]: ans };
-          const { score, maxScore } = gradeAgainstKey(newAnswers, s.detectedPart2, s.detectedPart3, s.essayScores, answerKey);
+          const { score, maxScore } = gradeAgainstKey(newAnswers, s.detectedPart2, s.detectedPart3, s.essayScores, answerKey, template);
           return {
             ...s,
             detectedAnswers: newAnswers,
@@ -2960,7 +2930,7 @@ export default function ScanGrading(props: ScanGradingProps) {
         return s;
       })
     );
-  }, [answerKey]);
+  }, [answerKey, template]);
 
   const updateDetectedPart2 = useCallback((sheetId: string, q: number, sub: string, val: boolean | null) => {
     setSheets(prev =>
@@ -2970,7 +2940,7 @@ export default function ScanGrading(props: ScanGradingProps) {
             ...s.detectedPart2,
             [q]: { ...s.detectedPart2[q], [sub]: val },
           };
-          const { score, maxScore } = gradeAgainstKey(s.detectedAnswers, newPart2, s.detectedPart3, s.essayScores, answerKey);
+          const { score, maxScore } = gradeAgainstKey(s.detectedAnswers, newPart2, s.detectedPart3, s.essayScores, answerKey, template);
           return {
             ...s,
             detectedPart2: newPart2,
@@ -2981,14 +2951,14 @@ export default function ScanGrading(props: ScanGradingProps) {
         return s;
       })
     );
-  }, [answerKey]);
+  }, [answerKey, template]);
 
   const updateDetectedPart3 = useCallback((sheetId: string, q: number, val: string) => {
     setSheets(prev =>
       prev.map(s => {
         if (s.id === sheetId) {
           const newPart3 = { ...s.detectedPart3, [q]: val };
-          const { score, maxScore } = gradeAgainstKey(s.detectedAnswers, s.detectedPart2, newPart3, s.essayScores, answerKey);
+          const { score, maxScore } = gradeAgainstKey(s.detectedAnswers, s.detectedPart2, newPart3, s.essayScores, answerKey, template);
           return {
             ...s,
             detectedPart3: newPart3,
@@ -2999,7 +2969,7 @@ export default function ScanGrading(props: ScanGradingProps) {
         return s;
       })
     );
-  }, [answerKey]);
+  }, [answerKey, template]);
 
   // Cập nhật điểm tự luận cho từng phiếu
   const updateEssayScore = useCallback((sheetId: string, eqId: string, val: number) => {
@@ -3008,14 +2978,14 @@ export default function ScanGrading(props: ScanGradingProps) {
         if (s.id === sheetId) {
           const newEssayScores = { ...s.essayScores, [eqId]: val };
           const { score, maxScore } = gradeAgainstKey(
-            s.detectedAnswers, s.detectedPart2, s.detectedPart3, newEssayScores, answerKey
+            s.detectedAnswers, s.detectedPart2, s.detectedPart3, newEssayScores, answerKey, template
           );
           return { ...s, essayScores: newEssayScores, totalScore: score, maxScore };
         }
         return s;
       })
     );
-  }, [answerKey]);
+  }, [answerKey, template]);
 
   // Cập nhật ghi chú tự luận
   const updateEssayNotes = useCallback((sheetId: string, eqId: string, note: string) => {
@@ -3070,7 +3040,26 @@ export default function ScanGrading(props: ScanGradingProps) {
       {/* View Mode Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-3xl font-bold text-foreground">Quét & Chấm Điểm</h1>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
+          {OMR_TEMPLATES.length > 1 ? (
+            <select
+              value={template.id}
+              onChange={(e) => setTemplate(getTemplateById(e.target.value))}
+              title="Mẫu phiếu"
+              className="px-3 py-2 rounded-lg text-sm font-medium border border-border bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              {OMR_TEMPLATES.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span
+              title={template.description}
+              className="px-3 py-2 rounded-lg text-xs font-medium border border-border bg-muted text-muted-foreground"
+            >
+              Mẫu: {template.name}
+            </span>
+          )}
           <button
             onClick={() => setShowCamera(true)}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow hover:shadow-lg transition-all flex items-center gap-2"
@@ -3101,10 +3090,16 @@ export default function ScanGrading(props: ScanGradingProps) {
 
       {viewMode === 'scan' && sheets.length > 0 && <ProcessingView sheets={sheets} totalProgress={totalProgress} />}
 
+      {/* Đang chấm phiếu vừa chụp (camera) — tránh màn hình trống */}
+      {viewMode === 'review' && sheets.filter(s => s.status !== 'scanning').length === 0 && sheets.some(s => s.status === 'scanning') && (
+        <ProcessingView sheets={sheets} totalProgress={totalProgress} />
+      )}
+
       {viewMode === 'review' && sheets.filter(s => s.status !== 'scanning').length > 0 && (
         <ReviewView
           sheets={sheets.filter(s => s.status !== 'scanning')}
           answerKey={answerKey}
+          template={template}
           currentSheetIdx={currentSheetIdx}
           setCurrentSheetIdx={setCurrentSheetIdx}
           updateDetectedAnswers={updateDetectedAnswers}
@@ -3133,14 +3128,23 @@ export default function ScanGrading(props: ScanGradingProps) {
           <div className="text-center py-8">
             <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-foreground font-semibold">Chưa có phiếu nào</p>
-            <p className="text-sm text-muted-foreground mt-1">Vui lòng upload phiếu trắc nghiệm để bắt đầu</p>
-            <button
-              onClick={() => setViewMode('scan')}
-              className="ai-button-primary text-white px-5 py-2.5 rounded-lg font-semibold mt-4 text-sm inline-block hover:shadow-lg transition-all"
-            >
-              <Upload className="w-4 h-4 inline mr-2" />
-              Upload phiếu
-            </button>
+            <p className="text-sm text-muted-foreground mt-1">Chụp bằng camera để chấm ngay, hoặc upload phiếu</p>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <button
+                onClick={() => setShowCamera(true)}
+                className="text-white px-5 py-2.5 rounded-lg font-semibold text-sm bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg transition-all flex items-center gap-2"
+              >
+                <Camera className="w-4 h-4" />
+                Camera chấm ngay
+              </button>
+              <button
+                onClick={() => setViewMode('scan')}
+                className="ai-button text-foreground px-5 py-2.5 rounded-lg font-semibold text-sm border border-border hover:bg-muted transition-all flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload phiếu
+              </button>
+            </div>
           </div>
         </GlassCard>
       )}
