@@ -32,6 +32,8 @@ export default function CameraCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // true cho tới khi component unmount — để huỷ stream nếu getUserMedia trả về muộn
+  const mountedRef = useRef(true);
 
   const [state, setState] = useState<CamState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -73,6 +75,13 @@ export default function CameraCapture({
         },
         audio: false,
       });
+
+      // Nếu đã unmount (hoặc khởi động lại) trong lúc chờ getUserMedia → huỷ ngay
+      // để không rò camera (đèn camera kẹt sáng).
+      if (!mountedRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -103,8 +112,12 @@ export default function CameraCapture({
 
   // Khởi động khi mở, dọn dẹp khi đóng
   useEffect(() => {
+    mountedRef.current = true;
     startStream(facingMode);
-    return () => stopStream();
+    return () => {
+      mountedRef.current = false;
+      stopStream();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
