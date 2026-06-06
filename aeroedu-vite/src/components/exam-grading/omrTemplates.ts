@@ -112,5 +112,11 @@ export const OMR_TEMPLATES: OmrTemplate[] = [BGD_2025];
 export const DEFAULT_TEMPLATE = BGD_2025;
 
 export function getTemplateById(id: string | undefined): OmrTemplate {
-  return OMR_TEMPLATES.find(t => t.id === id) || DEFAULT_TEMPLATE;
+  if (!id) return DEFAULT_TEMPLATE;
+  const found = OMR_TEMPLATES.find(t => t.id === id);
+  if (!found) {
+    console.warn(`[omr] Không tìm thấy mẫu phiếu "${id}" — dùng mẫu mặc định ${DEFAULT_TEMPLATE.id}`);
+    return DEFAULT_TEMPLATE;
+  }
+  return found;
 }

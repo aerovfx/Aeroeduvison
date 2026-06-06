@@ -2583,6 +2583,13 @@ export default function ScanGrading(props: ScanGradingProps) {
   // Sau khi chụp bằng camera, tự nhảy sang "Xem lại" để hiện điểm + chi tiết ngay
   const wantReviewRef = useRef(false);
 
+  // Đồng bộ mẫu phiếu theo answer key đang chọn: khi đổi sang key gắn mẫu khác
+  // thì engine dùng đúng toạ độ của mẫu đó. (templateId là chuỗi nguyên thuỷ nên
+  // effect chỉ chạy khi GIÁ TRỊ mẫu đổi — không phá lựa chọn mẫu thủ công.)
+  useEffect(() => {
+    setTemplate(getTemplateById(answerKey?.templateId));
+  }, [answerKey?.templateId]);
+
   // Save graded results to database
   const saveGradedResults = useCallback(async () => {
     if (!answerKey?.dbId || sheets.length === 0) return;
