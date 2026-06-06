@@ -595,12 +595,34 @@ export default function ExamMatrixPage() {
     outline: 'none',
   } as React.CSSProperties
 
+  // 4 nút thao tác dùng chung cho bảng (desktop) và thẻ (mobile)
+  const matrixActions = (m: ExamMatrix) => (
+    <>
+      <button onClick={() => navigate(`/teacher/exam-matrix/${m.id}`)}
+        className="p-2 rounded-lg transition-colors hover:bg-white/10" title="Xem" style={{ color: D.muted }}>
+        <Eye className="w-4 h-4" />
+      </button>
+      <button onClick={() => setGenerateTarget({ id: m.id, name: m.name })}
+        className="p-2 rounded-lg transition-colors hover:bg-white/10" title="Sinh đề" style={{ color: D.muted }}>
+        <Plus className="w-4 h-4" />
+      </button>
+      <button onClick={() => handleDuplicate(m.id)}
+        className="p-2 rounded-lg transition-colors hover:bg-white/10" title="Nhân bản" style={{ color: D.muted }}>
+        <Copy className="w-4 h-4" />
+      </button>
+      <button onClick={() => setDeleteDialog(m.id)}
+        className="p-2 rounded-lg transition-colors hover:bg-red-500/10" title="Xóa" style={{ color: '#f87171' }}>
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </>
+  )
+
   return (
     <div className="min-h-screen" style={{ background: D.bg }}>
 
       {/* Top Bar */}
       <div className="sticky top-0 z-10 border-b" style={{ background: D.card, borderColor: D.border }}>
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -615,17 +637,17 @@ export default function ExamMatrixPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setDigitizeOpen(true)}
-                className="px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors hover:bg-white/10"
+                className="px-3 sm:px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors hover:bg-white/10 whitespace-nowrap"
                 style={{ color: D.text }}
               >
-                <Upload className="w-4 h-4" />Số hóa
+                <Upload className="w-4 h-4 flex-shrink-0" />Số hóa
               </button>
               <button
                 onClick={() => navigate('/teacher/exam-matrix/create')}
-                className="px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors"
+                className="px-3 sm:px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap"
                 style={{ background: D.purple, color: '#fff' }}
               >
-                <Plus className="w-4 h-4" />Tạo mới
+                <Plus className="w-4 h-4 flex-shrink-0" />Tạo mới
               </button>
             </div>
           </div>
@@ -633,7 +655,7 @@ export default function ExamMatrixPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="grid grid-cols-12 gap-6">
 
           {/* ── Left Column: List (8 cols) ──────────────────────────── */}
@@ -680,8 +702,8 @@ export default function ExamMatrixPage() {
               </div>
             </div>
 
-            {/* Matrix Table */}
-            <div className="rounded-xl overflow-hidden" style={{ background: D.card, border: `1px solid ${D.border}` }}>
+            {/* Matrix Table — desktop (md+) */}
+            <div className="hidden md:block rounded-xl overflow-hidden" style={{ background: D.card, border: `1px solid ${D.border}` }}>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -749,38 +771,7 @@ export default function ExamMatrixPage() {
                           <td className="p-4"><StatusBadge status={m.status} /></td>
                           <td className="p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end gap-1">
-                              <button
-                                onClick={() => navigate(`/teacher/exam-matrix/${m.id}`)}
-                                className="p-2 rounded-lg transition-colors hover:bg-white/10"
-                                title="Xem"
-                                style={{ color: D.muted }}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setGenerateTarget({ id: m.id, name: m.name })}
-                                className="p-2 rounded-lg transition-colors hover:bg-white/10"
-                                title="Sinh đề"
-                                style={{ color: D.muted }}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(m.id)}
-                                className="p-2 rounded-lg transition-colors hover:bg-white/10"
-                                title="Nhân bản"
-                                style={{ color: D.muted }}
-                              >
-                                <Copy className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => { setDeleteDialog(m.id) }}
-                                className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
-                                title="Xóa"
-                                style={{ color: '#f87171' }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {matrixActions(m)}
                             </div>
                           </td>
                         </tr>
@@ -789,6 +780,62 @@ export default function ExamMatrixPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Matrix Cards — mobile (< md) */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="rounded-xl p-10 flex items-center justify-center gap-3"
+                  style={{ background: D.card, border: `1px solid ${D.border}` }}>
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: D.purple }} />
+                  <span style={{ color: D.muted }}>Đang tải...</span>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="rounded-xl p-10 text-center"
+                  style={{ background: D.card, border: `1px solid ${D.border}` }}>
+                  <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: D.muted2 }} />
+                  <p className="font-medium" style={{ color: D.muted }}>Chưa có ma trận nào</p>
+                  <p className="text-sm mt-1" style={{ color: D.muted2 }}>Tạo ma trận đầu tiên để bắt đầu</p>
+                </div>
+              ) : (
+                filtered.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => setSelectedId(m.id === selectedId ? null : m.id)}
+                    className="rounded-xl p-4 cursor-pointer transition-colors"
+                    style={{
+                      background: D.card,
+                      border: `1px solid ${selectedId === m.id ? D.purple : D.border}`,
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(147,51,234,0.15)' }}>
+                        <FileText className="w-5 h-5" style={{ color: D.purple }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm break-words" style={{ color: D.text }}>{m.name}</div>
+                        <div className="text-xs mt-0.5" style={{ color: D.muted }}>{m.grade}</div>
+                      </div>
+                      <div className="flex-shrink-0"><StatusBadge status={m.status} /></div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 text-xs" style={{ color: D.muted }}>
+                      <span>{m.type}</span>
+                      <span style={{ color: D.muted2 }}>•</span>
+                      <span>{m.examType || '—'}</span>
+                      <span style={{ color: D.muted2 }}>•</span>
+                      <span>{new Date(m.createdAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
+
+                    <div className="flex justify-end gap-1 mt-3 pt-3"
+                      style={{ borderTop: `1px solid ${D.border}` }}
+                      onClick={(e) => e.stopPropagation()}>
+                      {matrixActions(m)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
