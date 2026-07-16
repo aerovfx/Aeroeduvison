@@ -22,6 +22,7 @@ import PageFallback from '@/pages/common/PageFallback'
 const NotFoundPage = lazy(() => import('@/pages/common/NotFound'))
 import { RouteErrorBoundary } from '@/components/common/ErrorBoundary'
 import { usePageTracking } from '@/hooks/usePageTracking'
+import { isTauriDesktop, DESKTOP_HOME } from '@/lib/desktop'
 
 // Loading spinner
 function PageLoader() {
@@ -50,6 +51,18 @@ const AeroEpisodePlayerPage = lazy(() => import('@/pages/kids/AeroEpisodePlayer'
 const StorybookLibraryPage = lazy(() => import('@/pages/kids/StorybookLibrary'))
 const StorybookPlayerPage = lazy(() => import('@/pages/kids/StorybookPlayer'))
 const StorybookEditorPage = lazy(() => import('@/pages/kids/StorybookEditor'))
+// ── Desktop App (bộ UI standalone — 9 màn, tách khỏi production) ──
+const DesktopGallery            = lazy(() => import('@/pages/desktop/Gallery'))
+const DesktopStudentTutor       = lazy(() => import('@/pages/desktop/StudentTutor'))
+const DesktopStudentCourses     = lazy(() => import('@/pages/desktop/StudentCourses'))
+const DesktopStudentLabTwin     = lazy(() => import('@/pages/desktop/StudentLabTwin'))
+const DesktopStudentAnalytics   = lazy(() => import('@/pages/desktop/StudentAnalytics'))
+const DesktopStudentSettings    = lazy(() => import('@/pages/desktop/StudentSettings'))
+const DesktopTeacherGrading     = lazy(() => import('@/pages/desktop/TeacherGrading'))
+const DesktopTeacherQuestionBank = lazy(() => import('@/pages/desktop/TeacherQuestionBank'))
+const DesktopAdminUsers         = lazy(() => import('@/pages/desktop/AdminUsers'))
+const DesktopAdminOverview      = lazy(() => import('@/pages/desktop/AdminOverview'))
+
 const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
 const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
@@ -338,7 +351,8 @@ export function AppRouter() {
         {/* ══════════════════════════════════════════════════
             PUBLIC / MARKETING
         ══════════════════════════════════════════════════ */}
-        <Route path="/"               element={<LandingPage />} />
+        {/* App native (Tauri) mở thẳng vào bộ UI desktop; web vẫn là landing */}
+        <Route path="/"               element={isTauriDesktop() ? <Navigate to={DESKTOP_HOME} replace /> : <LandingPage />} />
         <Route path="/free-courses/llm-mastery" element={<FreeAiCoursePage />} />
         <Route path="/free-courses/llm-mastery/visualize" element={<LLMVisualizerPage />} />
         <Route path="/free-courses/pedagogy" element={<PedagogyCoursePage />} />
@@ -384,6 +398,21 @@ export function AppRouter() {
         <Route path="/auth/signin"    element={<Navigate to="/auth/login" replace />} />
         <Route path="/auth/signup"    element={<Navigate to="/auth/register" replace />} />
         <Route path="/auth/error"     element={<PageFallback />} />
+
+        {/* ══════════════════════════════════════════════════
+            DESKTOP APP — bộ UI standalone (dark glassmorphism), full-screen,
+            không dùng DashboardLayout, không đụng trang production.
+        ══════════════════════════════════════════════════ */}
+        <Route path="/desktop"                       element={<DesktopGallery />} />
+        <Route path="/desktop/student/tutor"         element={<DesktopStudentTutor />} />
+        <Route path="/desktop/student/courses"       element={<DesktopStudentCourses />} />
+        <Route path="/desktop/student/labtwin"       element={<DesktopStudentLabTwin />} />
+        <Route path="/desktop/student/analytics"     element={<DesktopStudentAnalytics />} />
+        <Route path="/desktop/student/settings"      element={<DesktopStudentSettings />} />
+        <Route path="/desktop/teacher/grading"       element={<DesktopTeacherGrading />} />
+        <Route path="/desktop/teacher/question-bank" element={<DesktopTeacherQuestionBank />} />
+        <Route path="/desktop/admin/users"           element={<DesktopAdminUsers />} />
+        <Route path="/desktop/admin/overview"        element={<DesktopAdminOverview />} />
 
         {/* ══════════════════════════════════════════════════
             PUBLIC PLAY ROUTES — học sinh quét QR/nhập code, không cần login

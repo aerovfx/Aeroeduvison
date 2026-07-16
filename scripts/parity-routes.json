@@ -1,0 +1,35 @@
+[
+  {
+    "family": "auth",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "auth": false,
+    "body": { "email": "teacher@local.test", "password": "Test@1234" },
+    "ignore": ["tokens", "user.lastLoginAt"]
+  },
+  {
+    "family": "auth",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "auth": false,
+    "body": { "email": "teacher@local.test", "password": "wrong" }
+  },
+  {
+    "family": "auth",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "auth": "teacher"
+  },
+  {
+    "family": "student",
+    "method": "GET",
+    "path": "/api/student/progress-overview",
+    "auth": "student"
+  },
+  {
+    "family": "courses",
+    "method": "GET",
+    "path": "/api/courses",
+    "auth": false
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vite",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5173"],
+      "port": 5173,
+      "cwd": "aeroedu-vite",
+      "env": {
+        "VITE_RUST_BACKEND_URL": "http://localhost:8091"
+      }
+    }
+  ]
+}

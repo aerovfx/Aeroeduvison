@@ -23,7 +23,7 @@ pub async fn get_progress(
     let user_id = require_user_id(&state, &headers)?;
 
     let progress = sqlx::query_as::<_, UserProgress>(
-        r#"SELECT * FROM "UserProgress" WHERE chapter_id = $1 AND user_id = $2"#
+        r#"SELECT * FROM "UserProgress" WHERE "chapterId" = $1 AND "userId" = $2"#
     )
     .bind(&chapter_id)
     .bind(&user_id)
@@ -36,7 +36,7 @@ pub async fn get_progress(
             // Create new progress record
             let progress = sqlx::query_as::<_, UserProgress>(
                 r#"
-                INSERT INTO "UserProgress" (id, user_id, chapter_id, is_completed, created_at, updated_at)
+                INSERT INTO "UserProgress" (id, "userId", "chapterId", "isCompleted", "createdAt", "updatedAt")
                 VALUES ($1, $2, $3, false, $4, $5)
                 RETURNING *
                 "#
@@ -66,10 +66,10 @@ pub async fn update_progress(
     let progress = sqlx::query_as::<_, UserProgress>(
         r#"
         UPDATE "UserProgress" 
-        SET is_completed = $1, 
-            completed_at = CASE WHEN $1 = true THEN $2 ELSE NULL END,
-            updated_at = $3
-        WHERE chapter_id = $4 AND user_id = $5
+        SET "isCompleted" = $1, 
+            "completedAt" = CASE WHEN $1 = true THEN $2 ELSE NULL END,
+            "updatedAt" = $3
+        WHERE "chapterId" = $4 AND "userId" = $5
         RETURNING *
         "#
     )

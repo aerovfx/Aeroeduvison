@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[sqlx(rename_all = "camelCase")]
 pub struct Course {
     pub id: String,
     pub user_id: String,
@@ -18,6 +19,7 @@ pub struct Course {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[sqlx(rename_all = "camelCase")]
 pub struct Chapter {
     pub id: String,
     pub title: String,
@@ -32,6 +34,7 @@ pub struct Chapter {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[sqlx(rename_all = "camelCase")]
 pub struct Attachment {
     pub id: String,
     pub name: String,
@@ -42,6 +45,7 @@ pub struct Attachment {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[sqlx(rename_all = "camelCase")]
 pub struct UserProgress {
     pub id: String,
     pub user_id: String,

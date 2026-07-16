@@ -1600,3 +1600,9 @@ html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
   /* counter-rotate inner để ảnh đại diện không bị xoay theo */
   animation: avatarSpin 4s linear infinite reverse;
 }
+
+/* Desktop App (pages/desktop) — pulse cho status dot "dịch vụ hoạt động" (2h) */
+@keyframes aeroPulse {
+  0%, 100% { opacity: .5; }
+  50%      { opacity: 1; }
+}

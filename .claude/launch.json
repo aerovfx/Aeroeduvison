@@ -6,7 +6,7 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "5173"],
       "port": 5173,
-      "cwd": "/Users/pixidev/Aeroeduvison/.claude/worktrees/elated-khayyam-41c9ed/aeroedu-vite",
+      "cwd": "aeroedu-vite",
       "env": {
         "VITE_RUST_BACKEND_URL": "http://localhost:8091"
       }

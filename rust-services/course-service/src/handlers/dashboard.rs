@@ -42,10 +42,10 @@ pub async fn get_dashboard(
         r#"
         SELECT DISTINCT c.*
         FROM "Course" c
-        INNER JOIN "Chapter" ch ON ch.course_id = c.id
-        INNER JOIN "UserProgress" up ON up.chapter_id = ch.id AND up.user_id = $1
-        WHERE c.is_published = true
-        ORDER BY c.updated_at DESC
+        INNER JOIN "Chapter" ch ON ch."courseId" = c.id
+        INNER JOIN "UserProgress" up ON up."chapterId" = ch.id AND up."userId" = $1
+        WHERE c."isPublished" = true
+        ORDER BY c."updatedAt" DESC
         "#
     )
     .bind(&user_id)
@@ -61,7 +61,7 @@ pub async fn get_dashboard(
 
     for course in &courses {
         let total_chapters: i64 = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM "Chapter" WHERE course_id = $1 AND is_published = true"#
+            r#"SELECT COUNT(*) FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true"#
         )
         .bind(&course.id)
         .fetch_one(&state.db)
@@ -72,8 +72,8 @@ pub async fn get_dashboard(
             r#"
             SELECT COUNT(*)
             FROM "UserProgress" up
-            INNER JOIN "Chapter" ch ON ch.id = up.chapter_id
-            WHERE ch.course_id = $1 AND up.user_id = $2 AND up.is_completed = true
+            INNER JOIN "Chapter" ch ON ch.id = up."chapterId"
+            WHERE ch."courseId" = $1 AND up."userId" = $2 AND up."isCompleted" = true
             "#
         )
         .bind(&course.id)
@@ -146,7 +146,7 @@ pub async fn get_course_progress(
     }
 
     let total_chapters: i64 = sqlx::query_scalar(
-        r#"SELECT COUNT(*) FROM "Chapter" WHERE course_id = $1 AND is_published = true"#
+        r#"SELECT COUNT(*) FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true"#
     )
     .bind(&course_id)
     .fetch_one(&state.db)
@@ -157,8 +157,8 @@ pub async fn get_course_progress(
         r#"
         SELECT COUNT(*)
         FROM "UserProgress" up
-        INNER JOIN "Chapter" ch ON ch.id = up.chapter_id
-        WHERE ch.course_id = $1 AND up.user_id = $2 AND up.is_completed = true
+        INNER JOIN "Chapter" ch ON ch.id = up."chapterId"
+        WHERE ch."courseId" = $1 AND up."userId" = $2 AND up."isCompleted" = true
         "#
     )
     .bind(&course_id)

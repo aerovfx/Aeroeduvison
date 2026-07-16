@@ -17,10 +17,8 @@ async fn main() {
         .await
         .expect("Failed to create pool");
 
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    // Schema do Prisma quản lý (prisma/schema.prisma) — service Rust không tự
+    // migrate (thống nhất với 18 service còn lại). Bỏ sqlx::migrate!.
 
     let state = AppState {
         db: pool,

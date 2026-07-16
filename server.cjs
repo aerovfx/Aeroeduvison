@@ -98,6 +98,11 @@ app.use((_req, res, next) => {
     'capacitor://localhost',
     'https://localhost',
     'ionic://localhost',
+    // ── Tauri desktop app (macOS/Linux dùng tauri://localhost, Windows dùng
+    //    http(s)://tauri.localhost). Cùng cơ chế reflect origin + credentials ──
+    'tauri://localhost',
+    'https://tauri.localhost',
+    'http://tauri.localhost',
   ]);
   app.use((req, res, next) => {
     const origin = req.headers.origin;

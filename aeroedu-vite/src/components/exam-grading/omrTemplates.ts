@@ -48,6 +48,23 @@ export interface OmrTemplate {
     digitsRead: number;            // số cột chữ số đọc ra đáp án (vd 4)
     questions: { q: number; cols: number[] }[]; // X tâm từng cột chữ số
   };
+
+  /** 7. Số báo danh — lưới ô tô chữ số (cols cột × 10 hàng 0-9). Optional:
+   *  mẫu cũ chưa khai báo thì engine chỉ đọc đáp án, SBD lấy từ OCR. */
+  sbd?: DigitGrid;
+
+  /** 8. Mã đề thi — lưới ô tô chữ số (thường 3 cột × 10 hàng). */
+  examCode?: DigitGrid;
+}
+
+/** Lưới ô tô chữ số 0-9 (dùng chung cho SBD + Mã đề). Toạ độ template-absolute. */
+export interface DigitGrid {
+  cols: number;                    // số cột chữ số
+  digitRows: string[];             // ['0'..'9']
+  firstColX: number;               // X tâm cột đầu
+  lastColX: number;                // X tâm cột cuối
+  firstRowY: number;               // Y tâm hàng '0'
+  lastRowY: number;                // Y tâm hàng '9'
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -103,6 +120,29 @@ export const BGD_2025: OmrTemplate = {
       { q: 5, cols: [0.695, 0.713, 0.731, 0.749, 0.767] },
       { q: 6, cols: [0.860, 0.878, 0.896, 0.914, 0.932] },
     ],
+  },
+
+  // 7. Số báo danh — 8 cột × 10 hàng (0-9), khối phải-trên phiếu.
+  // ⚠️ Toạ độ nằm PHÍA TRÊN khung marker (y<0.315) nên engine ngoại suy; giá trị
+  //    ước lượng từ phiếu chuẩn — cần 1 lần hiệu chỉnh với ảnh quét thật. OCR
+  //    (/api/grading/ocr) là lớp dự phòng khi ô tô đọc lệch/trống.
+  sbd: {
+    cols: 8,
+    digitRows: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    firstColX: 0.668,
+    lastColX: 0.806,
+    firstRowY: 0.100,
+    lastRowY: 0.275,
+  },
+
+  // 8. Mã đề thi — 3 cột × 10 hàng (0-9).
+  examCode: {
+    cols: 3,
+    digitRows: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    firstColX: 0.862,
+    lastColX: 0.918,
+    firstRowY: 0.100,
+    lastRowY: 0.275,
   },
 };
 

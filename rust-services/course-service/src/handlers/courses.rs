@@ -147,7 +147,7 @@ pub async fn create_course(
     // Create course
     let course = sqlx::query_as::<_, Course>(
         r#"
-        INSERT INTO "Course" (id, user_id, school_id, title, description, category_id, is_published, created_at, updated_at)
+        INSERT INTO "Course" (id, "userId", "schoolId", title, description, "categoryId", "isPublished", "createdAt", "updatedAt")
         VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8)
         RETURNING *
         "#
@@ -177,7 +177,7 @@ pub async fn list_courses(
     State(state): State<AppState>,
 ) -> Result<Json<CourseListResponse>> {
     let courses = sqlx::query_as::<_, Course>(
-        r#"SELECT * FROM "Course" ORDER BY created_at DESC"#
+        r#"SELECT * FROM "Course" ORDER BY "createdAt" DESC"#
     )
     .fetch_all(&state.db)
     .await?;
@@ -220,7 +220,7 @@ pub async fn update_course(
     let course = sqlx::query_as::<_, Course>(
         r#"
         UPDATE "Course" 
-        SET title = $1, description = $2, category_id = $3, updated_at = $4
+        SET title = $1, description = $2, "categoryId" = $3, "updatedAt" = $4
         WHERE id = $5
         RETURNING *
         "#
@@ -269,8 +269,8 @@ pub async fn publish_course(
     let course = sqlx::query_as::<_, Course>(
         r#"
         UPDATE "Course" 
-        SET is_published = true, updated_at = $1
-        WHERE id = $2 AND is_published = false
+        SET "isPublished" = true, "updatedAt" = $1
+        WHERE id = $2 AND "isPublished" = false
         RETURNING *
         "#
     )
@@ -293,8 +293,8 @@ pub async fn unpublish_course(
     let course = sqlx::query_as::<_, Course>(
         r#"
         UPDATE "Course" 
-        SET is_published = false, updated_at = $1
-        WHERE id = $2 AND is_published = true
+        SET "isPublished" = false, "updatedAt" = $1
+        WHERE id = $2 AND "isPublished" = true
         RETURNING *
         "#
     )

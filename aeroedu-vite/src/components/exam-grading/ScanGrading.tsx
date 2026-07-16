@@ -145,7 +145,9 @@ interface BubblePosition {
   x: number;
   y: number;
   label: string;
-  section: 'part1' | 'part2' | 'part3';
+  // sbd/examCode: lưới ô tô chữ số (7. Số báo danh · 8. Mã đề thi)
+  section: 'part1' | 'part2' | 'part3' | 'sbd' | 'examCode';
+  // với sbd/examCode: questionId = chỉ số cột (0-based); optionLabel = chữ số '0'-'9'
   questionId: number;
   optionLabel: string;
   filled?: boolean;
@@ -938,7 +940,50 @@ function mapBubbleCoordinates(
     }
   }
 
+  // ─── 7. SỐ BÁO DANH & 8. MÃ ĐỀ THI (lưới ô tô chữ số 0-9) ─────
+  // Mỗi cột = 1 chữ số; đọc hàng có ô tô đậm nhất trong 0-9. questionId = cột.
+  const digitGrids: { grid: typeof template.sbd; section: 'sbd' | 'examCode' }[] = [
+    { grid: template.sbd, section: 'sbd' },
+    { grid: template.examCode, section: 'examCode' },
+  ];
+  for (const { grid, section } of digitGrids) {
+    if (!grid || grid.cols < 1) continue;
+    const colSpacing = grid.cols > 1 ? (grid.lastColX - grid.firstColX) / (grid.cols - 1) : 0;
+    const rowSpacing = grid.digitRows.length > 1 ? (grid.lastRowY - grid.firstRowY) / (grid.digitRows.length - 1) : 0;
+    for (let c = 0; c < grid.cols; c++) {
+      const tx = grid.firstColX + c * colSpacing;
+      for (let d = 0; d < grid.digitRows.length; d++) {
+        const ty = grid.firstRowY + d * rowSpacing;
+        const { x, y } = mp(tx, ty);
+        bubbles.push({
+          x, y,
+          label: `${section}-col${c}-${grid.digitRows[d]}`,
+          section,
+          questionId: c,
+          optionLabel: grid.digitRows[d],
+        });
+      }
+    }
+  }
+
   return bubbles;
+}
+
+/** Đọc một lưới ô tô chữ số (SBD/Mã đề) → chuỗi số. Mỗi cột lấy chữ số của ô
+ *  tô đậm nhất; cột trống → bỏ qua (không chèn ký tự). */
+function readDigitGrid(
+  detected: BubblePosition[],
+  section: 'sbd' | 'examCode',
+  cols: number
+): string {
+  let out = '';
+  for (let c = 0; c < cols; c++) {
+    const colB = detected.filter(b => b.section === section && b.questionId === c && b.filled);
+    if (colB.length === 0) continue;
+    colB.sort((a, b) => ((a as any)._mean ?? 255) - ((b as any)._mean ?? 255));
+    out += colB[0].optionLabel;
+  }
+  return out;
 }
 
 // ===================== PENCIL FILL DETECTION =====================
@@ -2713,6 +2758,8 @@ export default function ScanGrading(props: ScanGradingProps) {
             detectedAnswers: Record<number, 'A' | 'B' | 'C' | 'D' | null>;
             detectedPart2: Record<number, Record<string, boolean | null>>;
             detectedPart3: Record<number, string>;
+            detectedStudentId: string;
+            detectedExamCode: string;
             correctedPreview: string | null;
           }>((resolve) => {
             const img = document.createElement('img');
@@ -2724,7 +2771,7 @@ export default function ScanGrading(props: ScanGradingProps) {
               offCanvas.height = img.naturalHeight;
               const ctx = offCanvas.getContext('2d');
               if (!ctx) {
-                resolve({ detectedAnswers: {}, detectedPart2: {}, detectedPart3: {}, correctedPreview: null });
+                resolve({ detectedAnswers: {}, detectedPart2: {}, detectedPart3: {}, detectedStudentId: '', detectedExamCode: '', correctedPreview: null });
                 return;
               }
               ctx.drawImage(img, 0, 0);
@@ -2807,6 +2854,10 @@ export default function ScanGrading(props: ScanGradingProps) {
                 detectedPart3[q] = answer;
               }
 
+              // Số báo danh (7) & Mã đề (8): đọc lưới ô tô chữ số
+              const detectedStudentId = template.sbd ? readDigitGrid(detected, 'sbd', template.sbd.cols) : '';
+              const detectedExamCode = template.examCode ? readDigitGrid(detected, 'examCode', template.examCode.cols) : '';
+
               const correctedPreview = corrected ? flatCanvas.toDataURL('image/jpeg', 0.92) : null;
 
               console.log('[Scan] Sheet detection complete:', {
@@ -2816,10 +2867,10 @@ export default function ScanGrading(props: ScanGradingProps) {
                 totalBubblesFilled: detected.filter(b => b.filled).length,
               });
 
-              resolve({ detectedAnswers, detectedPart2, detectedPart3, correctedPreview });
+              resolve({ detectedAnswers, detectedPart2, detectedPart3, detectedStudentId, detectedExamCode, correctedPreview });
             };
             img.onerror = () => {
-              resolve({ detectedAnswers: {}, detectedPart2: {}, detectedPart3: {}, correctedPreview: null });
+              resolve({ detectedAnswers: {}, detectedPart2: {}, detectedPart3: {}, detectedStudentId: '', detectedExamCode: '', correctedPreview: null });
             };
           });
 
@@ -2870,6 +2921,14 @@ export default function ScanGrading(props: ScanGradingProps) {
                   answerKey,
                   template
                 );
+                // Số báo danh & Mã đề: ưu tiên ô tô (OMR, xác định) → OCR dự phòng.
+                // SBD hợp lệ khi đọc được đủ số cột của mẫu; nếu thiếu (ngoại suy
+                // lệch/ô trống) thì rơi về OCR.
+                const omrStudentId = (scanResult.detectedStudentId || '').trim();
+                const omrExamCode = (scanResult.detectedExamCode || '').trim();
+                const sbdComplete = template.sbd ? omrStudentId.length === template.sbd.cols : false;
+                const finalStudentId = (sbdComplete ? omrStudentId : '') || ocrStudentId || s.studentId;
+                const finalExamCode = omrExamCode || ocrExamCode || s.examCode;
                 return {
                   ...s,
                   status: 'scanned' as const,
@@ -2878,10 +2937,12 @@ export default function ScanGrading(props: ScanGradingProps) {
                   detectedPart3: scanResult.detectedPart3,
                   totalScore: score,
                   maxScore: maxScore,
-                  // OCR-extracted student info
+                  // Số báo danh / Mã đề: OMR chính, OCR dự phòng.
+                  // Tên: OCR (dòng viết tay); TODO đối chiếu roster theo SBD khi
+                  // có danh sách lớp truyền vào ScanGrading.
                   ...(ocrStudentName ? { studentName: ocrStudentName } : {}),
-                  ...(ocrStudentId ? { studentId: ocrStudentId } : {}),
-                  ...(ocrExamCode ? { examCode: ocrExamCode } : {}),
+                  ...(finalStudentId ? { studentId: finalStudentId } : {}),
+                  ...(finalExamCode ? { examCode: finalExamCode } : {}),
                   // Store corrected image URL if perspective was corrected
                   ...(scanResult.correctedPreview ? { preview: scanResult.correctedPreview } : {}),
                 };

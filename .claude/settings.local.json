@@ -230,7 +230,20 @@
       "Bash(git commit --no-verify -m 'fix\\(exam-matrix\\): 6 CRUD handlers + bảng ExamMatrix persist *)",
       "Bash(awk '/^if \\\\\\(USE_NODEJS_AUTH\\\\\\) \\\\{/{depth++} /^}$/{if\\(depth>0\\)depth--} /function _kgAuth/{print \"_kgAuth at line\", NR, \"depth:\", depth}' /Users/pixidev/Aeroeduvison/server.cjs)",
       "Bash(cp -f /Users/pixidev/Aeroeduvison/server.cjs /Users/pixidev/Aeroeduvison/.claude/worktrees/elated-khayyam-41c9ed/server.cjs)",
-      "Bash(./deploy-hotfix.sh)"
+      "Bash(./deploy-hotfix.sh)",
+      "Bash(pkill -f \"http.server 8971\")",
+      "Bash(node -v)",
+      "Bash(npm -v)",
+      "Bash(echo \"npm: $\\(npm -v 2>/dev/null || echo none\\)\")",
+      "Bash(ls package-lock.json bun.lockb pnpm-lock.yaml yarn.lock)",
+      "Bash(ls /Users/dangvietchung/Aeroeduvison/bun.lock)",
+      "Bash(node -e \"try{require\\('esbuild'\\).version && console.log\\('esbuild js ok'\\)}catch\\(e\\){console.log\\('esbuild require err:', e.message.split\\('\\\\n'\\)[0]\\)}\")",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(cargo tauri *)",
+      "Bash(xcode-select -p)",
+      "Bash(node_modules/.bin/tauri --version)",
+      "Bash(node_modules/.bin/tauri icon *)"
     ]
   }
 }

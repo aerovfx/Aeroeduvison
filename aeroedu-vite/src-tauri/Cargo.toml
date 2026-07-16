@@ -1,0 +1,31 @@
+# Tách khỏi workspace Rust ở repo root (rust-services/) — đây là package độc lập.
+[workspace]
+
+[package]
+name = "aeroedu-desktop"
+version = "1.0.0"
+description = "AeroEdu Vision — Desktop App"
+authors = ["AeroEdu Vision"]
+edition = "2021"
+rust-version = "1.77"
+
+# Thư viện lõi Tauri (dùng chung cho main.rs + mobile nếu mở rộng sau)
+[lib]
+name = "aeroedu_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Build nhẹ hơn cho bản release (binary nhỏ + tối ưu)
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

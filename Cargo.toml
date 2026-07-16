@@ -11,16 +11,25 @@
 [workspace]
 resolver = "2"
 members = [
+    "rust-services/achievements-service",
     "rust-services/admin-service",
     "rust-services/aero-backend",
     "rust-services/ai-service",
+    "rust-services/analytics-service",
+    "rust-services/assignments-service",
     "rust-services/auth-service",
     "rust-services/camera-iot-service",
+    "rust-services/chat-service",
     "rust-services/course-service",
+    "rust-services/emotion-service",
+    "rust-services/exam-service",
     "rust-services/grading-service",
+    "rust-services/latex-service",
     "rust-services/media-service",
     "rust-services/stem-service",
     "rust-services/student-service",
+    "rust-services/teacher-service",
+    "rust-services/transcript-service",
     "latex-compiler",
     "openfang-core/openfang-types",
     "openfang-core/openfang-runtime",
@@ -45,7 +54,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "macros"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 sha2 = "0.10"
 hex = "0.4"

@@ -10,18 +10,27 @@ import { coldStart } from '@/lib/coldStart'
 // Web (Vite dev + production same-origin): /api  → đi qua proxy / nginx → backend
 // Capacitor native (iOS/Android): app chạy từ capacitor://localhost — phải gọi
 //   tuyệt đối tới https://inphysic.com/api, KHÔNG có proxy.
+// Tauri desktop (macOS/Win/Linux): app chạy từ tauri://localhost — cũng KHÔNG có
+//   proxy, phải gọi tuyệt đối. Detect qua window.__TAURI_INTERNALS__ (v2) /
+//   window.__TAURI__ (v1). CORS cho tauri origin đã thêm ở server.cjs.
 // Detect Capacitor qua window.Capacitor (injected bởi WebView bridge).
 function resolveBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    const cap = (window as Window & {
+    const w = window as Window & {
       Capacitor?: { isNativePlatform?: () => boolean }
-    }).Capacitor
-    if (cap?.isNativePlatform?.()) {
-      // Override qua env nếu cần switch sang staging
-      const native = (import.meta.env.VITE_API_URL_NATIVE as string | undefined)
-        || 'https://inphysic.com/api'
-      return native
+      __TAURI_INTERNALS__?: unknown
+      __TAURI__?: unknown
     }
+    const isTauri = !!(w.__TAURI_INTERNALS__ || w.__TAURI__)
+    // Override qua env nếu cần switch sang staging
+    const native = (import.meta.env.VITE_API_URL_NATIVE as string | undefined)
+      || 'https://inphysic.com/api'
+    if (w.Capacitor?.isNativePlatform?.()) return native
+    // Tauri: app đóng gói (PROD) chạy từ tauri://localhost → gọi tuyệt đối.
+    //   Khi `tauri dev` (import.meta.env.PROD === false) frontend ở localhost:5173
+    //   → dùng /api qua Vite proxy (beforeDevCommand trỏ proxy sang inphysic.com)
+    //   để tránh CORS ở origin dev.
+    if (isTauri && import.meta.env.PROD) return native
   }
   return '/api'
 }

@@ -21,7 +21,7 @@ pub async fn validate_can_manage_courses(db: &DbPool, user_id: &str) -> Result<b
 /// Get user's school ID
 pub async fn get_user_school_id(db: &DbPool, user_id: &str) -> Result<String> {
     let school_id = sqlx::query_scalar::<_, String>(
-        r#"SELECT school_id FROM "User" WHERE id = $1"#
+        r#"SELECT "schoolId" FROM "User" WHERE id = $1"#
     )
     .bind(user_id)
     .fetch_optional(db)

@@ -27,7 +27,7 @@ pub async fn create_chapter(
 
     // Get max position
     let max_position = sqlx::query_scalar::<_, i32>(
-        r#"SELECT COALESCE(MAX(position), -1) FROM "Chapter" WHERE course_id = $1"#
+        r#"SELECT COALESCE(MAX(position), -1) FROM "Chapter" WHERE "courseId" = $1"#
     )
     .bind(&course_id)
     .fetch_one(&state.db)
@@ -35,7 +35,7 @@ pub async fn create_chapter(
 
     let chapter = sqlx::query_as::<_, Chapter>(
         r#"
-        INSERT INTO "Chapter" (id, course_id, title, description, video_url, position, is_free, is_published, created_at, updated_at)
+        INSERT INTO "Chapter" (id, "courseId", title, description, "videoUrl", position, "isFree", "isPublished", "createdAt", "updatedAt")
         VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9)
         RETURNING *
         "#
@@ -67,14 +67,14 @@ pub async fn list_chapters(
     Path(course_id): Path<String>,
 ) -> Result<Json<ChapterListResponse>> {
     let chapters = sqlx::query_as::<_, Chapter>(
-        r#"SELECT * FROM "Chapter" WHERE course_id = $1 ORDER BY position ASC"#
+        r#"SELECT * FROM "Chapter" WHERE "courseId" = $1 ORDER BY position ASC"#
     )
     .bind(&course_id)
     .fetch_all(&state.db)
     .await?;
 
     let total = sqlx::query_scalar::<_, i64>(
-        r#"SELECT COUNT(*) FROM "Chapter" WHERE course_id = $1"#
+        r#"SELECT COUNT(*) FROM "Chapter" WHERE "courseId" = $1"#
     )
     .bind(&course_id)
     .fetch_one(&state.db)
@@ -89,7 +89,7 @@ pub async fn get_chapter(
     Path((course_id, id)): Path<(String, String)>,
 ) -> Result<Json<Chapter>> {
     let chapter = sqlx::query_as::<_, Chapter>(
-        r#"SELECT * FROM "Chapter" WHERE id = $1 AND course_id = $2"#
+        r#"SELECT * FROM "Chapter" WHERE id = $1 AND "courseId" = $2"#
     )
     .bind(&id)
     .bind(&course_id)
@@ -121,10 +121,10 @@ pub async fn update_chapter(
         UPDATE "Chapter" 
         SET title = COALESCE($1, title),
             description = COALESCE($2, description),
-            video_url = COALESCE($3, video_url),
-            is_free = COALESCE($4, is_free),
-            updated_at = $5
-        WHERE id = $6 AND course_id = $7
+            "videoUrl" = COALESCE($3, "videoUrl"),
+            "isFree" = COALESCE($4, "isFree"),
+            "updatedAt" = $5
+        WHERE id = $6 AND "courseId" = $7
         RETURNING *
         "#
     )
@@ -150,7 +150,7 @@ pub async fn delete_chapter(
     Path((course_id, id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>> {
     let result = sqlx::query(
-        r#"DELETE FROM "Chapter" WHERE id = $1 AND course_id = $2"#
+        r#"DELETE FROM "Chapter" WHERE id = $1 AND "courseId" = $2"#
     )
     .bind(&id)
     .bind(&course_id)
@@ -177,7 +177,7 @@ pub async fn reorder_chapters(
 
     for update in body.updates {
         sqlx::query(
-            r#"UPDATE "Chapter" SET position = $1, updated_at = $2 WHERE id = $3 AND course_id = $4"#
+            r#"UPDATE "Chapter" SET position = $1, "updatedAt" = $2 WHERE id = $3 AND "courseId" = $4"#
         )
         .bind(update.position)
         .bind(chrono::Utc::now())
@@ -203,8 +203,8 @@ pub async fn publish_chapter(
     let chapter = sqlx::query_as::<_, Chapter>(
         r#"
         UPDATE "Chapter" 
-        SET is_published = true, updated_at = $1
-        WHERE id = $2 AND course_id = $3 AND is_published = false
+        SET "isPublished" = true, "updatedAt" = $1
+        WHERE id = $2 AND "courseId" = $3 AND "isPublished" = false
         RETURNING *
         "#
     )
@@ -228,8 +228,8 @@ pub async fn unpublish_chapter(
     let chapter = sqlx::query_as::<_, Chapter>(
         r#"
         UPDATE "Chapter" 
-        SET is_published = false, updated_at = $1
-        WHERE id = $2 AND course_id = $3 AND is_published = true
+        SET "isPublished" = false, "updatedAt" = $1
+        WHERE id = $2 AND "courseId" = $3 AND "isPublished" = true
         RETURNING *
         "#
     )

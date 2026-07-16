@@ -12,7 +12,10 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
@@ -66,6 +69,7 @@
     "@tanstack/react-query-devtools": "^5.0.0",
     "@tanstack/react-query-persist-client": "^5.100.14",
     "@tanstack/react-table": "^8.9.11",
+    "@tauri-apps/api": "^2.11.1",
     "@tiptap/core": "3.22.3",
     "@tiptap/extension-color": "3.22.3",
     "@tiptap/extension-highlight": "3.22.3",
@@ -120,6 +124,7 @@
     "zustand": "^4.4.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
