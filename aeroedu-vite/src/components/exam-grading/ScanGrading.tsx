@@ -986,6 +986,53 @@ function readDigitGrid(
   return out;
 }
 
+// ===================== ĐỐI CHIẾU TÊN VỚI DANH SÁCH LỚP =====================
+/** Chuẩn hoá tên tiếng Việt để so khớp: bỏ dấu, đ→d, gộp khoảng trắng, thường hoá. */
+function normalizeVnName(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let cur = new Array<number>(n + 1);
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+
+/** Tìm tên gần nhất trong danh sách lớp cho tên OCR. Trả tên chuẩn (canonical)
+ *  nếu độ tương đồng ≥ threshold, để sửa lỗi OCR chữ viết tay; ngược lại null. */
+export function bestRosterMatch(ocrName: string, roster: string[], threshold = 0.82): string | null {
+  const n = normalizeVnName(ocrName || '');
+  if (!n || n.length < 3 || roster.length === 0) return null;
+  let best: { name: string; score: number } | null = null;
+  for (const r of roster) {
+    const nr = normalizeVnName(r || '');
+    if (!nr) continue;
+    const dist = levenshtein(n, nr);
+    const score = 1 - dist / Math.max(n.length, nr.length);
+    if (!best || score > best.score) best = { name: r, score };
+  }
+  return best && best.score >= threshold ? best.name : null;
+}
+
 // ===================== PENCIL FILL DETECTION =====================
 // Detects whether each bubble has been filled in with pencil
 // Uses adaptive thresholding: compares bubble darkness to surrounding paper
@@ -1190,6 +1237,19 @@ function BubbleOverlay({
           icon: isCorrect ? 'check' : 'cross',
         });
       }
+    }
+
+    // 7. Số báo danh & 8. Mã đề: vẽ lưới ô tô (guide xanh) để KIỂM TRA canh chỉnh
+    // toạ độ. Nếu vòng xanh trùng vòng in trên phiếu → toạ độ đúng; lệch → cần
+    // hiệu chỉnh firstColX/lastColX/firstRowY/lastRowY của mẫu trong omrTemplates.
+    for (const bubble of bubbles) {
+      if (bubble.section !== 'sbd' && bubble.section !== 'examCode') continue;
+      drawBubble(ctx, bubble.x, bubble.y, bubbleRadius * 0.7, {
+        fill: 'rgba(59, 130, 246, 0.10)',
+        stroke: 'rgba(59, 130, 246, 0.6)',
+        lineWidth: Math.max(1, lineWidth - 1),
+        icon: 'none',
+      });
     }
   }, [imageLoaded, imageDims, bubbles, detectedAnswers, detectedPart2, detectedPart3, answerKey, template]);
 
@@ -2628,6 +2688,23 @@ export default function ScanGrading(props: ScanGradingProps) {
   // Sau khi chụp bằng camera, tự nhảy sang "Xem lại" để hiện điểm + chi tiết ngay
   const wantReviewRef = useRef(false);
 
+  // Danh sách tên HS của GV (để đối chiếu tên OCR — sửa lỗi chữ viết tay).
+  // Dùng ref để luồng quét (closure) luôn đọc được danh sách mới nhất.
+  const rosterNamesRef = useRef<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ students?: { name?: string }[] }>('/teacher/roster')
+      .then(r => {
+        if (!alive) return;
+        rosterNamesRef.current = (r.data?.students ?? [])
+          .map(s => (s.name || '').trim())
+          .filter(n => n && !n.startsWith('HS '));
+      })
+      .catch(() => { /* roster không có → giữ tên OCR */ });
+    return () => { alive = false; };
+  }, []);
+
   // Đồng bộ mẫu phiếu theo answer key đang chọn: khi đổi sang key gắn mẫu khác
   // thì engine dùng đúng toạ độ của mẫu đó. (templateId là chuỗi nguyên thuỷ nên
   // effect chỉ chạy khi GIÁ TRỊ mẫu đổi — không phá lựa chọn mẫu thủ công.)
@@ -2929,6 +3006,11 @@ export default function ScanGrading(props: ScanGradingProps) {
                 const sbdComplete = template.sbd ? omrStudentId.length === template.sbd.cols : false;
                 const finalStudentId = (sbdComplete ? omrStudentId : '') || ocrStudentId || s.studentId;
                 const finalExamCode = omrExamCode || ocrExamCode || s.examCode;
+                // Tên: OCR chữ viết tay → đối chiếu danh sách lớp để sửa lỗi OCR.
+                const rosterName = ocrStudentName
+                  ? bestRosterMatch(ocrStudentName, rosterNamesRef.current)
+                  : null;
+                const finalStudentName = rosterName || ocrStudentName;
                 return {
                   ...s,
                   status: 'scanned' as const,
@@ -2938,9 +3020,8 @@ export default function ScanGrading(props: ScanGradingProps) {
                   totalScore: score,
                   maxScore: maxScore,
                   // Số báo danh / Mã đề: OMR chính, OCR dự phòng.
-                  // Tên: OCR (dòng viết tay); TODO đối chiếu roster theo SBD khi
-                  // có danh sách lớp truyền vào ScanGrading.
-                  ...(ocrStudentName ? { studentName: ocrStudentName } : {}),
+                  // Tên: OCR (dòng viết tay) → đối chiếu danh sách lớp (fuzzy) sửa lỗi OCR.
+                  ...(finalStudentName ? { studentName: finalStudentName } : {}),
                   ...(finalStudentId ? { studentId: finalStudentId } : {}),
                   ...(finalExamCode ? { examCode: finalExamCode } : {}),
                   // Store corrected image URL if perspective was corrected
