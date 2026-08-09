@@ -351,7 +351,8 @@ export function AppRouter() {
         {/* ══════════════════════════════════════════════════
             PUBLIC / MARKETING
         ══════════════════════════════════════════════════ */}
-        {/* App native (Tauri) mở thẳng vào bộ UI desktop; web vẫn là landing */}
+        {/* App native mở dashboard production giống web đã đăng nhập. ProtectedRoute
+            sẽ đưa người chưa đăng nhập tới /auth/login. */}
         <Route path="/"               element={isTauriDesktop() ? <Navigate to={DESKTOP_HOME} replace /> : <LandingPage />} />
         <Route path="/free-courses/llm-mastery" element={<FreeAiCoursePage />} />
         <Route path="/free-courses/llm-mastery/visualize" element={<LLMVisualizerPage />} />
@@ -400,8 +401,8 @@ export function AppRouter() {
         <Route path="/auth/error"     element={<PageFallback />} />
 
         {/* ══════════════════════════════════════════════════
-            DESKTOP APP — bộ UI standalone (dark glassmorphism), full-screen,
-            không dùng DashboardLayout, không đụng trang production.
+            DESKTOP UI PROTOTYPE — gallery standalone, chỉ truy cập thủ công;
+            không dùng làm entry point của bản Tauri phát hành.
         ══════════════════════════════════════════════════ */}
         <Route path="/desktop"                       element={<DesktopGallery />} />
         <Route path="/desktop/student/tutor"         element={<DesktopStudentTutor />} />

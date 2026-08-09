@@ -1,0 +1,12 @@
+[Unit]
+Description=AeroEdu on-premise verified backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment=AEROEDU_HOME=/opt/aeroedu
+Environment=AEROEDU_BACKUP_DIR=/var/backups/aeroedu
+ExecStart=/opt/aeroedu/scripts/scheduled-backup.sh

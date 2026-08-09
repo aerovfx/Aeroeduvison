@@ -12,8 +12,6 @@ dist
 .env
 .env.*
 !.env.example
-# Vite production vars are baked into JS bundle at build time — safe to include
-!aeroedu-vite/.env.production
 sa-ci-deployer-key.json
 gen-lang-client-*.json
 *.pem
@@ -56,7 +54,12 @@ docs/*.md
 !README.md
 
 # === Scripts & tooling ===
-scripts/
+scripts/*
+!scripts/onprem-bootstrap.cjs
+!scripts/sync-license-state.cjs
+!scripts/onprem-entrypoint.sh
+!scripts/ops-event.cjs
+!scripts/reconcile-state.cjs
 .claude/
 .github/
 .vscode/

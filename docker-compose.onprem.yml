@@ -1,0 +1,89 @@
+name: ${AEROEDU_COMPOSE_PROJECT:-aeroedu-onprem}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set digest-pinned POSTGRES_IMAGE in .env.onprem}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aeroedu}
+      POSTGRES_USER: ${POSTGRES_USER:-aeroedu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.onprem}
+    volumes:
+      - aeroedu_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aeroedu} -d ${POSTGRES_DB:-aeroedu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256mb
+
+  app:
+    image: ${AEROEDU_IMAGE:-aeroedu/onprem:${AEROEDU_VERSION:-local}}
+    build:
+      context: .
+      dockerfile: Dockerfile.onprem
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:?Set digest-pinned NODE_IMAGE in .env.onprem}
+        VITE_APP_URL: ${PUBLIC_URL:-http://localhost:8080}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        LICENSE_PUBLIC_KEY_B64: ${LICENSE_PUBLIC_KEY_B64:-}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${AEROEDU_BIND_ADDRESS:-127.0.0.1}:${AEROEDU_PORT:-8080}:8080"
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      DEPLOYMENT_MODE: on-premise
+      OFFLINE_MODE: ${OFFLINE_MODE:-true}
+      OFFLINE_OUTBOUND_ALLOWLIST: ${OFFLINE_OUTBOUND_ALLOWLIST:-}
+      DATA_DIR: /var/lib/aeroedu
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aeroedu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aeroedu}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.onprem}
+      NEXTAUTH_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.onprem}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      LICENSE_FILE: /etc/aeroedu/license.json
+      INSTALLATION_ID: ${INSTALLATION_ID:?Set INSTALLATION_ID in .env.onprem}
+      AEROEDU_IMAGE_DIGEST: ${AEROEDU_IMAGE_DIGEST:-}
+      LICENSE_ALLOWED_ISSUERS: ${LICENSE_ALLOWED_ISSUERS:-aeroedu}
+      LICENSE_ISSUER: ${LICENSE_ISSUER:-aeroedu}
+      LICENSE_KEY_ID: ${LICENSE_KEY_ID:-primary-2026}
+      LICENSE_REVOKED_IDS: ${LICENSE_REVOKED_IDS:-}
+      LICENSE_TRUSTED_KEYS_JSON_B64: ${LICENSE_TRUSTED_KEYS_JSON_B64:-}
+      REDIS_URL: ${REDIS_URL:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}
+      AI_PROVIDER: ${AI_PROVIDER:-demo}
+      DISABLE_GATING: ${DISABLE_GATING:-false}
+      TELEGRAM_USE_WEBHOOK: "false"
+    volumes:
+      - aeroedu_data:/var/lib/aeroedu
+      - ${LICENSE_FILE_HOST:-./license.json}:/etc/aeroedu/license.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health/ready"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  aeroedu_data:
+    name: ${AEROEDU_DATA_VOLUME:-aeroedu_onprem_data}
+  aeroedu_postgres:
+    name: ${AEROEDU_POSTGRES_VOLUME:-aeroedu_onprem_postgres}

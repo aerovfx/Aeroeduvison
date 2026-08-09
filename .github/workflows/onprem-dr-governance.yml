@@ -1,0 +1,54 @@
+name: Approve On-Premise DR Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_url:
+        description: HTTPS URL to the exact customer DR evidence JSON
+        required: true
+      evidence_sha256:
+        description: Expected SHA-256 of the downloaded evidence JSON
+        required: true
+      ticket_url:
+        description: HTTPS change/incident ticket containing reconciliation evidence
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  approve:
+    runs-on: ubuntu-24.04
+    environment: release-governance
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+      - name: Download and verify exact evidence
+        env:
+          DR_EVIDENCE_URL: ${{ inputs.evidence_url }}
+          DR_EVIDENCE_SHA256: ${{ inputs.evidence_sha256 }}
+        run: |
+          case "$DR_EVIDENCE_URL" in https://*) ;; *) echo 'Evidence URL must use HTTPS' >&2; exit 2;; esac
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --max-time 120 "$DR_EVIDENCE_URL" -o dr-evidence.json
+          printf '%s  %s\n' "${DR_EVIDENCE_SHA256#sha256:}" dr-evidence.json | sha256sum --check --strict
+      - name: Validate evidence and create approval
+        env:
+          DR_EVIDENCE_FILE: dr-evidence.json
+          DR_TICKET_URL: ${{ inputs.ticket_url }}
+        run: node scripts/approve-dr-evidence.cjs dr-approval.json
+      - name: Sign governance approval
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.GOVERNANCE_COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.GOVERNANCE_COSIGN_PASSWORD }}
+        run: cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY --bundle dr-approval.bundle dr-approval.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dr-governance-${{ github.run_id }}
+          path: |
+            dr-approval.json
+            dr-approval.bundle
+          if-no-files-found: error
+          retention-days: 365

@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AeroEdu Vision",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "identifier": "com.aeroedu.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "VITE_RUST_BACKEND_URL=https://inphysic.com npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "VITE_API_URL_NATIVE=http://127.0.0.1:43127/api npm run dev",
+    "beforeBuildCommand": "cd .. && ./scripts/prepare-tauri-macos.sh && cd aeroedu-vite && VITE_API_URL_NATIVE=http://127.0.0.1:43127/api npm run build"
   },
   "app": {
     "windows": [
@@ -28,7 +28,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg"],
     "category": "Education",
     "copyright": "© AeroEdu Vision",
     "shortDescription": "AeroEdu Vision — nền tảng STEM cho trường học",
@@ -38,6 +38,8 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "externalBin": ["binaries/aeroedu-node", "binaries/tectonic"],
+    "resources": ["resources/backend/*"]
   }
 }

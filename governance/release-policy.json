@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "releaseTagPattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?$",
+  "supportedArchitectures": ["amd64", "arm64"],
+  "requiredAttestations": ["cyclonedx", "slsaprovenance", "https://aeroedu.vn/attestations/migrations/v1", "https://aeroedu.vn/attestations/release/v1"],
+  "protectedEnvironment": "secure-release",
+  "minimumHumanReviewers": 2,
+  "rpoSeconds": 86400,
+  "rtoSeconds": 14400,
+  "restoreDrillMaximumAgeDays": 90,
+  "immutableMigrationPolicy": true,
+  "allowMutableReleaseTags": false
+}

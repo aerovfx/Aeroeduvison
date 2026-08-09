@@ -9,6 +9,10 @@
 /.next
 /out
 /build
+/release/
+/secrets/
+/license.json
+/license-public.pem
 **/.next/
 **/dist/
 **/dist-electron/
@@ -49,6 +53,8 @@ pnpm-debug.log*
 # Prisma
 /prisma/migrations
 *.db
+*.db-shm
+*.db-wal
 
 # Optional: MacOS and Linux
 ehthumbs.db

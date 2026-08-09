@@ -1,0 +1,313 @@
+name: On-Premise Secure Release
+
+on:
+  pull_request:
+    paths:
+      - 'server.cjs'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'prisma/**'
+      - 'aeroedu-vite/**'
+      - 'Dockerfile.onprem'
+      - 'docker-compose.onprem.yml'
+      - 'onprem.sh'
+      - 'ON_PREMISE_RUNBOOK.md'
+      - 'ops/**'
+      - 'governance/**'
+      - '.dockerignore'
+      - '.env.onprem.example'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/onprem-release.yml'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onprem-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/aeroedu-onprem
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run license:test
+      - run: npm run onprem:migrations:validate
+      - run: npm run onprem:governance:validate
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Verify signed DR governance approval before release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DR_APPROVAL_RUN_ID: ${{ vars.LAST_DR_APPROVAL_RUN_ID }}
+          GOVERNANCE_PUBLIC_KEY_B64: ${{ vars.GOVERNANCE_PUBLIC_KEY_B64 }}
+          GOVERNANCE_PUBLIC_KEY_SHA256: ${{ vars.GOVERNANCE_PUBLIC_KEY_SHA256 }}
+          COSIGN_PUBLIC_KEY_SHA256: ${{ vars.COSIGN_PUBLIC_KEY_SHA256 }}
+        run: |
+          [[ "$DR_APPROVAL_RUN_ID" =~ ^[0-9]+$ ]]
+          mkdir -p approved-dr
+          gh run download "$DR_APPROVAL_RUN_ID" -n "dr-governance-$DR_APPROVAL_RUN_ID" -D approved-dr
+          printf '%s' "$GOVERNANCE_PUBLIC_KEY_B64" | base64 -d > approved-dr/governance.pub
+          actual="$(openssl dgst -sha256 approved-dr/governance.pub | awk '{print $NF}')"
+          [ "sha256:$actual" = "$GOVERNANCE_PUBLIC_KEY_SHA256" ]
+          cosign verify-blob --key approved-dr/governance.pub --bundle approved-dr/dr-approval.bundle approved-dr/dr-approval.json
+          DR_APPROVAL_FILE=approved-dr/dr-approval.json node scripts/validate-release-readiness.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: approved-dr-evidence
+          path: |
+            approved-dr/dr-approval.json
+            approved-dr/dr-approval.bundle
+          if-no-files-found: error
+          retention-days: 365
+      - run: npm run onprem:protect-source
+      - run: node --check build/onprem/server.bundle.cjs
+      - run: DATABASE_URL=postgresql://aeroedu:aeroedu@localhost:5432/aeroedu npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/schema.sql
+      - run: test -s /tmp/schema.sql
+      - name: Enforce private source and semantic release tag
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          [ "$REPOSITORY_PRIVATE" = true ] || { echo 'On-prem release requires a private source repository' >&2; exit 1; }
+          if [[ "$REF" == refs/tags/* ]]; then [[ "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; fi
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  scan:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - name: Validate pinned build inputs
+        env:
+          NODE_IMAGE: ${{ vars.NODE_IMAGE }}
+          POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
+          LICENSE_PUBLIC_KEY_B64: ${{ vars.LICENSE_PUBLIC_KEY_B64 }}
+        run: |
+          [[ "$NODE_IMAGE" =~ @sha256:[a-f0-9]{64}$ ]]
+          [[ "$POSTGRES_IMAGE" =~ @sha256:[a-f0-9]{64}$ ]]
+          test -n "$LICENSE_PUBLIC_KEY_B64"
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          file: Dockerfile.onprem
+          load: true
+          platforms: ${{ matrix.platform }}
+          tags: aeroedu/onprem:scan-${{ matrix.arch }}
+          build-args: |
+            NODE_IMAGE=${{ vars.NODE_IMAGE }}
+            LICENSE_PUBLIC_KEY_B64=${{ vars.LICENSE_PUBLIC_KEY_B64 }}
+          provenance: false
+          sbom: false
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          image-ref: aeroedu/onprem:scan-${{ matrix.arch }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - run: bash scripts/verify-protected-image.sh aeroedu/onprem:scan-${{ matrix.arch }}
+
+  build-sign:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: scan
+    runs-on: ubuntu-24.04
+    environment: secure-release
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.image.outputs.value }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - id: image
+        shell: bash
+        run: echo "value=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: approved-dr-evidence
+          path: approved-dr
+      - name: Require pre-provisioned private registry package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/assert-ghcr-private.sh aeroedu-onprem
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
+        id: meta
+        with:
+          images: ${{ steps.image.outputs.value }}
+          tags: |
+            type=ref,event=tag
+            type=sha,format=long
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: build
+        with:
+          context: .
+          file: Dockerfile.onprem
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NODE_IMAGE=${{ vars.NODE_IMAGE }}
+            LICENSE_PUBLIC_KEY_B64=${{ vars.LICENSE_PUBLIC_KEY_B64 }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          image-ref: ${{ steps.image.outputs.value }}@${{ steps.build.outputs.digest }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          image-ref: ${{ steps.image.outputs.value }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx
+          output: sbom.cdx.json
+          scanners: vuln
+      - name: Create signed release metadata
+        env:
+          IMAGE: ${{ steps.image.outputs.value }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          NODE_IMAGE: ${{ vars.NODE_IMAGE }}
+        run: |
+          node scripts/create-provenance.cjs provenance.json
+          node scripts/validate-migrations.cjs > migration-manifest.json
+      - name: Create governed release manifest
+        env:
+          IMAGE: ${{ steps.image.outputs.value }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          NODE_IMAGE: ${{ vars.NODE_IMAGE }}
+          POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
+          COSIGN_PUBLIC_KEY_SHA256: ${{ vars.COSIGN_PUBLIC_KEY_SHA256 }}
+          DR_APPROVAL_FILE: approved-dr/dr-approval.json
+        run: node scripts/create-release-manifest.cjs release-manifest.json
+      - name: Sign exact image digest
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          target="${{ steps.image.outputs.value }}@${{ steps.build.outputs.digest }}"
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$target"
+          cosign attest --yes --key env://COSIGN_PRIVATE_KEY --type cyclonedx --predicate sbom.cdx.json "$target"
+          cosign attest --yes --key env://COSIGN_PRIVATE_KEY --type slsaprovenance --predicate provenance.json "$target"
+          cosign attest --yes --key env://COSIGN_PRIVATE_KEY --type https://aeroedu.vn/attestations/migrations/v1 --predicate migration-manifest.json "$target"
+          cosign attest --yes --key env://COSIGN_PRIVATE_KEY --type https://aeroedu.vn/attestations/release/v1 --predicate release-manifest.json "$target"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: onprem-release-metadata
+          path: |
+            sbom.cdx.json
+            provenance.json
+            migration-manifest.json
+            release-manifest.json
+            governance/release-policy.json
+            approved-dr/dr-approval.json
+            approved-dr/dr-approval.bundle
+          if-no-files-found: error
+          retention-days: 365
+
+  airgap-bundle:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-sign
+    runs-on: ubuntu-24.04
+    environment: secure-release
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: onprem-release-metadata
+          path: release-metadata
+      - name: Pull PostgreSQL for ${{ matrix.arch }} scan
+        run: |
+          docker pull --platform linux/${{ matrix.arch }} "${{ vars.POSTGRES_IMAGE }}"
+          docker tag "${{ vars.POSTGRES_IMAGE }}" "aeroedu/postgres-scan:${{ matrix.arch }}"
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          image-ref: aeroedu/postgres-scan:${{ matrix.arch }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Prepare ${{ matrix.arch }} air-gap bundle
+        env:
+          IMAGE: ${{ needs.build-sign.outputs.image }}
+          DIGEST: ${{ needs.build-sign.outputs.digest }}
+          VERSION: ${{ github.ref_name }}
+          POSTGRES_IMAGE: ${{ vars.POSTGRES_IMAGE }}
+          ARCH: ${{ matrix.arch }}
+        run: bash scripts/package-ci-airgap.sh
+      - name: Sign air-gap archive for offline verification
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY --bundle "release/aeroedu-onprem-${{ github.ref_name }}-${{ matrix.arch }}.bundle" "release/aeroedu-onprem-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aeroedu-onprem-${{ github.ref_name }}-${{ matrix.arch }}
+          path: |
+            release/aeroedu-onprem-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz
+            release/aeroedu-onprem-${{ github.ref_name }}-${{ matrix.arch }}.bundle
+          if-no-files-found: error
+          retention-days: 30

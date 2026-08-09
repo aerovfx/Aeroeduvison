@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE} AS frontend
+WORKDIR /build
+COPY aeroedu-vite/package.json aeroedu-vite/package-lock.json* ./
+RUN npm ci --legacy-peer-deps
+COPY aeroedu-vite/ ./
+ARG VITE_APP_URL=""
+ARG VITE_GOOGLE_CLIENT_ID=""
+ENV NODE_ENV=production VITE_APP_VERSION=on-premise VITE_APP_URL=${VITE_APP_URL} VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID} NODE_OPTIONS=--max-old-space-size=6144
+RUN npm run build
+
+FROM ${NODE_IMAGE} AS schema-builder
+WORKDIR /schema
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY onprem-migrations ./onprem-migrations
+COPY scripts/validate-migrations.cjs ./scripts/validate-migrations.cjs
+RUN npm ci --legacy-peer-deps
+ENV DATABASE_URL=postgresql://aeroedu:aeroedu@localhost:5432/aeroedu
+RUN npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /schema/onprem-init.sql
+RUN node scripts/validate-migrations.cjs onprem-migrations > /schema/migration-manifest.json
+
+FROM schema-builder AS server-builder
+COPY server.cjs ./server.cjs
+COPY lib ./lib
+RUN npx esbuild server.cjs --bundle --platform=node --target=node22 --format=cjs --packages=external --minify --legal-comments=none --outfile=/schema/server.bundle.cjs
+COPY scripts/sync-license-state.cjs ./scripts/sync-license-state.cjs
+RUN npx esbuild scripts/sync-license-state.cjs --bundle --platform=node --target=node22 --format=cjs --packages=external --minify --legal-comments=none --outfile=/schema/sync-license-state.bundle.cjs
+COPY scripts/reconcile-state.cjs ./scripts/reconcile-state.cjs
+RUN npx esbuild scripts/reconcile-state.cjs --bundle --platform=node --target=node22 --format=cjs --packages=external --minify --legal-comments=none --outfile=/schema/reconcile-state.bundle.cjs
+
+FROM ${NODE_IMAGE} AS runtime
+WORKDIR /app
+ENV NODE_ENV=production PORT=8080 HOME=/var/lib/aeroedu
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --legacy-peer-deps --ignore-scripts && npm cache clean --force
+COPY scripts/onprem-bootstrap.cjs ./scripts/onprem-bootstrap.cjs
+COPY --from=server-builder /schema/sync-license-state.bundle.cjs ./scripts/sync-license-state.cjs
+COPY --from=server-builder /schema/reconcile-state.bundle.cjs ./scripts/reconcile-state.cjs
+COPY scripts/onprem-entrypoint.sh ./scripts/onprem-entrypoint.sh
+COPY onprem-migrations ./onprem-migrations
+COPY --from=schema-builder /schema/onprem-init.sql ./schema/onprem-init.sql
+COPY --from=schema-builder /schema/migration-manifest.json ./schema/migration-manifest.json
+COPY --from=server-builder /schema/server.bundle.cjs ./server.cjs
+COPY --from=frontend /build/dist ./dist
+ARG LICENSE_PUBLIC_KEY_B64
+RUN test -n "$LICENSE_PUBLIC_KEY_B64" && printf '%s' "$LICENSE_PUBLIC_KEY_B64" | base64 -d > /app/license-public.pem
+RUN chmod +x /app/scripts/onprem-entrypoint.sh && groupadd --system --gid 10001 aeroedu && useradd --system --uid 10001 --gid aeroedu --home-dir /var/lib/aeroedu aeroedu && mkdir -p /var/lib/aeroedu/data /var/lib/aeroedu/uploads /var/lib/aeroedu/logs && chown -R aeroedu:aeroedu /app /var/lib/aeroedu
+USER aeroedu
+VOLUME ["/var/lib/aeroedu"]
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["curl", "-fsS", "http://127.0.0.1:8080/api/health/ready"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/onprem-entrypoint.sh"]

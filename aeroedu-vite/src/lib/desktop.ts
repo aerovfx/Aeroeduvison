@@ -18,5 +18,11 @@ export function isDesktopRoute(pathname: string): boolean {
   return pathname === '/desktop' || pathname.startsWith('/desktop/')
 }
 
-/** Màn hình mặc định khi mở app native. */
-export const DESKTOP_HOME = '/desktop'
+/**
+ * Màn hình mặc định khi mở app native.
+ *
+ * Tauri phải chạy cùng dashboard production với bản web. `/desktop` chỉ là
+ * gallery/prototype UI độc lập, không dùng DashboardLayout và không có đầy đủ
+ * hành vi điều hướng nên không được dùng làm entry point của app phát hành.
+ */
+export const DESKTOP_HOME = '/dashboard'

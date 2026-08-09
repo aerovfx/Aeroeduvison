@@ -1,0 +1,74 @@
+name: Issue On-Premise License
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer_id:
+        description: Customer identifier
+        required: true
+      installation_id:
+        description: Installation identifier
+        required: true
+      days:
+        description: Validity in days
+        required: true
+        default: '365'
+      seats:
+        description: Licensed seats
+        required: true
+        default: '100'
+      features:
+        description: Comma-separated features
+        required: true
+        default: core
+      image_digest:
+        description: Required sha256 image digest binding
+        required: true
+      issuer:
+        description: Trusted license issuer
+        required: true
+        default: aeroedu
+      key_id:
+        description: Signing key identifier from the trusted key ring
+        required: true
+        default: primary-2026
+
+permissions:
+  contents: read
+
+jobs:
+  issue:
+    runs-on: ubuntu-24.04
+    environment: license-issuance
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - name: Issue signed license
+        env:
+          LICENSE_PRIVATE_KEY: ${{ secrets.LICENSE_PRIVATE_KEY }}
+          CUSTOMER_ID: ${{ inputs.customer_id }}
+          INSTALLATION_ID: ${{ inputs.installation_id }}
+          LICENSE_DAYS: ${{ inputs.days }}
+          LICENSE_SEATS: ${{ inputs.seats }}
+          LICENSE_FEATURES: ${{ inputs.features }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          LICENSE_ISSUER: ${{ inputs.issuer }}
+          LICENSE_KEY_ID: ${{ inputs.key_id }}
+        run: |
+          umask 077
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$LICENSE_DAYS" =~ ^[1-9][0-9]*$ ]]
+          [[ "$LICENSE_SEATS" =~ ^[1-9][0-9]*$ ]]
+          keydir="$(mktemp -d)"
+          trap 'rm -rf "$keydir"' EXIT
+          printf '%s' "$LICENSE_PRIVATE_KEY" > "$keydir/license-private.pem"
+          args=(issue --private "$keydir/license-private.pem" --customer "$CUSTOMER_ID" --installation "$INSTALLATION_ID" --issuer "$LICENSE_ISSUER" --key-id "$LICENSE_KEY_ID" --days "$LICENSE_DAYS" --seats "$LICENSE_SEATS" --features "$LICENSE_FEATURES" --image-digest "$IMAGE_DIGEST" --out license.json)
+          node scripts/license-cli.cjs "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: license-${{ inputs.customer_id }}-${{ inputs.installation_id }}
+          path: license.json
+          retention-days: 7
+          if-no-files-found: error

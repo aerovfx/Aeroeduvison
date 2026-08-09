@@ -3,7 +3,7 @@
 
 [package]
 name = "aeroedu-desktop"
-version = "1.0.0"
+version = "1.0.1"
 description = "AeroEdu Vision — Desktop App"
 authors = ["AeroEdu Vision"]
 edition = "2021"
@@ -19,8 +19,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rand = "0.8"
 
 # Build nhẹ hơn cho bản release (binary nhỏ + tối ưu)
 [profile.release]

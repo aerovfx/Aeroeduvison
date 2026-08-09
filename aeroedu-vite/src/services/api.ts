@@ -24,7 +24,7 @@ function resolveBaseUrl(): string {
     const isTauri = !!(w.__TAURI_INTERNALS__ || w.__TAURI__)
     // Override qua env nếu cần switch sang staging
     const native = (import.meta.env.VITE_API_URL_NATIVE as string | undefined)
-      || 'https://inphysic.com/api'
+      || 'http://127.0.0.1:43127/api'
     if (w.Capacitor?.isNativePlatform?.()) return native
     // Tauri: app đóng gói (PROD) chạy từ tauri://localhost → gọi tuyệt đối.
     //   Khi `tauri dev` (import.meta.env.PROD === false) frontend ở localhost:5173

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Convert to Secure On-Prem"
+  short_description: "Ship secure on-prem, App Store and VPS releases"
+  default_prompt: "Use $convert-to-secure-onprem to assess and prepare this application for secure on-premise, App Store, and VPS distribution."

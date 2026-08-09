@@ -34,10 +34,56 @@ const http = require('http');
 const path = require('path');
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 const { normalizeSubject } = require('./lib/subject-normalize.cjs');
+const { requiredFeature, hasFeature } = require('./lib/license-policy.cjs');
+const isLicenseSeatError = (error) => /license seat limit reached|license runtime state is not initialized|license expired/i.test(String(error?.message || ''));
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
+const HOST = process.env.HOST || '0.0.0.0';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8090';
+const DEPLOYMENT_MODE = process.env.DEPLOYMENT_MODE || 'cloud';
+const OFFLINE_MODE = process.env.OFFLINE_MODE === 'true';
+const ONPREM_MIGRATION_MANIFEST = DEPLOYMENT_MODE === 'on-premise'
+  ? JSON.parse(require('fs').readFileSync('/app/schema/migration-manifest.json', 'utf8'))
+  : [];
+let LICENSE_PAYLOAD = null;
+let LICENSE_CHECKED_AT = 0;
+function refreshLicense(force = false) {
+  if (DEPLOYMENT_MODE !== 'on-premise') return null;
+  if (!force && Date.now() - LICENSE_CHECKED_AT < 60_000) return LICENSE_PAYLOAD;
+  LICENSE_PAYLOAD = require('./lib/license.cjs').loadAndVerifyLicense();
+  LICENSE_CHECKED_AT = Date.now();
+  return LICENSE_PAYLOAD;
+}
+
+if (OFFLINE_MODE && typeof globalThis.fetch === 'function') {
+  const nativeFetch = globalThis.fetch;
+  const explicitlyAllowed = new Set(String(process.env.OFFLINE_OUTBOUND_ALLOWLIST || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
+  for (const candidate of [process.env.OLLAMA_URL, process.env.PUBLIC_URL]) {
+    try { if (candidate) explicitlyAllowed.add(new URL(candidate).hostname.toLowerCase()); } catch {}
+  }
+  const isPrivateHost = (host) => host === 'localhost' || host === '::1' || host.endsWith('.local') || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  globalThis.fetch = function offlineFetch(input, init) {
+    const target = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+    const host = target.hostname.toLowerCase();
+    if (!isPrivateHost(host) && !explicitlyAllowed.has(host)) {
+      return Promise.reject(new Error(`OFFLINE_MODE blocked outbound request to ${host}`));
+    }
+    return nativeFetch(input, init);
+  };
+}
+
+if (DEPLOYMENT_MODE === 'on-premise') {
+  const jwtSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || '';
+  if (jwtSecret.length < 32 || jwtSecret.includes('CHANGE_ME')) {
+    throw new Error('On-premise startup refused: JWT_SECRET must be at least 32 random characters');
+  }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('On-premise startup refused: DATABASE_URL is required');
+  }
+  LICENSE_PAYLOAD = refreshLicense(true);
+  console.log(`[license] valid id=${LICENSE_PAYLOAD.licenseId} expires=${LICENSE_PAYLOAD.expiresAt}`);
+}
 
 // AUTH_SERVICE_URL: DEPRECATED — built-in handlers cover toàn bộ /api/auth/*.
 // Giữ biến để log warning nếu user còn set, nhưng KHÔNG dùng làm fallback nữa.
@@ -80,6 +126,75 @@ console.log(`[server] USE_NODEJS_AUTH=${USE_NODEJS_AUTH} (built-in /api/auth/* �
 console.log(`[server] MEDIA_SERVICE_URL=${MEDIA_SERVICE_URL}`);
 console.log(`[server] TEACHER_SERVICE_URL=${TEACHER_SERVICE_URL}`);
 console.log(`[server] LATEX_SERVICE_URL=${LATEX_SERVICE_URL}`);
+console.log(`[server] DEPLOYMENT_MODE=${DEPLOYMENT_MODE} OFFLINE_MODE=${OFFLINE_MODE}`);
+
+// Stable probes for container orchestrators and on-premise diagnostics.
+app.get('/api/health/live', (_req, res) => {
+  res.json({ status: 'live', deploymentMode: DEPLOYMENT_MODE, version: process.env.AEROEDU_VERSION || 'unknown' });
+});
+app.get('/api/health/ready', async (_req, res) => {
+  try {
+    refreshLicense(true);
+    const pool = _getPool();
+    await pool.query('SELECT 1 AS ok');
+    if (!process.env.LOCAL_DATABASE_PATH) {
+      const schema = await pool.query(`SELECT to_regclass('public."User"') AS user_table,
+        to_regclass('public.aeroedu_schema_migrations') AS migration_table,
+        to_regclass('public.aeroedu_license_runtime') AS license_table`);
+      if (!schema.rows[0]?.user_table) throw new Error('database schema is not initialized');
+      if (DEPLOYMENT_MODE === 'on-premise') {
+        if (!schema.rows[0]?.migration_table || !schema.rows[0]?.license_table) throw new Error('on-premise schema metadata is not initialized');
+        const migration = await pool.query('SELECT version, checksum FROM aeroedu_schema_migrations ORDER BY version');
+        if (migration.rows.length < ONPREM_MIGRATION_MANIFEST.length || ONPREM_MIGRATION_MANIFEST.some((entry, index) => migration.rows[index]?.version !== entry.version || migration.rows[index]?.checksum !== entry.sha256)) {
+          throw new Error('database migration ledger does not match this image');
+        }
+      }
+    }
+    res.json({
+      status: 'ready',
+      deploymentMode: DEPLOYMENT_MODE,
+      offlineMode: OFFLINE_MODE,
+      database: process.env.LOCAL_DATABASE_PATH ? 'sqlite' : 'postgresql',
+      capabilities: {
+        localAuth: true,
+        cloudOAuth: !OFFLINE_MODE,
+        localAI: Boolean(process.env.OLLAMA_URL),
+        cloudAI: !OFFLINE_MODE,
+      },
+      license: LICENSE_PAYLOAD ? { valid: true } : null,
+    });
+  } catch (error) {
+    res.status(503).json({ status: 'not-ready', database: 'unavailable', error: error.message });
+  }
+});
+
+if (DEPLOYMENT_MODE === 'on-premise') {
+  app.use('/api', (_req, res, next) => {
+    try { refreshLicense(false); next(); }
+    catch (error) { res.status(402).json({ error: 'License không hợp lệ', code: 'LICENSE_INVALID', detail: error.message }); }
+  });
+  app.use('/api', (req, res, next) => {
+    const feature = requiredFeature(`${req.baseUrl}${req.path}`);
+    if (hasFeature(LICENSE_PAYLOAD, feature)) return next();
+    return res.status(403).json({ error: `License không bao gồm tính năng ${feature}`, code: 'FEATURE_NOT_LICENSED', feature });
+  });
+}
+
+// In sealed/offline installations, fail closed for routes that necessarily
+// contact public cloud services. Local email/password auth remains available.
+if (OFFLINE_MODE) {
+  const cloudOnlyPaths = [
+    '/api/auth/google',
+    '/api/tts',
+    '/api/telegram/webhook',
+  ];
+  app.use((req, res, next) => {
+    if (cloudOnlyPaths.some((prefix) => req.path.startsWith(prefix))) {
+      return res.status(503).json({ error: 'Tính năng cloud đã bị tắt trong chế độ offline', code: 'OFFLINE_MODE' });
+    }
+    next();
+  });
+}
 
 // ── Security headers (required for Google OAuth) ───────────
 app.use((_req, res, next) => {
@@ -150,7 +265,7 @@ app.get('/api/tts', tts.handler);
 if (USE_NODEJS_AUTH) {
   console.log('[auth] Built-in Node.js auth handlers active');
 
-  const { Pool } = require('pg');
+  const { Pool } = require('./lib/db-pool.cjs');
   const bcrypt = require('bcryptjs');
   const jwt = require('jsonwebtoken');
   // hash-wasm provides pure-WASM Argon2 — no native compilation needed
@@ -354,6 +469,7 @@ if (USE_NODEJS_AUTH) {
       });
     } catch (err) {
       console.error('[auth:google] ❌', err.message);
+      if (isLicenseSeatError(err)) return res.status(403).json({ error: 'Đã đạt giới hạn tài khoản của license', code: 'LICENSE_SEAT_LIMIT' });
       return res.status(500).json({ error: 'Lỗi xác thực Google, vui lòng thử lại' });
     }
   });
@@ -564,6 +680,12 @@ if (USE_NODEJS_AUTH) {
         : role;  // fallback theo role
 
       const pool = getPool();
+      if (DEPLOYMENT_MODE === 'on-premise' && LICENSE_PAYLOAD?.seats) {
+        const seatCount = await pool.query('SELECT COUNT(*)::int AS count FROM "User" WHERE COALESCE(banned, false) = false');
+        if (Number(seatCount.rows[0]?.count || 0) >= LICENSE_PAYLOAD.seats) {
+          return res.status(403).json({ error: 'Đã đạt giới hạn tài khoản của license', code: 'LICENSE_SEAT_LIMIT' });
+        }
+      }
       const existing = await pool.query(
         'SELECT id FROM "User" WHERE LOWER(email) = $1',
         [email.toLowerCase().trim()]
@@ -628,6 +750,7 @@ if (USE_NODEJS_AUTH) {
       });
     } catch (err) {
       console.error('[auth:register] ❌', err.message);
+      if (isLicenseSeatError(err)) return res.status(403).json({ error: 'Đã đạt giới hạn tài khoản của license', code: 'LICENSE_SEAT_LIMIT' });
       return res.status(500).json({ error: 'Lỗi đăng ký, vui lòng thử lại' });
     }
   });
@@ -681,7 +804,7 @@ function makeProxy(target, label, pathFilter) {
 // Falls through to teacher-service proxy for everything else.
 // ══════════════════════════════════════════════════════════════
 {
-  const { Pool: EPool } = require('pg');
+  const { Pool: EPool } = require('./lib/db-pool.cjs');
   const ejwt = require('jsonwebtoken');
   const { randomUUID: examUUID } = require('crypto');
 
@@ -829,7 +952,7 @@ function makeProxy(target, label, pathFilter) {
 // ══════════════════════════════════════════════════════════════
 {
   const { extractQuestionsFromPdf, generateQuestionsFromPdf } = require('./lib/fal-quiz-extractor.cjs');
-  const { Pool: QPool } = require('pg');
+  const { Pool: QPool } = require('./lib/db-pool.cjs');
   const qjwt = require('jsonwebtoken');
   const { randomUUID: quizUUID } = require('crypto');
 
@@ -3913,7 +4036,7 @@ app.get('/api/teachers/all', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 {
   console.log('[stem] Built-in STEM project handlers active');
-  const { Pool: SPool } = require('pg');
+  const { Pool: SPool } = require('./lib/db-pool.cjs');
   const sjwt = require('jsonwebtoken');
   const { randomUUID: stemUUID, randomBytes: stemRandom } = require('crypto');
 
@@ -4906,7 +5029,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 {
   console.log('[instructor] Built-in Node.js instructor-course handlers active');
 
-  const { Pool: IPool } = require('pg');
+  const { Pool: IPool } = require('./lib/db-pool.cjs');
   const ijwt = require('jsonwebtoken');
 
   let _ipool = null;
@@ -5904,7 +6027,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 if (USE_NODEJS_QUESTIONS) {
   console.log('[questions] Built-in Node.js question-bank handlers active');
 
-  const { Pool: QPool } = require('pg');
+  const { Pool: QPool } = require('./lib/db-pool.cjs');
   const { randomUUID } = require('crypto');
 
   let _qpool = null;
@@ -6300,7 +6423,7 @@ if (USE_NODEJS_QUESTIONS) {
 // Không yêu cầu auth (chỉ đọc metadata, không lộ nội dung câu hỏi).
 // ══════════════════════════════════════════════════════════════
 {
-  const { Pool: DbgPool } = require('pg');
+  const { Pool: DbgPool } = require('./lib/db-pool.cjs');
   let _dbgpool = null;
   function getDbgPool() {
     if (!_dbgpool) {
@@ -7119,7 +7242,7 @@ if (USE_NODEJS_QUESTIONS) {
 // Tạo APNs Auth Key: docs/IOS_APP_GUIDE.md.
 // ══════════════════════════════════════════════════════════════
 {
-  const { Pool } = require('pg');
+  const { Pool } = require('./lib/db-pool.cjs');
   const jwt = require('jsonwebtoken');
   const JWT_SECRET_DT = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
     || 'dev-secret-fallback-change-in-production!!';
@@ -7274,7 +7397,7 @@ if (USE_NODEJS_QUESTIONS) {
 // writes in dev; read endpoints require a valid token.
 // ══════════════════════════════════════════════════════════════
 {
-  const { Pool } = require('pg');
+  const { Pool } = require('./lib/db-pool.cjs');
   const jwt = require('jsonwebtoken');
 
   const JWT_SECRET_LH = process.env.JWT_SECRET
@@ -7528,7 +7651,7 @@ if (USE_NODEJS_QUESTIONS) {
 // with CREATE TABLE IF NOT EXISTS on first call.
 // ══════════════════════════════════════════════════════════════
 {
-  const { Pool } = require('pg');
+  const { Pool } = require('./lib/db-pool.cjs');
   const jwt = require('jsonwebtoken');
 
   const JWT_SECRET_EP = process.env.JWT_SECRET
@@ -8250,7 +8373,7 @@ if (USE_NODEJS_QUESTIONS) {
 // Must register BEFORE the catch-all makeProxy(BACKEND_URL, ...) at line ~2085.
 // ════════════════════════════════════════════════════════════════════════
 {
-  const { Pool: AsgnPool } = require('pg');
+  const { Pool: AsgnPool } = require('./lib/db-pool.cjs');
   const jwtAsgn = require('jsonwebtoken');
   const cryptoAsgn = require('crypto');
 
@@ -9046,7 +9169,7 @@ if (USE_NODEJS_QUESTIONS) {
 // MUST register BEFORE the catch-all aero-backend proxy at the bottom.
 // ════════════════════════════════════════════════════════════════════════
 {
-  const { Pool: KcPool } = require('pg');
+  const { Pool: KcPool } = require('./lib/db-pool.cjs');
   const jwtKc = require('jsonwebtoken');
   const cryptoKc = require('crypto');
 
@@ -10861,7 +10984,7 @@ if (!USE_NODEJS_QUESTIONS) {
 var _akPool = null;
 function _getPool() {
   if (!_akPool) {
-    const { Pool } = require('pg');
+    const { Pool } = require('./lib/db-pool.cjs');
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('DATABASE_URL không được set');
     _akPool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
@@ -11154,9 +11277,26 @@ app.post('/api/latex-projects/compile', async (req, res) => {
     const { randomUUID } = require('crypto');
     const fs = require('fs');
     const path = require('path');
-    const { exec } = require('child_process');
+    const { execFile } = require('child_process');
     const { promisify } = require('util');
-    const execAsync = promisify(exec);
+    const execFileAsync = promisify(execFile);
+
+    // Desktop bundle ships Tectonic next to aeroedu-node. Cloud/container
+    // deployments continue to resolve it from PATH.
+    const bundledTectonic = path.join(path.dirname(process.execPath), 'tectonic');
+    const tectonicBin = fs.existsSync(bundledTectonic) ? bundledTectonic : 'tectonic';
+    try {
+      await execFileAsync(tectonicBin, ['--version'], { timeout: 5_000 });
+    } catch (engineError) {
+      const missing = engineError?.code === 'ENOENT' || /not found/i.test(String(engineError?.message || ''));
+      if (missing) {
+        return res.status(503).json({
+          error: 'Dịch vụ biên dịch LaTeX chưa sẵn sàng',
+          log: 'Không tìm thấy Tectonic trong app bundle hoặc PATH.',
+        });
+      }
+      throw engineError;
+    }
 
     // Tmp dir riêng cho mỗi compile để tránh race
     const sessionId = randomUUID();
@@ -11168,9 +11308,10 @@ app.post('/api/latex-projects/compile', async (req, res) => {
     let pdfBuffer = null;
     let logOutput = '';
     try {
-      const { stdout, stderr } = await execAsync(
-        `tectonic --outdir "${tmpDir}" "${texFile}"`,
-        { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 }
+      const { stdout, stderr } = await execFileAsync(
+        tectonicBin,
+        ['--outdir', tmpDir, texFile],
+        { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 },
       );
       logOutput = `${stdout}\n${stderr}`;
       const pdfPath = path.join(tmpDir, 'main.pdf');
@@ -18284,8 +18425,8 @@ try {
   console.warn('[server] ⚠ Broker attach failed:', e.message);
 }
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`[server] ✅ AeroEduVision listening on 0.0.0.0:${PORT}`);
+httpServer.listen(PORT, HOST, () => {
+  console.log(`[server] ✅ AeroEduVision listening on ${HOST}:${PORT}`);
   console.log(`[server] 📡 API proxy     → ${BACKEND_URL}`);
   if (!USE_NODEJS_AUTH) {
     console.log(`[server] 🔐 Auth proxy    → ${AUTH_SERVICE_URL}`);
