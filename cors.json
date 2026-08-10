@@ -1,8 +1,0 @@
-[
-  {
-    "origin": ["http://localhost:3000", "https://myapp.vercel.app"],
-    "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
-    "responseHeader": ["Content-Type", "x-goog-resumable", "Authorization", "x-goog-content-length-range", "x-goog-algorithm", "x-goog-credential", "x-goog-date", "x-goog-expires", "x-goog-signedheaders", "x-goog-signature"],
-    "maxAgeSeconds": 3600
-  }
-]
