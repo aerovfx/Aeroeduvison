@@ -182,9 +182,6 @@ export default function TeacherDashboard() {
   const loadData = async () => {
     setLoadError(null)
     try {
-      // FE Dashboard fetch real BE: /api/teacher/dashboard/full
-      // BE return: { students, stats, classes, emotionCounts, topPerformers,
-      //              needAttention, aiSuggestions, updatedAt }
       const { data } = await api.get<DashboardFullData>('/teacher/dashboard/full')
       setStudents(data.students || [])
       setClassStats(data.stats || null)
@@ -196,7 +193,6 @@ export default function TeacherDashboard() {
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Không tải được dữ liệu lớp'
       setLoadError(msg)
-      // KHÔNG fallback DEMO — show empty state thực tế
       setStudents([]); setClassStats(null)
     } finally {
       setLoading(false)
@@ -216,8 +212,6 @@ export default function TeacherDashboard() {
     return true
   })
 
-  /* ─── AI Co-Teacher suggestions — từ BE thật (rule-based on real data) ──── */
-  // Map BE shape → FE display shape (icon + color)
   const aiSuggestions = beSuggestions.length > 0
     ? beSuggestions.map(s => {
         const meta = s.severity === 'high' || s.type === 'alert'
@@ -230,7 +224,6 @@ export default function TeacherDashboard() {
         return { ...s, ...meta }
       })
     : [
-        // Empty fallback hint khi chưa có data — không phải mock
         {
           type: 'tip' as const,
           color: D.cyan, icon: Lightbulb,
@@ -243,7 +236,6 @@ export default function TeacherDashboard() {
         },
       ]
 
-  /* ─── Loading ─────────────────────────────────────────────── */
   if (loading) return (
     <div style={{ minHeight: '100vh', background: D.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
@@ -260,18 +252,21 @@ export default function TeacherDashboard() {
     </div>
   )
 
-  /* ─── Render ─────────────────────────────────────────────── */
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text }}>
       <style>{`
         @keyframes spin { to { transform:rotate(360deg) } }
         @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
+        @keyframes cam-fab-pop { from{transform:scale(0.6) translateY(20px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
         .td-row:hover { background: rgba(255,255,255,0.025) !important; }
         .td-action-btn:hover { background: rgba(124,58,237,0.15) !important; color: #a78bfa !important; }
         .td-action-btn2:hover { background: rgba(34,211,238,0.12) !important; color: #22d3ee !important; }
         .custom-scrollbar::-webkit-scrollbar { width:4px; height:4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background:transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background:rgba(124,58,237,.3); border-radius:4px; }
+        .cam-fab { animation: cam-fab-pop .3s cubic-bezier(.34,1.56,.64,1) both; }
+        .cam-fab:active { transform: scale(0.93) !important; }
+        @media (min-width: 768px) { .cam-fab { display: none !important; } }
       `}</style>
 
       {/* ════ TOP BAR ════ */}
@@ -283,7 +278,6 @@ export default function TeacherDashboard() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '14px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
 
-            {/* Left: brand + title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
@@ -310,7 +304,6 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {/* Center: time range */}
             <div style={{ display: 'flex', gap: 4, background: D.white(0.05), borderRadius: 10, padding: 4 }}>
               {(['today', 'week', 'month'] as const).map(r => (
                 <button key={r} onClick={() => setTimeRange(r)} style={{
@@ -326,7 +319,6 @@ export default function TeacherDashboard() {
               ))}
             </div>
 
-            {/* Right: actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button onClick={handleRefresh} style={{
                 width: 36, height: 36, borderRadius: 9, background: D.white(0.05),
@@ -407,7 +399,6 @@ export default function TeacherDashboard() {
                 {f === 'all' ? `Tất cả (${students.length})` : f === 'at-risk' ? `⚠ Cần hỗ trợ (${classStats?.atRiskCount ?? 0})` : `⭐ Xuất sắc (${classStats?.excellingCount ?? 0})`}
               </button>
             ))}
-            {/* View toggle */}
             <div style={{ display: 'flex', gap: 3, background: D.white(0.05), borderRadius: 9, padding: 3 }}>
               {([
                 { id: 'overview' as const, Icon: BarChart3 },
@@ -435,7 +426,6 @@ export default function TeacherDashboard() {
         {/* ── Left column (flex-1) ── */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Error banner */}
           {loadError && (
             <div style={{
               padding: 12, borderRadius: 12,
@@ -453,7 +443,6 @@ export default function TeacherDashboard() {
             </div>
           )}
 
-          {/* Empty state — chưa có HS nào */}
           {!loadError && classStats?.totalStudents === 0 && (
             <div style={{
               padding: 24, borderRadius: 14,
@@ -520,7 +509,6 @@ export default function TeacherDashboard() {
 
           {/* View panel */}
           <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, overflow: 'hidden' }}>
-            {/* Tab bar */}
             <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: `1px solid ${D.border}` }}>
               {([
                 { id: 'overview' as const, label: 'Tổng quan',    Icon: BarChart3 },
@@ -539,7 +527,6 @@ export default function TeacherDashboard() {
               ))}
             </div>
 
-            {/* Overview */}
             {selectedView === 'overview' && (
               <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
                 {[
@@ -559,7 +546,6 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {/* Engagement Heatmap */}
             {selectedView === 'heatmap' && (
               <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <p style={{ fontSize: 12, color: D.muted, margin: '0 0 8px' }}>Mức độ tương tác theo học sinh ({timeRange === 'today' ? 'hôm nay' : timeRange === 'week' ? 'tuần này' : 'tháng này'})</p>
@@ -590,7 +576,6 @@ export default function TeacherDashboard() {
               </div>
             )}
 
-            {/* Emotion Timeline */}
             {selectedView === 'emotions' && (
               <div style={{ padding: 16 }}>
                 <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -610,7 +595,6 @@ export default function TeacherDashboard() {
                     )
                   })}
                 </div>
-                {/* Emotion per-student row */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {filteredStudents.map(s => {
                     const meta = EMOTION_META[s.emotion]
@@ -667,7 +651,6 @@ export default function TeacherDashboard() {
                     const em = EMOTION_META[s.emotion]
                     return (
                       <tr key={s.id} className="td-row" style={{ borderBottom: `1px solid ${D.border}`, transition: 'background .12s' }}>
-                        {/* Name */}
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{
@@ -685,7 +668,6 @@ export default function TeacherDashboard() {
                             </div>
                           </div>
                         </td>
-                        {/* XP / Level */}
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Trophy size={13} style={{ color: D.amber }} />
@@ -693,7 +675,6 @@ export default function TeacherDashboard() {
                           </div>
                           <span style={{ fontSize: 11, color: D.muted }}>Cấp {s.level}</span>
                         </td>
-                        {/* Capability */}
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 64, height: 6, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
@@ -705,7 +686,6 @@ export default function TeacherDashboard() {
                             <span style={{ fontSize: 12, fontWeight: 600, color: s.capability >= 70 ? D.green : s.capability >= 40 ? D.amber : D.red }}>{s.capability}%</span>
                           </div>
                         </td>
-                        {/* Progress */}
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 64, height: 6, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
@@ -714,7 +694,6 @@ export default function TeacherDashboard() {
                             <span style={{ fontSize: 12, color: D.muted }}>{s.progress}%</span>
                           </div>
                         </td>
-                        {/* Score */}
                         <td style={{ padding: '12px 16px' }}>
                           <span style={{
                             padding: '3px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700,
@@ -723,11 +702,9 @@ export default function TeacherDashboard() {
                             border: `1px solid ${s.averageScore >= 8 ? D.greenA(0.3) : s.averageScore >= 6 ? 'rgba(245,158,11,.3)' : D.redA(0.3)}`,
                           }}>{s.averageScore}</span>
                         </td>
-                        {/* Emotion */}
                         <td style={{ padding: '12px 16px' }}>
                           <span title={em.label} style={{ fontSize: 20 }}>{em.icon}</span>
                         </td>
-                        {/* Status */}
                         <td style={{ padding: '12px 16px' }}>
                           {s.atRisk ? (
                             <span style={{
@@ -749,7 +726,6 @@ export default function TeacherDashboard() {
                             }}><CheckCircle size={10} /> Ổn định</span>
                           )}
                         </td>
-                        {/* Actions */}
                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                             <button
@@ -790,12 +766,10 @@ export default function TeacherDashboard() {
         {/* ── Right column (320px) ── */}
         <div style={{ width: 308, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Reco card — HS cần hỗ trợ + tự khảo sát */}
           <TeacherRecoCard D={D} />
 
           {/* AI Co-Teacher panel */}
           <div style={{ background: D.card, border: `1px solid ${D.purpleA(0.25)}`, borderRadius: 14, overflow: 'hidden' }}>
-            {/* Header */}
             <div style={{
               padding: '14px 16px', background: `linear-gradient(135deg, ${D.purpleA(0.2)}, ${D.purpleA(0.05)})`,
               borderBottom: `1px solid ${D.purpleA(0.2)}`,
@@ -821,7 +795,6 @@ export default function TeacherDashboard() {
               }} />
             </div>
 
-            {/* Suggestions */}
             {aiExpanded && (
               <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {aiSuggestions.map((s, i) => {
@@ -850,7 +823,7 @@ export default function TeacherDashboard() {
             )}
           </div>
 
-          {/* Class performance ring */}
+          {/* Class performance */}
           <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 16 }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: '0 0 14px' }}>Hiệu suất lớp học</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -917,10 +890,38 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* ════ LIVE LEADERBOARD — top học sinh dẫn đầu thời gian thực ════ */}
+      {/* ════ LIVE LEADERBOARD ════ */}
       <div style={{ maxWidth: 1400, margin: '24px auto 0', padding: '0 24px 32px' }}>
         <LiveLeaderboard />
       </div>
+
+      {/* ════ FAB: Camera chấm ngay (mobile only, hidden ≥ md) ════ */}
+      <button
+        className="cam-fab"
+        onClick={() => navigate('/teacher/exam-grading?camera=1')}
+        style={{
+          position: 'fixed',
+          bottom: 'max(24px, env(safe-area-inset-bottom, 0px) + 16px)',
+          right: 20,
+          zIndex: 60,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '14px 18px',
+          borderRadius: 99,
+          border: 'none',
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+          color: '#fff',
+          fontSize: 14,
+          fontWeight: 700,
+          boxShadow: '0 4px 20px rgba(124,58,237,0.55), 0 2px 8px rgba(0,0,0,0.4)',
+        }}
+        aria-label="Camera chấm ngay"
+      >
+        <Camera size={18} />
+        <span>Camera chấm ngay</span>
+      </button>
     </div>
   )
 }
@@ -1022,7 +1023,7 @@ function TeacherRecoCard({ D }: { D: any }) {
             </Link>
           )
         })}
-        {/* CTA tới Sprint Dashboard — RS Phase 7 UI */}
+        {/* CTA tới Sprint Dashboard */}
         <Link
           to="/teacher/sprint"
           onClick={() => rs.track({
