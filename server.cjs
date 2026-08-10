@@ -35,6 +35,7 @@ const path = require('path');
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 const { normalizeSubject } = require('./lib/subject-normalize.cjs');
 const { requiredFeature, hasFeature } = require('./lib/license-policy.cjs');
+const aiProvider = require('./lib/ai-provider.cjs');
 const isLicenseSeatError = (error) => /license seat limit reached|license runtime state is not initialized|license expired/i.test(String(error?.message || ''));
 
 const app = express();
@@ -3005,7 +3006,16 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
 // ── GCS signed-URL upload (VideoUploader) — TRƯỚC proxy ──
 // Browser PUT file trực tiếp lên GCS, không qua Cloud Run → tiết kiệm
 // bandwidth + không bị giới hạn 32MB request body của Cloud Run.
+//
+// Desktop/on-premise không có Application Default Credentials cho GCS →
+// dùng lib/local-storage.cjs (ghi xuống DATA_DIR/uploads/media, phục vụ lại
+// qua static /uploads/media). FE (uploadFileToGcs) không cần đổi gì: server
+// vẫn trả { uploadUrl, publicUrl } cùng hình dạng, chỉ khác uploadUrl trỏ về
+// PUT /api/upload/local/:token thay vì GCS.
 ;(() => {
+  const _localStorage = require('./lib/local-storage.cjs');
+  const _useLocalStorage = () => DEPLOYMENT_MODE !== 'cloud';
+
   let _storage = null;
   function _getStorage() {
     if (_storage) return _storage;
@@ -3035,8 +3045,6 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
 
     try {
-      const storage = _getStorage();
-      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
       const { filename = 'file', contentType = 'application/octet-stream', courseId } = req.body || {};
       // Validate content type — accept video/audio/pdf/document mime types
       const ALLOWED_MIME = /^(video\/|audio\/|application\/pdf$|application\/vnd\.openxmlformats-officedocument|application\/vnd\.ms-powerpoint$|application\/msword$|application\/vnd\.ms-excel$|image\/(png|jpeg|webp|gif|svg\+xml)$)/;
@@ -3050,6 +3058,14 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const userId = decoded.userId || decoded.id || decoded.sub || 'anon';
       const prefix = courseId ? `courses/${String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_')}`
                               : `uploads/${String(userId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+      if (_useLocalStorage()) {
+        const { uploadUrl, publicUrl } = _localStorage.createUploadTicket({ prefix, safeName, contentType });
+        return res.json({ uploadUrl, publicUrl, contentType, storage: 'local' });
+      }
+
+      const storage = _getStorage();
+      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
       const gcsPath = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
 
       const file = storage.bucket(BUCKET).file(gcsPath);
@@ -3060,12 +3076,53 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
         contentType,
       });
       const publicUrl = `https://storage.googleapis.com/${BUCKET}/${gcsPath}`;
-      return res.json({ uploadUrl, publicUrl, contentType, gcsPath });
+      return res.json({ uploadUrl, publicUrl, contentType, gcsPath, storage: 'gcs' });
     } catch (e) {
       console.error('[upload:signed-url]', e.message);
       return res.status(500).json({ error: 'Lỗi tạo signed URL: ' + e.message });
     }
   });
+
+  // PUT /api/upload/local/:token — nhận file thật khi ở chế độ local storage.
+  // Vé 1-lần do createUploadTicket phát, hết hạn sau 1h (khớp GCS signed URL).
+  // Stream thẳng xuống đĩa (không buffer cả file vào RAM) + giới hạn kích
+  // thước qua MAX_BYTES; ghi file tạm .part rồi rename để tránh file dở dang
+  // nếu tiến trình bị ngắt giữa chừng.
+  app.put('/api/upload/local/:token', (req, res) => {
+    const ticket = _localStorage.consumeTicket(req.params.token);
+    if (!ticket) return res.status(410).json({ error: 'Vé tải lên đã hết hạn hoặc không hợp lệ' });
+    const fs = require('fs');
+    fs.mkdirSync(path.dirname(ticket.absPath), { recursive: true });
+    const tmpPath = `${ticket.absPath}.part`;
+    const out = fs.createWriteStream(tmpPath);
+    let bytes = 0;
+    let aborted = false;
+    const fail = (status, message) => {
+      if (!res.headersSent) res.status(status).json({ error: message });
+    };
+    req.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (bytes > _localStorage.MAX_BYTES && !aborted) {
+        aborted = true;
+        out.destroy();
+        req.destroy();
+      }
+    });
+    req.on('aborted', () => { aborted = true; out.destroy(); });
+    out.on('error', (e) => { console.error('[upload:local]', e.message); fail(500, 'Lỗi ghi file'); });
+    out.on('finish', () => {
+      if (aborted) { fs.unlink(tmpPath, () => {}); return fail(413, 'File vượt quá giới hạn kích thước'); }
+      fs.rename(tmpPath, ticket.absPath, (err) => {
+        if (err) { console.error('[upload:local] rename', err.message); return fail(500, 'Lỗi lưu file'); }
+        res.status(200).json({ ok: true });
+      });
+    });
+    req.pipe(out);
+  });
+
+  // Phục vụ lại file đã upload local — express.static hỗ trợ sẵn Range request
+  // (bắt buộc để tua video/audio) + Content-Type suy từ phần mở rộng file.
+  app.use('/uploads/media', express.static(_localStorage.ROOT, { maxAge: '7d', acceptRanges: true }));
 
   // ── Share snapshot: nhận ảnh chụp màn hình (dataURL) → tải lên GCS, lưu mapping
   //    path → image_url để server gắn vào og:image/twitter:image cho social crawler.
@@ -3102,10 +3159,24 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const buf = Buffer.from(m[2], 'base64');
       if (buf.length > 4 * 1024 * 1024) return res.status(413).json({ error: 'Ảnh quá lớn (>4MB)' });
 
-      const storage = _getStorage();
-      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
       const crypto = require('crypto');
       const hash = crypto.createHash('sha1').update(p).digest('hex').slice(0, 16);
+
+      if (_useLocalStorage()) {
+        const relUrl = _localStorage.writeBuffer(`share-thumbs/${hash}.${ext}`, buf);
+        const cleanUrl = `${(process.env.PUBLIC_URL || '').replace(/\/+$/, '')}${relUrl}`;
+        const pool = _getPool();
+        await pool.query(
+          `INSERT INTO "ShareSnapshot"(path, image_url, title, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (path) DO UPDATE SET image_url = EXCLUDED.image_url, title = EXCLUDED.title, updated_at = NOW()`,
+          [p, cleanUrl, title ? String(title).slice(0, 200) : null]
+        );
+        return res.json({ ok: true, url: `${cleanUrl}?v=${Date.now()}` });
+      }
+
+      const storage = _getStorage();
+      if (!storage) return res.status(500).json({ error: 'GCS chưa cấu hình' });
       const gcsPath = `share-thumbs/${hash}.${ext}`;
       const file = storage.bucket(BUCKET).file(gcsPath);
       await file.save(buf, {
@@ -6574,6 +6645,24 @@ if (USE_NODEJS_QUESTIONS) {
     return collapsed.slice(-10); // keep last ~10 turns
   }
 
+  // Ollama local (offline/desktop/on-premise) — thử khi DeepSeek/Anthropic
+  // không cấu hình hoặc lỗi. Trả null nếu OLLAMA_URL chưa cấu hình hoặc gọi
+  // thất bại — nơi gọi tự rơi về thông báo "ai_unavailable" như cũ.
+  async function tryOllamaTutor(subject, messages, startedAt) {
+    if (!aiProvider.isOllamaConfigured()) return null;
+    try {
+      const out = await aiProvider.callOllama(
+        [{ role: 'system', content: buildSystemPrompt(subject) }, ...messages],
+        { temperature: 0.5, maxTokens: AI_TUTOR_MAX_TOKENS },
+      );
+      console.log(`[ai-tutor] ok provider=ollama model=${out.model} subject="${subject}" latency=${Date.now() - startedAt}ms`);
+      return { reply: out.text, model: out.model, usage: null, provider: 'ollama' };
+    } catch (e) {
+      console.error('[ai-tutor:ollama]', e.message);
+      return null;
+    }
+  }
+
   const _aiGating = require('./lib/gating.cjs');
   app.post('/api/ai-tutor/chat', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
     const startedAt = Date.now();
@@ -6636,6 +6725,8 @@ if (USE_NODEJS_QUESTIONS) {
           console.error('[ai-tutor:deepseek]', e.message);
           // Fall through to Anthropic if Anthropic key tồn tại
           if (!process.env.ANTHROPIC_API_KEY) {
+            const ollamaReply = await tryOllamaTutor(subject, messages, startedAt);
+            if (ollamaReply) return res.json(ollamaReply);
             return res.status(503).json({
               error: 'ai_unavailable',
               reply: 'Dịch vụ AI hiện chưa sẵn sàng (DeepSeek lỗi, Anthropic chưa cấu hình).',
@@ -6650,6 +6741,8 @@ if (USE_NODEJS_QUESTIONS) {
         client = getAnthropic();
       } catch (err) {
         console.error('[ai-tutor] Anthropic SDK unavailable:', err.message);
+        const ollamaReply = await tryOllamaTutor(subject, messages, startedAt);
+        if (ollamaReply) return res.json(ollamaReply);
         return res.status(503).json({
           error: 'ai_unavailable',
           reply: 'Dịch vụ AI hiện chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
@@ -6776,6 +6869,38 @@ if (USE_NODEJS_QUESTIONS) {
     return out.slice(-10);
   }
 
+  // Ollama local (offline/desktop/on-premise) — thử khi DeepSeek/Anthropic
+  // không cấu hình hoặc lỗi. `res` phải đã ở đúng chế độ (SSE header đã gửi
+  // nếu stream=true). Trả true nếu đã ghi + kết thúc response, false nếu nên
+  // fallback tiếp/trả lỗi như cũ (KHÔNG ghi gì vào res trong trường hợp đó).
+  async function tryOllamaArkBot({ systemPrompt, messages, stream, res, startedAt }) {
+    if (!aiProvider.isOllamaConfigured()) return false;
+    const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
+    try {
+      if (stream) {
+        const model = await aiProvider.streamOllamaToSSE(fullMessages, { temperature: 0.7, maxTokens: ARK_MAX_TOKENS }, res);
+        res.end();
+        console.log(`[ark-bot] ok provider=ollama model=${model} stream=true latency=${Date.now() - startedAt}ms`);
+      } else {
+        const out = await aiProvider.callOllama(fullMessages, { temperature: 0.7, maxTokens: ARK_MAX_TOKENS });
+        console.log(`[ark-bot] ok provider=ollama model=${out.model} latency=${Date.now() - startedAt}ms`);
+        res.json({ content: out.text, provider: 'ollama', model: out.model });
+      }
+      return true;
+    } catch (e) {
+      console.error('[ark-bot:ollama]', e.message);
+      return false;
+    }
+  }
+
+  function setArkSseHeaders(res) {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+    res.flushHeaders?.();
+  }
+
   app.post('/api/ark-bot/chat', async (req, res) => {
     const startedAt = Date.now();
     try {
@@ -6794,20 +6919,24 @@ if (USE_NODEJS_QUESTIONS) {
       const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
 
       if (!hasDeepseek && !hasAnthropic) {
+        if (aiProvider.isOllamaConfigured()) {
+          if (stream) setArkSseHeaders(res);
+          const handled = await tryOllamaArkBot({ systemPrompt, messages, stream, res, startedAt });
+          if (handled) return;
+          if (stream) {
+            res.write(`data: ${JSON.stringify({ error: 'ollama_failed', message: 'Ollama không phản hồi' })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            return res.end();
+          }
+        }
         return res.status(503).json({
           error: 'ai_unavailable',
-          message: 'Trợ lý AeroEdu chưa cấu hình API key (cần DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY)',
+          message: 'Trợ lý AeroEdu chưa cấu hình API key (cần DEEPSEEK_API_KEY, ANTHROPIC_API_KEY hoặc OLLAMA_URL)',
         });
       }
 
       // SSE headers
-      if (stream) {
-        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-cache, no-transform');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
-        res.flushHeaders?.();
-      }
+      if (stream) setArkSseHeaders(res);
 
       // ── Provider 1: DeepSeek (OpenAI-compatible SSE) ──
       if (hasDeepseek) {
@@ -6856,6 +6985,8 @@ if (USE_NODEJS_QUESTIONS) {
           console.error('[ark-bot:deepseek]', e.message);
           // Fallback to Anthropic only if SSE chưa start
           if (!hasAnthropic || (stream && res.headersSent)) {
+            const handled = await tryOllamaArkBot({ systemPrompt, messages, stream, res, startedAt });
+            if (handled) return;
             if (stream) {
               res.write(`data: ${JSON.stringify({ error: 'deepseek_failed', message: e.message })}\n\n`);
               res.write('data: [DONE]\n\n');
@@ -6912,6 +7043,8 @@ if (USE_NODEJS_QUESTIONS) {
         }
       } catch (e) {
         console.error('[ark-bot:anthropic]', e.message);
+        const handled = await tryOllamaArkBot({ systemPrompt, messages, stream, res, startedAt });
+        if (handled) return;
         if (stream && !res.headersSent) {
           return res.status(503).json({ error: 'ai_unavailable', message: e.message });
         }
@@ -7066,10 +7199,10 @@ if (USE_NODEJS_QUESTIONS) {
 
       const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
       const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-      if (!hasDeepseek && !hasAnthropic) {
+      if (!hasDeepseek && !hasAnthropic && !aiProvider.isOllamaConfigured()) {
         return res.status(503).json({
           error: 'ai_unavailable',
-          message: 'Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY',
+          message: 'Chưa cấu hình DEEPSEEK_API_KEY, ANTHROPIC_API_KEY hoặc OLLAMA_URL',
         });
       }
 
@@ -7160,6 +7293,17 @@ if (USE_NODEJS_QUESTIONS) {
         return { text, model };
       };
 
+      // Ollama local (offline/desktop/on-premise) — thử khi DeepSeek/Anthropic
+      // không cấu hình hoặc lỗi. Không hỗ trợ response_format ép JSON như
+      // DeepSeek nên dựa vào extractJsonFromAI (đã xử lý cả text lẫn JSON).
+      const callOllama = async () => {
+        const out = await aiProvider.callOllama(
+          [{ role: 'system', content: sysPrompt }, { role: 'user', content: userPrompt }],
+          { temperature: 0.6, maxTokens: 4000 },
+        );
+        return { text: out.text, model: out.model };
+      };
+
       // Try primary → fallback. Nếu primary parse fail, vẫn try fallback (vì có thể
       // provider khác trả JSON sạch hơn).
       const attempts = [];
@@ -7178,6 +7322,7 @@ if (USE_NODEJS_QUESTIONS) {
       let result = null;
       if (hasDeepseek) result = await tryProvider('deepseek', callDeepseek);
       if (!result && hasAnthropic) result = await tryProvider('anthropic', callAnthropic);
+      if (!result && aiProvider.isOllamaConfigured()) result = await tryProvider('ollama', callOllama);
 
       if (!result) {
         const lastSample = attempts[attempts.length - 1]?.rawSample || attempts[attempts.length - 1]?.error || '';
@@ -11386,6 +11531,12 @@ async function _aiComplete({ system, user, maxTokens = 4096, temperature = 0.2 }
     const text = Array.isArray(j.content) ? j.content.filter(b => b.type === 'text').map(b => b.text).join('').trim() : '';
     return { text, provider: 'anthropic', model };
   };
+  // Ollama local (offline/desktop/on-premise) — luôn thử SAU CÙNG, chỉ khi
+  // DeepSeek/Anthropic đều không cấu hình hoặc lỗi.
+  const tryOllama = async () => {
+    const out = await aiProvider.callOllama([{ role: 'system', content: system }, { role: 'user', content: user }], { temperature, maxTokens });
+    return { text: out.text, provider: 'ollama', model: out.model };
+  };
   const useDsFirst = (pref === 'deepseek' && hasDS) || (!hasAnt && hasDS);
   const order = useDsFirst ? [tryDeepseek, tryAnthropic] : [tryAnthropic, tryDeepseek];
   let lastErr;
@@ -11395,7 +11546,11 @@ async function _aiComplete({ system, user, maxTokens = 4096, temperature = 0.2 }
     try { const out = await fn(); if (out.text) return out; lastErr = new Error('empty response'); }
     catch (e) { lastErr = e; console.warn('[ai-convert]', e.message); }
   }
-  throw lastErr || new Error('Chưa cấu hình AI (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY)');
+  if (aiProvider.isOllamaConfigured()) {
+    try { const out = await tryOllama(); if (out.text) return out; lastErr = new Error('empty response'); }
+    catch (e) { lastErr = e; console.warn('[ai-convert:ollama]', e.message); }
+  }
+  throw lastErr || new Error('Chưa cấu hình AI (DEEPSEEK_API_KEY, ANTHROPIC_API_KEY hoặc OLLAMA_URL)');
 }
 
 // Bóc ``` fences nếu model lỡ bọc code block (kể cả khi thiếu fence đóng)
@@ -18085,7 +18240,7 @@ app.get('/api/exam-xp/me', (_req, res) => res.json({
       const sysPrompt = AGENT_PROMPTS[agentId] || AGENT_PROMPTS['general-assistant'];
       const hasDeepseek = !!process.env.DEEPSEEK_API_KEY;
       const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
-      if (!hasDeepseek && !hasAnthropic) {
+      if (!hasDeepseek && !hasAnthropic && !aiProvider.isOllamaConfigured()) {
         return res.status(503).json({ error: 'AI chưa cấu hình' });
       }
 
@@ -18137,6 +18292,19 @@ app.get('/api/exam-xp/me', (_req, res) => res.json({
           return res.json({ reply: reply || 'Không có phản hồi', agentId, provider: 'anthropic' });
         } catch (e) {
           console.error('[openfang:chat:anthropic]', e.message);
+        }
+      }
+
+      // Ollama local (offline/desktop/on-premise)
+      if (aiProvider.isOllamaConfigured()) {
+        try {
+          const out = await aiProvider.callOllama(
+            [{ role: 'system', content: sysPrompt }, { role: 'user', content: message }],
+            { temperature: 0.7, maxTokens: 1200 },
+          );
+          return res.json({ reply: out.text, agentId, provider: 'ollama' });
+        } catch (e) {
+          console.error('[openfang:chat:ollama]', e.message);
         }
       }
 

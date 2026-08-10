@@ -144,6 +144,12 @@ pub fn run_app() {
                 runtime_log(&data_root, "bootstrap ready");
 
                 let server = resource.join("server.cjs").to_string_lossy().to_string();
+                // Bản desktop không đóng gói API key cloud (không thể giữ bí mật trong
+                // app tải về máy) nên AI chỉ hoạt động qua Ollama local. Trỏ sẵn tới
+                // cổng mặc định của Ollama — nếu người dùng chưa cài, các endpoint AI
+                // tự rơi về thông báo "chưa cấu hình" như cũ (không tốn gì thêm ngoài
+                // 1 lần connect-refused rất nhanh trên loopback).
+                let ollama_url = std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
                 let node = Command::new(&node_binary)
                     .arg(server)
                     .env("DATABASE_URL", database_url)
@@ -154,6 +160,8 @@ pub fn run_app() {
                     .env("DEPLOYMENT_MODE", "desktop")
                     .env("OFFLINE_MODE", "true")
                     .env("DATA_DIR", &app_data)
+                    .env("OLLAMA_URL", ollama_url)
+                    .env("OLLAMA_MODEL", std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2:latest".to_string()))
                     .spawn().map_err(|e| e.to_string())?;
                 runtime_log(&data_root, "node server spawned");
                 app.manage(RuntimeState { node: Mutex::new(Some(node)), pg_ctl, pg_data });

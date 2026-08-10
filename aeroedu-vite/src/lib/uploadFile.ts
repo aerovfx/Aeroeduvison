@@ -1,8 +1,12 @@
 /**
- * uploadFileToGcs — tải 1 file (ảnh/audio/pdf) lên GCS qua signed-URL native.
+ * uploadFileToGcs — tải 1 file (ảnh/audio/pdf) lên storage qua vé (ticket) rồi
+ * PUT thẳng, không qua Cloud Run body limit.
  *
  * Dùng endpoint Node `/api/upload/video-signed-url` (ổn định, không phụ thuộc
- * media-service). Trả về publicUrl công khai.
+ * media-service) để lấy { uploadUrl, publicUrl }. Server tự quyết định nơi
+ * lưu: GCS signed URL khi DEPLOYMENT_MODE=cloud, hoặc file local dưới
+ * DATA_DIR khi chạy desktop/on-premise (xem lib/local-storage.cjs) — client
+ * không cần biết sự khác biệt, chỉ PUT vào uploadUrl như cũ.
  */
 import { api } from '@/services/api'
 

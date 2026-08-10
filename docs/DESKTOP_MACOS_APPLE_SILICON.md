@@ -26,6 +26,31 @@ mất dữ liệu:
 PostgreSQL được khởi động khi mở app và shutdown nhanh, sạch khi quit app. Không
 xóa thư mục Application Support nếu muốn giữ database.
 
+## Upload file (video/ảnh/PDF/truyện thiếu nhi)
+
+Bản desktop không có Application Default Credentials cho GCS nên mọi upload
+(video khoá học, tài liệu GV, ảnh/audio truyện thiếu nhi...) tự lưu local dưới
+`~/Library/Application Support/com.aeroedu.desktop/data/uploads/media` — nằm
+trong cùng thư mục `data` đã liệt kê ở trên nên **được giữ nguyên khi upgrade
+app** giống database. Không cần cấu hình gì thêm.
+
+## Trợ lý AI (Ollama local)
+
+Không đóng gói `DEEPSEEK_API_KEY`/`ANTHROPIC_API_KEY` trong app tải về máy vì
+không thể giữ bí mật phía client. Trợ lý AeroEdu, Gia Sư AI, sinh đề AI và AI
+chuyển LaTeX↔Word chỉ hoạt động khi máy có [Ollama](https://ollama.com) chạy
+sẵn ở cổng mặc định `127.0.0.1:11434`:
+
+```bash
+brew install ollama
+ollama pull llama3.2        # hoặc model khác — đổi qua biến môi trường OLLAMA_MODEL
+ollama serve                # hoặc mở app Ollama.app, giữ chạy nền
+```
+
+Không cài Ollama thì các tính năng AI trả "Dịch vụ AI hiện chưa sẵn sàng" —
+phần còn lại của app (bài học, chấm điểm camera OMR, lớp học...) không bị ảnh
+hưởng vì các tính năng đó không phụ thuộc AI cloud.
+
 ## Tài khoản ban đầu
 
 Bootstrap là idempotent: tạo tài khoản còn thiếu nhưng không đặt lại mật khẩu của

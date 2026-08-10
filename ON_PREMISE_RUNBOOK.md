@@ -9,9 +9,28 @@ volume `aeroedu_onprem_postgres`; file/upload local nằm trong
 `aeroedu_onprem_data`.
 
 `OFFLINE_MODE=true` không biến các API bên thứ ba thành dịch vụ local. Google
-OAuth, Telegram, thanh toán cloud, GCS và các AI provider cloud sẽ không khả
-dụng khi mạng bị ngắt. Đăng nhập email/mật khẩu, dữ liệu local và nội dung tĩnh
-vẫn hoạt động. Có thể nối Ollama trong mạng nội bộ qua `OLLAMA_URL`.
+OAuth, Telegram, thanh toán cloud và các AI provider cloud sẽ không khả dụng
+khi mạng bị ngắt. Đăng nhập email/mật khẩu, dữ liệu local và nội dung tĩnh vẫn
+hoạt động.
+
+Hai gap trước đây chỉ có scaffolding chưa nối logic — nay đã hoạt động:
+
+- **Upload file** (video khoá học, PDF, ảnh, truyện thiếu nhi có audio...):
+  khi `DEPLOYMENT_MODE != cloud` server tự lưu xuống
+  `DATA_DIR/uploads/media` thay vì GCS signed URL (xem `lib/local-storage.cjs`)
+  — nằm trong volume `aeroedu_onprem_data` nên được backup/restore cùng dữ
+  liệu ứng dụng, không cần cấu hình GCS.
+- **AI** (Trợ lý AeroEdu, Gia Sư AI, sinh đề AI, AI chuyển LaTeX↔Word): khi
+  `DEEPSEEK_API_KEY`/`ANTHROPIC_API_KEY` không cấu hình hoặc bị `OFFLINE_MODE`
+  chặn, server thử gọi Ollama qua `OLLAMA_URL` (xem `lib/ai-provider.cjs`).
+  Đặt `OLLAMA_URL` trỏ tới một Ollama server chạy trong mạng nội bộ (không đi
+  kèm bản phân phối — đơn vị vận hành tự cài) để có AI hoạt động offline;
+  không đặt thì các tính năng AI trả lỗi rõ ràng thay vì treo.
+
+Cả hai vẫn CHƯA thay thế: Google OAuth (chỉ email/mật khẩu offline), thanh
+toán cloud, Google TTS đọc truyện (fallback giọng trình duyệt), và các tính
+năng cần Anthropic Vision (OCR chấm bài bằng ảnh) — những phần này vẫn cần
+Internet hoặc key cloud.
 
 ## Yêu cầu máy chủ
 
