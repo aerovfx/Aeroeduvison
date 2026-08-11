@@ -27,6 +27,9 @@
     "start": "npm run preview --prefix aeroedu-vite",
     "lint": "npm run lint --prefix aeroedu-vite",
     "type-check": "tsc --noEmit",
+    "test:setup-db": "bash scripts/setup-test-db.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -193,7 +196,9 @@
     "concurrently": "^9.1.0",
     "esbuild": "^0.27.7",
     "prisma": "^5.3.0",
-    "tsx": "^4.6.0"
+    "supertest": "^7.0.0",
+    "tsx": "^4.6.0",
+    "vitest": "^2.1.9"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

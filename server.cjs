@@ -36,6 +36,19 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { normalizeSubject } = require('./lib/subject-normalize.cjs');
 const { requiredFeature, hasFeature } = require('./lib/license-policy.cjs');
 const aiProvider = require('./lib/ai-provider.cjs');
+const { logger } = require('./lib/logger.cjs');
+
+// Lưới an toàn cuối cùng: bắt lỗi async/sync không ai catch thay vì để process
+// crash âm thầm (Cloud Run chỉ thấy container chết, không có log rõ nguyên nhân).
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', {
+    category: 'system',
+    error: reason instanceof Error ? reason.stack : String(reason),
+  });
+});
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', { category: 'system', error: error.stack });
+});
 const isLicenseSeatError = (error) => /license seat limit reached|license runtime state is not initialized|license expired/i.test(String(error?.message || ''));
 
 const app = express();
@@ -18581,6 +18594,20 @@ app.use(async (req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
 });
 
+// Lưới an toàn cuối cùng ở tầng Express — bắt lỗi lọt qua try/catch của từng
+// route (throw đồng bộ, lỗi body-parser, next(err) tường minh...). PHẢI đăng
+// ký SAU mọi route/middleware khác (đúng vị trí — ngay trước http.createServer).
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  logger.error('Unhandled route error', {
+    category: 'api',
+    method: req.method,
+    path: req.originalUrl,
+    error: err instanceof Error ? err.stack : String(err),
+  });
+  res.status(err.status || 500).json({ error: 'Lỗi máy chủ, vui lòng thử lại' });
+});
+
 // ── Start ───────────────────────────────────────────────────
 // Switched từ app.listen → http.createServer để có thể attach
 // WebSocket upgrade handler cho realtime broker (/api/broker).
@@ -18594,10 +18621,18 @@ try {
   console.warn('[server] ⚠ Broker attach failed:', e.message);
 }
 
-httpServer.listen(PORT, HOST, () => {
-  console.log(`[server] ✅ AeroEduVision listening on ${HOST}:${PORT}`);
-  console.log(`[server] 📡 API proxy     → ${BACKEND_URL}`);
-  if (!USE_NODEJS_AUTH) {
-    console.log(`[server] 🔐 Auth proxy    → ${AUTH_SERVICE_URL}`);
-  }
-});
+// Chỉ thật sự lắng nghe khi file này được chạy trực tiếp (node server.cjs —
+// đúng như Dockerfile/Dockerfile.onprem CMD/ENTRYPOINT). Khi require() từ
+// test (supertest tự tạo ephemeral server riêng từ `app`), KHÔNG bind port
+// thật — tránh xung đột port + side-effect thừa giữa các lần chạy test.
+if (require.main === module) {
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`[server] ✅ AeroEduVision listening on ${HOST}:${PORT}`);
+    console.log(`[server] 📡 API proxy     → ${BACKEND_URL}`);
+    if (!USE_NODEJS_AUTH) {
+      console.log(`[server] 🔐 Auth proxy    → ${AUTH_SERVICE_URL}`);
+    }
+  });
+}
+
+module.exports = { app, httpServer };

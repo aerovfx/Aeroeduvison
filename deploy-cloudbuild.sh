@@ -56,6 +56,22 @@ if [ ! -f ".gcloudignore" ]; then
 fi
 echo "✅ gcloud + Dockerfile present"
 
+# Test đặc trưng (Phase B0) — chạy tay trước deploy, KHÔNG chặn deploy nếu
+# TEST_DATABASE_URL chưa cấu hình (đã chọn không ép CI gate). Cấu hình 1 lần:
+#   npm run test:setup-db   # in ra TEST_DATABASE_URL, export biến đó rồi deploy
+if [ -n "${TEST_DATABASE_URL:-}" ]; then
+  echo ""
+  echo "Step 0.5: Chạy test đặc trưng (TEST_DATABASE_URL đã cấu hình)..."
+  if ! npm test; then
+    echo "❌ Test fail — dừng deploy. Sửa lỗi hoặc bỏ qua bằng cách unset TEST_DATABASE_URL (không khuyến khích)."
+    exit 1
+  fi
+  echo "✅ Test pass"
+else
+  echo "⚠️  TEST_DATABASE_URL chưa cấu hình — bỏ qua bước test (không chặn deploy)."
+  echo "    Chạy 1 lần: npm run test:setup-db"
+fi
+
 # ── Step 1: Authenticate ────────────────────────────────────────
 echo ""
 echo "Step 1: Authenticating with gcloud..."
