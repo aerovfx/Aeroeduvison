@@ -1,3 +1,13 @@
+/**
+ * LatexEditor — Trình soạn thảo LaTeX cho GV (bộ công cụ latex-editor).
+ *
+ * Bọc @monaco-editor/react (Monaco Editor) với theme vs-dark + ngôn ngữ LaTeX:
+ *   - Lazy-load Monaco qua React.lazy để tránh nặng bundle khi tải trang
+ *   - value/onChange controlled; onMount nhận editor instance để parent
+ *     gọi editor.executeEdits() chèn snippet tại con trỏ
+ *   - Không bind state — giá trị hiện tại giữ trong prevValueRef phục vụ
+ *     các thao tác bên ngoài cần đọc giá trị mới nhất
+ */
 import { useRef, useEffect, Suspense, lazy } from 'react'
 
 // Lazy-load Monaco (heavy bundle)
@@ -17,6 +27,7 @@ interface LatexEditorProps {
   onMount?: (editor: any) => void
 }
 
+// Component chính: render Monaco editor LaTeX, bọc Suspense fallback "Đang tải editor..."
 export function LatexEditor({ value, onChange, height = '100%', readOnly, onMount }: LatexEditorProps) {
   const prevValueRef = useRef(value)
 

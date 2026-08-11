@@ -1,5 +1,9 @@
 import api from './api'
 
+/**
+ * Dịch vụ Bài tập (Assignments) — quản lý bài tập giao cho học sinh.
+ * Định nghĩa các loại bài tập, trạng thái và mức độ khó.
+ */
 export type AssignmentType = 'lesson' | 'quiz' | 'project' | 'ai-generated'
 export type AssignmentStatus = 'completed' | 'in-progress' | 'pending' | 'recommended' | 'published' | 'draft' | 'closed'
 export type DifficultyLevel = 'easy' | 'medium' | 'hard'

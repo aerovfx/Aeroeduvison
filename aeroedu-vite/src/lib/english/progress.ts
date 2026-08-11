@@ -29,6 +29,7 @@ export interface EnProgress {
   lessons: Record<string, LessonResult>
 }
 
+//──── Đọc/ghi tiến trình từ localStorage (namespace riêng English) ────
 function todayStr(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -122,6 +123,7 @@ export interface CompleteOutcome {
  * Ghi nhận hoàn thành 1 lesson.
  * @param scorePct  % đúng (0-100) → quy ra sao + XP
  */
+// Ghi nhận hoàn thành lesson: quy % đúng thành 0-3 sao, cộng XP, cập nhật streak theo ngày
 export function completeLesson(lessonId: string, scorePct: number): CompleteOutcome {
   const p = getProgress()
   const stars = scorePct >= 95 ? 3 : scorePct >= 75 ? 2 : scorePct >= 50 ? 1 : 0

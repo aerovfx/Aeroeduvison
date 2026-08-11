@@ -1,3 +1,10 @@
+/**
+ * ExamReports — Báo cáo & phân tích kết quả đề thi cho GV.
+ * Tổng hợp thống kê (điểm TB, tỉ lệ hoàn thành, biểu đồ phân phối), phân tích
+ * từng câu hỏi (độ khó, độ phân biệt, Cronbach α), phân nhóm HS theo thang điểm
+ * và xuất báo cáo dạng CSV/Excel/PDF. Dữ liệu từ /api/teacher/exam-reports.
+ */
+
 import { useCallback, useState, useEffect, useMemo } from "react"
 import { ExportMenu } from "@/components/common/ExportMenu"
 import type { SheetData } from "@/lib/exportReport"
@@ -174,6 +181,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+// Component chính: nạp báo cáo, dựng biểu đồ + bảng phân tích, xuất file
 export default function ExamReports() {
   const [exams, setExams]               = useState<Exam[]>([])
   const [selectedExamId, setSelectedExamId] = useState<string>("")
@@ -358,6 +366,7 @@ export default function ExamReports() {
     return sheets
   }, [analytics, attempts])
 
+  // Xuất báo cáo theo định dạng đã chọn (CSV/Excel/PDF)
   const handleExport = async (format: "csv" | "excel" | "pdf") => {
     if (!selectedExamId) { toast.error("Vui lòng chọn đề thi"); return }
     try {

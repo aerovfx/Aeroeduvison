@@ -1,4 +1,8 @@
 /**
+ * Learning Service — Dịch vụ học tập của học sinh
+ * Được port từ elearniv Next.js: /learning/*, /profile/*
+ * Xử lý ghi danh khóa học (enrollment), danh sách yêu thích, chứng chỉ, tiến trình bài học.
+ *
  * Learning Service — Student learning operations
  * Ported from elearniv Next.js: /learning/*, /profile/*
  */

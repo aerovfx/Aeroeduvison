@@ -1,6 +1,16 @@
 /**
  * Kéo Co Kiến Thức (Knowledge Tug-of-War)
  *
+ * Hai chế độ chơi:
+ *   1) Lớp học (Classroom) — giáo viên tạo phiên, học sinh quét QR, tự động phân
+ *      vào đội RED/BLUE cân bằng, câu hỏi đồng bộ, vị trí dây thừng theo thời gian thực.
+ *   2) Thách đấu 1-1 (1v1) — phiên bất đồng bộ; người tạo chơi trước, đặt điểm chuẩn,
+ *      đối thủ nhận link có thể chia sẻ để chơi và phá kỷ lục.
+ *
+ * Đồng bộ thời gian thực dựa trên polling (khoảng 1-2s gọi endpoint /state).
+ *
+ * Kéo Co Kiến Thức (Knowledge Tug-of-War)
+ *
  * Two modes:
  *   1) Classroom — teacher creates a session, students scan QR, auto-balanced
  *      to RED/BLUE teams, synchronized question delivery, live rope position.

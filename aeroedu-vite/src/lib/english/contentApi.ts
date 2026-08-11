@@ -20,6 +20,7 @@ function _bump() { _version++; _subs.forEach(fn => fn()) }
 export function englishContentVersion(): number { return _version }
 
 /** Nạp bản admin (1 lần / phiên). Không chặn render — fallback seed nếu lỗi. */
+// Nạp bản admin đã xuất bản một lần; fallback về seed tĩnh nếu mạng lỗi/data rỗng
 export function ensureEnglishContent(): void {
   if (_loaded) return
   _loaded = true
@@ -35,6 +36,7 @@ export function ensureEnglishContent(): void {
 }
 
 /** Hook: gọi trong các trang English → tự nạp + re-render khi có bản admin. */
+// Hook cho các trang English: tự nạp nội dung + re-render khi admin đổi bản
 export function useEnglishContent(): number {
   const [v, setV] = useState(_version)
   useEffect(() => {

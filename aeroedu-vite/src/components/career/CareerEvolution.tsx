@@ -45,6 +45,7 @@ const HOLLAND_LABELS: Record<string, string> = {
   S: 'Xã hội', E: 'Lãnh đạo', C: 'Quy củ',
 }
 
+// Phân tích toàn bộ lịch sử làm bài → MBTI/Holland/nghề chủ đạo + độ nhất quán
 function analyse(history: CareerTestResult[]): Evolution {
   const total = history.length
   if (total === 0) {
@@ -101,6 +102,7 @@ function analyse(history: CareerTestResult[]): Evolution {
   }
 }
 
+// Timeline + đánh giá chung: tính các thống kê rồi render dòng thời gian các mốc
 export default function CareerEvolution({ history, onOpenResult }: Props) {
   const ev = useMemo(() => analyse(history), [history])
   if (ev.total === 0) return null

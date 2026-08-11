@@ -1,3 +1,9 @@
+/**
+ * InteractionCenter — Trung tâm tương tác với học sinh (chat + gọi + tin nhắn tự động).
+ * Danh bạ HS (online/unread), khung chat 1-1, gửi tin nhắn nhanh, gọi video/voice,
+ * tin nhắn tự động chia theo loại (nhắc bài tập/thưởng/cảnh báo...). Dùng API realtime.
+ */
+
 import { useState, useEffect } from 'react'
 import {
   MessageSquare, Send, Users, Bell, Brain,
@@ -67,6 +73,7 @@ function TypeBadge({ type }: { type: AutoMessage['type'] }) {
   )
 }
 
+// Component chính: danh bạ + chat + tin nhắn tự động
 export default function InteractionCenterPage() {
   const [activeTab, setActiveTab] = useState<'chat' | 'notifications' | 'ai-copilot'>('chat')
   const [students, setStudents] = useState<Student[]>(STUDENTS)

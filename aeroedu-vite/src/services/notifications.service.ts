@@ -1,4 +1,9 @@
 /**
+ * Dịch vụ Thông báo (Notifications) — hàng đợi thông báo trong ứng dụng
+ * GET /api/notifications              → danh sách + unreadCount
+ * PATCH /api/notifications/:id/read   → đánh dấu đã đọc một thông báo
+ * POST /api/notifications/read-all    → đánh dấu đã đọc tất cả
+ *
  * Notifications service — in-app notification queue
  * GET /api/notifications              → list + unreadCount
  * PATCH /api/notifications/:id/read   → mark single read

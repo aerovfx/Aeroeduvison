@@ -2,6 +2,12 @@
  * Teacher: Edit Course
  * Ported from elearniv: /instructor/course/[courseId]/edit (CourseUpdateForm.jsx)
  */
+/**
+ * EditCourse — Chỉnh sửa khoá học cho GV.
+ * Nạp thông tin khoá hiện có theo :courseId, cho phép update tiêu đề, danh mục,
+ * giá, ảnh bìa (upload mới) và các trường nội dung rich text (Tiptap), lưu qua API.
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -33,6 +39,7 @@ interface FormValues {
   accessTime: string
 }
 
+// Component chính: form chỉnh sửa khoá + xử lý lưu cập nhật
 export default function EditCourse() {
   const { courseId } = useParams<{ courseId: string }>()
   const navigate = useNavigate()

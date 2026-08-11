@@ -278,6 +278,7 @@ interface Props {
   onClose?: () => void
 }
 
+// Game pixel art lớn: map 60×36, 25 NPC, câu hỏi hướng nghiệp, vòng lặp render canvas
 export default function CareerWorldOdyssey({ onClose }: Props = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isVisible = useIsVisible(canvasRef, { threshold: 0.1 })

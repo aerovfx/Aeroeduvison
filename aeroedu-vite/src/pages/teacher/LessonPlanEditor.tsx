@@ -21,6 +21,7 @@ import { exportLessonPlanToWord, exportLessonPlanToPdf } from '@/lib/lesson-plan
 const SUBJECTS = ['Toán', 'Vật lý', 'Hoá học', 'Sinh học', 'Ngữ văn', 'Tiếng Anh', 'Lịch sử', 'Địa lý', 'GDCD', 'Tin học', 'Công nghệ', 'Thể dục']
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
+// Component chính: editor giáo án WYSIWYG với auto-save + xuất Word/PDF/backup GCS
 export default function LessonPlanEditor() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()

@@ -294,6 +294,7 @@ export interface ProgressEntry {
   progressNote: string
 }
 
+// Component chính: bảng điểm tương tác + auto-save + điều hướng bàn phím + import/export
 export default function GradeBook() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
@@ -322,6 +323,7 @@ export default function GradeBook() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Export sổ điểm xlsx (CHỈ trong file export mới có cột Mã định danh) ──
+  // Xuất sổ điểm ra file Excel (có cảnh báo PII mã định danh HS)
   const handleExportGradebook = useCallback(() => {
     if (!classId || !subject || students.length === 0) {
       toast.error('Chưa có dữ liệu để xuất')

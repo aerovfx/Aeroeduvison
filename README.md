@@ -142,3 +142,14 @@ Artifacts:
 ```bash
 git show --stat --name-only HEAD
 ```
+npm run desktop:package
+Chạy từ thư mục gốc (Aeroeduvison/), trên máy Mac Apple Silicon (script tự chặn nếu không phải arm64 macOS). Đây là pipeline đầy đủ (scripts/package-tauri-macos.sh): kiểm tra node/npm/cargo/rustc/xcrun/initdb (Postgres 16)/tectonic đã cài chưa → build qua tauri:build → code-sign → verify → đóng gói .app + .dmg.
+
+Nếu muốn build xong cài luôn vào /Applications:
+
+npm run desktop:install
+Yêu cầu trước khi chạy (script sẽ tự báo thiếu gì, nhưng liệt kê sẵn):
+
+brew install postgresql@16 tectonic
+npm ci ở root và npm ci --prefix aeroedu-vite (cần node_modules/.bin/tauri, prisma, esbuild)
+Kết quả nằm ở aeroedu-vite/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/AeroEdu Vision.app (+ file .dmg cùng thư mục con dmg/).

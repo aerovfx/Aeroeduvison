@@ -176,6 +176,7 @@ const STEPS: { id: StepId; label: string; icon: typeof BookOpen }[] = [
   { id: 5, label: 'Xem trước',  icon: Eye },
 ]
 
+// StepNav — thanh tiến trình 5-6 bước, chặn nhảy bước chưa hợp lệ
 function StepNav({ current, onJump, blocked }: {
   current: StepId; onJump: (s: StepId) => void; blocked: Record<StepId, boolean>
 }) {
@@ -255,6 +256,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 /* ── Main Component ── */
+// Component chính: wizard dựng lộ trình học + gán HS + xuất bản
 export default function LearningPathBuilder() {
   const [step, setStep] = useState<StepId>(0)
 

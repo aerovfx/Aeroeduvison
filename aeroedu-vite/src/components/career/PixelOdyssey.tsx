@@ -227,6 +227,8 @@ interface CharState {
   drawX: number; drawY: number
 }
 
+// Game khám phá nghề nghiệp: player di chuyển qua khu phố, gặp NPC chuyên gia,
+// thu thập Compass Token — vòng lặp render canvas + input điều khiển
 export default function PixelOdyssey() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   /** Pause render loop khi canvas scrolled off-screen (battery saver mobile) */

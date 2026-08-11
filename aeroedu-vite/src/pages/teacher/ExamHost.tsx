@@ -41,6 +41,7 @@ interface RoomState {
 const QR_API = (text: string, size = 360) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(text)}`
 
+// Component chính: màn hình host phòng thi live (QR/code, poll, bắt đầu, leaderboard)
 export default function ExamHostPage() {
   const { id: examId } = useParams<{ id: string }>()
   const navigate = useNavigate()

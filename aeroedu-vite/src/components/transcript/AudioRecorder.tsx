@@ -1,3 +1,15 @@
+/**
+ * AudioRecorder — Bộ thu âm + phiên dịch transcript thời gian thực.
+ *
+ * Hỗ trợ 3 nguồn âm (microphone / system / cả hai) và 3 chế độ dịch:
+ *   - local      — nhận dạng trên thiết bị (Web Speech), ghi transcript cục bộ
+ *   - soniox     — dùng API Soniox streaming nhận dạng + dịch trực tiếp
+ *   - elevenlabs — tiếng nói ElevenLabs (tuỳ chỉnh giọng)
+ * Ghi segments có timestamp, provisional text khi đang nói, và gọi callback
+ * onSegmentsChange/onProvisionalChange cho panel transcript cha. UI tối màu
+ * tương thích giao diện transcript editor.
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Mic, Square, Play, Pause, Loader2, BookOpen, Monitor, Smartphone } from 'lucide-react'
 import toast from 'react-hot-toast'

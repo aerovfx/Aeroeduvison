@@ -20,6 +20,7 @@ export type Exercise =
   | { kind: 'repeat'; word: EnWord }
   | { kind: 'speak'; word: EnWord }  // nói vào mic → nhận dạng giọng nói
 
+// Trộn mảng (Fisher-Yates) để đáp án nhiễu loạn ngẫu nhiên mỗi lần chơi
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -46,6 +47,7 @@ function distractors(pool: EnWord[], answerWord: EnWord, field: 'en' | 'vi', n: 
  * @param words  từ vựng của lesson
  * @param pool   tập từ rộng hơn để lấy đáp án nhiễu (mặc định = words)
  */
+// Sinh cả chuỗi bài tập (chọn nghĩa/chọn từ/nghe/match/nói...) cho 1 lesson
 export function generateExercises(words: EnWord[], pool?: EnWord[]): Exercise[] {
   const distractorPool = (pool && pool.length >= 4 ? pool : words)
   const out: Exercise[] = []

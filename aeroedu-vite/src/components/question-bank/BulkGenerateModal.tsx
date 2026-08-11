@@ -1,3 +1,13 @@
+/**
+ * BulkGenerateModal — Modal tạo hàng loạt câu hỏi bằng AI cho Ngân hàng đề.
+ *
+ * Flow 3 bước:
+ *   1. Cấu hình: chọn môn / khối, số lượng câu, dạng TNKQ/Điền..., mức độ, cấp nhận thức.
+ *   2. Nguồn tài liệu: link YouTube / website / text do GV dán (tối đa vài nguồn).
+ *   3. Xem kết quả AI sinh ra, chọn/loại từng câu rồi lưu hàng loạt về ngân hàng.
+ * Gọi API /ai/generate-questions với retry, hiển thị progress và báo lỗi rõ ràng.
+ */
+
 import { useState, useEffect } from "react"
 import {
   Loader2, Sparkles, Plus, Trash2, CheckCircle2,
@@ -36,6 +46,7 @@ interface BulkGenerateModalProps {
 type Step = 1 | 2 | 3
 
 export function BulkGenerateModal({ isOpen, onClose, onSuccess }: BulkGenerateModalProps) {
+  // State cấu hình form + nguồn tài liệu; các state AI-sinh-bài riêng bên dưới
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

@@ -1,4 +1,14 @@
 /**
+ * Bộ nạp dữ liệu aero-backend cho quả địa cầu World Monitor trên trang chủ (Landing.tsx).
+ *
+ * Phản ánh worldmonitor-main/src/services/aero-backend.ts:
+ *   GET {VITE_AERO_BACKEND_URL}/api/startups   → AeroStartupResponse[]
+ *   GET {VITE_AERO_BACKEND_URL}/api/users-geo  → AeroUserResponse[]
+ *
+ * Mọi lỗi đều "mềm": hook trả về mảng rỗng và ghi log cảnh báo, nên quả địa cầu
+ * vẫn render được với dữ liệu tĩnh STARTUP_HUBS + VN_PROVINCES_2025 từ
+ * `@/config/world-monitor-data` và `@/config/vietnam-provinces-2025`.
+ *
  * Aero backend loader for the World Monitor hero globe on Landing.tsx.
  *
  * Mirrors worldmonitor-main/src/services/aero-backend.ts:

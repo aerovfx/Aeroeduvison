@@ -1,3 +1,10 @@
+/**
+ * ExamGrading — Chấm bài thi (phiếu trả lời trắc nghiệm + tự luận).
+ * Hỗ trợ chấm theo đáp án manual, quét phiếu (Vision AI), chấm hàng loạt,
+ * chấm tự luận, view PDF tham chiếu, lưu đáp án và xuất báo cáo.
+ * Dữ liệu lưu qua API /api/teacher/grading/* (Lưu đáp án + kết quả chấm).
+ */
+
 import { useState, useEffect, useCallback } from "react"
 import { api } from "@/services/api"
 import { ExportMenu } from "@/components/common/ExportMenu"
@@ -400,6 +407,7 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+// Component chính: điều phối chấm bài (đáp án, scan, hàng loạt, kết quả)
 export default function ExamGrading() {
   const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "bulk" | "graded" | "library">("answerkey")
   const [gradedRefreshKey, setGradedRefreshKey] = useState(0)
@@ -450,6 +458,7 @@ export default function ExamGrading() {
     return () => { cancelled = true }
   }, [])
 
+  // Lưu bộ đáp án chấm (đã sửa) lên server
   const handleSaveKey = useCallback(async () => {
     setSavingKey(true)
     try {

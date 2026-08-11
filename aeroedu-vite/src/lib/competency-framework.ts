@@ -244,6 +244,7 @@ export interface PathCompetencyCoverage {
   moduleCount: number                      // số module touch trụ cột này
 }
 
+// Tổng hợp coverage năng lực toàn bộ path: gộp theo pillar, đếm module + level cao nhất
 export function computePathCoverage(modules: Array<{ competencies?: Array<{ pillarId: string; targetLevel: CompetencyLevel }> }>): PathCompetencyCoverage[] {
   const byPillar = new Map<string, { levels: Set<CompetencyLevel>; count: number }>()
   for (const m of modules) {

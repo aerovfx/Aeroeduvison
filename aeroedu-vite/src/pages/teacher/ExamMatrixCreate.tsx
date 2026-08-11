@@ -86,6 +86,7 @@ const DEFAULT_SECTIONS: Section[] = [
   { key: 'IV',  title: 'PHẦN IV',  type: 'Tự luận',                      count: 2,  pointsPerQ: 1.0,  totalPoints: 2, difficultyHint: 'VD + VDC' },
 ]
 
+// Component chính: wizard 3 tab (thông tin chung → cấu trúc đề → phân bổ chủ đề)
 export default function ExamMatrixCreatePage() {
   const navigate = useNavigate()
   const { id: editId } = useParams<{ id?: string }>()
@@ -258,6 +259,7 @@ export default function ExamMatrixCreatePage() {
   }
 
   // ─── Save ─────────────────────────────────────────────
+  // Lưu ma trận mới/đã sửa lên server
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Cần nhập tên ma trận'); return }
     if (topics.length === 0) { toast.error('Cần ít nhất 1 chủ đề'); return }

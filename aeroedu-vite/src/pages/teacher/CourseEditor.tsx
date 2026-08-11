@@ -64,6 +64,7 @@ interface ContentForm {
 // ─────────────────────────────────────────────────────────────
 // Step indicator (chuẩn elearniv PageNavigation)
 // ─────────────────────────────────────────────────────────────
+// StepNav — thanh điều hướng 6 bước cho phép nhảy tới bước bất kỳ
 function StepNav({ current, courseId, onJump }: {
   current: Step
   courseId?: string
@@ -533,6 +534,7 @@ function Spin() {
 // ─────────────────────────────────────────────────────────────
 // Main CourseEditor
 // ─────────────────────────────────────────────────────────────
+// Component chính: điều phối tiến trình 6 bước tạo/sửa khoá học, quản lý state form
 export default function CourseEditor() {
   const { courseId } = useParams<{ courseId?: string }>()
   const navigate = useNavigate()

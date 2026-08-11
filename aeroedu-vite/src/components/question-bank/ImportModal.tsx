@@ -652,6 +652,7 @@ const PASTE_PLACEHOLDER_FULL = `{
   ]
 }`
 
+// Component chính: 3 bước upload → review → complete + tab paste + tạo câu bằng AI
 export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)

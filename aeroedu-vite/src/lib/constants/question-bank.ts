@@ -1,7 +1,13 @@
 // Shared constants for Question Bank, Exam Matrix, and related features
 // Single source of truth — import from here in all components
 
-// Tên môn chuẩn CT GDPT 2018 (đồng bộ với SUBJECT_CATEGORIES trong QuestionBank
+/**
+ * question-bank.ts — Hằng số dùng chung cho Ngân hàng câu hỏi, Ma trận đề thi
+ * và các tính năng liên quan. Nguồn chân lý (single source of truth): mọi
+ * component import từ đây. Chứa danh sách môn/gia, mức độ nhận thức Bloom,
+ * loại câu hỏi (UI ↔ DB ↔ ma trận), độ khó, loại đề, preset ma trận.
+ */
+ // Tên môn chuẩn CT GDPT 2018 (đồng bộ với SUBJECT_CATEGORIES trong QuestionBank
 // + lib/subject-normalize.cjs): "Vật lí"/"Hoá học"/"Địa lí"/"Mĩ thuật".
 // Bao gồm đủ môn & hoạt động giáo dục THPT.
 export const SUBJECTS = [

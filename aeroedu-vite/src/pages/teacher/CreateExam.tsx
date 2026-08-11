@@ -880,7 +880,7 @@ function PdfImportTab({
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN PAGE
+// MAIN PAGE — điều phối 3 tab tạo đề: thủ công / từ ma trận / nhập từ PDF
 // ─────────────────────────────────────────────────────────────
 export default function CreateExamPage() {
   const navigate = useNavigate()
@@ -976,6 +976,7 @@ export default function CreateExamPage() {
   const set = <K extends keyof CreateExamForm>(key: K, val: CreateExamForm[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
+  // Lưu đề thi: gom dữ liệu tab thủ công + auth → POST tạo đề mới
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim()) { toast.error('Vui lòng nhập tiêu đề đề thi'); return }

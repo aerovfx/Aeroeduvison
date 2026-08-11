@@ -1,4 +1,16 @@
 /**
+ * Admin Users Service — Dịch vụ Quản lý người dùng cho trang admin.
+ *
+ * Endpoints (chỉ dành cho admin):
+ *  - list(params)       → danh sách người dùng phân trang kèm bộ lọc
+ *  - stats()            → thống kê theo role/accountType + số liệu hoạt động
+ *  - get(id)            → chi tiết người dùng (profile + careerSurvey + hoạt động gần đây)
+ *  - update(id, data)   → cập nhật một phần (name/email/role/accountType/banned)
+ *  - resetPassword(id)  → admin đặt lại mật khẩu mới
+ *  - ban(id, reason)    → tiện ích bọc quanh update để khóa tài khoản
+ *  - unban(id)          → tiện ích bọc quanh update để mở khóa
+ *  - delete(id)         → xóa mềm (đánh dấu banned=true)
+ *
  * Admin Users Service
  *
  * Endpoints (admin only):

@@ -1,6 +1,7 @@
 // ============================================================
 // Core Types — AeroEduVision
-// Tương ứng với Prisma schema từ Next.js project
+// Các kiểu dữ liệu cốt lõi của ứng dụng: User, khóa học, bài học,
+// ghi danh, chứng chỉ... Tương ứng với Prisma schema từ Next.js project
 // ============================================================
 
 export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT'

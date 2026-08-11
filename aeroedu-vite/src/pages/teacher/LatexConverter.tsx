@@ -11,6 +11,7 @@ import { FileText, FileType2, Upload, Copy, Download, Save, Loader2, ArrowLeftRi
 
 type Tab = 'docx2tex' | 'tex2docx'
 
+// Component chính: chuyển đổi 2 chiều (Word→LaTeX / LaTeX→Word)
 export default function LatexConverter() {
   const [tab, setTab] = useState<Tab>('docx2tex')
   const navigate = useNavigate()

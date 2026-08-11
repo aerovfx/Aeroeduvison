@@ -1,4 +1,8 @@
 /**
+ * Instructor Service — Dịch vụ quản lý khóa học của giáo viên
+ * Được port từ elearniv Next.js: /instructor/*, /api/course/*
+ * Xử lý tạo/mở khóa học, danh mục, video/tài nguyên và gói mở rộng khóa học.
+ *
  * Instructor Service — Teacher course management
  * Ported from elearniv Next.js: /instructor/*, /api/course/*
  */

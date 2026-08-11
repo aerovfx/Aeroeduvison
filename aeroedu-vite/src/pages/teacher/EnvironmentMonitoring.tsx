@@ -1,3 +1,9 @@
+/**
+ * EnvironmentMonitoring — Giám sát môi trường phòng học IoT cho GV.
+ * Hiển thị cảm biến nhiệt độ/độ ẩm/AQI/ánh sáng/tiếng ồn của từng lớp + camera;
+ * dữ liệu thật từ /api/iot/classroom/:id, có chế độ mock khi chưa có thiết bị thật.
+ */
+
 import { useState, useEffect } from 'react'
 import {
   Thermometer, Droplets, Wind, Sun, Volume2,
@@ -87,6 +93,7 @@ function ActionBtn({
   )
 }
 
+// EnvGauge — đồng hồ analog hiển thị 1 chỉ số môi trường
 function EnvGauge({
   label, value, unit, icon: Icon, color, min = 0, max = 100
 }: {
@@ -132,6 +139,7 @@ function EnvGauge({
 }
 
 // ── Main Page ──
+// Component chính: chọn lớp, tải dữ liệu môi trường thật (hoặc mock) và vẽ dashboard
 export default function EnvironmentMonitoring() {
   const [envData, setEnvData]           = useState<ClassroomEnvironment | null>(null)
   const [loading, setLoading]           = useState(true)

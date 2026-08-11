@@ -7,6 +7,7 @@
  */
 
 /** True khi frontend đang chạy bên trong app Tauri (native desktop). */
+// True khi frontend đang chạy bên trong app Tauri (native desktop) — detect qua globals do Tauri inject
 export function isTauriDesktop(): boolean {
   if (typeof window === 'undefined') return false
   const w = window as unknown as { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
@@ -14,6 +15,7 @@ export function isTauriDesktop(): boolean {
 }
 
 /** Route thuộc bộ UI desktop standalone (/desktop, /desktop/...). */
+// Kiểm tra route có thuộc bộ UI desktop standalone (/desktop, /desktop/...)
 export function isDesktopRoute(pathname: string): boolean {
   return pathname === '/desktop' || pathname.startsWith('/desktop/')
 }

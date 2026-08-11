@@ -1,5 +1,9 @@
 import api from './api'
 
+/**
+ * Dịch vụ Nhắn tin (Chat) — quản lý người dùng trong hệ thống chat và tin nhắn.
+ * ChatUser lưu thông tin + trạng thái online/offline của người dùng.
+ */
 export interface ChatUser {
   id: string
   name: string | null

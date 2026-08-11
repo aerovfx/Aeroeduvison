@@ -61,6 +61,7 @@ interface Exam {
 
 const STATUSES = ['Nháp', 'Đang diễn ra', 'Đã kết thúc']
 
+// Component chính: nạp dữ liệu đề + câu hỏi, xử lý sửa/xuất bản/xoá/mở phòng thi
 export default function ExamDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()

@@ -38,6 +38,7 @@ const VISIBILITY_OPTIONS: Array<{ value: ModuleVisibility; label: string; icon: 
   { value: 'private', label: 'Bí mật',    icon: Lock,   color: '#f59e0b', description: 'Chỉ bạn thấy. Có thể share qua link trực tiếp sau.' },
 ]
 
+// Component chính: form tạo/sửa module + trình biên tập chương + lưu lên server
 export default function CreateModule() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -507,6 +508,7 @@ export default function CreateModule() {
 
 /* ──────────────── Sub-components ──────────────── */
 
+// SaveStatusPill — hiển thị trạng thái lưu (mới/đang lưu/đã lưu/chưa lưu/lỗi)
 function SaveStatusPill({ status }: { status: SaveStatus }) {
   if (status === 'saved') return <span className="text-xs text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Đã lưu</span>
   if (status === 'saving') return <span className="text-xs text-amber-600 font-medium flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang lưu...</span>
@@ -607,6 +609,7 @@ function ChapterRow({ chapter, index, total, isEditing, onEdit, onUpdate, onDele
   )
 }
 
+// PreviewPanel — bản xem trước module khi bật chế độ Preview
 function PreviewPanel({ title, description, chapters, audience, visibility, duration, tags, isPublished, onExit }: {
   title: string
   description: string

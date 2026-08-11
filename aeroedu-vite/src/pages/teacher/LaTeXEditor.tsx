@@ -1,3 +1,9 @@
+/**
+ * LaTeXEditor — Quản lý thư viện văn bản LaTeX của GV.
+ * Liệt kê tài liệu LaTeX đã tạo, tạo mới, tạo bằng AI (đề thi/giáo án/soạn thảo),
+ * tìm kiếm, sửa và xoá. Dữ liệu từ /api/latex/documents theo từng user.
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download, BookOpenCheck } from 'lucide-react'
@@ -48,6 +54,7 @@ interface LatexProject {
   updatedAt: string
 }
 
+// Component chính: danh sách tài liệu LaTeX + các thao tác tạo/AI/sửa/xoá
 export default function LaTeXEditorPage() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<LatexProject[]>([])
@@ -91,6 +98,7 @@ export default function LaTeXEditorPage() {
   }
 
   /** Tạo project mới với nội dung LaTeX đã sinh bởi AI rồi điều hướng vào editor */
+  // Xử lý kết quả AI sinh về: thêm tài liệu mới vào thư viện
   const handleAiGenerated = async (result: GenerateResult, config: ExamConfig) => {
     try {
       setAiCreating(true)

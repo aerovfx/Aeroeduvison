@@ -36,6 +36,7 @@ interface FormValues {
   accessTime: string
 }
 
+// Component chính: form tạo khoá học mới (6 trường cơ bản + editor rich text)
 export default function CreateCourse() {
   const navigate = useNavigate()
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -80,6 +81,7 @@ export default function CreateCourse() {
     onError: () => toast.error('Có lỗi xảy ra, vui lòng thử lại.'),
   })
 
+  // Xử lý chọn ảnh bìa: xem trước local + upload lên server lấy URL
   const handleImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Chỉ chấp nhận file ảnh')
@@ -102,6 +104,7 @@ export default function CreateCourse() {
     }
   }
 
+  // Submit: kiểm tra ảnh bìa bắt buộc rồi tạo khoá qua API
   const onSubmit = (data: FormValues) => {
     if (!imageUrl) {
       toast.error('Vui lòng upload ảnh bìa khoá học (750×500)')

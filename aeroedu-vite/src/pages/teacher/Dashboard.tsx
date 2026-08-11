@@ -1,4 +1,12 @@
 /**
+ * Dashboard (GV) — Trang tổng quan AI cho giáo viên.
+ * Hiển thị lớp học, danh sách HS + phân tích hành vi (XP, cảm xúc, mức tương tác),
+ * các stress/cảnh báo at-risk, bảng xếp hạng trực tiếp và gợi ý Sprint AI.
+ * Dữ liệu sau này chuyển sang dùng các component chuyên dụng (AICoTeacherPanel, ...).
+ * Bản sau khi chuyển sang Vite: useRouter→useNavigate, useSession→useAuth.
+ */
+
+/**
  * Teacher AI Dashboard
  * Port of app/(dashboard)/(routes)/teacher/ai-dashboard/page.tsx → Vite
  *
@@ -126,6 +134,7 @@ const EMOTION_META: Record<string, { icon: string; color: string; label: string 
 }
 
 /* ─── Small hover-aware button ──────────────────────────────────── */
+// ActionBtn — nút hành động nhanh dùng chung (kết hợp icon + nhãn)
 function ActionBtn({
   icon: Icon, label, color, onClick,
 }: {
@@ -157,6 +166,7 @@ function ActionBtn({
 /* ══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════ */
+// Component chính: tổng hợp toàn bộ dashboard cho GV
 export default function TeacherDashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()

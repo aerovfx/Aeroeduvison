@@ -1,3 +1,9 @@
+/**
+ * DocumentDigitizationReview — Màn hình duyệt kết quả số hoá tài liệu.
+ * Xem văn bản trích xuất + bản gốc file, tải tài liệu, chép văn bản,
+ * xử lý lại (reprocess qua AI) và sửa trạng thái lỗi khi cần.
+ */
+
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
@@ -80,6 +86,7 @@ const STATUS_C: Record<string, { bg: string; color: string; border: string }> = 
   'Lỗi':         { bg: 'rgba(239,68,68,0.12)',  color: '#f87171', border: 'rgba(239,68,68,0.3)' },
   'Hàng đợi':    { bg: 'rgba(148,163,184,0.12)',color: '#94a3b8', border: 'rgba(148,163,184,0.3)' },
 }
+// Hiển thị badge trạng thái xử lý của tài liệu
 function StatusBadge({ status }: { status: string }) {
   const c = STATUS_C[status] ?? STATUS_C['Hàng đợi']
   return (
@@ -176,6 +183,7 @@ function getFileUrl(url: string): string {
 }
 
 /* ════════════════════════════════ Main Page ════════════════════════════════ */
+// Component chính: hiển thị chi tiết kết quả số hoá + các hành động tải/chép/xử lý lại
 export default function DocumentDigitizationReview() {
   const { id: documentId } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -248,6 +256,7 @@ export default function DocumentDigitizationReview() {
     }
   }
 
+  // Xử lý lại tài liệu: gọi lại pipeline AI và refresh kết quả
   const handleReprocess = async () => {
     if (!doc) return
     try {

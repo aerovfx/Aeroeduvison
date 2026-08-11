@@ -1,4 +1,10 @@
 
+/**
+ * Exams — Quản lý danh sách đề thi của GV.
+ * Xem/sửa/xoá/nhân bản đề, tạo đề mới (thủ công / ma trận / AI), tạo thêm mã đề,
+ * đưa đề vào game catalog, xuất dữ liệu LaTeX và mở phòng thi live.
+ */
+
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
@@ -101,6 +107,7 @@ interface CommunityStats {
 type ScopeTab = 'mine' | 'all'
 
 // ── Status badge ──────────────────────────────────────────────
+// StatusBadge — trạng thái đề thi (Nháp/Đã xuất bản/Lưu trữ)
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; border: string }> = {
     "Hoàn tất":  { bg: 'rgba(22,163,74,0.15)',  color: '#4ade80', border: 'rgba(22,163,74,0.4)'  },
@@ -129,6 +136,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────
+// Component chính: danh sách đề + thao tác CRUD/nhân bản/xuất LaTeX
 export default function ExamsPage() {
   const navigate = useNavigate()
 

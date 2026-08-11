@@ -1,3 +1,9 @@
+/**
+ * DocumentDigitization — Số hoá tài liệu: danh sách tài liệu đã upload (PDF/ảnh...).
+ * Hiển thị tiến trình xử lý (Hàng đợi/Đang xử lý/Hoàn tất/Lỗi), cho phép tải tài liệu,
+ * mở màn hình review/duyệt và xoá. Dữ liệu từ /api/documents + upload qua modal con.
+ */
+
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
@@ -84,6 +90,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 }
 
 /* ── Main page ── */
+// Component chính: danh sách + bộ lọc trạng thái + xoá tài liệu
 export default function DocumentDigitizationPage() {
   const navigate = useNavigate()
   const [documents, setDocuments] = useState<Document[]>([])
@@ -111,6 +118,7 @@ export default function DocumentDigitizationPage() {
     }
   }
 
+  // Xoá tài liệu (có xác nhận) qua API
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/documents/${id}`)

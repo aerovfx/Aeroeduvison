@@ -1,3 +1,10 @@
+/**
+ * ExamGenerator — Tạo đề thi từ ma trận câu hỏi bằng AI.
+ * Nhập Matrix ID + Teacher ID, chọn số mã đề (1 hoặc nhiều), tùy chọn trộn câu/không trùng,
+ * gọi /api/ai/exam/generate-from-matrix hoặc generate-multiple-variants,
+ * xem đề đã tạo + xuất PDF (mỗi mã đề một bản).
+ */
+
 import { useState } from 'react'
 import { Loader2, FileText, Download, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react'
 
@@ -23,6 +30,7 @@ interface GeneratedExam {
   metadata: ExamMetadata
 }
 
+// Component chính: form tạo đề + danh sách đề đã tạo
 export default function ExamGeneratorPage() {
   const [matrixId, setMatrixId] = useState('')
   const [teacherId, setTeacherId] = useState('')
@@ -34,6 +42,7 @@ export default function ExamGeneratorPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Tạo đề: gọi API generate theo số lượng mã đề rồi lưu vào state hiển thị
   const handleGenerate = async () => {
     setIsGenerating(true)
     setError(null)
@@ -75,6 +84,7 @@ export default function ExamGeneratorPage() {
     }
   }
 
+  // Xuất đề đã tạo ra file PDF tải về máy
   const handleExportPDF = async (examId: string, variant: string) => {
     try {
       const res = await fetch(`/api/ai/exam/export/${examId}/pdf`, {

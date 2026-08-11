@@ -4,6 +4,13 @@
  * bg-[#0d0e17] page / bg-[#10111e] cards / border-[#1e2033]
  */
 
+/**
+ * EmotionMap (GV) — Bản đồ cảm xúc học sinh.
+ * Trực quan hoá trạng thái cảm xúc của lớp học qua nhiều biểu đồ (bar/pie/area/radar
+ * với Recharts): phân bố cảm xúc, xu hướng tuần, cường độ, chất lượng học tập,
+ * mức độ tập trung. Dữ liệu từ /api/emotion/stats (hỗ trợ cả 2 shape GV/HS).
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   BarChart, Bar, PieChart, Pie, Cell,
@@ -215,6 +222,7 @@ function ChartPanel({ title, icon, children, className = '' }: {
 }
 
 // ── Main Component ──────────────────────────────────────────────
+// Component chính: tải dữ liệu cảm xúc và dựng toàn bộ biểu đồ
 export default function TeacherEmotionMapPage() {
   const [timeRange,       setTimeRange]       = useState<'24h' | '7d' | '30d'>('7d')
   const [groupBy,         setGroupBy]         = useState<'hour' | 'day'>('hour')

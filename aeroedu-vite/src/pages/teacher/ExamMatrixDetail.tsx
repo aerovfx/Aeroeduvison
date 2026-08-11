@@ -34,6 +34,7 @@ interface MatrixDetail {
   data?: unknown
 }
 
+// Component chính: chi tiết ma trận theo route xem/sửa/review sau digitize
 export default function ExamMatrixDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -60,6 +61,7 @@ export default function ExamMatrixDetailPage() {
     return () => { cancelled = true }
   }, [id, navigate])
 
+  // Sinh đề thi AI trực tiếp từ ma trận đang xem
   const handleGenerateExam = async () => {
     if (!matrix?.id) return
     setGenerating(true)

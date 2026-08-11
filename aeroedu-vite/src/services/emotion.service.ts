@@ -1,5 +1,9 @@
 import api from './api'
 
+/**
+ * Dịch vụ Cảm xúc (Emotion) — ghi nhận và truy vấn trạng thái cảm xúc của học sinh.
+ * EmotionType liệt kê các trạng thái cảm xúc; intensity là mức độ 1-10.
+ */
 export type EmotionType = 'happy' | 'neutral' | 'sad' | 'stressed' | 'excited' | 'focused'
 
 export interface EmotionRecord {

@@ -1,3 +1,9 @@
+/**
+ * ExamMatrix — Quản lý ma trận đề thi (kẻ bảng phân bố câu hỏi theo chủ đề & mức độ).
+ * Xem/nhập ma trận (upload ảnh số hoá), tạo đề AI từ ma trận, nhân bản, sửa, xoá,
+ * xuất LaTeX. Dữ liệu từ /api/exam-matrixes với các modal hỗ trợ từng thao tác.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
@@ -79,7 +85,12 @@ const SAMPLE_MATRICES: ExamMatrix[] = [
   },
 ]
 
+<<<<<<< HEAD
 // ─── Status badge ──────────────────────────────────────────────────────────────────────────────
+=======
+// ─── Status badge ─────────────────────────────────────────────────────────────
+// StatusBadge — trạng thái ma trận (khi nhập/xử lý/sẵn sàng trước khi tạo đề)
+>>>>>>> b9c75d3e (clean code)
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     'Hoàn tất':    { bg: 'rgba(16,185,129,0.15)', color: '#34d399' },
@@ -105,6 +116,7 @@ interface DigitizeModalProps {
   onSuccess: () => void
 }
 
+// DigitizeModal — upload ảnh ma trận để số hoá tự động thành dữ liệu
 function DigitizeModal({ onClose, onSuccess }: DigitizeModalProps) {
   const navigate = useNavigate()
   const [file, setFile] = useState<File | null>(null)
@@ -267,6 +279,7 @@ interface PreviewData {
   summary: { totalRequired: number; totalAvailable: number; coverage: number; canGenerate: boolean }
 }
 
+// GenerateExamModal — chạy AI sinh đề thi từ ma trận (tùy chọn số mã đề)
 function GenerateExamModal({ matrixId, matrixName, onClose }: GenerateExamModalProps) {
   const navigate = useNavigate()
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -498,7 +511,12 @@ function GenerateExamModal({ matrixId, matrixName, onClose }: GenerateExamModalP
   )
 }
 
+<<<<<<< HEAD
 // ─── Main Page ────────────────────────────────────────────────────────────────────────────────────
+=======
+// ─── Main Page ────────────────────────────────────────────────────────────────
+// Component chính: danh sách ma trận + thao tác tạo/nhập/sửa/xoá/nhân bản
+>>>>>>> b9c75d3e (clean code)
 export default function ExamMatrixPage() {
   const navigate = useNavigate()
   const [matrices, setMatrices] = useState<ExamMatrix[]>([])

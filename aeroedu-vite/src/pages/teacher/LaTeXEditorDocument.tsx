@@ -1,3 +1,10 @@
+/**
+ * LaTeXEditorDocument — Soạn thảo văn bản LaTeX đầy đủ (trình soạn thảo Monaco).
+ * Biên tập mã LaTeX với snippet/template mẫu, hỗ trợ AI sinh đề & sinh section,
+ * biên dịch ra PDF, in/tải PDF, xem lịch sử phiên bản, chia sẻ, lưu thành giáo án.
+ * Dữ liệu tài liệu từ /api/latex/documents/:id, project lưu có phiên bản.
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
@@ -55,6 +62,7 @@ interface Collaborator {
  *
  * Trả về { phanI: ['B','D','A',...], phanII: ['TFTT', 'FTFT',...] }
  */
+// Tự nhận diện phần đáp án trong đề LaTeX (Phần I trắc nghiệm / Phần II đúng-sai)
 function autoDetectAnswersFromLatex(latex: string): { phanI: string[]; phanII: string[] } {
   const phanI: string[] = []
   const phanII: string[] = []
@@ -141,6 +149,7 @@ function IconBtn({
 }
 
 /* ════════════════════════════════ Main ════════════════════════════════ */
+// Component chính: trình soạn thảo LaTeX + compile/print/lịch sử/AI
 export default function LaTeXEditorDocument() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
