@@ -44,6 +44,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8090';
 const DEPLOYMENT_MODE = process.env.DEPLOYMENT_MODE || 'cloud';
 const OFFLINE_MODE = process.env.OFFLINE_MODE === 'true';
+require('./lib/env-validate.cjs').validateEnv();
 const ONPREM_MIGRATION_MANIFEST = DEPLOYMENT_MODE === 'on-premise'
   ? JSON.parse(require('fs').readFileSync('/app/schema/migration-manifest.json', 'utf8'))
   : [];

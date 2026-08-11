@@ -227,7 +227,6 @@ export default defineConfig(({ mode }) => {
             'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
             'chart-vendor': ['recharts'],
             'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-            'state-vendor': ['zustand'],
             // socket.io-client — chỉ load khi vào Chat / OnlineExamRoom (lazy)
             'socket-vendor': ['socket.io-client'],
             // pdfjs — chỉ load khi mở PdfBookViewer
@@ -248,7 +247,6 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         '@tanstack/react-query',
         'axios',
-        'zustand',
         'lucide-react',
         // R3F v8 deps that ship as CJS and need ESM wrapping by Vite
         'use-sync-external-store',

@@ -176,8 +176,7 @@
     "winston": "^3.17.0",
     "ws": "^8.21.0",
     "xlsx-js-style": "^1.2.0",
-    "zod": "^3.22.2",
-    "zustand": "^4.4.1"
+    "zod": "^3.22.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
